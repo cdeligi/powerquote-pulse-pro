@@ -1,14 +1,33 @@
-// Update this page (the content is just a fallback if you fail to update the page)
+
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import LoginForm from "@/components/auth/LoginForm";
+import Dashboard from "@/components/dashboard/Dashboard";
+import { User } from "@/types/auth";
 
 const Index = () => {
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-background">
-      <div className="text-center">
-        <h1 className="text-4xl font-bold mb-4">Welcome to Your Blank App</h1>
-        <p className="text-xl text-muted-foreground">Start building your amazing project here!</p>
+  const [user, setUser] = useState<User | null>(null);
+  const navigate = useNavigate();
+
+  const handleLogin = (userData: User) => {
+    setUser(userData);
+    console.log("User logged in:", userData);
+  };
+
+  const handleLogout = () => {
+    setUser(null);
+    console.log("User logged out");
+  };
+
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-black flex items-center justify-center">
+        <LoginForm onLogin={handleLogin} />
       </div>
-    </div>
-  );
+    );
+  }
+
+  return <Dashboard user={user} onLogout={handleLogout} />;
 };
 
 export default Index;
