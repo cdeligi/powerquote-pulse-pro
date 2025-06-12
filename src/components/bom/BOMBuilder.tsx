@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { User } from "@/types/auth";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -30,8 +29,9 @@ const BOMBuilder = ({ user }: BOMBuilderProps) => {
     
     setBomItems(prev => [...prev, newItem]);
     
-    if (slot && 'type' in product) {
-      setSlotAssignments(prev => ({ ...prev, [slot]: product }));
+    // Only add to slot assignments if it's a card (not chassis) and has a slot
+    if (slot && 'type' in product && product.type !== 'LTX' && product.type !== 'MTX' && product.type !== 'STX') {
+      setSlotAssignments(prev => ({ ...prev, [slot]: product as ProductCard }));
     }
     
     console.log("Added to BOM:", newItem);
@@ -65,7 +65,7 @@ const BOMBuilder = ({ user }: BOMBuilderProps) => {
           <p className="text-gray-400">Configure your power transformer solution</p>
         </div>
         <div className="flex space-x-2">
-          <Button variant="outline" className="border-gray-600 text-white hover:bg-gray-800">
+          <Button variant="outline" className="border-gray-600 text-black hover:bg-gray-800 hover:text-white bg-white">
             <Save className="mr-2 h-4 w-4" />
             Save Draft
           </Button>

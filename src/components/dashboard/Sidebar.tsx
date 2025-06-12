@@ -84,7 +84,16 @@ const Sidebar = ({ user, activeView, onViewChange, onLogout }: SidebarProps) => 
       </nav>
 
       {/* Footer */}
-      <div className="p-4 border-t border-gray-800">
+      <div className="p-4 border-t border-gray-800 space-y-4">
+        {/* Qualitrol Logo */}
+        <div className="flex justify-center">
+          <img 
+            src="https://www.qualitrolcorp.com/wp-content/uploads/2023/08/qualitrol-logo.png" 
+            alt="Qualitrol Logo" 
+            className="h-8 w-auto opacity-80 hover:opacity-100 transition-opacity"
+          />
+        </div>
+        
         <Button
           variant="ghost"
           className="w-full justify-start text-gray-300 hover:text-white hover:bg-gray-800"

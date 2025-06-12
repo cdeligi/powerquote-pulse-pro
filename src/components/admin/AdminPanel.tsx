@@ -1,9 +1,15 @@
 
+import { useState } from "react";
 import { User } from "@/types/auth";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { 
   Settings, 
   Package, 
@@ -13,7 +19,8 @@ import {
   XCircle,
   AlertCircle,
   DollarSign,
-  Plus
+  Plus,
+  Edit
 } from "lucide-react";
 
 interface AdminPanelProps {
@@ -21,6 +28,16 @@ interface AdminPanelProps {
 }
 
 const AdminPanel = ({ user }: AdminPanelProps) => {
+  const [isAddProductOpen, setIsAddProductOpen] = useState(false);
+  const [newProduct, setNewProduct] = useState({
+    name: '',
+    type: '',
+    price: '',
+    description: '',
+    slots: '',
+    compatibleChassis: ''
+  });
+
   // Mock data for demonstration
   const pendingApprovals = [
     {
@@ -41,6 +58,14 @@ const AdminPanel = ({ user }: AdminPanelProps) => {
       requestedAt: '2024-01-16',
       justification: 'Competitive bid situation, need to match competitor pricing'
     }
+  ];
+
+  const products = [
+    { id: 1, name: 'LTX Chassis', type: 'chassis', price: 12500, slots: 14 },
+    { id: 2, name: 'MTX Chassis', type: 'chassis', price: 8500, slots: 7 },
+    { id: 3, name: 'STX Chassis', type: 'chassis', price: 5500, slots: 4 },
+    { id: 4, name: 'Relay Card - 8 Channel', type: 'relay', price: 2500, slots: 1 },
+    { id: 5, name: 'Analog Input Card - 8 Channel', type: 'analog', price: 3200, slots: 1 }
   ];
 
   const recentActivity = [
@@ -69,9 +94,23 @@ const AdminPanel = ({ user }: AdminPanelProps) => {
     // In real implementation, this would update the quote status
   };
 
-  const handleRejectDiscount = (quoteId: string) => {
-    console.log(`Rejecting discount for quote ${quoteId}`);
-    // In real implementation, this would update the quote status
+  const handleRejectWithCounter = (quoteId: string, counterOffer: number) => {
+    console.log(`Counter-offering ${counterOffer}% discount for quote ${quoteId}`);
+    // In real implementation, this would create a counter-proposal
+  };
+
+  const handleAddProduct = () => {
+    console.log("Adding new product:", newProduct);
+    // In real implementation, this would add to the database
+    setIsAddProductOpen(false);
+    setNewProduct({
+      name: '',
+      type: '',
+      price: '',
+      description: '',
+      slots: '',
+      compatibleChassis: ''
+    });
   };
 
   return (
@@ -82,10 +121,71 @@ const AdminPanel = ({ user }: AdminPanelProps) => {
           <p className="text-gray-400">System administration and approval management</p>
         </div>
         <div className="flex space-x-2">
-          <Button variant="outline" className="border-gray-600 text-white hover:bg-gray-800">
-            <Plus className="mr-2 h-4 w-4" />
-            Add Product
-          </Button>
+          <Dialog open={isAddProductOpen} onOpenChange={setIsAddProductOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline" className="border-gray-600 text-white hover:bg-gray-800">
+                <Plus className="mr-2 h-4 w-4" />
+                Add Product
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="bg-gray-900 border-gray-800">
+              <DialogHeader>
+                <DialogTitle className="text-white">Add New Product</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="product-name" className="text-white">Product Name</Label>
+                  <Input
+                    id="product-name"
+                    value={newProduct.name}
+                    onChange={(e) => setNewProduct(prev => ({ ...prev, name: e.target.value }))}
+                    className="bg-gray-800 border-gray-700 text-white"
+                    placeholder="Enter product name"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="product-type" className="text-white">Product Type</Label>
+                  <Select value={newProduct.type} onValueChange={(value) => setNewProduct(prev => ({ ...prev, type: value }))}>
+                    <SelectTrigger className="bg-gray-800 border-gray-700 text-white">
+                      <SelectValue placeholder="Select product type" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-gray-800 border-gray-700">
+                      <SelectItem value="chassis">Chassis</SelectItem>
+                      <SelectItem value="relay">Relay Card</SelectItem>
+                      <SelectItem value="analog">Analog Card</SelectItem>
+                      <SelectItem value="fiber">Fiber Card</SelectItem>
+                      <SelectItem value="display">Display Module</SelectItem>
+                      <SelectItem value="bushing">Bushing Module</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label htmlFor="product-price" className="text-white">Price ($)</Label>
+                  <Input
+                    id="product-price"
+                    type="number"
+                    value={newProduct.price}
+                    onChange={(e) => setNewProduct(prev => ({ ...prev, price: e.target.value }))}
+                    className="bg-gray-800 border-gray-700 text-white"
+                    placeholder="Enter price"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="product-description" className="text-white">Description</Label>
+                  <Textarea
+                    id="product-description"
+                    value={newProduct.description}
+                    onChange={(e) => setNewProduct(prev => ({ ...prev, description: e.target.value }))}
+                    className="bg-gray-800 border-gray-700 text-white"
+                    placeholder="Enter product description"
+                  />
+                </div>
+                <Button onClick={handleAddProduct} className="w-full bg-red-600 hover:bg-red-700 text-white">
+                  Add Product
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
           <Button className="bg-red-600 hover:bg-red-700 text-white">
             <Settings className="mr-2 h-4 w-4" />
             System Settings
@@ -115,7 +215,7 @@ const AdminPanel = ({ user }: AdminPanelProps) => {
             <Package className="h-4 w-4 text-green-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-white">47</div>
+            <div className="text-2xl font-bold text-white">{products.length}</div>
           </CardContent>
         </Card>
 
@@ -169,55 +269,12 @@ const AdminPanel = ({ user }: AdminPanelProps) => {
             <CardContent>
               <div className="space-y-4">
                 {pendingApprovals.map((approval) => (
-                  <div
+                  <ApprovalCard 
                     key={approval.id}
-                    className="p-4 bg-gray-800 rounded-lg border border-yellow-600/20"
-                  >
-                    <div className="flex justify-between items-start mb-4">
-                      <div>
-                        <div className="flex items-center space-x-3 mb-2">
-                          <span className="text-white font-medium">{approval.id}</span>
-                          <Badge className="bg-yellow-600 text-white">
-                            {approval.discountRequested}% discount
-                          </Badge>
-                        </div>
-                        <p className="text-gray-400 text-sm">{approval.customer}</p>
-                        <p className="text-gray-400 text-sm">
-                          Requested by: {approval.salesperson}
-                        </p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-white font-bold text-lg">
-                          ${approval.value.toLocaleString()}
-                        </p>
-                        <p className="text-gray-400 text-sm">{approval.requestedAt}</p>
-                      </div>
-                    </div>
-                    
-                    <div className="mb-4">
-                      <p className="text-gray-400 text-sm mb-1">Justification:</p>
-                      <p className="text-white text-sm bg-gray-700 p-2 rounded">
-                        {approval.justification}
-                      </p>
-                    </div>
-                    
-                    <div className="flex space-x-2">
-                      <Button
-                        className="bg-green-600 hover:bg-green-700 text-white"
-                        onClick={() => handleApproveDiscount(approval.id)}
-                      >
-                        <CheckCircle className="mr-2 h-4 w-4" />
-                        Approve
-                      </Button>
-                      <Button
-                        variant="destructive"
-                        onClick={() => handleRejectDiscount(approval.id)}
-                      >
-                        <XCircle className="mr-2 h-4 w-4" />
-                        Reject
-                      </Button>
-                    </div>
-                  </div>
+                    approval={approval}
+                    onApprove={handleApproveDiscount}
+                    onRejectWithCounter={handleRejectWithCounter}
+                  />
                 ))}
               </div>
             </CardContent>
@@ -233,12 +290,18 @@ const AdminPanel = ({ user }: AdminPanelProps) => {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="text-center py-8">
-                <Package className="h-12 w-12 text-gray-600 mx-auto mb-4" />
-                <p className="text-gray-400">Product catalog management interface</p>
-                <p className="text-gray-500 text-sm mt-2">
-                  This would include CRUD operations for chassis, cards, and pricing
-                </p>
+              <div className="space-y-3">
+                {products.map((product) => (
+                  <div key={product.id} className="flex items-center justify-between p-3 bg-gray-800 rounded-lg">
+                    <div>
+                      <p className="text-white font-medium">{product.name}</p>
+                      <p className="text-gray-400 text-sm">{product.type} • ${product.price.toLocaleString()}</p>
+                    </div>
+                    <Button variant="ghost" size="sm" className="text-gray-400 hover:text-white">
+                      <Edit className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
               </div>
             </CardContent>
           </Card>
@@ -272,6 +335,107 @@ const AdminPanel = ({ user }: AdminPanelProps) => {
           </Card>
         </TabsContent>
       </Tabs>
+    </div>
+  );
+};
+
+// Separate component for approval cards to make the main component cleaner
+const ApprovalCard = ({ approval, onApprove, onRejectWithCounter }: {
+  approval: any;
+  onApprove: (id: string) => void;
+  onRejectWithCounter: (id: string, counter: number) => void;
+}) => {
+  const [counterOffer, setCounterOffer] = useState('');
+  const [showCounterForm, setShowCounterForm] = useState(false);
+
+  return (
+    <div className="p-4 bg-gray-800 rounded-lg border border-yellow-600/20">
+      <div className="flex justify-between items-start mb-4">
+        <div>
+          <div className="flex items-center space-x-3 mb-2">
+            <span className="text-white font-medium">{approval.id}</span>
+            <Badge className="bg-yellow-600 text-white">
+              {approval.discountRequested}% discount
+            </Badge>
+          </div>
+          <p className="text-gray-400 text-sm">{approval.customer}</p>
+          <p className="text-gray-400 text-sm">
+            Requested by: {approval.salesperson}
+          </p>
+        </div>
+        <div className="text-right">
+          <p className="text-white font-bold text-lg">
+            ${approval.value.toLocaleString()}
+          </p>
+          <p className="text-gray-400 text-sm">{approval.requestedAt}</p>
+        </div>
+      </div>
+      
+      <div className="mb-4">
+        <p className="text-gray-400 text-sm mb-1">Justification:</p>
+        <p className="text-white text-sm bg-gray-700 p-2 rounded">
+          {approval.justification}
+        </p>
+      </div>
+      
+      {showCounterForm ? (
+        <div className="space-y-3">
+          <div>
+            <Label htmlFor="counter-offer" className="text-white text-sm">Counter Offer (%)</Label>
+            <Input
+              id="counter-offer"
+              type="number"
+              value={counterOffer}
+              onChange={(e) => setCounterOffer(e.target.value)}
+              placeholder="e.g., 5"
+              className="bg-gray-700 border-gray-600 text-white mt-1"
+            />
+          </div>
+          <div className="flex space-x-2">
+            <Button
+              className="bg-orange-600 hover:bg-orange-700 text-white"
+              onClick={() => {
+                onRejectWithCounter(approval.id, Number(counterOffer));
+                setShowCounterForm(false);
+                setCounterOffer('');
+              }}
+            >
+              Send Counter Offer
+            </Button>
+            <Button
+              variant="ghost"
+              onClick={() => setShowCounterForm(false)}
+              className="text-gray-400 hover:text-white"
+            >
+              Cancel
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <div className="flex space-x-2">
+          <Button
+            className="bg-green-600 hover:bg-green-700 text-white"
+            onClick={() => onApprove(approval.id)}
+          >
+            <CheckCircle className="mr-2 h-4 w-4" />
+            Approve
+          </Button>
+          <Button
+            className="bg-orange-600 hover:bg-orange-700 text-white"
+            onClick={() => setShowCounterForm(true)}
+          >
+            <DollarSign className="mr-2 h-4 w-4" />
+            Counter Offer
+          </Button>
+          <Button
+            variant="destructive"
+            onClick={() => console.log('Full reject', approval.id)}
+          >
+            <XCircle className="mr-2 h-4 w-4" />
+            Reject
+          </Button>
+        </div>
+      )}
     </div>
   );
 };
