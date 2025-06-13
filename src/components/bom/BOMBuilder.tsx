@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { User } from "@/types/auth";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,7 +11,7 @@ import CardLibrary from "./CardLibrary";
 import RackVisualizer from "./RackVisualizer";
 import SlotCardSelector from "./SlotCardSelector";
 import ToggleSwitch from "@/components/ui/toggle-switch";
-import { BOMItem, Chassis, Card as ProductCard, Level1Product } from "@/types/product";
+import { BOMItem, Chassis, Card as ProductCard, Level1Product, isLevel1Product } from "@/types/product";
 import { ShoppingCart, Save, Send, ExternalLink } from "lucide-react";
 
 interface BOMBuilderProps {
@@ -114,11 +113,6 @@ const BOMBuilder = ({ user }: BOMBuilderProps) => {
   };
 
   const canSeePrices = user.role !== 'level1';
-
-  // Type guard function to check if product has productInfoUrl
-  const hasProductInfoUrl = (product: Chassis | ProductCard | Level1Product): product is Level1Product => {
-    return 'productInfoUrl' in product && typeof product.productInfoUrl === 'string';
-  };
 
   return (
     <div className="space-y-6">
@@ -251,7 +245,7 @@ const BOMBuilder = ({ user }: BOMBuilderProps) => {
                             Slot {item.slot}
                           </Badge>
                         )}
-                        {hasProductInfoUrl(item.product) && item.product.productInfoUrl && (
+                        {isLevel1Product(item.product) && item.product.productInfoUrl && (
                           <Button
                             variant="ghost"
                             size="sm"

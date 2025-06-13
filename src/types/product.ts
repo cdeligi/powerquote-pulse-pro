@@ -83,6 +83,19 @@ export interface Quote {
   termsAndConditions?: string;
 }
 
+// Type guard functions
+export function isLevel1Product(product: Chassis | Card | Level1Product): product is Level1Product {
+  return 'productInfoUrl' in product;
+}
+
+export function isChassis(product: Chassis | Card | Level1Product): product is Chassis {
+  return 'slots' in product;
+}
+
+export function isCard(product: Chassis | Card | Level1Product): product is Card {
+  return 'slotRequirement' in product;
+}
+
 // New sensor types for Level 3 analog customizations
 export const ANALOG_SENSOR_TYPES = [
   'Pt100/RTD',
