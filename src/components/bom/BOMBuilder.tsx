@@ -532,7 +532,7 @@ const BOMBuilder = ({ user }: BOMBuilderProps) => {
                 
                 {/* Rack Configuration - Only show in QTMS tab */}
                 {selectedChassis && (
-                  <div className="mt-6">
+                  <div className="mt-6 space-y-4">
                     <RackVisualizer 
                       chassis={selectedChassis}
                       slotAssignments={slotAssignments}
@@ -542,7 +542,7 @@ const BOMBuilder = ({ user }: BOMBuilderProps) => {
                     />
                     
                     {/* Remote Display Section */}
-                    <Card className="bg-gray-900 border-gray-800 mt-4">
+                    <Card className="bg-gray-900 border-gray-800">
                       <CardHeader>
                         <CardTitle className="text-white">Remote Display Option</CardTitle>
                         <CardDescription className="text-gray-400">
