@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { User } from "@/types/auth";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -341,9 +342,9 @@ const BOMBuilder = ({ user }: BOMBuilderProps) => {
             </CardHeader>
             <CardContent>
               <Tabs defaultValue="items" className="w-full">
-                <TabsList className="grid w-full grid-cols-2">
-                  <TabsTrigger value="items">Items</TabsTrigger>
-                  <TabsTrigger value="customization">Customization</TabsTrigger>
+                <TabsList className="grid w-full grid-cols-2 bg-gray-800">
+                  <TabsTrigger value="items" className="text-white data-[state=active]:bg-red-600 data-[state=active]:text-white">Items</TabsTrigger>
+                  <TabsTrigger value="customization" className="text-white data-[state=active]:bg-red-600 data-[state=active]:text-white">Level 2 Options</TabsTrigger>
                 </TabsList>
                 
                 <TabsContent value="items" className="space-y-3 mt-4">
@@ -369,7 +370,7 @@ const BOMBuilder = ({ user }: BOMBuilderProps) => {
                                 </Badge>
                               )}
                               
-                              {/* Level 2 Options */}
+                              {/* Level 2 Options Summary */}
                               {item.level2Options && item.level2Options.length > 0 && (
                                 <div className="mt-2 space-y-1">
                                   <p className="text-xs text-gray-400">Level 2 Options:</p>
@@ -432,29 +433,61 @@ const BOMBuilder = ({ user }: BOMBuilderProps) => {
                   )}
                 </TabsContent>
 
-                <TabsContent value="customization" className="space-y-3 mt-4">
+                <TabsContent value="customization" className="space-y-4 mt-4">
                   {bomItems.length === 0 ? (
                     <p className="text-gray-400 text-sm">No items to customize</p>
                   ) : (
                     bomItems.map((item) => (
-                      <div key={item.id} className="p-3 bg-gray-800 rounded">
-                        <h4 className="text-white font-medium mb-3">{item.product.name}</h4>
-                        {item.level2Options?.map(opt => (
-                          <div key={opt.id} className="custom-option-row flex items-center space-x-2 mb-2">
-                            <input
-                              type="checkbox"
-                              checked={opt.enabled}
-                              onChange={() => toggleLevel2Option(item.id, opt.id)}
-                              className="w-4 h-4"
-                            />
-                            <label className="text-gray-300 text-sm flex-1">
-                              {opt.name}
-                              {canSeePrices && (
-                                <span className="text-gray-400 ml-2">(${opt.price.toLocaleString()})</span>
-                              )}
-                            </label>
+                      <div key={item.id} className="p-4 bg-gray-800 rounded-lg border border-gray-700">
+                        <div className="flex items-center justify-between mb-3">
+                          <h4 className="text-white font-medium">{item.product.name}</h4>
+                          <Badge variant={item.enabled ? "default" : "secondary"} className="text-xs">
+                            {item.enabled ? "Enabled" : "Disabled"}
+                          </Badge>
+                        </div>
+                        
+                        {item.level2Options && item.level2Options.length > 0 ? (
+                          <div className="space-y-3">
+                            <h5 className="text-sm font-medium text-gray-300">Level 2 Options:</h5>
+                            {item.level2Options.map((option) => (
+                              <div key={option.id} className="flex items-center justify-between p-3 bg-gray-700 rounded">
+                                <div className="flex items-center space-x-3">
+                                  <ToggleSwitch
+                                    checked={option.enabled}
+                                    onCheckedChange={() => toggleLevel2Option(item.id, option.id)}
+                                    size="sm"
+                                  />
+                                  <div>
+                                    <p className={`text-sm font-medium ${option.enabled ? 'text-white' : 'text-gray-400'}`}>
+                                      {option.name}
+                                    </p>
+                                    <p className="text-xs text-gray-500">{option.description}</p>
+                                  </div>
+                                </div>
+                                <div className="text-right">
+                                  <p className={`text-sm font-bold ${option.enabled ? 'text-white' : 'text-gray-500'}`}>
+                                    {canSeePrices ? `$${option.price.toLocaleString()}` : '—'}
+                                  </p>
+                                </div>
+                              </div>
+                            ))}
+                            
+                            {/* Level 2 Options Total */}
+                            <div className="pt-2 border-t border-gray-600">
+                              <div className="flex justify-between items-center">
+                                <span className="text-sm text-gray-300">Level 2 Options Total:</span>
+                                <span className="text-sm font-bold text-white">
+                                  {canSeePrices 
+                                    ? `$${item.level2Options.filter(opt => opt.enabled).reduce((sum, opt) => sum + opt.price, 0).toLocaleString()}`
+                                    : '—'
+                                  }
+                                </span>
+                              </div>
+                            </div>
                           </div>
-                        )) || <p className="text-gray-400 text-sm">No customizations available.</p>}
+                        ) : (
+                          <p className="text-gray-400 text-sm">No Level 2 options available for this item.</p>
+                        )}
                       </div>
                     ))
                   )}
