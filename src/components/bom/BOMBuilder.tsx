@@ -129,6 +129,20 @@ const BOMBuilder = ({ user }: BOMBuilderProps) => {
     ));
   };
 
+  const toggleLevel2Option = (bomItemId: string, optionId: string) => {
+    setBomItems(prev => prev.map(item => {
+      if (item.id === bomItemId && item.level2Options) {
+        return {
+          ...item,
+          level2Options: item.level2Options.map(opt =>
+            opt.id === optionId ? { ...opt, enabled: !opt.enabled } : opt
+          )
+        };
+      }
+      return item;
+    }));
+  };
+
   const calculateTotal = () => {
     return bomItems
       .filter(item => item.enabled)
@@ -271,90 +285,127 @@ const BOMBuilder = ({ user }: BOMBuilderProps) => {
                 {bomItems.filter(item => item.enabled).length} of {bomItems.length} items enabled
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-3">
-              {bomItems.length === 0 ? (
-                <p className="text-gray-400 text-sm">No items added yet</p>
-              ) : (
-                bomItems.map((item) => (
-                  <div key={item.id} className="p-3 bg-gray-800 rounded">
-                    <div className="flex justify-between items-start">
-                      <div className="flex items-start space-x-3 flex-1">
-                        <ToggleSwitch
-                          checked={item.enabled}
-                          onCheckedChange={(enabled) => toggleBOMItem(item.id, enabled)}
-                          size="sm"
-                        />
-                        <div className="flex-1">
-                          <p className={`font-medium text-sm ${item.enabled ? 'text-white' : 'text-gray-500'}`}>
-                            {item.product.name}
-                          </p>
-                          {item.slot && (
-                            <Badge variant="outline" className="mt-1 text-xs">
-                              Slot {item.slot}
-                            </Badge>
-                          )}
-                          
-                          {/* Level 2 Options */}
-                          {item.level2Options && item.level2Options.length > 0 && (
-                            <div className="mt-2 space-y-1">
-                              <p className="text-xs text-gray-400">Level 2 Options:</p>
-                              {item.level2Options.map((option) => (
-                                <div key={option.id} className="text-xs text-gray-300 ml-2">
-                                  • {option.name} {option.enabled && canSeePrices && `($${option.price.toLocaleString()})`}
+            <CardContent>
+              <Tabs defaultValue="items" className="w-full">
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="items">Items</TabsTrigger>
+                  <TabsTrigger value="customization">Customization</TabsTrigger>
+                </TabsList>
+                
+                <TabsContent value="items" className="space-y-3 mt-4">
+                  {bomItems.length === 0 ? (
+                    <p className="text-gray-400 text-sm">No items added yet</p>
+                  ) : (
+                    bomItems.map((item) => (
+                      <div key={item.id} className="p-3 bg-gray-800 rounded">
+                        <div className="flex justify-between items-start">
+                          <div className="flex items-start space-x-3 flex-1">
+                            <ToggleSwitch
+                              checked={item.enabled}
+                              onCheckedChange={(enabled) => toggleBOMItem(item.id, enabled)}
+                              size="sm"
+                            />
+                            <div className="flex-1">
+                              <p className={`font-medium text-sm ${item.enabled ? 'text-white' : 'text-gray-500'}`}>
+                                {item.product.name}
+                              </p>
+                              {item.slot && (
+                                <Badge variant="outline" className="mt-1 text-xs">
+                                  Slot {item.slot}
+                                </Badge>
+                              )}
+                              
+                              {/* Level 2 Options */}
+                              {item.level2Options && item.level2Options.length > 0 && (
+                                <div className="mt-2 space-y-1">
+                                  <p className="text-xs text-gray-400">Level 2 Options:</p>
+                                  {item.level2Options.map((option) => (
+                                    <div key={option.id} className="text-xs text-gray-300 ml-2">
+                                      • {option.name} {option.enabled && canSeePrices && `($${option.price.toLocaleString()})`}
+                                    </div>
+                                  ))}
                                 </div>
-                              ))}
-                            </div>
-                          )}
-                          
-                          {/* Configuration button for Level 1 products */}
-                          {isLevel1Product(item.product) && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="text-blue-400 hover:text-blue-300 p-0 h-auto mt-1"
-                              onClick={() => openLevel2Options(item)}
-                            >
-                              <Settings className="h-3 w-3 mr-1" />
-                              Configure Options
-                            </Button>
-                          )}
+                              )}
+                              
+                              {/* Configuration button for Level 1 products */}
+                              {isLevel1Product(item.product) && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="text-blue-400 hover:text-blue-300 p-0 h-auto mt-1"
+                                  onClick={() => openLevel2Options(item)}
+                                >
+                                  <Settings className="h-3 w-3 mr-1" />
+                                  Configure Options
+                                </Button>
+                              )}
 
-                          {isLevel1Product(item.product) && item.product.productInfoUrl && (
+                              {isLevel1Product(item.product) && item.product.productInfoUrl && (
+                                <a
+                                  href={item.product.productInfoUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-red-600 underline text-xs block mt-1"
+                                >
+                                  <ExternalLink className="h-3 w-3 mr-1 inline" />
+                                  Click here for product information
+                                </a>
+                              )}
+                            </div>
+                          </div>
+                          <div className="text-right ml-2">
+                            <p className={`font-bold text-sm ${item.enabled ? 'text-white' : 'text-gray-500'}`}>
+                              {canSeePrices ? `$${item.product.price.toLocaleString()}` : '—'}
+                            </p>
+                            {/* Show Level 2 options total */}
+                            {item.level2Options && item.level2Options.length > 0 && canSeePrices && (
+                              <p className={`text-xs ${item.enabled ? 'text-gray-400' : 'text-gray-600'}`}>
+                                +${item.level2Options.filter(opt => opt.enabled).reduce((sum, opt) => sum + opt.price, 0).toLocaleString()} options
+                              </p>
+                            )}
                             <Button
                               variant="ghost"
                               size="sm"
-                              className="text-blue-400 hover:text-blue-300 p-0 h-auto mt-1"
-                              onClick={() => window.open(item.product.productInfoUrl, '_blank')}
+                              onClick={() => removeFromBOM(item.id)}
+                              className="text-red-400 hover:text-red-300 hover:bg-red-900/20 p-1 h-auto"
                             >
-                              <ExternalLink className="h-3 w-3 mr-1" />
-                              Product Info
+                              Remove
                             </Button>
-                          )}
+                          </div>
                         </div>
                       </div>
-                      <div className="text-right ml-2">
-                        <p className={`font-bold text-sm ${item.enabled ? 'text-white' : 'text-gray-500'}`}>
-                          {canSeePrices ? `$${item.product.price.toLocaleString()}` : '—'}
-                        </p>
-                        {/* Show Level 2 options total */}
-                        {item.level2Options && item.level2Options.length > 0 && canSeePrices && (
-                          <p className={`text-xs ${item.enabled ? 'text-gray-400' : 'text-gray-600'}`}>
-                            +${item.level2Options.filter(opt => opt.enabled).reduce((sum, opt) => sum + opt.price, 0).toLocaleString()} options
-                          </p>
-                        )}
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => removeFromBOM(item.id)}
-                          className="text-red-400 hover:text-red-300 hover:bg-red-900/20 p-1 h-auto"
-                        >
-                          Remove
-                        </Button>
+                    ))
+                  )}
+                </TabsContent>
+
+                <TabsContent value="customization" className="space-y-3 mt-4">
+                  {bomItems.length === 0 ? (
+                    <p className="text-gray-400 text-sm">No items to customize</p>
+                  ) : (
+                    bomItems.map((item) => (
+                      <div key={item.id} className="p-3 bg-gray-800 rounded">
+                        <h4 className="text-white font-medium mb-3">{item.product.name}</h4>
+                        {item.level2Options?.map(opt => (
+                          <div key={opt.id} className="custom-option-row flex items-center space-x-2 mb-2">
+                            <input
+                              type="checkbox"
+                              checked={opt.enabled}
+                              onChange={() => toggleLevel2Option(item.id, opt.id)}
+                              className="w-4 h-4"
+                            />
+                            <label className="text-gray-300 text-sm flex-1">
+                              {opt.name}
+                              {canSeePrices && (
+                                <span className="text-gray-400 ml-2">(${opt.price.toLocaleString()})</span>
+                              )}
+                            </label>
+                          </div>
+                        )) || <p className="text-gray-400 text-sm">No customizations available.</p>}
                       </div>
-                    </div>
-                  </div>
-                ))
-              )}
+                    ))
+                  )}
+                </TabsContent>
+              </Tabs>
               
               {bomItems.length > 0 && (
                 <div className="border-t border-gray-700 pt-3 mt-3">
