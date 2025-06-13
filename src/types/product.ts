@@ -1,4 +1,3 @@
-
 export interface Chassis {
   id: string;
   name: string;
@@ -129,3 +128,6 @@ export const ANALOG_SENSOR_DESCRIPTIONS: Record<AnalogSensorType, string> = {
   'Switch Contact (dry)': 'Open/Closed',
   'Switch Contact (opto-isolated)': '>80V or >130V Open, jumper selectable; optically isolated'
 };
+
+// Updated TM1 customization options
+export const TM1_CUSTOMIZATION_OPTIONS = ['Moisture Sensor', '4-20mA bridge'] as const;

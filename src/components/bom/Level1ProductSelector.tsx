@@ -1,4 +1,3 @@
-
 import { Level1Product } from "@/types/product";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -47,7 +46,7 @@ const Level1ProductSelector = ({ onProductSelect, selectedProduct, canSeePrices,
       price: 5400,
       productInfoUrl: 'https://www.qualitrolcorp.com/products/tm1',
       enabled: true,
-      customizations: ['CalGas', 'Helium Bottle', 'Moisture Sensor']
+      customizations: ['Moisture Sensor', '4-20mA bridge']
     }
   ];
 
@@ -128,7 +127,8 @@ const Level1ProductSelector = ({ onProductSelect, selectedProduct, canSeePrices,
       const incrementalPrices = {
         'CalGas': 450,
         'Helium Bottle': 280,
-        'Moisture Sensor': 320
+        'Moisture Sensor': 320,
+        '4-20mA bridge': 180
       };
       
       product.customizations.forEach(option => {
@@ -164,7 +164,7 @@ const Level1ProductSelector = ({ onProductSelect, selectedProduct, canSeePrices,
           return (
             <Card 
               key={product.id} 
-              className="bg-gray-900 border-gray-800 hover:border-red-600 transition-all"
+              className="bg-gray-900 border-gray-800 hover:border-red-600 transition-all flex flex-col"
             >
               <CardHeader>
                 <div className="flex justify-between items-start">
@@ -176,7 +176,7 @@ const Level1ProductSelector = ({ onProductSelect, selectedProduct, canSeePrices,
                   </div>
                 </div>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="space-y-4 flex-1 flex flex-col">
                 
                 {/* DGA Customization Options */}
                 {product.customizations && (
@@ -242,35 +242,39 @@ const Level1ProductSelector = ({ onProductSelect, selectedProduct, canSeePrices,
                   </div>
                 )}
 
-                <div className="flex justify-between items-center">
-                  <span className="text-white font-bold">
-                    {canSeePrices ? `$${totalPrice.toLocaleString()}` : '—'}
-                  </span>
-                </div>
+                <div className="flex-1" />
 
-                {product.productInfoUrl && (
-                  <div className="mb-2">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="text-blue-400 hover:text-blue-300 p-1"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        window.open(product.productInfoUrl, '_blank');
-                      }}
-                    >
-                      <ExternalLink className="h-4 w-4 mr-1" />
-                      Product Info
-                    </Button>
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-white font-bold">
+                      {canSeePrices ? `$${totalPrice.toLocaleString()}` : '—'}
+                    </span>
                   </div>
-                )}
-                
-                <Button 
-                  className="w-full bg-red-600 hover:bg-red-700 text-white"
-                  onClick={() => onProductSelect(product, config)}
-                >
-                  Select Product
-                </Button>
+
+                  {product.productInfoUrl && (
+                    <div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-blue-400 hover:text-blue-300 p-1"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          window.open(product.productInfoUrl, '_blank');
+                        }}
+                      >
+                        <ExternalLink className="h-4 w-4 mr-1" />
+                        Product Info
+                      </Button>
+                    </div>
+                  )}
+                  
+                  <Button 
+                    className="w-full bg-red-600 hover:bg-red-700 text-white"
+                    onClick={() => onProductSelect(product, config)}
+                  >
+                    Select Product
+                  </Button>
+                </div>
               </CardContent>
             </Card>
           );

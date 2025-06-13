@@ -331,7 +331,8 @@ const BOMBuilder = ({ user }: BOMBuilderProps) => {
         const incrementalPrices = {
           'CalGas': 450,
           'Helium Bottle': 280,
-          'Moisture Sensor': 320
+          'Moisture Sensor': 320,
+          '4-20mA bridge': 180
         };
         
         Object.entries(item.configuration).forEach(([key, value]) => {
@@ -377,6 +378,23 @@ const BOMBuilder = ({ user }: BOMBuilderProps) => {
       .reduce((total, item) => total + calculateItemPrice(item), 0);
   };
 
+  // Group QTMS items for combined pricing
+  const getQTMSTotal = () => {
+    const qtmsItems = bomItems.filter(item => 
+      item.enabled && (
+        'slots' in item.product || // Chassis
+        item.product.type === 'relay' || 
+        item.product.type === 'analog' || 
+        item.product.type === 'fiber' || 
+        item.product.type === 'display' ||
+        item.product.type === 'bushing' ||
+        item.product.id === 'remote-display'
+      )
+    );
+    
+    return qtmsItems.reduce((total, item) => total + calculateItemPrice(item), 0);
+  };
+
   const canSeePrices = user.role !== 'level1';
 
   return (
@@ -402,108 +420,136 @@ const BOMBuilder = ({ user }: BOMBuilderProps) => {
       <div className="flex">
         {/* Main Content */}
         <div className="flex-1 p-6 space-y-6">
-          {/* Quote Information Form */}
+          {/* Quote Information Form - Professional Layout */}
           <Card className="bg-gray-900 border-gray-800">
-            <CardHeader>
-              <CardTitle className="text-white">Quote Information</CardTitle>
+            <CardHeader className="pb-4">
+              <CardTitle className="text-white text-xl">Quote Information</CardTitle>
               <CardDescription className="text-gray-400">
-                Required information for quote generation
+                Please provide the required information for accurate quote generation
               </CardDescription>
             </CardHeader>
-            <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div>
-                <Label htmlFor="oracle-id" className="text-white">Oracle Customer ID</Label>
-                <Input
-                  id="oracle-id"
-                  value={oracleCustomerId}
-                  onChange={(e) => setOracleCustomerId(e.target.value)}
-                  className="bg-gray-800 border-gray-700 text-white placeholder:text-gray-400"
-                  placeholder="Enter Oracle ID"
-                />
+            <CardContent>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                {/* Customer Information Section */}
+                <div className="space-y-6">
+                  <div className="border-b border-gray-700 pb-2">
+                    <h3 className="text-white font-semibold text-lg">Customer Information</h3>
+                  </div>
+                  <div className="grid grid-cols-1 gap-4">
+                    <div>
+                      <Label htmlFor="oracle-id" className="text-white font-medium mb-2 block">Oracle Customer ID *</Label>
+                      <Input
+                        id="oracle-id"
+                        value={oracleCustomerId}
+                        onChange={(e) => setOracleCustomerId(e.target.value)}
+                        className="bg-gray-800 border-gray-600 text-white placeholder:text-gray-400 focus:border-red-500 focus:ring-red-500"
+                        placeholder="Enter Oracle Customer ID"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="customer-name" className="text-white font-medium mb-2 block">Customer Name *</Label>
+                      <Input
+                        id="customer-name"
+                        value={customerName}
+                        onChange={(e) => setCustomerName(e.target.value)}
+                        className="bg-gray-800 border-gray-600 text-white placeholder:text-gray-400 focus:border-red-500 focus:ring-red-500"
+                        placeholder="Enter customer name"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Quote Configuration Section */}
+                <div className="space-y-6">
+                  <div className="border-b border-gray-700 pb-2">
+                    <h3 className="text-white font-semibold text-lg">Quote Configuration</h3>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="priority" className="text-white font-medium mb-2 block">Priority Level</Label>
+                      <Select value={quotePriority} onValueChange={(value: 'High' | 'Medium' | 'Low') => setQuotePriority(value)}>
+                        <SelectTrigger className="bg-gray-800 border-gray-600 text-white focus:border-red-500 focus:ring-red-500">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className="bg-gray-800 border-gray-600 z-50">
+                          <SelectItem value="High" className="text-white hover:bg-gray-700 focus:bg-gray-700">High Priority</SelectItem>
+                          <SelectItem value="Medium" className="text-white hover:bg-gray-700 focus:bg-gray-700">Medium Priority</SelectItem>
+                          <SelectItem value="Low" className="text-white hover:bg-gray-700 focus:bg-gray-700">Low Priority</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label htmlFor="rep-involved" className="text-white font-medium mb-2 block">Rep Involvement</Label>
+                      <Select value={isRepInvolved?.toString() || ''} onValueChange={(value) => setIsRepInvolved(value === 'true')}>
+                        <SelectTrigger className="bg-gray-800 border-gray-600 text-white focus:border-red-500 focus:ring-red-500">
+                          <SelectValue placeholder="Is Rep involved?" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-gray-800 border-gray-600 z-50">
+                          <SelectItem value="true" className="text-white hover:bg-gray-700 focus:bg-gray-700">Yes</SelectItem>
+                          <SelectItem value="false" className="text-white hover:bg-gray-700 focus:bg-gray-700">No</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                </div>
               </div>
-              <div>
-                <Label htmlFor="customer-name" className="text-white">Customer Name</Label>
-                <Input
-                  id="customer-name"
-                  value={customerName}
-                  onChange={(e) => setCustomerName(e.target.value)}
-                  className="bg-gray-800 border-gray-700 text-white placeholder:text-gray-400"
-                  placeholder="Enter customer name"
-                />
-              </div>
-              <div>
-                <Label htmlFor="priority" className="text-white">Quote Priority</Label>
-                <Select value={quotePriority} onValueChange={(value: 'High' | 'Medium' | 'Low') => setQuotePriority(value)}>
-                  <SelectTrigger className="bg-gray-800 border-gray-700 text-white">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="bg-gray-800 border-gray-700">
-                    <SelectItem value="High" className="text-white hover:bg-gray-700">High</SelectItem>
-                    <SelectItem value="Medium" className="text-white hover:bg-gray-700">Medium</SelectItem>
-                    <SelectItem value="Low" className="text-white hover:bg-gray-700">Low</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label htmlFor="rep-involved" className="text-white">Is Rep involved?</Label>
-                <Select value={isRepInvolved?.toString() || ''} onValueChange={(value) => setIsRepInvolved(value === 'true')}>
-                  <SelectTrigger className="bg-gray-800 border-gray-700 text-white">
-                    <SelectValue placeholder="Select" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-gray-800 border-gray-700">
-                    <SelectItem value="true" className="text-white hover:bg-gray-700">Yes</SelectItem>
-                    <SelectItem value="false" className="text-white hover:bg-gray-700">No</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label htmlFor="shipping-terms" className="text-white">Shipping Terms</Label>
-                <Select value={shippingTerms} onValueChange={setShippingTerms}>
-                  <SelectTrigger className="bg-gray-800 border-gray-700 text-white">
-                    <SelectValue placeholder="Select terms" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-gray-800 border-gray-700">
-                    <SelectItem value="Ex-Works" className="text-white hover:bg-gray-700">Ex-Works</SelectItem>
-                    <SelectItem value="CFR" className="text-white hover:bg-gray-700">CFR</SelectItem>
-                    <SelectItem value="CIF" className="text-white hover:bg-gray-700">CIF</SelectItem>
-                    <SelectItem value="CIP" className="text-white hover:bg-gray-700">CIP</SelectItem>
-                    <SelectItem value="CPT" className="text-white hover:bg-gray-700">CPT</SelectItem>
-                    <SelectItem value="DDP" className="text-white hover:bg-gray-700">DDP</SelectItem>
-                    <SelectItem value="DAP" className="text-white hover:bg-gray-700">DAP</SelectItem>
-                    <SelectItem value="FCA" className="text-white hover:bg-gray-700">FCA</SelectItem>
-                    <SelectItem value="Prepaid" className="text-white hover:bg-gray-700">Prepaid</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label htmlFor="payment-terms" className="text-white">Payment Terms (days)</Label>
-                <Select value={paymentTerms} onValueChange={setPaymentTerms}>
-                  <SelectTrigger className="bg-gray-800 border-gray-700 text-white">
-                    <SelectValue placeholder="Select terms" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-gray-800 border-gray-700">
-                    <SelectItem value="Prepaid" className="text-white hover:bg-gray-700">Prepaid</SelectItem>
-                    <SelectItem value="15" className="text-white hover:bg-gray-700">15</SelectItem>
-                    <SelectItem value="30" className="text-white hover:bg-gray-700">30</SelectItem>
-                    <SelectItem value="60" className="text-white hover:bg-gray-700">60</SelectItem>
-                    <SelectItem value="90" className="text-white hover:bg-gray-700">90</SelectItem>
-                    <SelectItem value="120" className="text-white hover:bg-gray-700">120</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label htmlFor="quote-currency" className="text-white">Quote Currency</Label>
-                <Select value={quoteCurrency} onValueChange={setQuoteCurrency}>
-                  <SelectTrigger className="bg-gray-800 border-gray-700 text-white">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="bg-gray-800 border-gray-700">
-                    <SelectItem value="USD" className="text-white hover:bg-gray-700">USD</SelectItem>
-                    <SelectItem value="EURO" className="text-white hover:bg-gray-700">EURO</SelectItem>
-                    <SelectItem value="GBP" className="text-white hover:bg-gray-700">GBP</SelectItem>
-                    <SelectItem value="CAD" className="text-white hover:bg-gray-700">CAD</SelectItem>
-                  </SelectContent>
-                </Select>
+
+              {/* Terms and Currency Section */}
+              <div className="mt-8 pt-6 border-t border-gray-700">
+                <div className="border-b border-gray-700 pb-2 mb-6">
+                  <h3 className="text-white font-semibold text-lg">Terms & Currency</h3>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <div>
+                    <Label htmlFor="shipping-terms" className="text-white font-medium mb-2 block">Shipping Terms</Label>
+                    <Select value={shippingTerms} onValueChange={setShippingTerms}>
+                      <SelectTrigger className="bg-gray-800 border-gray-600 text-white focus:border-red-500 focus:ring-red-500">
+                        <SelectValue placeholder="Select shipping terms" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-gray-800 border-gray-600 z-50">
+                        <SelectItem value="Ex-Works" className="text-white hover:bg-gray-700 focus:bg-gray-700">Ex-Works</SelectItem>
+                        <SelectItem value="CFR" className="text-white hover:bg-gray-700 focus:bg-gray-700">CFR</SelectItem>
+                        <SelectItem value="CIF" className="text-white hover:bg-gray-700 focus:bg-gray-700">CIF</SelectItem>
+                        <SelectItem value="CIP" className="text-white hover:bg-gray-700 focus:bg-gray-700">CIP</SelectItem>
+                        <SelectItem value="CPT" className="text-white hover:bg-gray-700 focus:bg-gray-700">CPT</SelectItem>
+                        <SelectItem value="DDP" className="text-white hover:bg-gray-700 focus:bg-gray-700">DDP</SelectItem>
+                        <SelectItem value="DAP" className="text-white hover:bg-gray-700 focus:bg-gray-700">DAP</SelectItem>
+                        <SelectItem value="FCA" className="text-white hover:bg-gray-700 focus:bg-gray-700">FCA</SelectItem>
+                        <SelectItem value="Prepaid" className="text-white hover:bg-gray-700 focus:bg-gray-700">Prepaid</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label htmlFor="payment-terms" className="text-white font-medium mb-2 block">Payment Terms</Label>
+                    <Select value={paymentTerms} onValueChange={setPaymentTerms}>
+                      <SelectTrigger className="bg-gray-800 border-gray-600 text-white focus:border-red-500 focus:ring-red-500">
+                        <SelectValue placeholder="Select payment days" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-gray-800 border-gray-600 z-50">
+                        <SelectItem value="Prepaid" className="text-white hover:bg-gray-700 focus:bg-gray-700">Prepaid</SelectItem>
+                        <SelectItem value="15" className="text-white hover:bg-gray-700 focus:bg-gray-700">15 days</SelectItem>
+                        <SelectItem value="30" className="text-white hover:bg-gray-700 focus:bg-gray-700">30 days</SelectItem>
+                        <SelectItem value="60" className="text-white hover:bg-gray-700 focus:bg-gray-700">60 days</SelectItem>
+                        <SelectItem value="90" className="text-white hover:bg-gray-700 focus:bg-gray-700">90 days</SelectItem>
+                        <SelectItem value="120" className="text-white hover:bg-gray-700 focus:bg-gray-700">120 days</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label htmlFor="quote-currency" className="text-white font-medium mb-2 block">Currency</Label>
+                    <Select value={quoteCurrency} onValueChange={setQuoteCurrency}>
+                      <SelectTrigger className="bg-gray-800 border-gray-600 text-white focus:border-red-500 focus:ring-red-500">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="bg-gray-800 border-gray-600 z-50">
+                        <SelectItem value="USD" className="text-white hover:bg-gray-700 focus:bg-gray-700">USD ($)</SelectItem>
+                        <SelectItem value="EURO" className="text-white hover:bg-gray-700 focus:bg-gray-700">EURO (€)</SelectItem>
+                        <SelectItem value="GBP" className="text-white hover:bg-gray-700 focus:bg-gray-700">GBP (£)</SelectItem>
+                        <SelectItem value="CAD" className="text-white hover:bg-gray-700 focus:bg-gray-700">CAD (C$)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -573,7 +619,7 @@ const BOMBuilder = ({ user }: BOMBuilderProps) => {
                           <Button
                             variant={hasRemoteDisplay ? "default" : "outline"}
                             onClick={handleRemoteDisplayToggle}
-                            className={hasRemoteDisplay ? "bg-green-600 hover:bg-green-700" : "border-gray-600 text-white hover:bg-gray-800"}
+                            className={hasRemoteDisplay ? "bg-green-600 hover:bg-green-700 text-white" : "border-gray-600 text-white hover:bg-gray-800"}
                           >
                             {hasRemoteDisplay ? 'Remove' : 'Add Display'}
                           </Button>
@@ -655,80 +701,136 @@ const BOMBuilder = ({ user }: BOMBuilderProps) => {
                   {bomItems.length === 0 ? (
                     <p className="text-gray-400 text-sm">No items added yet</p>
                   ) : (
-                    bomItems.map((item) => (
-                      <div key={item.id} className="p-3 bg-gray-700 rounded">
-                        <div className="flex justify-between items-start">
-                          <div className="flex items-start space-x-3 flex-1">
-                            <ToggleSwitch
-                              checked={item.enabled}
-                              onCheckedChange={(enabled) => toggleBOMItem(item.id, enabled)}
-                              size="sm"
-                            />
-                            <div className="flex-1">
-                              <p className={`font-medium text-sm ${item.enabled ? 'text-white' : 'text-gray-500'}`}>
-                                {item.product.name}
-                              </p>
-                              {item.slot && (
-                                <Badge variant="outline" className="mt-1 text-xs text-white border-gray-500">
-                                  Slot {item.slot}
-                                </Badge>
-                              )}
-
-                              {/* Configuration details */}
-                              {item.configuration && Object.keys(item.configuration).length > 0 && (
-                                <div className="mt-1 text-xs text-gray-400">
-                                  {Object.entries(item.configuration).map(([key, value]) => {
-                                    if (value && key !== 'quantity') {
-                                      return <div key={key}>{key}: {value.toString()}</div>;
-                                    }
-                                    return null;
-                                  })}
-                                  {item.configuration.quantity && (
-                                    <div>Qty: {item.configuration.quantity}</div>
-                                  )}
-                                </div>
-                              )}
-
-                              {isLevel1Product(item.product) && item.product.productInfoUrl && (
-                                <a
-                                  href={item.product.productInfoUrl}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="text-red-400 underline text-xs block mt-1"
-                                >
-                                  <ExternalLink className="h-3 w-3 mr-1 inline" />
-                                  Product Info
-                                </a>
-                              )}
-
-                              {item.product.type === 'analog' && item.level3Customizations && item.level3Customizations.length > 0 && (
-                                <div className="mt-2">
-                                  <p className="text-xs text-gray-400 mb-1">Configured Channels:</p>
-                                  {item.level3Customizations.filter(c => c.enabled).map((config, idx) => (
-                                    <div key={idx} className="text-xs text-white">
-                                      Ch{idx + 1}: {config.name}
-                                    </div>
-                                  ))}
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                          <div className="text-right ml-2">
-                            <p className={`font-bold text-sm ${item.enabled ? 'text-white' : 'text-gray-500'}`}>
-                              {canSeePrices ? `$${calculateItemPrice(item).toLocaleString()}` : '—'}
+                    <>
+                      {/* QTMS Combined Section */}
+                      {bomItems.some(item => 
+                        item.enabled && (
+                          'slots' in item.product || // Chassis
+                          item.product.type === 'relay' || 
+                          item.product.type === 'analog' || 
+                          item.product.type === 'fiber' || 
+                          item.product.type === 'display' ||
+                          item.product.type === 'bushing' ||
+                          item.product.id === 'remote-display'
+                        )
+                      ) && (
+                        <div className="p-3 bg-gray-700 rounded border-l-4 border-red-600">
+                          <div className="flex justify-between items-center mb-2">
+                            <p className="font-medium text-white">QTMS System</p>
+                            <p className="font-bold text-white">
+                              {canSeePrices ? `$${getQTMSTotal().toLocaleString()}` : '—'}
                             </p>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => removeFromBOM(item.id)}
-                              className="text-red-400 hover:text-red-300 hover:bg-red-900/20 p-1 h-auto text-xs"
-                            >
-                              Remove
-                            </Button>
+                          </div>
+                          <div className="space-y-1 text-xs text-gray-300">
+                            {bomItems
+                              .filter(item => 
+                                item.enabled && (
+                                  'slots' in item.product || // Chassis
+                                  item.product.type === 'relay' || 
+                                  item.product.type === 'analog' || 
+                                  item.product.type === 'fiber' || 
+                                  item.product.type === 'display' ||
+                                  item.product.type === 'bushing' ||
+                                  item.product.id === 'remote-display'
+                                )
+                              )
+                              .map((item) => (
+                                <div key={item.id} className="flex justify-between">
+                                  <span>• {item.product.name}</span>
+                                  <span>{canSeePrices ? `$${calculateItemPrice(item).toLocaleString()}` : '—'}</span>
+                                </div>
+                              ))}
                           </div>
                         </div>
-                      </div>
-                    ))
+                      )}
+
+                      {/* Individual DGA/PD Products */}
+                      {bomItems
+                        .filter(item => 
+                          item.enabled && 
+                          !('slots' in item.product) && 
+                          item.product.type !== 'relay' && 
+                          item.product.type !== 'analog' && 
+                          item.product.type !== 'fiber' && 
+                          item.product.type !== 'display' && 
+                          item.product.type !== 'bushing' &&
+                          item.product.id !== 'remote-display'
+                        )
+                        .map((item) => (
+                          <div key={item.id} className="p-3 bg-gray-700 rounded">
+                            <div className="flex justify-between items-start">
+                              <div className="flex items-start space-x-3 flex-1">
+                                <ToggleSwitch
+                                  checked={item.enabled}
+                                  onCheckedChange={(enabled) => toggleBOMItem(item.id, enabled)}
+                                  size="sm"
+                                />
+                                <div className="flex-1">
+                                  <p className={`font-medium text-sm ${item.enabled ? 'text-white' : 'text-gray-500'}`}>
+                                    {item.product.name}
+                                  </p>
+                                  {item.slot && (
+                                    <Badge variant="outline" className="mt-1 text-xs text-white border-gray-500">
+                                      Slot {item.slot}
+                                    </Badge>
+                                  )}
+
+                                  {/* Configuration details */}
+                                  {item.configuration && Object.keys(item.configuration).length > 0 && (
+                                    <div className="mt-1 text-xs text-gray-400">
+                                      {Object.entries(item.configuration).map(([key, value]) => {
+                                        if (value && key !== 'quantity') {
+                                          return <div key={key}>{key}: {value.toString()}</div>;
+                                        }
+                                        return null;
+                                      })}
+                                      {item.configuration.quantity && (
+                                        <div>Qty: {item.configuration.quantity}</div>
+                                      )}
+                                    </div>
+                                  )}
+
+                                  {isLevel1Product(item.product) && item.product.productInfoUrl && (
+                                    <a
+                                      href={item.product.productInfoUrl}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-red-400 underline text-xs block mt-1"
+                                    >
+                                      <ExternalLink className="h-3 w-3 mr-1 inline" />
+                                      Product Info
+                                    </a>
+                                  )}
+
+                                  {item.product.type === 'analog' && item.level3Customizations && item.level3Customizations.length > 0 && (
+                                    <div className="mt-2">
+                                      <p className="text-xs text-gray-400 mb-1">Configured Channels:</p>
+                                      {item.level3Customizations.filter(c => c.enabled).map((config, idx) => (
+                                        <div key={idx} className="text-xs text-white">
+                                          Ch{idx + 1}: {config.name}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                              <div className="text-right ml-2">
+                                <p className={`font-bold text-sm ${item.enabled ? 'text-white' : 'text-gray-500'}`}>
+                                  {canSeePrices ? `$${calculateItemPrice(item).toLocaleString()}` : '—'}
+                                </p>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => removeFromBOM(item.id)}
+                                  className="text-red-400 hover:text-red-300 hover:bg-red-900/20 p-1 h-auto text-xs"
+                                >
+                                  Remove
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                    </>
                   )}
                 </TabsContent>
 
