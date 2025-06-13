@@ -1,3 +1,4 @@
+
 export interface Chassis {
   id: string;
   name: string;
@@ -31,6 +32,8 @@ export interface Level1Product {
   productInfoUrl?: string;
   enabled: boolean;
   image?: string;
+  customizations?: string[];
+  hasQuantitySelection?: boolean;
 }
 
 export interface Level2Option {

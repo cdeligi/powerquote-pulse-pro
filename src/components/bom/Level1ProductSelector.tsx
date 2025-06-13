@@ -9,7 +9,7 @@ import { ExternalLink } from "lucide-react";
 import { useState } from "react";
 
 interface Level1ProductSelectorProps {
-  onProductSelect: (product: Level1Product) => void;
+  onProductSelect: (product: Level1Product, configuration?: Record<string, any>) => void;
   selectedProduct: Level1Product | null;
   canSeePrices: boolean;
   productType?: 'QTMS' | 'DGA' | 'PD';
@@ -153,7 +153,27 @@ const Level1ProductSelector = ({ onProductSelect, selectedProduct, canSeePrices,
       basePrice *= parseInt(config.quantity);
     }
     
+    // Add incremental prices for DGA customizations
+    if (product.customizations && productType === 'DGA' && config) {
+      const incrementalPrices = {
+        'CalGas': 450,
+        'Helium Bottle': 280,
+        'Moisture Sensor': 320
+      };
+      
+      product.customizations.forEach((option: string) => {
+        if (config[option] && incrementalPrices[option as keyof typeof incrementalPrices]) {
+          basePrice += incrementalPrices[option as keyof typeof incrementalPrices];
+        }
+      });
+    }
+    
     return basePrice;
+  };
+
+  const handleProductSelect = (product: any) => {
+    const config = productConfigs[product.id];
+    onProductSelect(product as Level1Product, config);
   };
 
   const products = getProductsByType().filter(product => product.enabled);
@@ -172,7 +192,6 @@ const Level1ProductSelector = ({ onProductSelect, selectedProduct, canSeePrices,
             className={`bg-gray-900 border-gray-800 cursor-pointer transition-all hover:border-red-600 ${
               selectedProduct?.id === product.id ? 'border-red-600 bg-red-900/20' : ''
             }`}
-            onClick={() => onProductSelect(product as Level1Product)}
           >
             <CardHeader>
               <div className="flex justify-between items-start">
@@ -191,7 +210,7 @@ const Level1ProductSelector = ({ onProductSelect, selectedProduct, canSeePrices,
               <p className="text-gray-400 text-sm mb-4">{product.description}</p>
               
               {/* Customization options for DGA products */}
-              {product.customizations && (
+              {product.customizations && productType === 'DGA' && (
                 <div className="space-y-2 mb-4">
                   <Label className="text-white text-sm">Options:</Label>
                   {product.customizations.map((option: string) => (
@@ -218,7 +237,7 @@ const Level1ProductSelector = ({ onProductSelect, selectedProduct, canSeePrices,
                     <SelectTrigger className="bg-gray-800 border-gray-700 text-white mt-1">
                       <SelectValue placeholder="Select channels" />
                     </SelectTrigger>
-                    <SelectContent className="bg-gray-800 border-gray-700">
+                    <SelectContent className="bg-gray-800 border-gray-700 z-50">
                       <SelectItem value="3-channel" className="text-white hover:bg-gray-700">3-channel</SelectItem>
                       <SelectItem value="6-channel" className="text-white hover:bg-gray-700">6-channel</SelectItem>
                     </SelectContent>
@@ -234,7 +253,7 @@ const Level1ProductSelector = ({ onProductSelect, selectedProduct, canSeePrices,
                     <SelectTrigger className="bg-gray-800 border-gray-700 text-white mt-1">
                       <SelectValue placeholder="Select quantity" />
                     </SelectTrigger>
-                    <SelectContent className="bg-gray-800 border-gray-700 max-h-60">
+                    <SelectContent className="bg-gray-800 border-gray-700 max-h-60 z-50">
                       {Array.from({ length: 50 }, (_, i) => i + 1).map(num => (
                         <SelectItem key={num} value={num.toString()} className="text-white hover:bg-gray-700">
                           {num}
@@ -249,7 +268,10 @@ const Level1ProductSelector = ({ onProductSelect, selectedProduct, canSeePrices,
                 <span className="text-white font-bold">
                   {canSeePrices ? `$${getProductPrice(product).toLocaleString()}` : '—'}
                 </span>
-                {product.productInfoUrl && (
+              </div>
+
+              {product.productInfoUrl && (
+                <div className="mb-4">
                   <Button
                     variant="ghost"
                     size="sm"
@@ -262,14 +284,14 @@ const Level1ProductSelector = ({ onProductSelect, selectedProduct, canSeePrices,
                     <ExternalLink className="h-4 w-4 mr-1" />
                     Product Info
                   </Button>
-                )}
-              </div>
+                </div>
+              )}
               
               <Button 
                 className="w-full bg-red-600 hover:bg-red-700 text-white"
                 onClick={(e) => {
                   e.stopPropagation();
-                  onProductSelect(product as Level1Product);
+                  handleProductSelect(product);
                 }}
               >
                 Select Product

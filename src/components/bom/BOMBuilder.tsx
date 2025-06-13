@@ -34,7 +34,7 @@ const BOMBuilder = ({ user }: BOMBuilderProps) => {
   const [customerName, setCustomerName] = useState('');
   const [quotePriority, setQuotePriority] = useState<'High' | 'Medium' | 'Low'>('Medium');
 
-  const addToBOM = (product: Chassis | ProductCard | Level1Product, slot?: number, level2Options?: Level2Option[]) => {
+  const addToBOM = (product: Chassis | ProductCard | Level1Product, slot?: number, level2Options?: Level2Option[], configuration?: Record<string, any>) => {
     const newItem: BOMItem = {
       id: `bom-${Date.now()}`,
       product,
@@ -42,7 +42,8 @@ const BOMBuilder = ({ user }: BOMBuilderProps) => {
       slot,
       enabled: true,
       level2Options: level2Options || [],
-      level3Customizations: []
+      level3Customizations: [],
+      configuration: configuration || {}
     };
     
     setBomItems(prev => [...prev, newItem]);
@@ -295,6 +296,29 @@ const BOMBuilder = ({ user }: BOMBuilderProps) => {
       .reduce((total, item) => {
         let itemTotal = item.product.price * item.quantity;
         
+        // Handle configuration-based pricing
+        if (item.configuration) {
+          // For DGA products with options
+          if (isLevel1Product(item.product) && ['TM8', 'TM3', 'TM1'].includes(item.product.type)) {
+            const incrementalPrices = {
+              'CalGas': 450,
+              'Helium Bottle': 280,
+              'Moisture Sensor': 320
+            };
+            
+            Object.entries(item.configuration).forEach(([key, value]) => {
+              if (value && incrementalPrices[key as keyof typeof incrementalPrices]) {
+                itemTotal += incrementalPrices[key as keyof typeof incrementalPrices];
+              }
+            });
+          }
+          
+          // For PD products with quantity
+          if (item.configuration.quantity) {
+            itemTotal = item.product.price * parseInt(item.configuration.quantity);
+          }
+        }
+        
         // Add Level 2 options cost
         if (item.level2Options) {
           const level2Total = item.level2Options
@@ -410,7 +434,7 @@ const BOMBuilder = ({ user }: BOMBuilderProps) => {
 
               <TabsContent value="dga" className="mt-4">
                 <Level1ProductSelector 
-                  onProductSelect={(product) => addToBOM(product)}
+                  onProductSelect={(product, configuration) => addToBOM(product, undefined, undefined, configuration)}
                   selectedProduct={null}
                   canSeePrices={canSeePrices}
                   productType="DGA"
@@ -419,7 +443,7 @@ const BOMBuilder = ({ user }: BOMBuilderProps) => {
 
               <TabsContent value="pd" className="mt-4">
                 <Level1ProductSelector 
-                  onProductSelect={(product) => addToBOM(product)}
+                  onProductSelect={(product, configuration) => addToBOM(product, undefined, undefined, configuration)}
                   selectedProduct={null}
                   canSeePrices={canSeePrices}
                   productType="PD"
