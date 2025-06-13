@@ -3,7 +3,7 @@ import { Chassis } from "@/types/product";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Check } from "lucide-react";
+import { Check, ExternalLink } from "lucide-react";
 
 interface ChassisSelectorProps {
   onChassisSelect: (chassis: Chassis) => void;
@@ -21,7 +21,8 @@ const ChassisSelector = ({ onChassisSelect, selectedChassis, canSeePrices }: Cha
       slots: 15, // CPU + 14 slots
       price: 8500,
       description: 'Large form factor with maximum expansion capability',
-      image: '/placeholder.svg'
+      image: '/placeholder.svg',
+      productInfoUrl: 'https://www.qualitrolcorp.com/products/ltx-chassis'
     },
     {
       id: 'mtx-3u',
@@ -31,7 +32,8 @@ const ChassisSelector = ({ onChassisSelect, selectedChassis, canSeePrices }: Cha
       slots: 8, // CPU + 7 slots
       price: 6200,
       description: 'Medium form factor balancing features and space',
-      image: '/placeholder.svg'
+      image: '/placeholder.svg',
+      productInfoUrl: 'https://www.qualitrolcorp.com/products/mtx-chassis'
     },
     {
       id: 'stx-1.5u',
@@ -41,7 +43,8 @@ const ChassisSelector = ({ onChassisSelect, selectedChassis, canSeePrices }: Cha
       slots: 5, // CPU + 4 slots
       price: 4100,
       description: 'Compact form factor for space-constrained applications',
-      image: '/placeholder.svg'
+      image: '/placeholder.svg',
+      productInfoUrl: 'https://www.qualitrolcorp.com/products/stx-chassis'
     }
   ];
 
@@ -81,6 +84,23 @@ const ChassisSelector = ({ onChassisSelect, selectedChassis, canSeePrices }: Cha
                   {canSeePrices ? `$${chassis.price.toLocaleString()}` : '—'}
                 </span>
               </div>
+
+              {chassis.productInfoUrl && (
+                <div className="mb-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-blue-400 hover:text-blue-300 p-1"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      window.open(chassis.productInfoUrl, '_blank');
+                    }}
+                  >
+                    <ExternalLink className="h-4 w-4 mr-1" />
+                    Product Info
+                  </Button>
+                </div>
+              )}
               
               <Button 
                 className="w-full bg-red-600 hover:bg-red-700 text-white"

@@ -1,4 +1,3 @@
-
 export interface Chassis {
   id: string;
   name: string;
@@ -8,6 +7,7 @@ export interface Chassis {
   price: number;
   description: string;
   image?: string;
+  productInfoUrl?: string;
 }
 
 export interface Card {
@@ -78,11 +78,16 @@ export interface Quote {
   createdAt: string;
   updatedAt: string;
   notes?: string;
+  rejectionReason?: string;
   // New fields
   oracleCustomerId?: string;
   customerName?: string;
   priority: 'High' | 'Medium' | 'Low';
   termsAndConditions?: string;
+  isRepInvolved?: boolean;
+  shippingTerms?: 'Ex-Works' | 'CFR' | 'CIF' | 'CIP' | 'CPT' | 'DDP' | 'DAP' | 'FCA' | 'Prepaid';
+  paymentTerms?: 'Prepaid' | '15' | '30' | '60' | '90' | '120';
+  quoteCurrency?: 'USD' | 'EURO' | 'GBP' | 'CAD';
 }
 
 // Type guard functions

@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import ChassisSelector from "./ChassisSelector";
 import Level1ProductSelector from "./Level1ProductSelector";
 import Level2OptionsSelector from "./Level2OptionsSelector";
@@ -14,7 +15,7 @@ import SlotCardSelector from "./SlotCardSelector";
 import AnalogCardConfigurator from "./AnalogCardConfigurator";
 import ToggleSwitch from "@/components/ui/toggle-switch";
 import { BOMItem, Chassis, Card as ProductCard, Level1Product, Level2Option, Level3Customization, isLevel1Product } from "@/types/product";
-import { ShoppingCart, Save, Send, ExternalLink, Settings, Plus, Trash2 } from "lucide-react";
+import { ShoppingCart, Save, Send, ExternalLink, Settings, Plus, Trash2, Monitor } from "lucide-react";
 
 interface BOMBuilderProps {
   user: User;
@@ -28,11 +29,17 @@ const BOMBuilder = ({ user }: BOMBuilderProps) => {
   const [showSlotSelector, setShowSlotSelector] = useState(false);
   const [showAnalogConfigurator, setShowAnalogConfigurator] = useState(false);
   const [configuringAnalogCard, setConfiguringAnalogCard] = useState<BOMItem | null>(null);
+  const [hasRemoteDisplay, setHasRemoteDisplay] = useState(false);
+  const [activeTab, setActiveTab] = useState("qtms");
   
   // Quote fields
   const [oracleCustomerId, setOracleCustomerId] = useState('');
   const [customerName, setCustomerName] = useState('');
   const [quotePriority, setQuotePriority] = useState<'High' | 'Medium' | 'Low'>('Medium');
+  const [isRepInvolved, setIsRepInvolved] = useState<boolean | null>(null);
+  const [shippingTerms, setShippingTerms] = useState<string>('');
+  const [paymentTerms, setPaymentTerms] = useState<string>('');
+  const [quoteCurrency, setQuoteCurrency] = useState<string>('USD');
 
   const addToBOM = (product: Chassis | ProductCard | Level1Product, slot?: number, level2Options?: Level2Option[], configuration?: Record<string, any>) => {
     const newItem: BOMItem = {
@@ -57,6 +64,30 @@ const BOMBuilder = ({ user }: BOMBuilderProps) => {
     // Reset slot assignments when changing chassis
     setSlotAssignments({});
     setSelectedSlot(1); // Start at slot 1 after CPU
+  };
+
+  const handleRemoteDisplayToggle = () => {
+    const newHasRemoteDisplay = !hasRemoteDisplay;
+    setHasRemoteDisplay(newHasRemoteDisplay);
+    
+    if (newHasRemoteDisplay) {
+      // Add remote display to BOM
+      const remoteDisplay = {
+        id: 'remote-display',
+        name: 'Remote Display Panel',
+        type: 'display' as const,
+        description: 'Front panel remote display',
+        price: 850,
+        slotRequirement: 0, // No slot required
+        compatibleChassis: ['LTX', 'MTX', 'STX'],
+        specifications: {},
+        productInfoUrl: 'https://www.qualitrolcorp.com/products/remote-display'
+      };
+      addToBOM(remoteDisplay);
+    } else {
+      // Remove remote display from BOM
+      setBomItems(prev => prev.filter(item => item.product.id !== 'remote-display'));
+    }
   };
 
   const getBushingSlots = (chassisType: string): [number, number] => {
@@ -290,53 +321,60 @@ const BOMBuilder = ({ user }: BOMBuilderProps) => {
     ));
   };
 
+  const calculateItemPrice = (item: BOMItem) => {
+    let itemTotal = item.product.price * item.quantity;
+    
+    // Handle configuration-based pricing
+    if (item.configuration) {
+      // For DGA products with options
+      if (isLevel1Product(item.product) && ['TM8', 'TM3', 'TM1'].includes(item.product.type)) {
+        const incrementalPrices = {
+          'CalGas': 450,
+          'Helium Bottle': 280,
+          'Moisture Sensor': 320
+        };
+        
+        Object.entries(item.configuration).forEach(([key, value]) => {
+          if (value && incrementalPrices[key as keyof typeof incrementalPrices]) {
+            itemTotal += incrementalPrices[key as keyof typeof incrementalPrices];
+          }
+        });
+      }
+      
+      // For PD products with quantity
+      if (item.configuration.quantity) {
+        itemTotal = item.product.price * parseInt(item.configuration.quantity);
+      }
+      
+      // For QPDM with channel pricing
+      if (isLevel1Product(item.product) && item.product.type === 'QPDM' && item.configuration.channels === '6-channel') {
+        itemTotal += 2500; // Additional cost for 6-channel
+      }
+    }
+    
+    // Add Level 2 options cost
+    if (item.level2Options) {
+      const level2Total = item.level2Options
+        .filter(opt => opt.enabled)
+        .reduce((sum, opt) => sum + opt.price, 0);
+      itemTotal += level2Total;
+    }
+    
+    // Add Level 3 customizations cost
+    if (item.level3Customizations) {
+      const level3Total = item.level3Customizations
+        .filter(cust => cust.enabled)
+        .reduce((sum, cust) => sum + cust.price, 0);
+      itemTotal += level3Total;
+    }
+    
+    return itemTotal;
+  };
+
   const calculateTotal = () => {
     return bomItems
       .filter(item => item.enabled)
-      .reduce((total, item) => {
-        let itemTotal = item.product.price * item.quantity;
-        
-        // Handle configuration-based pricing
-        if (item.configuration) {
-          // For DGA products with options
-          if (isLevel1Product(item.product) && ['TM8', 'TM3', 'TM1'].includes(item.product.type)) {
-            const incrementalPrices = {
-              'CalGas': 450,
-              'Helium Bottle': 280,
-              'Moisture Sensor': 320
-            };
-            
-            Object.entries(item.configuration).forEach(([key, value]) => {
-              if (value && incrementalPrices[key as keyof typeof incrementalPrices]) {
-                itemTotal += incrementalPrices[key as keyof typeof incrementalPrices];
-              }
-            });
-          }
-          
-          // For PD products with quantity
-          if (item.configuration.quantity) {
-            itemTotal = item.product.price * parseInt(item.configuration.quantity);
-          }
-        }
-        
-        // Add Level 2 options cost
-        if (item.level2Options) {
-          const level2Total = item.level2Options
-            .filter(opt => opt.enabled)
-            .reduce((sum, opt) => sum + opt.price, 0);
-          itemTotal += level2Total;
-        }
-        
-        // Add Level 3 customizations cost
-        if (item.level3Customizations) {
-          const level3Total = item.level3Customizations
-            .filter(cust => cust.enabled)
-            .reduce((sum, cust) => sum + cust.price, 0);
-          itemTotal += level3Total;
-        }
-        
-        return total + itemTotal;
-      }, 0);
+      .reduce((total, item) => total + calculateItemPrice(item), 0);
   };
 
   const canSeePrices = user.role !== 'level1';
@@ -372,7 +410,7 @@ const BOMBuilder = ({ user }: BOMBuilderProps) => {
                 Required information for quote generation
               </CardDescription>
             </CardHeader>
-            <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               <div>
                 <Label htmlFor="oracle-id" className="text-white">Oracle Customer ID</Label>
                 <Input
@@ -395,23 +433,84 @@ const BOMBuilder = ({ user }: BOMBuilderProps) => {
               </div>
               <div>
                 <Label htmlFor="priority" className="text-white">Quote Priority</Label>
-                <select
-                  id="priority"
-                  value={quotePriority}
-                  onChange={(e) => setQuotePriority(e.target.value as 'High' | 'Medium' | 'Low')}
-                  className="w-full bg-gray-800 border border-gray-700 text-white rounded-md px-3 py-2 mt-1"
-                >
-                  <option value="High">High</option>
-                  <option value="Medium">Medium</option>
-                  <option value="Low">Low</option>
-                </select>
+                <Select value={quotePriority} onValueChange={(value: 'High' | 'Medium' | 'Low') => setQuotePriority(value)}>
+                  <SelectTrigger className="bg-gray-800 border-gray-700 text-white">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-gray-800 border-gray-700">
+                    <SelectItem value="High" className="text-white hover:bg-gray-700">High</SelectItem>
+                    <SelectItem value="Medium" className="text-white hover:bg-gray-700">Medium</SelectItem>
+                    <SelectItem value="Low" className="text-white hover:bg-gray-700">Low</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="rep-involved" className="text-white">Is Rep involved?</Label>
+                <Select value={isRepInvolved?.toString() || ''} onValueChange={(value) => setIsRepInvolved(value === 'true')}>
+                  <SelectTrigger className="bg-gray-800 border-gray-700 text-white">
+                    <SelectValue placeholder="Select" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-gray-800 border-gray-700">
+                    <SelectItem value="true" className="text-white hover:bg-gray-700">Yes</SelectItem>
+                    <SelectItem value="false" className="text-white hover:bg-gray-700">No</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="shipping-terms" className="text-white">Shipping Terms</Label>
+                <Select value={shippingTerms} onValueChange={setShippingTerms}>
+                  <SelectTrigger className="bg-gray-800 border-gray-700 text-white">
+                    <SelectValue placeholder="Select terms" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-gray-800 border-gray-700">
+                    <SelectItem value="Ex-Works" className="text-white hover:bg-gray-700">Ex-Works</SelectItem>
+                    <SelectItem value="CFR" className="text-white hover:bg-gray-700">CFR</SelectItem>
+                    <SelectItem value="CIF" className="text-white hover:bg-gray-700">CIF</SelectItem>
+                    <SelectItem value="CIP" className="text-white hover:bg-gray-700">CIP</SelectItem>
+                    <SelectItem value="CPT" className="text-white hover:bg-gray-700">CPT</SelectItem>
+                    <SelectItem value="DDP" className="text-white hover:bg-gray-700">DDP</SelectItem>
+                    <SelectItem value="DAP" className="text-white hover:bg-gray-700">DAP</SelectItem>
+                    <SelectItem value="FCA" className="text-white hover:bg-gray-700">FCA</SelectItem>
+                    <SelectItem value="Prepaid" className="text-white hover:bg-gray-700">Prepaid</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="payment-terms" className="text-white">Payment Terms (days)</Label>
+                <Select value={paymentTerms} onValueChange={setPaymentTerms}>
+                  <SelectTrigger className="bg-gray-800 border-gray-700 text-white">
+                    <SelectValue placeholder="Select terms" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-gray-800 border-gray-700">
+                    <SelectItem value="Prepaid" className="text-white hover:bg-gray-700">Prepaid</SelectItem>
+                    <SelectItem value="15" className="text-white hover:bg-gray-700">15</SelectItem>
+                    <SelectItem value="30" className="text-white hover:bg-gray-700">30</SelectItem>
+                    <SelectItem value="60" className="text-white hover:bg-gray-700">60</SelectItem>
+                    <SelectItem value="90" className="text-white hover:bg-gray-700">90</SelectItem>
+                    <SelectItem value="120" className="text-white hover:bg-gray-700">120</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="quote-currency" className="text-white">Quote Currency</Label>
+                <Select value={quoteCurrency} onValueChange={setQuoteCurrency}>
+                  <SelectTrigger className="bg-gray-800 border-gray-700 text-white">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-gray-800 border-gray-700">
+                    <SelectItem value="USD" className="text-white hover:bg-gray-700">USD</SelectItem>
+                    <SelectItem value="EURO" className="text-white hover:bg-gray-700">EURO</SelectItem>
+                    <SelectItem value="GBP" className="text-white hover:bg-gray-700">GBP</SelectItem>
+                    <SelectItem value="CAD" className="text-white hover:bg-gray-700">CAD</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </CardContent>
           </Card>
 
           {/* Product Selection Tabs */}
           <div className="space-y-4">
-            <Tabs defaultValue="qtms" className="w-full">
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
               <TabsList className="grid w-full grid-cols-3 bg-gray-800">
                 <TabsTrigger value="qtms" className="text-white data-[state=active]:bg-red-600 data-[state=active]:text-white">
                   1. Select QTMS Model
@@ -430,6 +529,59 @@ const BOMBuilder = ({ user }: BOMBuilderProps) => {
                   selectedChassis={selectedChassis}
                   canSeePrices={canSeePrices}
                 />
+                
+                {/* Rack Configuration - Only show in QTMS tab */}
+                {selectedChassis && (
+                  <div className="mt-6">
+                    <RackVisualizer 
+                      chassis={selectedChassis}
+                      slotAssignments={slotAssignments}
+                      onSlotClick={handleSlotClick}
+                      onSlotClear={clearSlot}
+                      selectedSlot={selectedSlot}
+                    />
+                    
+                    {/* Remote Display Section */}
+                    <Card className="bg-gray-900 border-gray-800 mt-4">
+                      <CardHeader>
+                        <CardTitle className="text-white">Remote Display Option</CardTitle>
+                        <CardDescription className="text-gray-400">
+                          Add optional remote display panel (mounted on front panel)
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-4">
+                            <div 
+                              className={`w-16 h-12 border-2 rounded cursor-pointer transition-all flex items-center justify-center ${
+                                hasRemoteDisplay 
+                                  ? 'border-green-500 bg-green-600' 
+                                  : 'border-gray-600 bg-gray-700 hover:border-red-600'
+                              }`}
+                              onClick={handleRemoteDisplayToggle}
+                            >
+                              <Monitor className={`h-6 w-6 ${hasRemoteDisplay ? 'text-white' : 'text-gray-400'}`} />
+                            </div>
+                            <div>
+                              <p className="text-white font-medium">Remote Display Panel</p>
+                              <p className="text-gray-400 text-sm">Front-mounted LCD display with navigation controls</p>
+                              {canSeePrices && (
+                                <p className="text-white font-bold mt-1">$850</p>
+                              )}
+                            </div>
+                          </div>
+                          <Button
+                            variant={hasRemoteDisplay ? "default" : "outline"}
+                            onClick={handleRemoteDisplayToggle}
+                            className={hasRemoteDisplay ? "bg-green-600 hover:bg-green-700" : "border-gray-600 text-white hover:bg-gray-800"}
+                          >
+                            {hasRemoteDisplay ? 'Remove' : 'Add Display'}
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+                )}
               </TabsContent>
 
               <TabsContent value="dga" className="mt-4">
@@ -451,17 +603,6 @@ const BOMBuilder = ({ user }: BOMBuilderProps) => {
               </TabsContent>
             </Tabs>
           </div>
-
-          {/* Rack Configuration - Shows after chassis selection */}
-          {selectedChassis && (
-            <RackVisualizer 
-              chassis={selectedChassis}
-              slotAssignments={slotAssignments}
-              onSlotClick={handleSlotClick}
-              onSlotClear={clearSlot}
-              selectedSlot={selectedSlot}
-            />
-          )}
 
           {/* Slot Card Selector Modal */}
           {showSlotSelector && selectedSlot && selectedChassis && (
@@ -533,6 +674,21 @@ const BOMBuilder = ({ user }: BOMBuilderProps) => {
                                 </Badge>
                               )}
 
+                              {/* Configuration details */}
+                              {item.configuration && Object.keys(item.configuration).length > 0 && (
+                                <div className="mt-1 text-xs text-gray-400">
+                                  {Object.entries(item.configuration).map(([key, value]) => {
+                                    if (value && key !== 'quantity') {
+                                      return <div key={key}>{key}: {value.toString()}</div>;
+                                    }
+                                    return null;
+                                  })}
+                                  {item.configuration.quantity && (
+                                    <div>Qty: {item.configuration.quantity}</div>
+                                  )}
+                                </div>
+                              )}
+
                               {isLevel1Product(item.product) && item.product.productInfoUrl && (
                                 <a
                                   href={item.product.productInfoUrl}
@@ -559,7 +715,7 @@ const BOMBuilder = ({ user }: BOMBuilderProps) => {
                           </div>
                           <div className="text-right ml-2">
                             <p className={`font-bold text-sm ${item.enabled ? 'text-white' : 'text-gray-500'}`}>
-                              {canSeePrices ? `$${item.product.price.toLocaleString()}` : '—'}
+                              {canSeePrices ? `$${calculateItemPrice(item).toLocaleString()}` : '—'}
                             </p>
                             <Button
                               variant="ghost"
