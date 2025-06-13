@@ -28,7 +28,8 @@ const SlotCardSelector = ({ chassis, slot, onCardSelect, onClose, canSeePrices }
         price: 850,
         slotRequirement: 1,
         compatibleChassis: ['LTX', 'MTX', 'STX'],
-        specifications: { channels: 8, voltage: '250VAC', current: '5A' }
+        specifications: { channels: 8, voltage: '250VAC', current: '5A' },
+        partNumber: 'ROC-8CH-001'
       },
       {
         id: 'analog-card-1',
@@ -38,7 +39,8 @@ const SlotCardSelector = ({ chassis, slot, onCardSelect, onClose, canSeePrices }
         price: 1200,
         slotRequirement: 1,
         compatibleChassis: ['LTX', 'MTX', 'STX'],
-        specifications: { channels: 8, resolution: '16-bit', inputRange: '0-10V' }
+        specifications: { channels: 8, resolution: '16-bit', inputRange: '0-10V' },
+        partNumber: 'AIC-8CH-001'
       },
       {
         id: 'fiber-card-1',
@@ -48,7 +50,8 @@ const SlotCardSelector = ({ chassis, slot, onCardSelect, onClose, canSeePrices }
         price: 1500,
         slotRequirement: 1,
         compatibleChassis: ['LTX', 'MTX', 'STX'],
-        specifications: { ports: 2, speed: '1Gbps', connector: 'LC' }
+        specifications: { ports: 2, speed: '1Gbps', connector: 'LC' },
+        partNumber: 'FOC-2P-001'
       },
       {
         id: 'display-card-1',
@@ -58,7 +61,8 @@ const SlotCardSelector = ({ chassis, slot, onCardSelect, onClose, canSeePrices }
         price: 650,
         slotRequirement: 1,
         compatibleChassis: ['LTX', 'MTX', 'STX'],
-        specifications: { display: 'LCD', resolution: '320x240', backlight: 'LED' }
+        specifications: { display: 'LCD', resolution: '320x240', backlight: 'LED' },
+        partNumber: 'DIC-LCD-001'
       },
       {
         id: 'bushing-card-1',
@@ -68,7 +72,8 @@ const SlotCardSelector = ({ chassis, slot, onCardSelect, onClose, canSeePrices }
         price: 2200,
         slotRequirement: 2,
         compatibleChassis: ['LTX', 'MTX', 'STX'],
-        specifications: { channels: 6, measurement: 'Capacitance & Power Factor' }
+        specifications: { channels: 6, measurement: 'Capacitance & Power Factor' },
+        partNumber: 'BMC-6CH-001'
       }
     ];
 
@@ -160,6 +165,14 @@ const SlotCardSelector = ({ chassis, slot, onCardSelect, onClose, canSeePrices }
                         ))}
                       </div>
                     </div>
+                    
+                    {/* Part Number */}
+                    {card.partNumber && (
+                      <div className="mb-4 p-2 bg-gray-700 rounded">
+                        <p className="text-xs text-gray-400">Part Number:</p>
+                        <p className="text-xs font-mono text-white">{card.partNumber}</p>
+                      </div>
+                    )}
                     
                     <div className="flex justify-between items-center mb-4">
                       <span className="text-white font-bold">

@@ -8,6 +8,7 @@ export interface Chassis {
   description: string;
   image?: string;
   productInfoUrl?: string;
+  partNumber?: string;
 }
 
 export interface Card {
@@ -20,6 +21,7 @@ export interface Card {
   compatibleChassis: string[];
   specifications: Record<string, any>;
   image?: string;
+  partNumber?: string;
 }
 
 // New expanded product hierarchy
@@ -34,6 +36,7 @@ export interface Level1Product {
   image?: string;
   customizations?: string[];
   hasQuantitySelection?: boolean;
+  partNumber?: string;
 }
 
 export interface Level2Option {
@@ -65,6 +68,7 @@ export interface BOMItem {
   enabled: boolean; // New toggle state
   level2Options?: Level2Option[];
   level3Customizations?: Level3Customization[];
+  partNumber?: string; // Generated part number
 }
 
 export interface Quote {
@@ -131,3 +135,71 @@ export const ANALOG_SENSOR_DESCRIPTIONS: Record<AnalogSensorType, string> = {
 
 // Updated TM1 customization options
 export const TM1_CUSTOMIZATION_OPTIONS = ['Moisture Sensor', '4-20mA bridge'] as const;
+
+// Part number generation functions
+export const generateQTMSPartNumber = (chassis: Chassis, cards: Card[], hasRemoteDisplay: boolean): string => {
+  let partNumber = '';
+  
+  // Base chassis part number
+  switch (chassis.type) {
+    case 'LTX':
+      partNumber = 'QTMS-LTX-';
+      break;
+    case 'MTX':
+      partNumber = 'QTMS-MTX-';
+      break;
+    case 'STX':
+      partNumber = 'QTMS-STX-';
+      break;
+  }
+  
+  // Add card configuration
+  const cardTypes = cards.map(card => {
+    switch (card.type) {
+      case 'relay': return 'R';
+      case 'analog': return 'A';
+      case 'fiber': return 'F';
+      case 'display': return 'D';
+      case 'bushing': return 'B';
+      default: return 'X';
+    }
+  }).join('');
+  
+  partNumber += cardTypes || 'BASE';
+  
+  // Add remote display suffix
+  if (hasRemoteDisplay) {
+    partNumber += '-RD';
+  }
+  
+  return partNumber;
+};
+
+export const generateProductPartNumber = (product: Level1Product, configuration?: Record<string, any>): string => {
+  let partNumber = product.partNumber || product.id.toUpperCase();
+  
+  // Add configuration suffix for DGA products
+  if (['TM8', 'TM3', 'TM1'].includes(product.type) && configuration) {
+    const options = [];
+    if (configuration['CalGas']) options.push('CG');
+    if (configuration['Helium Bottle']) options.push('HB');
+    if (configuration['Moisture Sensor']) options.push('MS');
+    if (configuration['4-20mA bridge']) options.push('MA');
+    
+    if (options.length > 0) {
+      partNumber += '-' + options.join('');
+    }
+  }
+  
+  // Add quantity suffix for PD products
+  if (product.type === 'QPDM' && configuration?.quantity) {
+    partNumber += '-Q' + configuration.quantity;
+  }
+  
+  // Add channel configuration for QPDM
+  if (product.type === 'QPDM' && configuration?.channels === '6-channel') {
+    partNumber += '-6CH';
+  }
+  
+  return partNumber;
+};

@@ -14,7 +14,7 @@ import RackVisualizer from "./RackVisualizer";
 import SlotCardSelector from "./SlotCardSelector";
 import AnalogCardConfigurator from "./AnalogCardConfigurator";
 import ToggleSwitch from "@/components/ui/toggle-switch";
-import { BOMItem, Chassis, Card as ProductCard, Level1Product, Level2Option, Level3Customization, isLevel1Product } from "@/types/product";
+import { BOMItem, Chassis, Card as ProductCard, Level1Product, Level2Option, Level3Customization, isLevel1Product, isChassis, isCard, generateQTMSPartNumber, generateProductPartNumber } from "@/types/product";
 import { ShoppingCart, Save, Send, ExternalLink, Settings, Plus, Trash2, Monitor } from "lucide-react";
 
 interface BOMBuilderProps {
@@ -42,6 +42,15 @@ const BOMBuilder = ({ user }: BOMBuilderProps) => {
   const [quoteCurrency, setQuoteCurrency] = useState<string>('USD');
 
   const addToBOM = (product: Chassis | ProductCard | Level1Product, slot?: number, level2Options?: Level2Option[], configuration?: Record<string, any>) => {
+    let partNumber = '';
+    
+    // Generate part number based on product type
+    if (isLevel1Product(product)) {
+      partNumber = generateProductPartNumber(product, configuration);
+    } else if (isChassis(product) || isCard(product)) {
+      partNumber = product.partNumber || product.id.toUpperCase();
+    }
+    
     const newItem: BOMItem = {
       id: `bom-${Date.now()}`,
       product,
@@ -50,7 +59,8 @@ const BOMBuilder = ({ user }: BOMBuilderProps) => {
       enabled: true,
       level2Options: level2Options || [],
       level3Customizations: [],
-      configuration: configuration || {}
+      configuration: configuration || {},
+      partNumber
     };
     
     setBomItems(prev => [...prev, newItem]);
@@ -81,7 +91,8 @@ const BOMBuilder = ({ user }: BOMBuilderProps) => {
         slotRequirement: 0, // No slot required
         compatibleChassis: ['LTX', 'MTX', 'STX'],
         specifications: {},
-        productInfoUrl: 'https://www.qualitrolcorp.com/products/remote-display'
+        productInfoUrl: 'https://www.qualitrolcorp.com/products/remote-display',
+        partNumber: 'RDP-001'
       };
       addToBOM(remoteDisplay);
     } else {
@@ -378,7 +389,7 @@ const BOMBuilder = ({ user }: BOMBuilderProps) => {
       .reduce((total, item) => total + calculateItemPrice(item), 0);
   };
 
-  // Group QTMS items for combined pricing
+  // Group QTMS items for combined pricing and generate combined part number
   const getQTMSTotal = () => {
     const qtmsItems = bomItems.filter(item => 
       item.enabled && (
@@ -393,6 +404,18 @@ const BOMBuilder = ({ user }: BOMBuilderProps) => {
     );
     
     return qtmsItems.reduce((total, item) => total + calculateItemPrice(item), 0);
+  };
+
+  const getQTMSPartNumber = () => {
+    const chassis = bomItems.find(item => isChassis(item.product))?.product as Chassis;
+    const cards = bomItems
+      .filter(item => isCard(item.product) && item.product.id !== 'remote-display')
+      .map(item => item.product as ProductCard);
+    
+    if (chassis) {
+      return generateQTMSPartNumber(chassis, cards, hasRemoteDisplay);
+    }
+    return '';
   };
 
   const canSeePrices = user.role !== 'level1';
@@ -619,7 +642,10 @@ const BOMBuilder = ({ user }: BOMBuilderProps) => {
                           <Button
                             variant={hasRemoteDisplay ? "default" : "outline"}
                             onClick={handleRemoteDisplayToggle}
-                            className={hasRemoteDisplay ? "bg-green-600 hover:bg-green-700 text-white" : "border-gray-600 text-white hover:bg-gray-800"}
+                            className={hasRemoteDisplay 
+                              ? "bg-green-600 hover:bg-green-700 text-white" 
+                              : "border-gray-600 text-black bg-white hover:bg-gray-100 hover:text-black"
+                            }
                           >
                             {hasRemoteDisplay ? 'Remove' : 'Add Display'}
                           </Button>
@@ -721,7 +747,7 @@ const BOMBuilder = ({ user }: BOMBuilderProps) => {
                               {canSeePrices ? `$${getQTMSTotal().toLocaleString()}` : '—'}
                             </p>
                           </div>
-                          <div className="space-y-1 text-xs text-gray-300">
+                          <div className="space-y-1 text-xs text-gray-300 mb-2">
                             {bomItems
                               .filter(item => 
                                 item.enabled && (
@@ -736,11 +762,18 @@ const BOMBuilder = ({ user }: BOMBuilderProps) => {
                               )
                               .map((item) => (
                                 <div key={item.id} className="flex justify-between">
-                                  <span>• {item.product.name}</span>
+                                  <span>• {item.product.name} {item.slot ? `(Slot ${item.slot})` : ''}</span>
                                   <span>{canSeePrices ? `$${calculateItemPrice(item).toLocaleString()}` : '—'}</span>
                                 </div>
                               ))}
                           </div>
+                          {/* QTMS Part Number */}
+                          {getQTMSPartNumber() && (
+                            <div className="mt-2 pt-2 border-t border-gray-600">
+                              <p className="text-xs text-gray-400">Part Number:</p>
+                              <p className="text-xs font-mono text-white">{getQTMSPartNumber()}</p>
+                            </div>
+                          )}
                         </div>
                       )}
 
@@ -769,11 +802,6 @@ const BOMBuilder = ({ user }: BOMBuilderProps) => {
                                   <p className={`font-medium text-sm ${item.enabled ? 'text-white' : 'text-gray-500'}`}>
                                     {item.product.name}
                                   </p>
-                                  {item.slot && (
-                                    <Badge variant="outline" className="mt-1 text-xs text-white border-gray-500">
-                                      Slot {item.slot}
-                                    </Badge>
-                                  )}
 
                                   {/* Configuration details */}
                                   {item.configuration && Object.keys(item.configuration).length > 0 && (
@@ -810,6 +838,14 @@ const BOMBuilder = ({ user }: BOMBuilderProps) => {
                                           Ch{idx + 1}: {config.name}
                                         </div>
                                       ))}
+                                    </div>
+                                  )}
+
+                                  {/* Part Number */}
+                                  {item.partNumber && (
+                                    <div className="mt-2 pt-2 border-t border-gray-600">
+                                      <p className="text-xs text-gray-400">Part Number:</p>
+                                      <p className="text-xs font-mono text-white">{item.partNumber}</p>
                                     </div>
                                   )}
                                 </div>
