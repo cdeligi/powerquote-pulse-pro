@@ -11,9 +11,10 @@ import ChassisSelector from "./ChassisSelector";
 import Level2OptionsSelector from "./Level2OptionsSelector";
 import RackVisualizer from "./RackVisualizer";
 import SlotCardSelector from "./SlotCardSelector";
+import AnalogCardConfigurator from "./AnalogCardConfigurator";
 import ToggleSwitch from "@/components/ui/toggle-switch";
-import { BOMItem, Chassis, Card as ProductCard, Level1Product, Level2Option, isLevel1Product } from "@/types/product";
-import { ShoppingCart, Save, Send, ExternalLink, Settings, Plus } from "lucide-react";
+import { BOMItem, Chassis, Card as ProductCard, Level1Product, Level2Option, Level3Customization, isLevel1Product } from "@/types/product";
+import { ShoppingCart, Save, Send, ExternalLink, Settings, Plus, Trash2 } from "lucide-react";
 
 interface BOMBuilderProps {
   user: User;
@@ -25,6 +26,8 @@ const BOMBuilder = ({ user }: BOMBuilderProps) => {
   const [slotAssignments, setSlotAssignments] = useState<Record<number, ProductCard>>({});
   const [selectedSlot, setSelectedSlot] = useState<number | null>(null);
   const [showSlotSelector, setShowSlotSelector] = useState(false);
+  const [showAnalogConfigurator, setShowAnalogConfigurator] = useState(false);
+  const [configuringAnalogCard, setConfiguringAnalogCard] = useState<BOMItem | null>(null);
   
   // Quote fields
   const [oracleCustomerId, setOracleCustomerId] = useState('');
@@ -38,11 +41,13 @@ const BOMBuilder = ({ user }: BOMBuilderProps) => {
       quantity: 1,
       slot,
       enabled: true,
-      level2Options: level2Options || []
+      level2Options: level2Options || [],
+      level3Customizations: []
     };
     
     setBomItems(prev => [...prev, newItem]);
     console.log("Added to BOM:", newItem);
+    return newItem;
   };
 
   const handleChassisSelect = (chassis: Chassis) => {
@@ -50,18 +55,24 @@ const BOMBuilder = ({ user }: BOMBuilderProps) => {
     addToBOM(chassis);
     // Reset slot assignments when changing chassis
     setSlotAssignments({});
-    setSelectedSlot(2); // Start at slot 2 (slot 1 is CPU)
+    setSelectedSlot(1); // Start at slot 1 after CPU
   };
 
   const addCardToSlot = (card: ProductCard, slot: number) => {
     // Add to BOM with slot assignment
-    addToBOM(card, slot);
+    const newBomItem = addToBOM(card, slot);
     
     // Update slot assignments
     setSlotAssignments(prev => ({ ...prev, [slot]: card }));
     
     // Close the slot selector
     setShowSlotSelector(false);
+    
+    // If it's an analog card, open the configurator
+    if (card.type === 'analog') {
+      setConfiguringAnalogCard(newBomItem);
+      setShowAnalogConfigurator(true);
+    }
     
     // Auto-advance to next available slot
     if (selectedChassis) {
@@ -76,7 +87,7 @@ const BOMBuilder = ({ user }: BOMBuilderProps) => {
     if (!selectedChassis) return null;
     
     for (let i = currentSlot + 1; i <= selectedChassis.slots; i++) {
-      if (i !== 1 && !slotAssignments[i]) { // Skip slot 1 (CPU) and occupied slots
+      if (!slotAssignments[i]) { // Skip occupied slots
         return i;
       }
     }
@@ -84,9 +95,20 @@ const BOMBuilder = ({ user }: BOMBuilderProps) => {
   };
 
   const handleSlotClick = (slot: number) => {
-    if (slot === 1) return; // CPU slot is fixed
     setSelectedSlot(slot);
     setShowSlotSelector(true);
+  };
+
+  const clearSlot = (slot: number) => {
+    // Remove from slot assignments
+    setSlotAssignments(prev => {
+      const updated = { ...prev };
+      delete updated[slot];
+      return updated;
+    });
+    
+    // Remove from BOM
+    setBomItems(prev => prev.filter(item => item.slot !== slot));
   };
 
   const removeFromBOM = (itemId: string) => {
@@ -121,6 +143,12 @@ const BOMBuilder = ({ user }: BOMBuilderProps) => {
     }));
   };
 
+  const updateLevel3Customizations = (bomItemId: string, customizations: Level3Customization[]) => {
+    setBomItems(prev => prev.map(item =>
+      item.id === bomItemId ? { ...item, level3Customizations: customizations } : item
+    ));
+  };
+
   const calculateTotal = () => {
     return bomItems
       .filter(item => item.enabled)
@@ -133,6 +161,14 @@ const BOMBuilder = ({ user }: BOMBuilderProps) => {
             .filter(opt => opt.enabled)
             .reduce((sum, opt) => sum + opt.price, 0);
           itemTotal += level2Total;
+        }
+        
+        // Add Level 3 customizations cost
+        if (item.level3Customizations) {
+          const level3Total = item.level3Customizations
+            .filter(cust => cust.enabled)
+            .reduce((sum, cust) => sum + cust.price, 0);
+          itemTotal += level3Total;
         }
         
         return total + itemTotal;
@@ -179,7 +215,7 @@ const BOMBuilder = ({ user }: BOMBuilderProps) => {
                   id="oracle-id"
                   value={oracleCustomerId}
                   onChange={(e) => setOracleCustomerId(e.target.value)}
-                  className="bg-gray-800 border-gray-700 text-white"
+                  className="bg-gray-800 border-gray-700 text-white placeholder:text-gray-400"
                   placeholder="Enter Oracle ID"
                 />
               </div>
@@ -189,7 +225,7 @@ const BOMBuilder = ({ user }: BOMBuilderProps) => {
                   id="customer-name"
                   value={customerName}
                   onChange={(e) => setCustomerName(e.target.value)}
-                  className="bg-gray-800 border-gray-700 text-white"
+                  className="bg-gray-800 border-gray-700 text-white placeholder:text-gray-400"
                   placeholder="Enter customer name"
                 />
               </div>
@@ -233,6 +269,7 @@ const BOMBuilder = ({ user }: BOMBuilderProps) => {
               chassis={selectedChassis}
               slotAssignments={slotAssignments}
               onSlotClick={handleSlotClick}
+              onSlotClear={clearSlot}
               selectedSlot={selectedSlot}
             />
           )}
@@ -245,6 +282,22 @@ const BOMBuilder = ({ user }: BOMBuilderProps) => {
               onCardSelect={addCardToSlot}
               onClose={() => setShowSlotSelector(false)}
               canSeePrices={canSeePrices}
+            />
+          )}
+
+          {/* Analog Card Configurator Modal */}
+          {showAnalogConfigurator && configuringAnalogCard && (
+            <AnalogCardConfigurator
+              bomItem={configuringAnalogCard}
+              onSave={(customizations) => {
+                updateLevel3Customizations(configuringAnalogCard.id, customizations);
+                setShowAnalogConfigurator(false);
+                setConfiguringAnalogCard(null);
+              }}
+              onClose={() => {
+                setShowAnalogConfigurator(false);
+                setConfiguringAnalogCard(null);
+              }}
             />
           )}
         </div>
@@ -286,7 +339,7 @@ const BOMBuilder = ({ user }: BOMBuilderProps) => {
                                 {item.product.name}
                               </p>
                               {item.slot && (
-                                <Badge variant="outline" className="mt-1 text-xs">
+                                <Badge variant="outline" className="mt-1 text-xs text-white border-gray-500">
                                   Slot {item.slot}
                                 </Badge>
                               )}
@@ -301,6 +354,17 @@ const BOMBuilder = ({ user }: BOMBuilderProps) => {
                                   <ExternalLink className="h-3 w-3 mr-1 inline" />
                                   Product Info
                                 </a>
+                              )}
+
+                              {item.product.type === 'analog' && item.level3Customizations && item.level3Customizations.length > 0 && (
+                                <div className="mt-2">
+                                  <p className="text-xs text-gray-400 mb-1">Configured Channels:</p>
+                                  {item.level3Customizations.filter(c => c.enabled).map((config, idx) => (
+                                    <div key={idx} className="text-xs text-white">
+                                      Ch{idx + 1}: {config.name}
+                                    </div>
+                                  ))}
+                                </div>
                               )}
                             </div>
                           </div>
@@ -362,6 +426,23 @@ const BOMBuilder = ({ user }: BOMBuilderProps) => {
                           </div>
                         ) : (
                           <p className="text-gray-400 text-xs">No options available</p>
+                        )}
+
+                        {item.product.type === 'analog' && (
+                          <div className="mt-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="text-white border-gray-500 hover:bg-gray-600"
+                              onClick={() => {
+                                setConfiguringAnalogCard(item);
+                                setShowAnalogConfigurator(true);
+                              }}
+                            >
+                              <Settings className="h-3 w-3 mr-1" />
+                              Configure Channels
+                            </Button>
+                          </div>
                         )}
                       </div>
                     ))
