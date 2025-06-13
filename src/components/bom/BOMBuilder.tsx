@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { User } from "@/types/auth";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,12 +8,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import Level1ProductSelector from "./Level1ProductSelector";
+import Level2OptionsSelector from "./Level2OptionsSelector";
 import CardLibrary from "./CardLibrary";
 import RackVisualizer from "./RackVisualizer";
 import SlotCardSelector from "./SlotCardSelector";
 import ToggleSwitch from "@/components/ui/toggle-switch";
-import { BOMItem, Chassis, Card as ProductCard, Level1Product, isLevel1Product } from "@/types/product";
-import { ShoppingCart, Save, Send, ExternalLink } from "lucide-react";
+import { BOMItem, Chassis, Card as ProductCard, Level1Product, Level2Option, isLevel1Product } from "@/types/product";
+import { ShoppingCart, Save, Send, ExternalLink, Settings, Plus } from "lucide-react";
 
 interface BOMBuilderProps {
   user: User;
@@ -25,19 +27,22 @@ const BOMBuilder = ({ user }: BOMBuilderProps) => {
   const [slotAssignments, setSlotAssignments] = useState<Record<number, ProductCard>>({});
   const [selectedSlot, setSelectedSlot] = useState<number | null>(null);
   const [showSlotSelector, setShowSlotSelector] = useState(false);
+  const [showLevel2Selector, setShowLevel2Selector] = useState(false);
+  const [level1ProductForOptions, setLevel1ProductForOptions] = useState<Level1Product | null>(null);
   
   // New quote fields
   const [oracleCustomerId, setOracleCustomerId] = useState('');
   const [customerName, setCustomerName] = useState('');
   const [quotePriority, setQuotePriority] = useState<'High' | 'Medium' | 'Low'>('Medium');
 
-  const addToBOM = (product: Chassis | ProductCard | Level1Product, slot?: number) => {
+  const addToBOM = (product: Chassis | ProductCard | Level1Product, slot?: number, level2Options?: Level2Option[]) => {
     const newItem: BOMItem = {
       id: `bom-${Date.now()}`,
       product,
       quantity: 1,
       slot,
-      enabled: true
+      enabled: true,
+      level2Options: level2Options || []
     };
     
     setBomItems(prev => [...prev, newItem]);
@@ -86,6 +91,26 @@ const BOMBuilder = ({ user }: BOMBuilderProps) => {
     setShowSlotSelector(true);
   };
 
+  const handleLevel1ProductSelect = (product: Level1Product) => {
+    setSelectedLevel1Product(product);
+    setLevel1ProductForOptions(product);
+    setShowLevel2Selector(true);
+  };
+
+  const handleLevel2OptionsSelect = (options: Level2Option[]) => {
+    if (level1ProductForOptions) {
+      addToBOM(level1ProductForOptions, undefined, options);
+      setLevel1ProductForOptions(null);
+    }
+  };
+
+  const openLevel2Options = (item: BOMItem) => {
+    if (isLevel1Product(item.product)) {
+      setLevel1ProductForOptions(item.product);
+      setShowLevel2Selector(true);
+    }
+  };
+
   const removeFromBOM = (itemId: string) => {
     const item = bomItems.find(i => i.id === itemId);
     if (item?.slot) {
@@ -108,7 +133,17 @@ const BOMBuilder = ({ user }: BOMBuilderProps) => {
     return bomItems
       .filter(item => item.enabled)
       .reduce((total, item) => {
-        return total + (item.product.price * item.quantity);
+        let itemTotal = item.product.price * item.quantity;
+        
+        // Add Level 2 options cost
+        if (item.level2Options) {
+          const level2Total = item.level2Options
+            .filter(opt => opt.enabled)
+            .reduce((sum, opt) => sum + opt.price, 0);
+          itemTotal += level2Total;
+        }
+        
+        return total + itemTotal;
       }, 0);
   };
 
@@ -182,10 +217,7 @@ const BOMBuilder = ({ user }: BOMBuilderProps) => {
         {/* Configuration Panel */}
         <div className="lg:col-span-2 space-y-6">
           <Level1ProductSelector 
-            onProductSelect={(product) => {
-              setSelectedLevel1Product(product);
-              addToBOM(product);
-            }}
+            onProductSelect={handleLevel1ProductSelect}
             selectedProduct={selectedLevel1Product}
             canSeePrices={canSeePrices}
           />
@@ -197,6 +229,21 @@ const BOMBuilder = ({ user }: BOMBuilderProps) => {
               slotAssignments={slotAssignments}
               onSlotClick={handleSlotClick}
               selectedSlot={selectedSlot}
+            />
+          )}
+
+          {/* Level 2 Options Selector */}
+          {level1ProductForOptions && (
+            <Level2OptionsSelector
+              level1Product={level1ProductForOptions}
+              onOptionsSelect={handleLevel2OptionsSelect}
+              selectedOptions={[]}
+              canSeePrices={canSeePrices}
+              isOpen={showLevel2Selector}
+              onClose={() => {
+                setShowLevel2Selector(false);
+                setLevel1ProductForOptions(null);
+              }}
             />
           )}
 
@@ -229,47 +276,81 @@ const BOMBuilder = ({ user }: BOMBuilderProps) => {
                 <p className="text-gray-400 text-sm">No items added yet</p>
               ) : (
                 bomItems.map((item) => (
-                  <div key={item.id} className="flex justify-between items-start p-3 bg-gray-800 rounded">
-                    <div className="flex items-start space-x-3 flex-1">
-                      <ToggleSwitch
-                        checked={item.enabled}
-                        onCheckedChange={(enabled) => toggleBOMItem(item.id, enabled)}
-                        size="sm"
-                      />
-                      <div className="flex-1">
-                        <p className={`font-medium text-sm ${item.enabled ? 'text-white' : 'text-gray-500'}`}>
-                          {item.product.name}
-                        </p>
-                        {item.slot && (
-                          <Badge variant="outline" className="mt-1 text-xs">
-                            Slot {item.slot}
-                          </Badge>
-                        )}
-                        {isLevel1Product(item.product) && item.product.productInfoUrl && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="text-blue-400 hover:text-blue-300 p-0 h-auto mt-1"
-                            onClick={() => window.open(item.product.productInfoUrl, '_blank')}
-                          >
-                            <ExternalLink className="h-3 w-3 mr-1" />
-                            Product Info
-                          </Button>
-                        )}
+                  <div key={item.id} className="p-3 bg-gray-800 rounded">
+                    <div className="flex justify-between items-start">
+                      <div className="flex items-start space-x-3 flex-1">
+                        <ToggleSwitch
+                          checked={item.enabled}
+                          onCheckedChange={(enabled) => toggleBOMItem(item.id, enabled)}
+                          size="sm"
+                        />
+                        <div className="flex-1">
+                          <p className={`font-medium text-sm ${item.enabled ? 'text-white' : 'text-gray-500'}`}>
+                            {item.product.name}
+                          </p>
+                          {item.slot && (
+                            <Badge variant="outline" className="mt-1 text-xs">
+                              Slot {item.slot}
+                            </Badge>
+                          )}
+                          
+                          {/* Level 2 Options */}
+                          {item.level2Options && item.level2Options.length > 0 && (
+                            <div className="mt-2 space-y-1">
+                              <p className="text-xs text-gray-400">Level 2 Options:</p>
+                              {item.level2Options.map((option) => (
+                                <div key={option.id} className="text-xs text-gray-300 ml-2">
+                                  • {option.name} {option.enabled && canSeePrices && `($${option.price.toLocaleString()})`}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                          
+                          {/* Configuration button for Level 1 products */}
+                          {isLevel1Product(item.product) && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-blue-400 hover:text-blue-300 p-0 h-auto mt-1"
+                              onClick={() => openLevel2Options(item)}
+                            >
+                              <Settings className="h-3 w-3 mr-1" />
+                              Configure Options
+                            </Button>
+                          )}
+
+                          {isLevel1Product(item.product) && item.product.productInfoUrl && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-blue-400 hover:text-blue-300 p-0 h-auto mt-1"
+                              onClick={() => window.open(item.product.productInfoUrl, '_blank')}
+                            >
+                              <ExternalLink className="h-3 w-3 mr-1" />
+                              Product Info
+                            </Button>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                    <div className="text-right ml-2">
-                      <p className={`font-bold text-sm ${item.enabled ? 'text-white' : 'text-gray-500'}`}>
-                        {canSeePrices ? `$${item.product.price.toLocaleString()}` : '—'}
-                      </p>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => removeFromBOM(item.id)}
-                        className="text-red-400 hover:text-red-300 hover:bg-red-900/20 p-1 h-auto"
-                      >
-                        Remove
-                      </Button>
+                      <div className="text-right ml-2">
+                        <p className={`font-bold text-sm ${item.enabled ? 'text-white' : 'text-gray-500'}`}>
+                          {canSeePrices ? `$${item.product.price.toLocaleString()}` : '—'}
+                        </p>
+                        {/* Show Level 2 options total */}
+                        {item.level2Options && item.level2Options.length > 0 && canSeePrices && (
+                          <p className={`text-xs ${item.enabled ? 'text-gray-400' : 'text-gray-600'}`}>
+                            +${item.level2Options.filter(opt => opt.enabled).reduce((sum, opt) => sum + opt.price, 0).toLocaleString()} options
+                          </p>
+                        )}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => removeFromBOM(item.id)}
+                          className="text-red-400 hover:text-red-300 hover:bg-red-900/20 p-1 h-auto"
+                        >
+                          Remove
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 ))
