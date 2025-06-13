@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { User } from "@/types/auth";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -34,6 +33,44 @@ const BOMBuilder = ({ user }: BOMBuilderProps) => {
   const [oracleCustomerId, setOracleCustomerId] = useState('');
   const [customerName, setCustomerName] = useState('');
   const [quotePriority, setQuotePriority] = useState<'High' | 'Medium' | 'Low'>('Medium');
+
+  // Function to convert Level 1 QTMS products to chassis
+  const getChassisFromLevel1Product = (product: Level1Product): Chassis | null => {
+    if (product.type !== 'QTMS') return null;
+    
+    if (product.id === 'qtms-ltx') {
+      return {
+        id: 'ltx-6u',
+        name: 'LTX Chassis',
+        type: 'LTX',
+        height: '6U',
+        slots: 14,
+        price: product.price,
+        description: 'High-capacity chassis with 14 slots for maximum flexibility'
+      };
+    } else if (product.id === 'qtms-mtx') {
+      return {
+        id: 'mtx-3u',
+        name: 'MTX Chassis',
+        type: 'MTX',
+        height: '3U',
+        slots: 7,
+        price: product.price,
+        description: 'Mid-range chassis with 7 slots for balanced solutions'
+      };
+    } else if (product.id === 'qtms-stx') {
+      return {
+        id: 'stx-1.5u',
+        name: 'STX Chassis',
+        type: 'STX',
+        height: '1.5U',
+        slots: 4,
+        price: product.price,
+        description: 'Compact chassis with 4 slots for space-constrained applications'
+      };
+    }
+    return null;
+  };
 
   const addToBOM = (product: Chassis | ProductCard | Level1Product, slot?: number, level2Options?: Level2Option[]) => {
     const newItem: BOMItem = {
@@ -93,6 +130,23 @@ const BOMBuilder = ({ user }: BOMBuilderProps) => {
 
   const handleLevel1ProductSelect = (product: Level1Product) => {
     setSelectedLevel1Product(product);
+    
+    // If it's a QTMS product, automatically set up the chassis
+    if (product.type === 'QTMS') {
+      const chassis = getChassisFromLevel1Product(product);
+      if (chassis) {
+        setSelectedChassis(chassis);
+        // Reset slot assignments when changing chassis
+        setSlotAssignments({});
+        setSelectedSlot(2); // Start at slot 2 (slot 1 is CPU)
+      }
+    } else {
+      // For non-QTMS products, clear chassis
+      setSelectedChassis(null);
+      setSlotAssignments({});
+      setSelectedSlot(null);
+    }
+    
     setLevel1ProductForOptions(product);
     setShowLevel2Selector(true);
   };
@@ -236,7 +290,7 @@ const BOMBuilder = ({ user }: BOMBuilderProps) => {
             canSeePrices={canSeePrices}
           />
 
-          {/* Rack Visualizer - Now shows after Level 1 selection */}
+          {/* Rack Visualizer - Shows after Level 1 QTMS selection */}
           {selectedChassis && (
             <RackVisualizer 
               chassis={selectedChassis}
