@@ -46,52 +46,55 @@ const ChassisSelector = ({ onChassisSelect, selectedChassis, canSeePrices }: Cha
   ];
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-      {chassisOptions.map((chassis) => (
-        <Card 
-          key={chassis.id} 
-          className={`bg-gray-900 border-gray-800 cursor-pointer transition-all hover:border-red-600 ${
-            selectedChassis?.id === chassis.id ? 'border-red-600 bg-red-900/20' : ''
-          }`}
-          onClick={() => onChassisSelect(chassis)}
-        >
-          <CardHeader>
-            <div className="flex justify-between items-start">
-              <div>
-                <CardTitle className="text-white text-lg">{chassis.name}</CardTitle>
-                <CardDescription className="text-gray-400">
-                  {chassis.height} • {chassis.slots} slots
-                </CardDescription>
+    <div className="space-y-4">
+      <h3 className="text-xl font-bold text-white mb-4">Select QTMS Chassis Model</h3>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {chassisOptions.map((chassis) => (
+          <Card 
+            key={chassis.id} 
+            className={`bg-gray-900 border-gray-800 cursor-pointer transition-all hover:border-red-600 ${
+              selectedChassis?.id === chassis.id ? 'border-red-600 bg-red-900/20' : ''
+            }`}
+            onClick={() => onChassisSelect(chassis)}
+          >
+            <CardHeader>
+              <div className="flex justify-between items-start">
+                <div>
+                  <CardTitle className="text-white text-lg">{chassis.name}</CardTitle>
+                  <CardDescription className="text-gray-400">
+                    {chassis.height} • {chassis.slots} slots
+                  </CardDescription>
+                </div>
+                {selectedChassis?.id === chassis.id && (
+                  <Check className="h-5 w-5 text-green-500" />
+                )}
               </div>
-              {selectedChassis?.id === chassis.id && (
-                <Check className="h-5 w-5 text-green-500" />
-              )}
-            </div>
-          </CardHeader>
-          <CardContent>
-            <p className="text-gray-400 text-sm mb-4">{chassis.description}</p>
-            
-            <div className="flex justify-between items-center">
-              <Badge variant="outline" className="text-xs">
-                {chassis.type}
-              </Badge>
-              <span className="text-white font-bold">
-                {canSeePrices ? `$${chassis.price.toLocaleString()}` : '—'}
-              </span>
-            </div>
-            
-            <Button 
-              className="w-full mt-4 bg-red-600 hover:bg-red-700 text-white"
-              onClick={(e) => {
-                e.stopPropagation();
-                onChassisSelect(chassis);
-              }}
-            >
-              Select Chassis
-            </Button>
-          </CardContent>
-        </Card>
-      ))}
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-gray-400 text-sm">{chassis.description}</p>
+              
+              <div className="flex justify-between items-center">
+                <Badge variant="outline" className="text-xs text-white border-gray-500">
+                  {chassis.type}
+                </Badge>
+                <span className="text-white font-bold">
+                  {canSeePrices ? `$${chassis.price.toLocaleString()}` : '—'}
+                </span>
+              </div>
+              
+              <Button 
+                className="w-full bg-red-600 hover:bg-red-700 text-white"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onChassisSelect(chassis);
+                }}
+              >
+                Select Chassis
+              </Button>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
     </div>
   );
 };

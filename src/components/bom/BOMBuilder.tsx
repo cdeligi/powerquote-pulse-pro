@@ -7,6 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import ChassisSelector from "./ChassisSelector";
+import Level1ProductSelector from "./Level1ProductSelector";
 import Level2OptionsSelector from "./Level2OptionsSelector";
 import RackVisualizer from "./RackVisualizer";
 import SlotCardSelector from "./SlotCardSelector";
@@ -151,6 +152,12 @@ const BOMBuilder = ({ user }: BOMBuilderProps) => {
       return;
     }
     
+    // Prevent non-display cards from being placed in slot 8 on LTX chassis
+    if (selectedChassis?.type === 'LTX' && slot === 8 && card.type !== 'display') {
+      console.log("Slot 8 is reserved for display cards only in LTX chassis");
+      return;
+    }
+    
     // Normal card handling
     const newBomItem = addToBOM(card, slot);
     
@@ -190,6 +197,21 @@ const BOMBuilder = ({ user }: BOMBuilderProps) => {
   };
 
   const handleSlotClick = (slot: number) => {
+    // Prevent non-display cards from being selected for slot 8 in LTX chassis
+    if (selectedChassis?.type === 'LTX' && slot === 8) {
+      // Only allow if it's for clearing or if we're going to add a display card
+      if (slotAssignments[slot]) {
+        // Allow clearing
+        setSelectedSlot(slot);
+        setShowSlotSelector(true);
+      } else {
+        // Only show display cards for slot 8
+        setSelectedSlot(slot);
+        setShowSlotSelector(true);
+      }
+      return;
+    }
+    
     setSelectedSlot(slot);
     setShowSlotSelector(true);
   };
@@ -304,7 +326,7 @@ const BOMBuilder = ({ user }: BOMBuilderProps) => {
           <p className="text-gray-400">Configure your power transformer solution</p>
         </div>
         <div className="flex space-x-2">
-          <Button variant="outline" className="border-gray-600 text-black hover:bg-gray-800 hover:text-white bg-white">
+          <Button variant="outline" className="border-gray-600 text-white hover:bg-gray-800 hover:text-white bg-gray-900">
             <Save className="mr-2 h-4 w-4" />
             Save Draft
           </Button>
@@ -363,22 +385,47 @@ const BOMBuilder = ({ user }: BOMBuilderProps) => {
             </CardContent>
           </Card>
 
-          {/* Step 1: Select Chassis */}
+          {/* Product Selection Tabs */}
           <div className="space-y-4">
-            <div className="flex items-center space-x-4">
-              <div className="bg-red-600 text-white px-4 py-2 rounded font-medium">
-                1. Select Chassis
-              </div>
-              <div className={`px-4 py-2 rounded font-medium ${selectedChassis ? 'bg-gray-600 text-white' : 'bg-gray-800 text-gray-400'}`}>
-                2. Add Cards
-              </div>
-            </div>
+            <Tabs defaultValue="qtms" className="w-full">
+              <TabsList className="grid w-full grid-cols-3 bg-gray-800">
+                <TabsTrigger value="qtms" className="text-white data-[state=active]:bg-red-600 data-[state=active]:text-white">
+                  1. Select QTMS Model
+                </TabsTrigger>
+                <TabsTrigger value="dga" className="text-white data-[state=active]:bg-red-600 data-[state=active]:text-white">
+                  2. DGA
+                </TabsTrigger>
+                <TabsTrigger value="pd" className="text-white data-[state=active]:bg-red-600 data-[state=active]:text-white">
+                  3. Partial Discharge
+                </TabsTrigger>
+              </TabsList>
 
-            <ChassisSelector 
-              onChassisSelect={handleChassisSelect}
-              selectedChassis={selectedChassis}
-              canSeePrices={canSeePrices}
-            />
+              <TabsContent value="qtms" className="mt-4">
+                <ChassisSelector 
+                  onChassisSelect={handleChassisSelect}
+                  selectedChassis={selectedChassis}
+                  canSeePrices={canSeePrices}
+                />
+              </TabsContent>
+
+              <TabsContent value="dga" className="mt-4">
+                <Level1ProductSelector 
+                  onProductSelect={(product) => addToBOM(product)}
+                  selectedProduct={null}
+                  canSeePrices={canSeePrices}
+                  productType="DGA"
+                />
+              </TabsContent>
+
+              <TabsContent value="pd" className="mt-4">
+                <Level1ProductSelector 
+                  onProductSelect={(product) => addToBOM(product)}
+                  selectedProduct={null}
+                  canSeePrices={canSeePrices}
+                  productType="PD"
+                />
+              </TabsContent>
+            </Tabs>
           </div>
 
           {/* Rack Configuration - Shows after chassis selection */}
