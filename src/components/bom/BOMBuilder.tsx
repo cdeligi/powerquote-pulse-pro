@@ -16,6 +16,7 @@ import AnalogCardConfigurator from "./AnalogCardConfigurator";
 import ToggleSwitch from "@/components/ui/toggle-switch";
 import { BOMItem, Chassis, Card as ProductCard, Level1Product, Level2Option, Level3Customization, isLevel1Product, isChassis, isCard, generateQTMSPartNumber, generateProductPartNumber } from "@/types/product";
 import { ShoppingCart, Save, Send, ExternalLink, Settings, Plus, Trash2, Monitor } from "lucide-react";
+import { generateQuotePDF } from '@/utils/pdfGenerator';
 
 interface BOMBuilderProps {
   user: User;
@@ -389,6 +390,35 @@ const BOMBuilder = ({ user }: BOMBuilderProps) => {
       .reduce((total, item) => total + calculateItemPrice(item), 0);
   };
 
+  // Enhanced QTMS part number generation
+  const getQTMSPartNumber = () => {
+    const chassis = bomItems.find(item => isChassis(item.product))?.product as Chassis;
+    const cards = bomItems
+      .filter(item => isCard(item.product) && item.product.id !== 'remote-display')
+      .map(item => item.product as ProductCard);
+    
+    // Get analog configurations for part number generation
+    const analogConfigurations: Record<string, any> = {};
+    bomItems
+      .filter(item => isCard(item.product) && item.product.type === 'analog')
+      .forEach(item => {
+        if (item.level3Customizations && item.level3Customizations.length > 0) {
+          const sensorTypes: Record<number, string> = {};
+          item.level3Customizations.forEach((customization, index) => {
+            if (customization.enabled) {
+              sensorTypes[index + 1] = customization.name;
+            }
+          });
+          analogConfigurations[item.product.id] = { sensorTypes };
+        }
+      });
+    
+    if (chassis) {
+      return generateQTMSPartNumber(chassis, cards, hasRemoteDisplay, slotAssignments, analogConfigurations);
+    }
+    return '';
+  };
+
   // Group QTMS items for combined pricing and generate combined part number
   const getQTMSTotal = () => {
     const qtmsItems = bomItems.filter(item => 
@@ -406,16 +436,44 @@ const BOMBuilder = ({ user }: BOMBuilderProps) => {
     return qtmsItems.reduce((total, item) => total + calculateItemPrice(item), 0);
   };
 
-  const getQTMSPartNumber = () => {
-    const chassis = bomItems.find(item => isChassis(item.product))?.product as Chassis;
-    const cards = bomItems
-      .filter(item => isCard(item.product) && item.product.id !== 'remote-display')
-      .map(item => item.product as ProductCard);
+  const handleSaveDraft = () => {
+    const quoteData: Partial<Quote> = {
+      id: `DRAFT-${Date.now()}`,
+      customerName,
+      oracleCustomerId,
+      priority: quotePriority,
+      isRepInvolved,
+      shippingTerms,
+      paymentTerms,
+      quoteCurrency,
+      createdAt: new Date().toISOString()
+    };
+
+    generateQuotePDF(bomItems, quoteData, canSeePrices);
+  };
+
+  const handleRequestQuote = () => {
+    // Prepare comprehensive quote request data
+    const quoteRequest = {
+      id: `QR-${Date.now()}`,
+      customerName,
+      oracleCustomerId,
+      priority: quotePriority,
+      isRepInvolved,
+      shippingTerms,
+      paymentTerms,
+      quoteCurrency,
+      bomItems: bomItems.filter(item => item.enabled),
+      total: calculateTotal(),
+      createdAt: new Date().toISOString(),
+      status: 'pending_approval' as const
+    };
+
+    console.log('Quote request submitted for approval:', quoteRequest);
+    // Here you would typically send this to your backend/admin system
     
-    if (chassis) {
-      return generateQTMSPartNumber(chassis, cards, hasRemoteDisplay);
-    }
-    return '';
+    // Show success message
+    alert('Quote request submitted successfully! You will be notified once it has been reviewed.');
   };
 
   const canSeePrices = user.role !== 'level1';
@@ -429,11 +487,19 @@ const BOMBuilder = ({ user }: BOMBuilderProps) => {
           <p className="text-gray-400">Configure your power transformer solution</p>
         </div>
         <div className="flex space-x-2">
-          <Button variant="outline" className="border-gray-600 text-white hover:bg-gray-800 hover:text-white bg-gray-900">
+          <Button 
+            variant="outline" 
+            className="border-gray-600 text-white hover:bg-gray-800 hover:text-white bg-gray-900"
+            onClick={handleSaveDraft}
+          >
             <Save className="mr-2 h-4 w-4" />
             Save Draft
           </Button>
-          <Button className="bg-red-600 hover:bg-red-700 text-white">
+          <Button 
+            className="bg-red-600 hover:bg-red-700 text-white"
+            onClick={handleRequestQuote}
+            disabled={bomItems.length === 0 || !customerName || !oracleCustomerId}
+          >
             <Send className="mr-2 h-4 w-4" />
             Request Quote
           </Button>

@@ -137,7 +137,13 @@ export const ANALOG_SENSOR_DESCRIPTIONS: Record<AnalogSensorType, string> = {
 export const TM1_CUSTOMIZATION_OPTIONS = ['Moisture Sensor', '4-20mA bridge'] as const;
 
 // Part number generation functions
-export const generateQTMSPartNumber = (chassis: Chassis, cards: Card[], hasRemoteDisplay: boolean): string => {
+export const generateQTMSPartNumber = (
+  chassis: Chassis, 
+  cards: Card[], 
+  hasRemoteDisplay: boolean,
+  slotAssignments: Record<number, Card>,
+  analogConfigurations?: Record<string, any>
+): string => {
   let partNumber = '';
   
   // Base chassis part number
@@ -153,19 +159,51 @@ export const generateQTMSPartNumber = (chassis: Chassis, cards: Card[], hasRemot
       break;
   }
   
-  // Add card configuration
-  const cardTypes = cards.map(card => {
-    switch (card.type) {
-      case 'relay': return 'R';
-      case 'analog': return 'A';
-      case 'fiber': return 'F';
-      case 'display': return 'D';
-      case 'bushing': return 'B';
-      default: return 'X';
-    }
-  }).join('');
+  // Generate slot configuration string
+  const maxSlots = chassis.type === 'LTX' ? 14 : chassis.type === 'MTX' ? 7 : 4;
+  let slotConfig = '';
   
-  partNumber += cardTypes || 'BASE';
+  for (let i = 1; i <= maxSlots; i++) {
+    const card = slotAssignments[i];
+    if (card) {
+      let slotCode = '';
+      switch (card.type) {
+        case 'relay': 
+          slotCode = 'R';
+          break;
+        case 'analog': 
+          // Check for analog configuration
+          const analogConfig = analogConfigurations?.[card.id];
+          if (analogConfig && analogConfig.sensorTypes) {
+            const uniqueSensors = [...new Set(Object.values(analogConfig.sensorTypes))];
+            slotCode = `A${uniqueSensors.length}`;
+          } else {
+            slotCode = 'A';
+          }
+          break;
+        case 'fiber': 
+          slotCode = 'F';
+          break;
+        case 'display': 
+          slotCode = 'D';
+          break;
+        case 'bushing': 
+          slotCode = 'B';
+          // Check if this is the second slot of a bushing card
+          if (i > 1 && slotAssignments[i-1]?.type === 'bushing' && slotAssignments[i-1]?.id === card.id) {
+            continue; // Skip second slot of bushing card
+          }
+          break;
+        default: 
+          slotCode = 'X';
+      }
+      slotConfig += slotCode;
+    } else {
+      slotConfig += 'E'; // Empty slot
+    }
+  }
+  
+  partNumber += slotConfig;
   
   // Add remote display suffix
   if (hasRemoteDisplay) {
