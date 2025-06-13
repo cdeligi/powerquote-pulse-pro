@@ -18,13 +18,11 @@ const RackVisualizer = ({ chassis, slotAssignments, onSlotClick, onSlotClear, se
     if (slot === 0) return 'bg-blue-600'; // CPU slot (slot 0)
     if (selectedSlot === slot) return 'bg-yellow-600'; // Selected slot
     if (slotAssignments[slot]) return 'bg-green-600'; // Occupied
-    if (chassis.type === 'LTX' && slot === 8) return 'bg-purple-600'; // Display slot for LTX
     return 'bg-gray-700'; // Empty
   };
 
   const getSlotLabel = (slot: number) => {
     if (slot === 0) return 'CPU';
-    if (chassis.type === 'LTX' && slot === 8 && !slotAssignments[slot]) return 'Display';
     if (slotAssignments[slot]) {
       const card = slotAssignments[slot];
       return card.type.charAt(0).toUpperCase() + card.type.slice(1);
@@ -34,7 +32,6 @@ const RackVisualizer = ({ chassis, slotAssignments, onSlotClick, onSlotClear, se
 
   const getSlotTitle = (slot: number) => {
     if (slot === 0) return 'CPU (Fixed)';
-    if (chassis.type === 'LTX' && slot === 8 && !slotAssignments[slot]) return 'Slot 8 - Reserved for Display Card';
     if (slotAssignments[slot]) return slotAssignments[slot].name;
     return `Slot ${slot} - Click to add card`;
   };
@@ -78,24 +75,23 @@ const RackVisualizer = ({ chassis, slotAssignments, onSlotClick, onSlotClear, se
 
   const renderChassisLayout = () => {
     if (chassis.type === 'LTX') {
-      // 15 slots total: CPU (0) + 1-14
-      // Top row: CPU + slots 1-7
-      // Bottom row: slots 8-14
-      const topRowSlots = [0, 1, 2, 3, 4, 5, 6, 7];
-      const bottomRowSlots = [8, 9, 10, 11, 12, 13, 14];
+      // Top row: slots 8-14
+      // Bottom row: CPU (0) + slots 1-7
+      const topRowSlots = [8, 9, 10, 11, 12, 13, 14];
+      const bottomRowSlots = [0, 1, 2, 3, 4, 5, 6, 7];
       
       return (
         <div className="space-y-2">
-          <div className="grid grid-cols-8 gap-2">
+          <div className="grid grid-cols-7 gap-2">
             {topRowSlots.map(renderSlot)}
           </div>
-          <div className="grid grid-cols-7 gap-2">
+          <div className="grid grid-cols-8 gap-2">
             {bottomRowSlots.map(renderSlot)}
           </div>
         </div>
       );
     } else if (chassis.type === 'MTX') {
-      // 8 slots total: CPU (0) + 1-7 in single row
+      // Single row: CPU (0) + slots 1-7
       const slots = [0, 1, 2, 3, 4, 5, 6, 7];
       return (
         <div className="grid grid-cols-8 gap-2">
@@ -103,7 +99,7 @@ const RackVisualizer = ({ chassis, slotAssignments, onSlotClick, onSlotClear, se
         </div>
       );
     } else {
-      // STX: 5 slots total: CPU (0) + 1-4 in single row
+      // STX: Single row: CPU (0) + slots 1-4
       const slots = [0, 1, 2, 3, 4];
       return (
         <div className="grid grid-cols-5 gap-2">
@@ -143,12 +139,6 @@ const RackVisualizer = ({ chassis, slotAssignments, onSlotClick, onSlotClear, se
               <div className="w-4 h-4 bg-green-600 rounded"></div>
               <span className="text-sm text-gray-400">Occupied</span>
             </div>
-            {chassis.type === 'LTX' && (
-              <div className="flex items-center space-x-2">
-                <div className="w-4 h-4 bg-purple-600 rounded"></div>
-                <span className="text-sm text-gray-400">Display Reserved</span>
-              </div>
-            )}
             <div className="flex items-center space-x-2">
               <div className="w-4 h-4 bg-gray-700 rounded"></div>
               <span className="text-sm text-gray-400">Available</span>

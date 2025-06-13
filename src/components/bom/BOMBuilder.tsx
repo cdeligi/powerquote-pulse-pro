@@ -94,6 +94,33 @@ const BOMBuilder = ({ user }: BOMBuilderProps) => {
   };
 
   const addCardToSlot = (card: ProductCard, slot: number) => {
+    // Special handling for display cards in LTX chassis - always go to slot 8
+    if (card.type === 'display' && selectedChassis?.type === 'LTX') {
+      slot = 8;
+      
+      // Clear slot 8 if occupied
+      if (slotAssignments[8]) {
+        clearSlot(8);
+      }
+      
+      // Add display card to slot 8
+      const newBomItem = addToBOM(card, 8);
+      
+      // Update slot assignments
+      setSlotAssignments(prev => ({ ...prev, [8]: card }));
+      
+      // Close the slot selector
+      setShowSlotSelector(false);
+      
+      // Find next available slot
+      const nextSlot = findNextAvailableSlot(8);
+      if (nextSlot) {
+        setSelectedSlot(nextSlot);
+      }
+      
+      return;
+    }
+    
     // Special handling for bushing cards
     if (card.type === 'bushing' && selectedChassis) {
       const bushingSlots = getBushingSlots(selectedChassis.type);
