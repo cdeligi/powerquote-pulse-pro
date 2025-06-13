@@ -1,4 +1,3 @@
-
 import { User } from "@/types/auth";
 import { Button } from "@/components/ui/button";
 import { 
@@ -88,9 +87,9 @@ const Sidebar = ({ user, activeView, onViewChange, onLogout }: SidebarProps) => 
         {/* Qualitrol Logo */}
         <div className="flex justify-center">
           <img 
-            src="https://www.qualitrolcorp.com/wp-content/uploads/2023/08/qualitrol-logo.png" 
+            src="/lovable-uploads/2955a70a-6714-4ded-af05-c5f87bbda099.png" 
             alt="Qualitrol Logo" 
-            className="h-8 w-auto opacity-80 hover:opacity-100 transition-opacity"
+            className="h-10 w-10 opacity-90 hover:opacity-100 transition-opacity"
           />
         </div>
         

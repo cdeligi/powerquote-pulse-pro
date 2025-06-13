@@ -1,30 +1,42 @@
+
 import { useState } from "react";
 import { User } from "@/types/auth";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import Level1ProductSelector from "./Level1ProductSelector";
 import ChassisSelector from "./ChassisSelector";
 import CardLibrary from "./CardLibrary";
 import RackVisualizer from "./RackVisualizer";
-import { BOMItem, Chassis, Card as ProductCard } from "@/types/product";
-import { ShoppingCart, Save, Send } from "lucide-react";
+import ToggleSwitch from "@/components/ui/toggle-switch";
+import { BOMItem, Chassis, Card as ProductCard, Level1Product } from "@/types/product";
+import { ShoppingCart, Save, Send, ExternalLink } from "lucide-react";
 
 interface BOMBuilderProps {
   user: User;
 }
 
 const BOMBuilder = ({ user }: BOMBuilderProps) => {
+  const [selectedLevel1Product, setSelectedLevel1Product] = useState<Level1Product | null>(null);
   const [selectedChassis, setSelectedChassis] = useState<Chassis | null>(null);
   const [bomItems, setBomItems] = useState<BOMItem[]>([]);
   const [slotAssignments, setSlotAssignments] = useState<Record<number, ProductCard>>({});
+  
+  // New quote fields
+  const [oracleCustomerId, setOracleCustomerId] = useState('');
+  const [customerName, setCustomerName] = useState('');
+  const [quotePriority, setQuotePriority] = useState<'High' | 'Medium' | 'Low'>('Medium');
 
-  const addToBOM = (product: Chassis | ProductCard, slot?: number) => {
+  const addToBOM = (product: Chassis | ProductCard | Level1Product, slot?: number) => {
     const newItem: BOMItem = {
       id: `bom-${Date.now()}`,
       product,
       quantity: 1,
-      slot
+      slot,
+      enabled: true // Default to enabled
     };
     
     setBomItems(prev => [...prev, newItem]);
@@ -49,10 +61,18 @@ const BOMBuilder = ({ user }: BOMBuilderProps) => {
     setBomItems(prev => prev.filter(item => item.id !== itemId));
   };
 
+  const toggleBOMItem = (itemId: string, enabled: boolean) => {
+    setBomItems(prev => prev.map(item => 
+      item.id === itemId ? { ...item, enabled } : item
+    ));
+  };
+
   const calculateTotal = () => {
-    return bomItems.reduce((total, item) => {
-      return total + (item.product.price * item.quantity);
-    }, 0);
+    return bomItems
+      .filter(item => item.enabled)
+      .reduce((total, item) => {
+        return total + (item.product.price * item.quantity);
+      }, 0);
   };
 
   const canSeePrices = user.role !== 'level1';
@@ -76,18 +96,77 @@ const BOMBuilder = ({ user }: BOMBuilderProps) => {
         </div>
       </div>
 
+      {/* Quote Information Form */}
+      <Card className="bg-gray-900 border-gray-800">
+        <CardHeader>
+          <CardTitle className="text-white">Quote Information</CardTitle>
+          <CardDescription className="text-gray-400">
+            Required information for quote generation
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <Label htmlFor="oracle-id" className="text-white">Oracle Customer ID</Label>
+            <Input
+              id="oracle-id"
+              value={oracleCustomerId}
+              onChange={(e) => setOracleCustomerId(e.target.value)}
+              className="bg-gray-800 border-gray-700 text-white"
+              placeholder="Enter Oracle ID"
+            />
+          </div>
+          <div>
+            <Label htmlFor="customer-name" className="text-white">Customer Name</Label>
+            <Input
+              id="customer-name"
+              value={customerName}
+              onChange={(e) => setCustomerName(e.target.value)}
+              className="bg-gray-800 border-gray-700 text-white"
+              placeholder="Enter customer name"
+            />
+          </div>
+          <div>
+            <Label htmlFor="priority" className="text-white">Quote Priority</Label>
+            <select
+              id="priority"
+              value={quotePriority}
+              onChange={(e) => setQuotePriority(e.target.value as 'High' | 'Medium' | 'Low')}
+              className="w-full bg-gray-800 border border-gray-700 text-white rounded-md px-3 py-2 mt-1"
+            >
+              <option value="High">High</option>
+              <option value="Medium">Medium</option>
+              <option value="Low">Low</option>
+            </select>
+          </div>
+        </CardContent>
+      </Card>
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Configuration Panel */}
         <div className="lg:col-span-2 space-y-6">
-          <Tabs defaultValue="chassis" className="w-full">
-            <TabsList className="grid w-full grid-cols-2 bg-gray-800">
+          <Tabs defaultValue="level1" className="w-full">
+            <TabsList className="grid w-full grid-cols-3 bg-gray-800">
+              <TabsTrigger value="level1" className="text-white data-[state=active]:bg-red-600">
+                1. Main System
+              </TabsTrigger>
               <TabsTrigger value="chassis" className="text-white data-[state=active]:bg-red-600">
-                1. Select Chassis
+                2. Select Chassis
               </TabsTrigger>
               <TabsTrigger value="cards" className="text-white data-[state=active]:bg-red-600">
-                2. Add Cards
+                3. Add Cards
               </TabsTrigger>
             </TabsList>
+            
+            <TabsContent value="level1">
+              <Level1ProductSelector 
+                onProductSelect={(product) => {
+                  setSelectedLevel1Product(product);
+                  addToBOM(product);
+                }}
+                selectedProduct={selectedLevel1Product}
+                canSeePrices={canSeePrices}
+              />              
+            </TabsContent>
             
             <TabsContent value="chassis">
               <ChassisSelector 
@@ -127,7 +206,7 @@ const BOMBuilder = ({ user }: BOMBuilderProps) => {
           )}
         </div>
 
-        {/* BOM Summary */}
+        {/* BOM Summary with Toggle Switches */}
         <div className="space-y-4">
           <Card className="bg-gray-900 border-gray-800">
             <CardHeader>
@@ -136,7 +215,7 @@ const BOMBuilder = ({ user }: BOMBuilderProps) => {
                 Bill of Materials
               </CardTitle>
               <CardDescription className="text-gray-400">
-                {bomItems.length} items configured
+                {bomItems.filter(item => item.enabled).length} of {bomItems.length} items enabled
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
@@ -145,16 +224,36 @@ const BOMBuilder = ({ user }: BOMBuilderProps) => {
               ) : (
                 bomItems.map((item) => (
                   <div key={item.id} className="flex justify-between items-start p-3 bg-gray-800 rounded">
-                    <div className="flex-1">
-                      <p className="text-white font-medium text-sm">{item.product.name}</p>
-                      {item.slot && (
-                        <Badge variant="outline" className="mt-1 text-xs">
-                          Slot {item.slot}
-                        </Badge>
-                      )}
+                    <div className="flex items-start space-x-3 flex-1">
+                      <ToggleSwitch
+                        checked={item.enabled}
+                        onCheckedChange={(enabled) => toggleBOMItem(item.id, enabled)}
+                        size="sm"
+                      />
+                      <div className="flex-1">
+                        <p className={`font-medium text-sm ${item.enabled ? 'text-white' : 'text-gray-500'}`}>
+                          {item.product.name}
+                        </p>
+                        {item.slot && (
+                          <Badge variant="outline" className="mt-1 text-xs">
+                            Slot {item.slot}
+                          </Badge>
+                        )}
+                        {'productInfoUrl' in item.product && item.product.productInfoUrl && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-blue-400 hover:text-blue-300 p-0 h-auto mt-1"
+                            onClick={() => window.open(item.product.productInfoUrl, '_blank')}
+                          >
+                            <ExternalLink className="h-3 w-3 mr-1" />
+                            Product Info
+                          </Button>
+                        )}
+                      </div>
                     </div>
                     <div className="text-right ml-2">
-                      <p className="text-white font-bold text-sm">
+                      <p className={`font-bold text-sm ${item.enabled ? 'text-white' : 'text-gray-500'}`}>
                         {canSeePrices ? `$${item.product.price.toLocaleString()}` : '—'}
                       </p>
                       <Button
@@ -173,7 +272,7 @@ const BOMBuilder = ({ user }: BOMBuilderProps) => {
               {bomItems.length > 0 && (
                 <div className="border-t border-gray-700 pt-3 mt-3">
                   <div className="flex justify-between items-center">
-                    <span className="text-white font-bold">Total:</span>
+                    <span className="text-white font-bold">Total (Enabled Items):</span>
                     <span className="text-white font-bold text-lg">
                       {canSeePrices ? `$${calculateTotal().toLocaleString()}` : '—'}
                     </span>
