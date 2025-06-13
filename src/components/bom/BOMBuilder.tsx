@@ -8,9 +8,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import Level1ProductSelector from "./Level1ProductSelector";
-import ChassisSelector from "./ChassisSelector";
 import CardLibrary from "./CardLibrary";
 import RackVisualizer from "./RackVisualizer";
+import SlotCardSelector from "./SlotCardSelector";
 import ToggleSwitch from "@/components/ui/toggle-switch";
 import { BOMItem, Chassis, Card as ProductCard, Level1Product } from "@/types/product";
 import { ShoppingCart, Save, Send, ExternalLink } from "lucide-react";
@@ -24,6 +24,8 @@ const BOMBuilder = ({ user }: BOMBuilderProps) => {
   const [selectedChassis, setSelectedChassis] = useState<Chassis | null>(null);
   const [bomItems, setBomItems] = useState<BOMItem[]>([]);
   const [slotAssignments, setSlotAssignments] = useState<Record<number, ProductCard>>({});
+  const [selectedSlot, setSelectedSlot] = useState<number | null>(null);
+  const [showSlotSelector, setShowSlotSelector] = useState(false);
   
   // New quote fields
   const [oracleCustomerId, setOracleCustomerId] = useState('');
@@ -36,17 +38,53 @@ const BOMBuilder = ({ user }: BOMBuilderProps) => {
       product,
       quantity: 1,
       slot,
-      enabled: true // Default to enabled
+      enabled: true
     };
     
     setBomItems(prev => [...prev, newItem]);
     
-    // Only add to slot assignments if it's a card (not chassis) and has a slot
-    if (slot && 'type' in product && product.type !== 'LTX' && product.type !== 'MTX' && product.type !== 'STX') {
-      setSlotAssignments(prev => ({ ...prev, [slot]: product as ProductCard }));
+    // If it's a chassis selection, set it as selected
+    if ('slots' in product && product.type && ['LTX', 'MTX', 'STX'].includes(product.type)) {
+      setSelectedChassis(product as Chassis);
     }
     
     console.log("Added to BOM:", newItem);
+  };
+
+  const addCardToSlot = (card: ProductCard, slot: number) => {
+    // Add to BOM with slot assignment
+    addToBOM(card, slot);
+    
+    // Update slot assignments
+    setSlotAssignments(prev => ({ ...prev, [slot]: card }));
+    
+    // Close the slot selector
+    setShowSlotSelector(false);
+    
+    // Auto-advance to next available slot
+    if (selectedChassis) {
+      const nextSlot = findNextAvailableSlot(slot);
+      if (nextSlot) {
+        setSelectedSlot(nextSlot);
+      }
+    }
+  };
+
+  const findNextAvailableSlot = (currentSlot: number): number | null => {
+    if (!selectedChassis) return null;
+    
+    for (let i = currentSlot + 1; i <= selectedChassis.slots; i++) {
+      if (i !== 1 && !slotAssignments[i]) { // Skip slot 1 (CPU) and occupied slots
+        return i;
+      }
+    }
+    return null;
+  };
+
+  const handleSlotClick = (slot: number) => {
+    if (slot === 1) return; // CPU slot is fixed
+    setSelectedSlot(slot);
+    setShowSlotSelector(true);
   };
 
   const removeFromBOM = (itemId: string) => {
@@ -76,6 +114,11 @@ const BOMBuilder = ({ user }: BOMBuilderProps) => {
   };
 
   const canSeePrices = user.role !== 'level1';
+
+  // Type guard function to check if product has productInfoUrl
+  const hasProductInfoUrl = (product: Chassis | ProductCard | Level1Product): product is Level1Product => {
+    return 'productInfoUrl' in product && typeof product.productInfoUrl === 'string';
+  };
 
   return (
     <div className="space-y-6">
@@ -144,64 +187,33 @@ const BOMBuilder = ({ user }: BOMBuilderProps) => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Configuration Panel */}
         <div className="lg:col-span-2 space-y-6">
-          <Tabs defaultValue="level1" className="w-full">
-            <TabsList className="grid w-full grid-cols-3 bg-gray-800">
-              <TabsTrigger value="level1" className="text-white data-[state=active]:bg-red-600">
-                1. Main System
-              </TabsTrigger>
-              <TabsTrigger value="chassis" className="text-white data-[state=active]:bg-red-600">
-                2. Select Chassis
-              </TabsTrigger>
-              <TabsTrigger value="cards" className="text-white data-[state=active]:bg-red-600">
-                3. Add Cards
-              </TabsTrigger>
-            </TabsList>
-            
-            <TabsContent value="level1">
-              <Level1ProductSelector 
-                onProductSelect={(product) => {
-                  setSelectedLevel1Product(product);
-                  addToBOM(product);
-                }}
-                selectedProduct={selectedLevel1Product}
-                canSeePrices={canSeePrices}
-              />              
-            </TabsContent>
-            
-            <TabsContent value="chassis">
-              <ChassisSelector 
-                onChassisSelect={(chassis) => {
-                  setSelectedChassis(chassis);
-                  addToBOM(chassis);
-                }}
-                selectedChassis={selectedChassis}
-                canSeePrices={canSeePrices}
-              />
-            </TabsContent>
-            
-            <TabsContent value="cards">
-              {selectedChassis ? (
-                <CardLibrary 
-                  chassis={selectedChassis}
-                  onCardSelect={addToBOM}
-                  canSeePrices={canSeePrices}
-                />
-              ) : (
-                <Card className="bg-gray-900 border-gray-800">
-                  <CardContent className="p-8 text-center">
-                    <p className="text-gray-400">Please select a chassis first</p>
-                  </CardContent>
-                </Card>
-              )}
-            </TabsContent>
-          </Tabs>
+          <Level1ProductSelector 
+            onProductSelect={(product) => {
+              setSelectedLevel1Product(product);
+              addToBOM(product);
+            }}
+            selectedProduct={selectedLevel1Product}
+            canSeePrices={canSeePrices}
+          />
 
-          {/* Rack Visualizer */}
+          {/* Rack Visualizer - Now shows after Level 1 selection */}
           {selectedChassis && (
             <RackVisualizer 
               chassis={selectedChassis}
               slotAssignments={slotAssignments}
-              onSlotClick={(slot) => console.log("Slot clicked:", slot)}
+              onSlotClick={handleSlotClick}
+              selectedSlot={selectedSlot}
+            />
+          )}
+
+          {/* Slot Card Selector Modal */}
+          {showSlotSelector && selectedSlot && selectedChassis && (
+            <SlotCardSelector
+              chassis={selectedChassis}
+              slot={selectedSlot}
+              onCardSelect={addCardToSlot}
+              onClose={() => setShowSlotSelector(false)}
+              canSeePrices={canSeePrices}
             />
           )}
         </div>
@@ -239,7 +251,7 @@ const BOMBuilder = ({ user }: BOMBuilderProps) => {
                             Slot {item.slot}
                           </Badge>
                         )}
-                        {'productInfoUrl' in item.product && item.product.productInfoUrl && (
+                        {hasProductInfoUrl(item.product) && item.product.productInfoUrl && (
                           <Button
                             variant="ghost"
                             size="sm"

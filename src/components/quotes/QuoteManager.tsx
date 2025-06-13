@@ -27,7 +27,8 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
       createdAt: '2024-01-15',
       updatedAt: '2024-01-15',
       items: 5,
-      discountRequested: 10
+      discountRequested: 10,
+      pdfUrl: '/quotes/Q-2024-001.pdf'
     },
     {
       id: 'Q-2024-002',
@@ -39,7 +40,8 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
       createdAt: '2024-01-14',
       updatedAt: '2024-01-16',
       items: 8,
-      discountRequested: 5
+      discountRequested: 5,
+      pdfUrl: '/quotes/Q-2024-002.pdf'
     },
     {
       id: 'Q-2024-003',
@@ -51,7 +53,8 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
       createdAt: '2024-01-13',
       updatedAt: '2024-01-13',
       items: 3,
-      discountRequested: 0
+      discountRequested: 0,
+      pdfUrl: null
     },
     {
       id: 'Q-2024-004',
@@ -63,7 +66,8 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
       createdAt: '2024-01-10',
       updatedAt: '2024-01-12',
       items: 12,
-      discountRequested: 15
+      discountRequested: 15,
+      pdfUrl: '/quotes/Q-2024-004.pdf'
     },
     {
       id: 'Q-2024-005',
@@ -75,7 +79,8 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
       createdAt: '2024-01-08',
       updatedAt: '2024-01-09',
       items: 2,
-      discountRequested: 25
+      discountRequested: 25,
+      pdfUrl: '/quotes/Q-2024-005.pdf'
     }
   ];
 
@@ -109,9 +114,24 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
 
   const canSeePrices = user.role !== 'level1';
 
-  const handleViewQuote = (quoteId: string) => {
-    console.log(`Viewing quote ${quoteId} - would open PDF in new tab`);
-    // In real implementation, this would open the PDF quote
+  const handleViewQuote = (quote: any) => {
+    if (quote.pdfUrl) {
+      // In a real implementation, this would open the actual PDF
+      console.log(`Opening quote PDF: ${quote.pdfUrl}`);
+      // For demo purposes, we'll show an alert
+      alert(`Opening quote ${quote.id} PDF in new window. In production, this would open: ${quote.pdfUrl}`);
+      // window.open(quote.pdfUrl, '_blank');
+    } else {
+      alert('PDF not yet generated for this quote.');
+    }
+  };
+
+  const handleDownloadQuote = (quote: any) => {
+    if (quote.pdfUrl) {
+      console.log(`Downloading quote PDF: ${quote.pdfUrl}`);
+      // In a real implementation, this would trigger a download
+      alert(`Downloading quote ${quote.id} PDF. In production, this would download: ${quote.pdfUrl}`);
+    }
   };
 
   return (
@@ -249,16 +269,19 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="text-gray-400 hover:text-white hover:bg-gray-700"
-                      onClick={() => handleViewQuote(quote.id)}
+                      className="text-blue-400 hover:text-blue-300 hover:bg-gray-700"
+                      onClick={() => handleViewQuote(quote)}
+                      title="View Quote PDF"
                     >
                       <Eye className="h-4 w-4" />
                     </Button>
-                    {quote.status === 'finalized' && (
+                    {(quote.status === 'finalized' || quote.status === 'approved') && quote.pdfUrl && (
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="text-gray-400 hover:text-white hover:bg-gray-700"
+                        className="text-green-400 hover:text-green-300 hover:bg-gray-700"
+                        onClick={() => handleDownloadQuote(quote)}
+                        title="Download Quote PDF"
                       >
                         <Download className="h-4 w-4" />
                       </Button>

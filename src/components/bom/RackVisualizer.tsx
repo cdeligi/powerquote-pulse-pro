@@ -8,11 +8,13 @@ interface RackVisualizerProps {
   chassis: Chassis;
   slotAssignments: Record<number, ProductCard>;
   onSlotClick: (slot: number) => void;
+  selectedSlot?: number | null;
 }
 
-const RackVisualizer = ({ chassis, slotAssignments, onSlotClick }: RackVisualizerProps) => {
+const RackVisualizer = ({ chassis, slotAssignments, onSlotClick, selectedSlot }: RackVisualizerProps) => {
   const getSlotColor = (slot: number) => {
     if (slot === 1) return 'bg-blue-600'; // CPU slot
+    if (selectedSlot === slot) return 'bg-yellow-600'; // Selected slot
     if (slotAssignments[slot]) return 'bg-green-600'; // Occupied
     return 'bg-gray-700'; // Empty
   };
@@ -34,9 +36,11 @@ const RackVisualizer = ({ chassis, slotAssignments, onSlotClick }: RackVisualize
         flex items-center justify-center text-white text-sm font-medium
         transition-all hover:border-red-600 hover:bg-opacity-80
         ${getSlotColor(slot)}
+        ${slot === 1 ? 'cursor-not-allowed' : ''}
+        ${selectedSlot === slot ? 'ring-2 ring-yellow-400' : ''}
       `}
-      onClick={() => onSlotClick(slot)}
-      title={slotAssignments[slot]?.name || `Slot ${slot}`}
+      onClick={() => slot !== 1 && onSlotClick(slot)}
+      title={slotAssignments[slot]?.name || (slot === 1 ? 'CPU (Fixed)' : `Slot ${slot} - Click to add card`)}
     >
       {slot === 1 && <Cpu className="h-4 w-4 mr-1" />}
       {getSlotLabel(slot)}
@@ -88,6 +92,8 @@ const RackVisualizer = ({ chassis, slotAssignments, onSlotClick }: RackVisualize
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
+          <p className="text-gray-400 text-sm">Click on any slot (except CPU) to add a card</p>
+          
           {renderChassisLayout()}
           
           {/* Legend */}
@@ -95,6 +101,10 @@ const RackVisualizer = ({ chassis, slotAssignments, onSlotClick }: RackVisualize
             <div className="flex items-center space-x-2">
               <div className="w-4 h-4 bg-blue-600 rounded"></div>
               <span className="text-sm text-gray-400">CPU (Fixed)</span>
+            </div>
+            <div className="flex items-center space-x-2">
+              <div className="w-4 h-4 bg-yellow-600 rounded"></div>
+              <span className="text-sm text-gray-400">Selected</span>
             </div>
             <div className="flex items-center space-x-2">
               <div className="w-4 h-4 bg-green-600 rounded"></div>
