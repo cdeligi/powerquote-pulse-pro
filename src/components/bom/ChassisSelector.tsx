@@ -18,27 +18,30 @@ const ChassisSelector = ({ onChassisSelect, selectedChassis, canSeePrices }: Cha
       name: 'LTX Chassis',
       type: 'LTX',
       height: '6U',
-      slots: 14,
-      price: 12500,
-      description: 'High-capacity chassis with 14 slots for maximum flexibility'
+      slots: 15, // CPU + 14 slots
+      price: 8500,
+      description: 'Large form factor with maximum expansion capability',
+      image: '/placeholder.svg'
     },
     {
       id: 'mtx-3u',
       name: 'MTX Chassis',
       type: 'MTX',
       height: '3U',
-      slots: 7,
-      price: 8500,
-      description: 'Mid-range chassis with 7 slots for balanced solutions'
+      slots: 8, // CPU + 7 slots
+      price: 6200,
+      description: 'Medium form factor balancing features and space',
+      image: '/placeholder.svg'
     },
     {
       id: 'stx-1.5u',
       name: 'STX Chassis',
       type: 'STX',
       height: '1.5U',
-      slots: 4,
-      price: 5500,
-      description: 'Compact chassis with 4 slots for space-constrained applications'
+      slots: 5, // CPU + 4 slots
+      price: 4100,
+      description: 'Compact form factor for space-constrained applications',
+      image: '/placeholder.svg'
     }
   ];
 

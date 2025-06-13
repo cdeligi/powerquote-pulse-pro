@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { User } from "@/types/auth";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -58,8 +57,74 @@ const BOMBuilder = ({ user }: BOMBuilderProps) => {
     setSelectedSlot(1); // Start at slot 1 after CPU
   };
 
+  const getBushingSlots = (chassisType: string): [number, number] => {
+    switch (chassisType) {
+      case 'LTX':
+        // Try slots 6,7 first, then 13,14 if occupied, force clear 6,7 if both occupied
+        if (!slotAssignments[6] && !slotAssignments[7]) {
+          return [6, 7];
+        } else if (!slotAssignments[13] && !slotAssignments[14]) {
+          return [13, 14];
+        } else {
+          return [6, 7]; // Force clear and use 6,7
+        }
+      case 'MTX':
+        return [6, 7]; // Always use 6,7 for MTX
+      case 'STX':
+        return [3, 4]; // Always use 3,4 for STX
+      default:
+        return [6, 7];
+    }
+  };
+
+  const clearBushingSlots = (slots: [number, number]) => {
+    slots.forEach(slot => {
+      if (slotAssignments[slot]) {
+        // Remove from slot assignments
+        setSlotAssignments(prev => {
+          const updated = { ...prev };
+          delete updated[slot];
+          return updated;
+        });
+        
+        // Remove from BOM
+        setBomItems(prev => prev.filter(item => item.slot !== slot));
+      }
+    });
+  };
+
   const addCardToSlot = (card: ProductCard, slot: number) => {
-    // Add to BOM with slot assignment
+    // Special handling for bushing cards
+    if (card.type === 'bushing' && selectedChassis) {
+      const bushingSlots = getBushingSlots(selectedChassis.type);
+      const [slot1, slot2] = bushingSlots;
+      
+      // Clear any existing cards in the bushing slots
+      clearBushingSlots(bushingSlots);
+      
+      // Add bushing card to both slots
+      const newBomItem = addToBOM(card, slot1);
+      
+      // Update slot assignments for both slots
+      setSlotAssignments(prev => ({ 
+        ...prev, 
+        [slot1]: card,
+        [slot2]: card
+      }));
+      
+      // Close the slot selector
+      setShowSlotSelector(false);
+      
+      // Find next available slot
+      const nextSlot = findNextAvailableSlot(slot2);
+      if (nextSlot) {
+        setSelectedSlot(nextSlot);
+      }
+      
+      return;
+    }
+    
+    // Normal card handling
     const newBomItem = addToBOM(card, slot);
     
     // Update slot assignments
@@ -86,8 +151,11 @@ const BOMBuilder = ({ user }: BOMBuilderProps) => {
   const findNextAvailableSlot = (currentSlot: number): number | null => {
     if (!selectedChassis) return null;
     
-    for (let i = currentSlot + 1; i <= selectedChassis.slots; i++) {
-      if (!slotAssignments[i]) { // Skip occupied slots
+    const maxSlot = selectedChassis.type === 'LTX' ? 14 : 
+                   selectedChassis.type === 'MTX' ? 7 : 4;
+    
+    for (let i = currentSlot + 1; i <= maxSlot; i++) {
+      if (!slotAssignments[i]) {
         return i;
       }
     }
@@ -100,15 +168,38 @@ const BOMBuilder = ({ user }: BOMBuilderProps) => {
   };
 
   const clearSlot = (slot: number) => {
-    // Remove from slot assignments
-    setSlotAssignments(prev => {
-      const updated = { ...prev };
-      delete updated[slot];
-      return updated;
-    });
+    const cardInSlot = slotAssignments[slot];
     
-    // Remove from BOM
-    setBomItems(prev => prev.filter(item => item.slot !== slot));
+    // Special handling for bushing cards (they occupy 2 slots)
+    if (cardInSlot?.type === 'bushing') {
+      // Find both slots occupied by this bushing card
+      const occupiedSlots = Object.entries(slotAssignments)
+        .filter(([, card]) => card.type === 'bushing' && card.id === cardInSlot.id)
+        .map(([slotNum]) => parseInt(slotNum));
+      
+      // Clear both slots
+      occupiedSlots.forEach(slotNum => {
+        setSlotAssignments(prev => {
+          const updated = { ...prev };
+          delete updated[slotNum];
+          return updated;
+        });
+      });
+      
+      // Remove from BOM (only once since it's one item)
+      setBomItems(prev => prev.filter(item => 
+        !(item.slot === occupiedSlots[0] && item.product.id === cardInSlot.id)
+      ));
+    } else {
+      // Normal single-slot card
+      setSlotAssignments(prev => {
+        const updated = { ...prev };
+        delete updated[slot];
+        return updated;
+      });
+      
+      setBomItems(prev => prev.filter(item => item.slot !== slot));
+    }
   };
 
   const removeFromBOM = (itemId: string) => {

@@ -93,7 +93,7 @@ const SlotCardSelector = ({ chassis, slot, onCardSelect, onClose, canSeePrices }
       description: 'Dual-slot bushing monitoring for transformer health',
       price: 5800,
       slotRequirement: 2,
-      compatibleChassis: ['ltx-6u'],
+      compatibleChassis: ['ltx-6u', 'mtx-3u', 'stx-1.5u'], // Now compatible with all chassis
       specifications: {
         channels: 6,
         measurements: ['Capacitance', 'Tan Delta', 'Temperature']
