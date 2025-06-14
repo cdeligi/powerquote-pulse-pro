@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,6 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { User, LoginCredentials } from "@/types/auth";
 import { Shield, Zap } from "lucide-react";
+import UserRegistrationForm from "./UserRegistrationForm";
 
 interface LoginFormProps {
   onLogin: (user: User) => void;
@@ -17,6 +17,7 @@ const LoginForm = ({ onLogin }: LoginFormProps) => {
     password: ''
   });
   const [isLoading, setIsLoading] = useState(false);
+  const [showRegistration, setShowRegistration] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -60,6 +61,23 @@ const LoginForm = ({ onLogin }: LoginFormProps) => {
       setIsLoading(false);
     }, 1000);
   };
+
+  const handleRegistrationSubmit = (request: any) => {
+    console.log('Registration request submitted:', request);
+    alert('Registration request submitted successfully! You will receive an email notification once reviewed.');
+    setShowRegistration(false);
+  };
+
+  if (showRegistration) {
+    return (
+      <div className="w-full max-w-4xl space-y-8">
+        <UserRegistrationForm 
+          onSubmit={handleRegistrationSubmit}
+          onBack={() => setShowRegistration(false)}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="w-full max-w-md space-y-8">
@@ -115,6 +133,16 @@ const LoginForm = ({ onLogin }: LoginFormProps) => {
               {isLoading ? "Signing in..." : "Sign In"}
             </Button>
           </form>
+          
+          <div className="mt-4 text-center">
+            <Button
+              variant="outline"
+              onClick={() => setShowRegistration(true)}
+              className="w-full border-gray-600 text-white hover:bg-gray-800 hover:text-white"
+            >
+              Request Account Access
+            </Button>
+          </div>
           
           <div className="mt-6 text-sm text-gray-400">
             <p className="mb-2">Demo Accounts:</p>
