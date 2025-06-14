@@ -1,3 +1,4 @@
+
 export interface Chassis {
   id: string;
   name: string;
@@ -86,7 +87,7 @@ export interface Quote {
   // New fields
   oracleCustomerId?: string;
   customerName?: string;
-  priority: 'High' | 'Medium' | 'Low';
+  priority: 'High' | 'Medium' | 'Low' | 'Urgent';
   termsAndConditions?: string;
   isRepInvolved?: boolean;
   shippingTerms?: 'Ex-Works' | 'CFR' | 'CIF' | 'CIP' | 'CPT' | 'DDP' | 'DAP' | 'FCA' | 'Prepaid';
