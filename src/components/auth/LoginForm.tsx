@@ -135,7 +135,7 @@ const LoginForm = ({ onLogin }: LoginFormProps) => {
             <Button
               type="button"
               variant="outline"
-              className="w-full mt-4 border-gray-600 text-white hover:bg-gray-800"
+              className="w-full mt-4 border-gray-600 text-gray-300 hover:bg-gray-800 hover:text-white"
               onClick={() => setShowRegistration(true)}
             >
               <UserPlus className="mr-2 h-4 w-4" />
