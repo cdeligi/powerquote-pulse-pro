@@ -15,6 +15,7 @@ import SlotCardSelector from "./SlotCardSelector";
 import AnalogCardConfigurator from "./AnalogCardConfigurator";
 import ToggleSwitch from "@/components/ui/toggle-switch";
 import { BOMItem, Chassis, Card as ProductCard, Level1Product, Level2Option, Level3Customization, isLevel1Product, isChassis, isCard, generateQTMSPartNumber, generateProductPartNumber } from "@/types/product";
+import { Quote } from "@/types/quote";
 import { ShoppingCart, Save, Send, ExternalLink, Settings, Plus, Trash2, Monitor } from "lucide-react";
 import { generateQuotePDF } from '@/utils/pdfGenerator';
 

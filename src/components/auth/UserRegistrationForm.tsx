@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,7 +24,7 @@ const UserRegistrationForm = ({ onSubmit, onBack }: UserRegistrationFormProps) =
     jobTitle: '',
     phoneNumber: '',
     businessJustification: '',
-    requestedRole: '' as 'level1' | 'level2' | '',
+    requestedRole: 'level1' as 'level1' | 'level2',
     managerEmail: '',
     companyName: '',
     securityClearanceLevel: '',
