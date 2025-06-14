@@ -1,3 +1,4 @@
+
 export interface Chassis {
   id: string;
   name: string;
@@ -59,11 +60,28 @@ export interface Level3Customization {
   enabled: boolean;
 }
 
-// Export shipping terms type
-export type ShippingTerms = 'Ex-Works' | 'CFR' | 'CIF' | 'CIP' | 'CPT' | 'DDP' | 'DAP' | 'FCA' | 'Prepaid';
+// Export shipping terms type - widened to allow any string while preserving literals
+export type ShippingTerms = 
+  | 'Ex-Works' 
+  | 'CFR' 
+  | 'CIF' 
+  | 'CIP' 
+  | 'CPT' 
+  | 'DDP' 
+  | 'DAP' 
+  | 'FCA' 
+  | 'Prepaid'
+  | (string & {});
 
-// Export payment terms type  
-export type PaymentTerms = 'Prepaid' | '15' | '30' | '60' | '90' | '120';
+// Export payment terms type - widened to allow any string while preserving literals
+export type PaymentTerms = 
+  | 'Prepaid' 
+  | '15' 
+  | '30' 
+  | '60' 
+  | '90' 
+  | '120'
+  | (string & {});
 
 export interface BOMItem {
   id: string;
