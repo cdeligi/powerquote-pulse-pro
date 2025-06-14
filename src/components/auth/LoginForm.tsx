@@ -126,15 +126,6 @@ const LoginForm = ({ onLogin }: LoginFormProps) => {
           </div>
         </CardContent>
       </Card>
-
-      {/* TROL Logo */}
-      <div className="flex justify-center mt-6">
-        <img 
-          src="/lovable-uploads/1ce191bf-0a18-4c8d-89c6-c8afd61e9f45.png" 
-          alt="TROL Logo" 
-          className="h-8 opacity-70 hover:opacity-100 transition-opacity"
-        />
-      </div>
     </div>
   );
 };
