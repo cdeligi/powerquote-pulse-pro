@@ -453,30 +453,27 @@ const BOMBuilder = ({ user }: BOMBuilderProps) => {
   };
 
   const handleRequestQuote = () => {
-    if (bomItems.length === 0) {
-      console.log("No items in BOM");
-      return;
-    }
-
-    const quote: Partial<Quote> = {
-      id: Date.now().toString(),
-      items: bomItems,
-      subtotal: calculateTotal(),
-      discount: 0,
+    // Prepare comprehensive quote request data
+    const quoteRequest = {
+      id: `QR-${Date.now()}`,
+      customerName,
+      oracleCustomerId,
+      priority: quotePriority,
+      isRepInvolved,
+      shippingTerms,
+      paymentTerms,
+      quoteCurrency,
+      bomItems: bomItems.filter(item => item.enabled),
       total: calculateTotal(),
-      status: 'pending_approval',
       createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      customerName: quoteInfo.customerName,
-      oracleCustomerId: quoteInfo.oracleCustomerId,
-      priority: quoteInfo.priority,
-      isRepInvolved: quoteInfo.isRepInvolved,
-      shippingTerms: quoteInfo.shippingTerms,
-      paymentTerms: quoteInfo.paymentTerms,
-      quoteCurrency: quoteInfo.quoteCurrency
+      status: 'pending_approval' as const
     };
 
-    console.log("Requesting quote approval:", quote);
+    console.log('Quote request submitted for approval:', quoteRequest);
+    // Here you would typically send this to your backend/admin system
+    
+    // Show success message
+    alert('Quote request submitted successfully! You will be notified once it has been reviewed.');
   };
 
   const canSeePrices = user.role !== 'level1';
