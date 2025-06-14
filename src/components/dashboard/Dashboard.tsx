@@ -1,6 +1,7 @@
 
 import { useState } from "react";
 import { User } from "@/types/auth";
+import { UserProvider } from "@/context/UserContext";
 import Sidebar from "./Sidebar";
 import DashboardOverview from "./DashboardOverview";
 import BOMBuilder from "../bom/BOMBuilder";
@@ -22,7 +23,7 @@ const Dashboard = ({ user, onLogout }: DashboardProps) => {
       case 'overview':
         return <DashboardOverview user={user} />;
       case 'bom':
-        return <BOMBuilder user={user} />;
+        return <BOMBuilder onQuoteUpdate={() => {}} />;
       case 'quotes':
         return <QuoteManager user={user} />;
       case 'admin':
@@ -33,17 +34,19 @@ const Dashboard = ({ user, onLogout }: DashboardProps) => {
   };
 
   return (
-    <div className="min-h-screen bg-black flex">
-      <Sidebar 
-        user={user}
-        activeView={activeView}
-        onViewChange={setActiveView}
-        onLogout={onLogout}
-      />
-      <main className="flex-1 ml-64 p-8">
-        {renderContent()}
-      </main>
-    </div>
+    <UserProvider user={user}>
+      <div className="min-h-screen bg-black flex">
+        <Sidebar 
+          user={user}
+          activeView={activeView}
+          onViewChange={setActiveView}
+          onLogout={onLogout}
+        />
+        <main className="flex-1 ml-64 p-8">
+          {renderContent()}
+        </main>
+      </div>
+    </UserProvider>
   );
 };
 

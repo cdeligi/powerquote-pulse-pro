@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
+
+import React, { useState, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -6,10 +7,18 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider"
-import { Product, BOMItem, Quote } from '@/types/product';
+import { BOMItem, Quote } from '@/types/product';
 import ProductTable from './ProductTable';
 import { generateQuotePDF } from '@/utils/pdfGenerator';
 import { useUser } from '@/context/UserContext';
+
+interface Product {
+  id: string;
+  name: string;
+  description: string;
+  price: number;
+  currency: string;
+}
 
 interface BOMBuilderProps {
   onQuoteUpdate: (quote: Partial<Quote>) => void;
@@ -43,7 +52,14 @@ const BOMBuilder = ({ onQuoteUpdate }: BOMBuilderProps) => {
         updatedItems[existingItemIndex].quantity += 1;
         return updatedItems;
       } else {
-        return [...prevItems, { product: product, quantity: 1, enabled: true, slot: '', partNumber: '' }];
+        return [...prevItems, { 
+          id: `bom-${Date.now()}`,
+          product: product, 
+          quantity: 1, 
+          enabled: true, 
+          slot: 0, 
+          partNumber: '' 
+        }];
       }
     });
   };
@@ -55,9 +71,8 @@ const BOMBuilder = ({ onQuoteUpdate }: BOMBuilderProps) => {
         updatedItems[index].quantity = parseInt(value, 10) || 1;
       } else if (key === 'enabled') {
         updatedItems[index].enabled = value;
-      }
-       else if (key === 'slot') {
-        updatedItems[index].slot = value;
+      } else if (key === 'slot') {
+        updatedItems[index].slot = parseInt(value, 10) || 0;
       } else if (key === 'partNumber') {
         updatedItems[index].partNumber = value;
       }
@@ -107,11 +122,11 @@ const BOMBuilder = ({ onQuoteUpdate }: BOMBuilderProps) => {
       status: 'pending_approval',
       customerName: quoteInfo.customerName,
       oracleCustomerId: quoteInfo.oracleCustomerId,
-      priority: quoteInfo.priority,
+      priority: quoteInfo.priority as 'High' | 'Medium' | 'Low',
       isRepInvolved: quoteInfo.isRepInvolved,
       shippingTerms: quoteInfo.shippingTerms,
       paymentTerms: quoteInfo.paymentTerms,
-      quoteCurrency: quoteInfo.quoteCurrency,
+      quoteCurrency: quoteInfo.quoteCurrency as 'USD' | 'EURO' | 'GBP' | 'CAD',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
@@ -130,11 +145,11 @@ const BOMBuilder = ({ onQuoteUpdate }: BOMBuilderProps) => {
       status: 'draft',
       customerName: quoteInfo.customerName,
       oracleCustomerId: quoteInfo.oracleCustomerId,
-      priority: quoteInfo.priority,
+      priority: quoteInfo.priority as 'High' | 'Medium' | 'Low',
       isRepInvolved: quoteInfo.isRepInvolved,
       shippingTerms: quoteInfo.shippingTerms,
       paymentTerms: quoteInfo.paymentTerms,
-      quoteCurrency: quoteInfo.quoteCurrency,
+      quoteCurrency: quoteInfo.quoteCurrency as 'USD' | 'EURO' | 'GBP' | 'CAD',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
@@ -234,7 +249,7 @@ const BOMBuilder = ({ onQuoteUpdate }: BOMBuilderProps) => {
             </div>
             <div>
               <Label htmlFor="priority" className="text-white">Priority</Label>
-              <Select onValueChange={(value) => setQuoteInfo(prev => ({ ...prev, priority: value }))}>
+              <Select onValueChange={(value) => setQuoteInfo(prev => ({ ...prev, priority: value as 'High' | 'Medium' | 'Low' }))}>
                 <SelectTrigger className="bg-gray-800 border-gray-700 text-white w-full">
                   <SelectValue placeholder="Select priority" />
                 </SelectTrigger>
@@ -277,14 +292,15 @@ const BOMBuilder = ({ onQuoteUpdate }: BOMBuilderProps) => {
             </div>
             <div>
               <Label htmlFor="quoteCurrency" className="text-white">Quote Currency</Label>
-              <Select onValueChange={(value) => setQuoteInfo(prev => ({ ...prev, quoteCurrency: value }))}>
+              <Select onValueChange={(value) => setQuoteInfo(prev => ({ ...prev, quoteCurrency: value as 'USD' | 'EURO' | 'GBP' | 'CAD' }))}>
                 <SelectTrigger className="bg-gray-800 border-gray-700 text-white w-full">
                   <SelectValue placeholder="Select currency" />
                 </SelectTrigger>
                 <SelectContent className="bg-gray-800 border-gray-700">
                   <SelectItem value="USD" className="text-white">USD</SelectItem>
-                  <SelectItem value="EUR" className="text-white">EUR</SelectItem>
+                  <SelectItem value="EURO" className="text-white">EUR</SelectItem>
                   <SelectItem value="GBP" className="text-white">GBP</SelectItem>
+                  <SelectItem value="CAD" className="text-white">CAD</SelectItem>
                 </SelectContent>
               </Select>
             </div>
