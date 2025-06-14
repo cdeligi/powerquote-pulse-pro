@@ -1,17 +1,10 @@
 
 import { Button } from "@/components/ui/button";
-
-interface Product {
-  id: string;
-  name: string;
-  description: string;
-  price: number;
-  currency: string;
-}
+import { Level1Product } from "@/types/product";
 
 interface ProductTableProps {
-  products: Product[];
-  onProductSelect: (product: Product) => void;
+  products: Level1Product[];
+  onProductSelect: (product: Level1Product) => void;
 }
 
 const ProductTable = ({ products, onProductSelect }: ProductTableProps) => {

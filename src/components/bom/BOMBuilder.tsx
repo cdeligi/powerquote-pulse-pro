@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,43 +6,57 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider"
-import { BOMItem, Quote } from '@/types/product';
+import { BOMItem, Quote, Level1Product } from '@/types/product';
 import ProductTable from './ProductTable';
 import { generateQuotePDF } from '@/utils/pdfGenerator';
 import { useUser } from '@/context/UserContext';
-
-interface Product {
-  id: string;
-  name: string;
-  description: string;
-  price: number;
-  currency: string;
-}
 
 interface BOMBuilderProps {
   onQuoteUpdate: (quote: Partial<Quote>) => void;
 }
 
 const BOMBuilder = ({ onQuoteUpdate }: BOMBuilderProps) => {
-  const [products, setProducts] = useState<Product[]>([]);
+  const [products, setProducts] = useState<Level1Product[]>([]);
   const [bomItems, setBomItems] = useState<BOMItem[]>([]);
-  const [newProduct, setNewProduct] = useState<Partial<Product>>({});
-  const [isAddingProduct, setIsAddingProduct] = useState(false);
   const [discountPercentage, setDiscountPercentage] = useState(0);
   const [quoteInfo, setQuoteInfo] = useState<Partial<Quote>>({});
   const { user } = useUser();
 
   useEffect(() => {
-    // Mock data fetching
-    const mockProducts: Product[] = [
-      { id: '1', name: 'Transformer Oil Level Indicator', description: 'Standard model', price: 1200, currency: 'USD' },
-      { id: '2', name: 'Winding Temperature Monitor', description: 'Advanced monitoring system', price: 3500, currency: 'USD' },
-      { id: '3', name: 'Bushing Monitor', description: 'Monitors bushing health', price: 2800, currency: 'USD' },
+    // Mock data fetching - using Level1Product structure
+    const mockProducts: Level1Product[] = [
+      { 
+        id: '1', 
+        name: 'Transformer Oil Level Indicator', 
+        type: 'TM1',
+        description: 'Standard model', 
+        price: 1200, 
+        enabled: true,
+        partNumber: 'TM1-STD'
+      },
+      { 
+        id: '2', 
+        name: 'Winding Temperature Monitor', 
+        type: 'TM8',
+        description: 'Advanced monitoring system', 
+        price: 3500, 
+        enabled: true,
+        partNumber: 'TM8-ADV'
+      },
+      { 
+        id: '3', 
+        name: 'Bushing Monitor', 
+        type: 'QPDM',
+        description: 'Monitors bushing health', 
+        price: 2800, 
+        enabled: true,
+        partNumber: 'QPDM-BUS'
+      },
     ];
     setProducts(mockProducts);
   }, []);
 
-  const addProductToBOM = (product: Product) => {
+  const addProductToBOM = (product: Level1Product) => {
     setBomItems(prevItems => {
       const existingItemIndex = prevItems.findIndex(item => item.product.id === product.id);
 
@@ -58,7 +71,7 @@ const BOMBuilder = ({ onQuoteUpdate }: BOMBuilderProps) => {
           quantity: 1, 
           enabled: true, 
           slot: 0, 
-          partNumber: '' 
+          partNumber: product.partNumber || '' 
         }];
       }
     });
@@ -286,7 +299,7 @@ const BOMBuilder = ({ onQuoteUpdate }: BOMBuilderProps) => {
                 type="number"
                 id="paymentTerms"
                 name="paymentTerms"
-                onChange={handleInputChange}
+                onChange={handleInputChange)
                 className="bg-gray-800 border-gray-700 text-white"
               />
             </div>
