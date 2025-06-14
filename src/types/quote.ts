@@ -1,14 +1,16 @@
 
+import { BOMItem } from "./product";
+
 export interface Quote {
   id: string;
-  items: QuoteItem[];
+  items: BOMItem[];
   subtotal: number;
   discount: number;
   total: number;
   status: 'draft' | 'pending_approval' | 'approved' | 'rejected';
   customerName: string;
   oracleCustomerId: string;
-  priority: 'low' | 'normal' | 'high' | 'urgent';
+  priority: 'High' | 'Medium' | 'Low' | 'Urgent';
   isRepInvolved: boolean;
   shippingTerms: string;
   paymentTerms: string;

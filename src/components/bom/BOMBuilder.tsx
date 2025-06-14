@@ -34,14 +34,14 @@ const BOMBuilder = ({ user }: BOMBuilderProps) => {
   const [hasRemoteDisplay, setHasRemoteDisplay] = useState(false);
   const [activeTab, setActiveTab] = useState("qtms");
   
-  // Quote fields
+  // Quote fields - Updated types to match Quote interface
   const [oracleCustomerId, setOracleCustomerId] = useState('');
   const [customerName, setCustomerName] = useState('');
-  const [quotePriority, setQuotePriority] = useState<'High' | 'Medium' | 'Low'>('Medium');
+  const [quotePriority, setQuotePriority] = useState<'High' | 'Medium' | 'Low' | 'Urgent'>('Medium');
   const [isRepInvolved, setIsRepInvolved] = useState<boolean | null>(null);
   const [shippingTerms, setShippingTerms] = useState<string>('');
   const [paymentTerms, setPaymentTerms] = useState<string>('');
-  const [quoteCurrency, setQuoteCurrency] = useState<string>('USD');
+  const [quoteCurrency, setQuoteCurrency] = useState<'USD' | 'EURO' | 'GBP' | 'CAD'>('USD');
 
   const addToBOM = (product: Chassis | ProductCard | Level1Product, slot?: number, level2Options?: Level2Option[], configuration?: Record<string, any>) => {
     let partNumber = '';
@@ -443,10 +443,11 @@ const BOMBuilder = ({ user }: BOMBuilderProps) => {
       customerName,
       oracleCustomerId,
       priority: quotePriority,
-      isRepInvolved,
+      isRepInvolved: isRepInvolved ?? false,
       shippingTerms,
       paymentTerms,
       quoteCurrency,
+      items: bomItems,
       createdAt: new Date().toISOString()
     };
 
@@ -460,7 +461,7 @@ const BOMBuilder = ({ user }: BOMBuilderProps) => {
       customerName,
       oracleCustomerId,
       priority: quotePriority,
-      isRepInvolved,
+      isRepInvolved: isRepInvolved ?? false,
       shippingTerms,
       paymentTerms,
       quoteCurrency,
@@ -557,7 +558,7 @@ const BOMBuilder = ({ user }: BOMBuilderProps) => {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <Label htmlFor="priority" className="text-white font-medium mb-2 block">Priority Level</Label>
-                      <Select value={quotePriority} onValueChange={(value: 'High' | 'Medium' | 'Low') => setQuotePriority(value)}>
+                      <Select value={quotePriority} onValueChange={(value: 'High' | 'Medium' | 'Low' | 'Urgent') => setQuotePriority(value)}>
                         <SelectTrigger className="bg-gray-800 border-gray-600 text-white focus:border-red-500 focus:ring-red-500">
                           <SelectValue />
                         </SelectTrigger>
@@ -565,6 +566,7 @@ const BOMBuilder = ({ user }: BOMBuilderProps) => {
                           <SelectItem value="High" className="text-white hover:bg-gray-700 focus:bg-gray-700">High Priority</SelectItem>
                           <SelectItem value="Medium" className="text-white hover:bg-gray-700 focus:bg-gray-700">Medium Priority</SelectItem>
                           <SelectItem value="Low" className="text-white hover:bg-gray-700 focus:bg-gray-700">Low Priority</SelectItem>
+                          <SelectItem value="Urgent" className="text-white hover:bg-gray-700 focus:bg-gray-700">Urgent Priority</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -627,7 +629,7 @@ const BOMBuilder = ({ user }: BOMBuilderProps) => {
                   </div>
                   <div>
                     <Label htmlFor="quote-currency" className="text-white font-medium mb-2 block">Currency</Label>
-                    <Select value={quoteCurrency} onValueChange={setQuoteCurrency}>
+                    <Select value={quoteCurrency} onValueChange={(value: 'USD' | 'EURO' | 'GBP' | 'CAD') => setQuoteCurrency(value)}>
                       <SelectTrigger className="bg-gray-800 border-gray-600 text-white focus:border-red-500 focus:ring-red-500">
                         <SelectValue />
                       </SelectTrigger>
