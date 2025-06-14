@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { User } from "@/types/auth";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -25,7 +26,6 @@ import {
   Upload,
   Download
 } from "lucide-react";
-import UserManagement from "./UserManagement";
 
 interface AdminPanelProps {
   user: User;
@@ -344,12 +344,9 @@ const AdminPanel = ({ user }: AdminPanelProps) => {
 
       {/* Main Content Tabs */}
       <Tabs defaultValue="approvals" className="w-full">
-        <TabsList className="grid w-full grid-cols-5 bg-gray-800">
+        <TabsList className="grid w-full grid-cols-4 bg-gray-800">
           <TabsTrigger value="approvals" className="text-white data-[state=active]:bg-red-600">
             Discount Approvals
-          </TabsTrigger>
-          <TabsTrigger value="users" className="text-white data-[state=active]:bg-red-600">
-            User Management
           </TabsTrigger>
           <TabsTrigger value="products" className="text-white data-[state=active]:bg-red-600">
             Product Catalog
@@ -383,10 +380,6 @@ const AdminPanel = ({ user }: AdminPanelProps) => {
               </div>
             </CardContent>
           </Card>
-        </TabsContent>
-
-        <TabsContent value="users">
-          <UserManagement />
         </TabsContent>
 
         <TabsContent value="products">

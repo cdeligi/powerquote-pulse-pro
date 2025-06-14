@@ -5,8 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { User, LoginCredentials } from "@/types/auth";
-import { Shield, Zap, UserPlus } from "lucide-react";
-import UserRegistrationForm from "./UserRegistrationForm";
+import { Shield, Zap } from "lucide-react";
 
 interface LoginFormProps {
   onLogin: (user: User) => void;
@@ -18,7 +17,6 @@ const LoginForm = ({ onLogin }: LoginFormProps) => {
     password: ''
   });
   const [isLoading, setIsLoading] = useState(false);
-  const [showRegistration, setShowRegistration] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -62,10 +60,6 @@ const LoginForm = ({ onLogin }: LoginFormProps) => {
       setIsLoading(false);
     }, 1000);
   };
-
-  if (showRegistration) {
-    return <UserRegistrationForm onBack={() => setShowRegistration(false)} />;
-  }
 
   return (
     <div className="w-full max-w-md space-y-8">
@@ -121,27 +115,6 @@ const LoginForm = ({ onLogin }: LoginFormProps) => {
               {isLoading ? "Signing in..." : "Sign In"}
             </Button>
           </form>
-          
-          <div className="mt-6">
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-gray-700" />
-              </div>
-              <div className="relative flex justify-center text-sm">
-                <span className="bg-gray-900 px-2 text-gray-400">Don't have an account?</span>
-              </div>
-            </div>
-            
-            <Button
-              type="button"
-              variant="outline"
-              className="w-full mt-4 border-gray-600 text-gray-300 hover:bg-gray-800 hover:text-white"
-              onClick={() => setShowRegistration(true)}
-            >
-              <UserPlus className="mr-2 h-4 w-4" />
-              Request Account Access
-            </Button>
-          </div>
           
           <div className="mt-6 text-sm text-gray-400">
             <p className="mb-2">Demo Accounts:</p>
