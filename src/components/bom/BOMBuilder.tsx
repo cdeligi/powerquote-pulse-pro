@@ -4,8 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
-import { toast } from "@/components/ui/use-toast";
+import { toast } from "@/hooks/use-toast";
 import { generateQuotePDF } from "@/lib/pdf-generator";
 import { useUser } from "@/hooks/use-user";
 import { Quote } from '@/types/quote';
@@ -87,7 +86,10 @@ const BOMBuilder = ({ onQuoteUpdate }: { onQuoteUpdate: (quote: any) => void }) 
     };
     
     console.log('Quote request submitted:', quote);
-    toast.success('Quote request submitted for approval');
+    toast({
+      title: "Success",
+      description: "Quote request submitted for approval"
+    });
   };
 
   const handleSaveDraft = () => {
@@ -110,7 +112,10 @@ const BOMBuilder = ({ onQuoteUpdate }: { onQuoteUpdate: (quote: any) => void }) 
     };
     
     generateQuotePDF(bomItems.filter(item => item.enabled), quote, user.role !== 'level1');
-    toast.success('Draft quote PDF generated');
+    toast({
+      title: "Success",
+      description: "Draft quote PDF generated"
+    });
   };
 
   return (

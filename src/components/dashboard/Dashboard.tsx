@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { User } from "@/types/auth";
 import Sidebar from "./Sidebar";
@@ -17,12 +16,16 @@ type ActiveView = 'overview' | 'bom' | 'quotes' | 'admin';
 const Dashboard = ({ user, onLogout }: DashboardProps) => {
   const [activeView, setActiveView] = useState<ActiveView>('overview');
 
+  const handleQuoteUpdate = (quote: any) => {
+    console.log('Quote updated:', quote);
+  };
+
   const renderContent = () => {
     switch (activeView) {
       case 'overview':
         return <DashboardOverview user={user} />;
       case 'bom':
-        return <BOMBuilder user={user} />;
+        return <BOMBuilder onQuoteUpdate={handleQuoteUpdate} />;
       case 'quotes':
         return <QuoteManager user={user} />;
       case 'admin':
