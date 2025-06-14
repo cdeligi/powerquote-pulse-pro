@@ -1,1016 +1,329 @@
-import { useState } from "react";
-import { User } from "@/types/auth";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import React, { useState, useEffect, useCallback } from 'react';
+import { toast } from 'react-hot-toast';
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import ChassisSelector from "./ChassisSelector";
-import Level1ProductSelector from "./Level1ProductSelector";
-import Level2OptionsSelector from "./Level2OptionsSelector";
-import RackVisualizer from "./RackVisualizer";
-import SlotCardSelector from "./SlotCardSelector";
-import AnalogCardConfigurator from "./AnalogCardConfigurator";
-import ToggleSwitch from "@/components/ui/toggle-switch";
-import { BOMItem, Chassis, Card as ProductCard, Level1Product, Level2Option, Level3Customization, isLevel1Product, isChassis, isCard, generateQTMSPartNumber, generateProductPartNumber } from "@/types/product";
-import { ShoppingCart, Save, Send, ExternalLink, Settings, Plus, Trash2, Monitor } from "lucide-react";
+import { Slider } from "@/components/ui/slider"
+import { Product, BOMItem, Quote } from '@/types/product';
+import ProductTable from './ProductTable';
 import { generateQuotePDF } from '@/utils/pdfGenerator';
+import { useUser } from '@/context/UserContext';
 
 interface BOMBuilderProps {
-  user: User;
+  onQuoteUpdate: (quote: Partial<Quote>) => void;
 }
 
-const BOMBuilder = ({ user }: BOMBuilderProps) => {
-  const [selectedChassis, setSelectedChassis] = useState<Chassis | null>(null);
+const BOMBuilder = ({ onQuoteUpdate }: BOMBuilderProps) => {
+  const [products, setProducts] = useState<Product[]>([]);
   const [bomItems, setBomItems] = useState<BOMItem[]>([]);
-  const [slotAssignments, setSlotAssignments] = useState<Record<number, ProductCard>>({});
-  const [selectedSlot, setSelectedSlot] = useState<number | null>(null);
-  const [showSlotSelector, setShowSlotSelector] = useState(false);
-  const [showAnalogConfigurator, setShowAnalogConfigurator] = useState(false);
-  const [configuringAnalogCard, setConfiguringAnalogCard] = useState<BOMItem | null>(null);
-  const [hasRemoteDisplay, setHasRemoteDisplay] = useState(false);
-  const [activeTab, setActiveTab] = useState("qtms");
-  
-  // Quote fields
-  const [oracleCustomerId, setOracleCustomerId] = useState('');
-  const [customerName, setCustomerName] = useState('');
-  const [quotePriority, setQuotePriority] = useState<'High' | 'Medium' | 'Low'>('Medium');
-  const [isRepInvolved, setIsRepInvolved] = useState<boolean | null>(null);
-  const [shippingTerms, setShippingTerms] = useState<string>('');
-  const [paymentTerms, setPaymentTerms] = useState<string>('');
-  const [quoteCurrency, setQuoteCurrency] = useState<string>('USD');
+  const [newProduct, setNewProduct] = useState<Partial<Product>>({});
+  const [isAddingProduct, setIsAddingProduct] = useState(false);
+  const [discountPercentage, setDiscountPercentage] = useState(0);
+  const [quoteInfo, setQuoteInfo] = useState<Partial<Quote>>({});
+  const { user } = useUser();
 
-  const addToBOM = (product: Chassis | ProductCard | Level1Product, slot?: number, level2Options?: Level2Option[], configuration?: Record<string, any>) => {
-    let partNumber = '';
-    
-    // Generate part number based on product type
-    if (isLevel1Product(product)) {
-      partNumber = generateProductPartNumber(product, configuration);
-    } else if (isChassis(product) || isCard(product)) {
-      partNumber = product.partNumber || product.id.toUpperCase();
-    }
-    
-    const newItem: BOMItem = {
-      id: `bom-${Date.now()}`,
-      product,
-      quantity: 1,
-      slot,
-      enabled: true,
-      level2Options: level2Options || [],
-      level3Customizations: [],
-      configuration: configuration || {},
-      partNumber
-    };
-    
-    setBomItems(prev => [...prev, newItem]);
-    console.log("Added to BOM:", newItem);
-    return newItem;
-  };
+  useEffect(() => {
+    // Mock data fetching
+    const mockProducts: Product[] = [
+      { id: '1', name: 'Transformer Oil Level Indicator', description: 'Standard model', price: 1200, currency: 'USD' },
+      { id: '2', name: 'Winding Temperature Monitor', description: 'Advanced monitoring system', price: 3500, currency: 'USD' },
+      { id: '3', name: 'Bushing Monitor', description: 'Monitors bushing health', price: 2800, currency: 'USD' },
+    ];
+    setProducts(mockProducts);
+  }, []);
 
-  const handleChassisSelect = (chassis: Chassis) => {
-    setSelectedChassis(chassis);
-    addToBOM(chassis);
-    // Reset slot assignments when changing chassis
-    setSlotAssignments({});
-    setSelectedSlot(1); // Start at slot 1 after CPU
-  };
+  const addProductToBOM = (product: Product) => {
+    setBomItems(prevItems => {
+      const existingItemIndex = prevItems.findIndex(item => item.product.id === product.id);
 
-  const handleRemoteDisplayToggle = () => {
-    const newHasRemoteDisplay = !hasRemoteDisplay;
-    setHasRemoteDisplay(newHasRemoteDisplay);
-    
-    if (newHasRemoteDisplay) {
-      // Add remote display to BOM
-      const remoteDisplay = {
-        id: 'remote-display',
-        name: 'Remote Display Panel',
-        type: 'display' as const,
-        description: 'Front panel remote display',
-        price: 850,
-        slotRequirement: 0, // No slot required
-        compatibleChassis: ['LTX', 'MTX', 'STX'],
-        specifications: {},
-        productInfoUrl: 'https://www.qualitrolcorp.com/products/remote-display',
-        partNumber: 'RDP-001'
-      };
-      addToBOM(remoteDisplay);
-    } else {
-      // Remove remote display from BOM
-      setBomItems(prev => prev.filter(item => item.product.id !== 'remote-display'));
-    }
-  };
-
-  const getBushingSlots = (chassisType: string): [number, number] => {
-    switch (chassisType) {
-      case 'LTX':
-        // Try slots 6,7 first, then 13,14 if occupied, force clear 6,7 if both occupied
-        if (!slotAssignments[6] && !slotAssignments[7]) {
-          return [6, 7];
-        } else if (!slotAssignments[13] && !slotAssignments[14]) {
-          return [13, 14];
-        } else {
-          return [6, 7]; // Force clear and use 6,7
-        }
-      case 'MTX':
-        return [6, 7]; // Always use 6,7 for MTX
-      case 'STX':
-        return [3, 4]; // Always use 3,4 for STX
-      default:
-        return [6, 7];
-    }
-  };
-
-  const clearBushingSlots = (slots: [number, number]) => {
-    slots.forEach(slot => {
-      if (slotAssignments[slot]) {
-        // Remove from slot assignments
-        setSlotAssignments(prev => {
-          const updated = { ...prev };
-          delete updated[slot];
-          return updated;
-        });
-        
-        // Remove from BOM
-        setBomItems(prev => prev.filter(item => item.slot !== slot));
+      if (existingItemIndex > -1) {
+        const updatedItems = [...prevItems];
+        updatedItems[existingItemIndex].quantity += 1;
+        return updatedItems;
+      } else {
+        return [...prevItems, { product: product, quantity: 1, enabled: true, slot: '', partNumber: '' }];
       }
     });
   };
 
-  const addCardToSlot = (card: ProductCard, slot: number) => {
-    // Special handling for display cards in LTX chassis - always go to slot 8
-    if (card.type === 'display' && selectedChassis?.type === 'LTX') {
-      slot = 8;
-      
-      // Clear slot 8 if occupied
-      if (slotAssignments[8]) {
-        clearSlot(8);
+  const updateBOMItem = (index: number, key: string, value: any) => {
+    setBomItems(prevItems => {
+      const updatedItems = [...prevItems];
+      if (key === 'quantity') {
+        updatedItems[index].quantity = parseInt(value, 10) || 1;
+      } else if (key === 'enabled') {
+        updatedItems[index].enabled = value;
       }
-      
-      // Add display card to slot 8
-      const newBomItem = addToBOM(card, 8);
-      
-      // Update slot assignments
-      setSlotAssignments(prev => ({ ...prev, [8]: card }));
-      
-      // Close the slot selector
-      setShowSlotSelector(false);
-      
-      // Find next available slot
-      const nextSlot = findNextAvailableSlot(8);
-      if (nextSlot) {
-        setSelectedSlot(nextSlot);
+       else if (key === 'slot') {
+        updatedItems[index].slot = value;
+      } else if (key === 'partNumber') {
+        updatedItems[index].partNumber = value;
       }
-      
-      return;
-    }
-    
-    // Special handling for bushing cards
-    if (card.type === 'bushing' && selectedChassis) {
-      const bushingSlots = getBushingSlots(selectedChassis.type);
-      const [slot1, slot2] = bushingSlots;
-      
-      // Clear any existing cards in the bushing slots
-      clearBushingSlots(bushingSlots);
-      
-      // Add bushing card to both slots
-      const newBomItem = addToBOM(card, slot1);
-      
-      // Update slot assignments for both slots
-      setSlotAssignments(prev => ({ 
-        ...prev, 
-        [slot1]: card,
-        [slot2]: card
-      }));
-      
-      // Close the slot selector
-      setShowSlotSelector(false);
-      
-      // Find next available slot
-      const nextSlot = findNextAvailableSlot(slot2);
-      if (nextSlot) {
-        setSelectedSlot(nextSlot);
-      }
-      
-      return;
-    }
-    
-    // Prevent non-display cards from being placed in slot 8 on LTX chassis
-    if (selectedChassis?.type === 'LTX' && slot === 8 && card.type !== 'display') {
-      console.log("Slot 8 is reserved for display cards only in LTX chassis");
-      return;
-    }
-    
-    // Normal card handling
-    const newBomItem = addToBOM(card, slot);
-    
-    // Update slot assignments
-    setSlotAssignments(prev => ({ ...prev, [slot]: card }));
-    
-    // Close the slot selector
-    setShowSlotSelector(false);
-    
-    // If it's an analog card, open the configurator
-    if (card.type === 'analog') {
-      setConfiguringAnalogCard(newBomItem);
-      setShowAnalogConfigurator(true);
-    }
-    
-    // Auto-advance to next available slot
-    if (selectedChassis) {
-      const nextSlot = findNextAvailableSlot(slot);
-      if (nextSlot) {
-        setSelectedSlot(nextSlot);
-      }
-    }
+      return updatedItems;
+    });
   };
 
-  const findNextAvailableSlot = (currentSlot: number): number | null => {
-    if (!selectedChassis) return null;
-    
-    const maxSlot = selectedChassis.type === 'LTX' ? 14 : 
-                   selectedChassis.type === 'MTX' ? 7 : 4;
-    
-    for (let i = currentSlot + 1; i <= maxSlot; i++) {
-      if (!slotAssignments[i]) {
-        return i;
-      }
-    }
-    return null;
+  const removeBOMItem = (index: number) => {
+    setBomItems(prevItems => {
+      const updatedItems = [...prevItems];
+      updatedItems.splice(index, 1);
+      return updatedItems;
+    });
   };
 
-  const handleSlotClick = (slot: number) => {
-    // Prevent non-display cards from being selected for slot 8 in LTX chassis
-    if (selectedChassis?.type === 'LTX' && slot === 8) {
-      // Only allow if it's for clearing or if we're going to add a display card
-      if (slotAssignments[slot]) {
-        // Allow clearing
-        setSelectedSlot(slot);
-        setShowSlotSelector(true);
-      } else {
-        // Only show display cards for slot 8
-        setSelectedSlot(slot);
-        setShowSlotSelector(true);
-      }
-      return;
-    }
-    
-    setSelectedSlot(slot);
-    setShowSlotSelector(true);
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    setQuoteInfo(prev => ({ ...prev, [name]: value }));
   };
 
-  const clearSlot = (slot: number) => {
-    const cardInSlot = slotAssignments[slot];
-    
-    // Special handling for bushing cards (they occupy 2 slots)
-    if (cardInSlot?.type === 'bushing') {
-      // Find both slots occupied by this bushing card
-      const occupiedSlots = Object.entries(slotAssignments)
-        .filter(([, card]) => card.type === 'bushing' && card.id === cardInSlot.id)
-        .map(([slotNum]) => parseInt(slotNum));
-      
-      // Clear both slots
-      occupiedSlots.forEach(slotNum => {
-        setSlotAssignments(prev => {
-          const updated = { ...prev };
-          delete updated[slotNum];
-          return updated;
-        });
-      });
-      
-      // Remove from BOM (only once since it's one item)
-      setBomItems(prev => prev.filter(item => 
-        !(item.slot === occupiedSlots[0] && item.product.id === cardInSlot.id)
-      ));
-    } else {
-      // Normal single-slot card
-      setSlotAssignments(prev => {
-        const updated = { ...prev };
-        delete updated[slot];
-        return updated;
-      });
-      
-      setBomItems(prev => prev.filter(item => item.slot !== slot));
-    }
+  const handleCheckboxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, checked } = e.target;
+    setQuoteInfo(prev => ({ ...prev, [name]: checked }));
   };
 
-  const removeFromBOM = (itemId: string) => {
-    const item = bomItems.find(i => i.id === itemId);
-    if (item?.slot) {
-      setSlotAssignments(prev => {
-        const updated = { ...prev };
-        delete updated[item.slot!];
-        return updated;
-      });
-    }
-    setBomItems(prev => prev.filter(item => item.id !== itemId));
-  };
+  const subtotal = bomItems.filter(item => item.enabled).reduce((total, item) => total + (item.product.price * item.quantity), 0);
+  const discountAmount = subtotal * (discountPercentage / 100);
+  const total = subtotal - discountAmount;
 
-  const toggleBOMItem = (itemId: string, enabled: boolean) => {
-    setBomItems(prev => prev.map(item => 
-      item.id === itemId ? { ...item, enabled } : item
-    ));
-  };
+  useEffect(() => {
+    onQuoteUpdate({
+      items: bomItems.filter(item => item.enabled),
+      subtotal: subtotal,
+      discount: discountPercentage,
+      total: total,
+      ...quoteInfo
+    });
+  }, [bomItems, discountPercentage, subtotal, total, quoteInfo, onQuoteUpdate]);
 
-  const toggleLevel2Option = (bomItemId: string, optionId: string) => {
-    setBomItems(prev => prev.map(item => {
-      if (item.id === bomItemId && item.level2Options) {
-        return {
-          ...item,
-          level2Options: item.level2Options.map(opt =>
-            opt.id === optionId ? { ...opt, enabled: !opt.enabled } : opt
-          )
-        };
-      }
-      return item;
-    }));
-  };
+  const handleRequestQuote = () => {
+    const quote: Partial<Quote> = {
+      id: `Q-${Date.now()}`,
+      items: bomItems.filter(item => item.enabled),
+      subtotal: subtotal,
+      discount: discountPercentage,
+      total: total,
+      status: 'pending_approval',
+      customerName: quoteInfo.customerName,
+      oracleCustomerId: quoteInfo.oracleCustomerId,
+      priority: quoteInfo.priority,
+      isRepInvolved: quoteInfo.isRepInvolved,
+      shippingTerms: quoteInfo.shippingTerms,
+      paymentTerms: quoteInfo.paymentTerms,
+      quoteCurrency: quoteInfo.quoteCurrency,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
 
-  const updateLevel3Customizations = (bomItemId: string, customizations: Level3Customization[]) => {
-    setBomItems(prev => prev.map(item =>
-      item.id === bomItemId ? { ...item, level3Customizations: customizations } : item
-    ));
-  };
-
-  const calculateItemPrice = (item: BOMItem) => {
-    let itemTotal = item.product.price * item.quantity;
-    
-    // Handle configuration-based pricing
-    if (item.configuration) {
-      // For DGA products with options
-      if (isLevel1Product(item.product) && ['TM8', 'TM3', 'TM1'].includes(item.product.type)) {
-        const incrementalPrices = {
-          'CalGas': 450,
-          'Helium Bottle': 280,
-          'Moisture Sensor': 320,
-          '4-20mA bridge': 180
-        };
-        
-        Object.entries(item.configuration).forEach(([key, value]) => {
-          if (value && incrementalPrices[key as keyof typeof incrementalPrices]) {
-            itemTotal += incrementalPrices[key as keyof typeof incrementalPrices];
-          }
-        });
-      }
-      
-      // For PD products with quantity
-      if (item.configuration.quantity) {
-        itemTotal = item.product.price * parseInt(item.configuration.quantity);
-      }
-      
-      // For QPDM with channel pricing
-      if (isLevel1Product(item.product) && item.product.type === 'QPDM' && item.configuration.channels === '6-channel') {
-        itemTotal += 2500; // Additional cost for 6-channel
-      }
-    }
-    
-    // Add Level 2 options cost
-    if (item.level2Options) {
-      const level2Total = item.level2Options
-        .filter(opt => opt.enabled)
-        .reduce((sum, opt) => sum + opt.price, 0);
-      itemTotal += level2Total;
-    }
-    
-    // Add Level 3 customizations cost
-    if (item.level3Customizations) {
-      const level3Total = item.level3Customizations
-        .filter(cust => cust.enabled)
-        .reduce((sum, cust) => sum + cust.price, 0);
-      itemTotal += level3Total;
-    }
-    
-    return itemTotal;
-  };
-
-  const calculateTotal = () => {
-    return bomItems
-      .filter(item => item.enabled)
-      .reduce((total, item) => total + calculateItemPrice(item), 0);
-  };
-
-  // Enhanced QTMS part number generation
-  const getQTMSPartNumber = () => {
-    const chassis = bomItems.find(item => isChassis(item.product))?.product as Chassis;
-    const cards = bomItems
-      .filter(item => isCard(item.product) && item.product.id !== 'remote-display')
-      .map(item => item.product as ProductCard);
-    
-    // Get analog configurations for part number generation
-    const analogConfigurations: Record<string, any> = {};
-    bomItems
-      .filter(item => isCard(item.product) && item.product.type === 'analog')
-      .forEach(item => {
-        if (item.level3Customizations && item.level3Customizations.length > 0) {
-          const sensorTypes: Record<number, string> = {};
-          item.level3Customizations.forEach((customization, index) => {
-            if (customization.enabled) {
-              sensorTypes[index + 1] = customization.name;
-            }
-          });
-          analogConfigurations[item.product.id] = { sensorTypes };
-        }
-      });
-    
-    if (chassis) {
-      return generateQTMSPartNumber(chassis, cards, hasRemoteDisplay, slotAssignments, analogConfigurations);
-    }
-    return '';
-  };
-
-  // Group QTMS items for combined pricing and generate combined part number
-  const getQTMSTotal = () => {
-    const qtmsItems = bomItems.filter(item => 
-      item.enabled && (
-        'slots' in item.product || // Chassis
-        item.product.type === 'relay' || 
-        item.product.type === 'analog' || 
-        item.product.type === 'fiber' || 
-        item.product.type === 'display' ||
-        item.product.type === 'bushing' ||
-        item.product.id === 'remote-display'
-      )
-    );
-    
-    return qtmsItems.reduce((total, item) => total + calculateItemPrice(item), 0);
+    console.log('Quote request submitted:', quote);
+    toast.success('Quote request submitted for approval');
   };
 
   const handleSaveDraft = () => {
-    const quoteData: Partial<Quote> = {
+    const quote: Partial<Quote> = {
       id: `DRAFT-${Date.now()}`,
-      customerName,
-      oracleCustomerId,
-      priority: quotePriority,
-      isRepInvolved,
-      shippingTerms,
-      paymentTerms,
-      quoteCurrency,
-      createdAt: new Date().toISOString()
-    };
-
-    generateQuotePDF(bomItems, quoteData, canSeePrices);
-  };
-
-  const handleRequestQuote = () => {
-    // Prepare comprehensive quote request data
-    const quoteRequest = {
-      id: `QR-${Date.now()}`,
-      customerName,
-      oracleCustomerId,
-      priority: quotePriority,
-      isRepInvolved,
-      shippingTerms,
-      paymentTerms,
-      quoteCurrency,
-      bomItems: bomItems.filter(item => item.enabled),
-      total: calculateTotal(),
+      items: bomItems.filter(item => item.enabled),
+      subtotal: subtotal,
+      discount: discountPercentage,
+      total: total,
+      status: 'draft',
+      customerName: quoteInfo.customerName,
+      oracleCustomerId: quoteInfo.oracleCustomerId,
+      priority: quoteInfo.priority,
+      isRepInvolved: quoteInfo.isRepInvolved,
+      shippingTerms: quoteInfo.shippingTerms,
+      paymentTerms: quoteInfo.paymentTerms,
+      quoteCurrency: quoteInfo.quoteCurrency,
       createdAt: new Date().toISOString(),
-      status: 'pending_approval' as const
+      updatedAt: new Date().toISOString()
     };
 
-    console.log('Quote request submitted for approval:', quoteRequest);
-    // Here you would typically send this to your backend/admin system
-    
-    // Show success message
-    alert('Quote request submitted successfully! You will be notified once it has been reviewed.');
+    generateQuotePDF(bomItems.filter(item => item.enabled), quote, user.role !== 'level1');
+    toast.success('Draft quote PDF generated');
   };
-
-  const canSeePrices = user.role !== 'level1';
 
   return (
-    <div className="min-h-screen bg-black text-white">
-      {/* Header */}
-      <div className="flex justify-between items-center p-6 border-b border-gray-800">
-        <div>
-          <h1 className="text-3xl font-bold text-white mb-2">BOM Builder</h1>
-          <p className="text-gray-400">Configure your power transformer solution</p>
-        </div>
-        <div className="flex space-x-2">
-          <Button 
-            variant="outline" 
-            className="border-gray-600 text-white hover:bg-gray-800 hover:text-white bg-gray-900"
-            onClick={handleSaveDraft}
-          >
-            <Save className="mr-2 h-4 w-4" />
-            Save Draft
-          </Button>
-          <Button 
-            className="bg-red-600 hover:bg-red-700 text-white"
-            onClick={handleRequestQuote}
-            disabled={bomItems.length === 0 || !customerName || !oracleCustomerId}
-          >
-            <Send className="mr-2 h-4 w-4" />
-            Request Quote
-          </Button>
-        </div>
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      {/* Product Selection and BOM Items */}
+      <div className="space-y-4">
+        <Card className="bg-gray-900 border-gray-800">
+          <CardHeader>
+            <CardTitle className="text-white">Select Products</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ProductTable products={products} onProductSelect={addProductToBOM} />
+          </CardContent>
+        </Card>
+
+        <Card className="bg-gray-900 border-gray-800">
+          <CardHeader>
+            <CardTitle className="text-white">BOM Items</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {bomItems.length === 0 ? (
+              <p className="text-gray-400">No items added to BOM.</p>
+            ) : (
+              <div className="space-y-2">
+                {bomItems.map((item, index) => (
+                  <div key={index} className="flex items-center space-x-2">
+                    <Input
+                      type="number"
+                      value={item.quantity}
+                      onChange={(e) => updateBOMItem(index, 'quantity', e.target.value)}
+                      className="w-16 bg-gray-800 border-gray-700 text-white"
+                    />
+                     <Input
+                      type="text"
+                      placeholder="Slot"
+                      value={item.slot || ''}
+                      onChange={(e) => updateBOMItem(index, 'slot', e.target.value)}
+                      className="w-24 bg-gray-800 border-gray-700 text-white"
+                    />
+                     <Input
+                      type="text"
+                      placeholder="Part Number"
+                      value={item.partNumber || ''}
+                      onChange={(e) => updateBOMItem(index, 'partNumber', e.target.value)}
+                      className="w-32 bg-gray-800 border-gray-700 text-white"
+                    />
+                    <Label className="text-white">{item.product.name} (${item.product.price})</Label>
+                    <Input
+                      type="checkbox"
+                      checked={item.enabled}
+                      onChange={(e) => updateBOMItem(index, 'enabled', e.target.checked)}
+                      className="bg-gray-800 border-gray-700 text-white"
+                    />
+                    <Button variant="ghost" size="sm" onClick={() => removeBOMItem(index)}>
+                      Remove
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
 
-      <div className="flex">
-        {/* Main Content */}
-        <div className="flex-1 p-6 space-y-6">
-          {/* Quote Information Form - Professional Layout */}
-          <Card className="bg-gray-900 border-gray-800">
-            <CardHeader className="pb-4">
-              <CardTitle className="text-white text-xl">Quote Information</CardTitle>
-              <CardDescription className="text-gray-400">
-                Please provide the required information for accurate quote generation
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                {/* Customer Information Section */}
-                <div className="space-y-6">
-                  <div className="border-b border-gray-700 pb-2">
-                    <h3 className="text-white font-semibold text-lg">Customer Information</h3>
-                  </div>
-                  <div className="grid grid-cols-1 gap-4">
-                    <div>
-                      <Label htmlFor="oracle-id" className="text-white font-medium mb-2 block">Oracle Customer ID *</Label>
-                      <Input
-                        id="oracle-id"
-                        value={oracleCustomerId}
-                        onChange={(e) => setOracleCustomerId(e.target.value)}
-                        className="bg-gray-800 border-gray-600 text-white placeholder:text-gray-400 focus:border-red-500 focus:ring-red-500"
-                        placeholder="Enter Oracle Customer ID"
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="customer-name" className="text-white font-medium mb-2 block">Customer Name *</Label>
-                      <Input
-                        id="customer-name"
-                        value={customerName}
-                        onChange={(e) => setCustomerName(e.target.value)}
-                        className="bg-gray-800 border-gray-600 text-white placeholder:text-gray-400 focus:border-red-500 focus:ring-red-500"
-                        placeholder="Enter customer name"
-                      />
-                    </div>
-                  </div>
-                </div>
+      {/* Quote Information and Actions */}
+      <div className="space-y-4">
+        <Card className="bg-gray-900 border-gray-800">
+          <CardHeader>
+            <CardTitle className="text-white">Quote Information</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <Label htmlFor="customerName" className="text-white">Customer Name</Label>
+              <Input
+                type="text"
+                id="customerName"
+                name="customerName"
+                onChange={handleInputChange}
+                className="bg-gray-800 border-gray-700 text-white"
+              />
+            </div>
+            <div>
+              <Label htmlFor="oracleCustomerId" className="text-white">Oracle Customer ID</Label>
+              <Input
+                type="text"
+                id="oracleCustomerId"
+                name="oracleCustomerId"
+                onChange={handleInputChange}
+                className="bg-gray-800 border-gray-700 text-white"
+              />
+            </div>
+            <div>
+              <Label htmlFor="priority" className="text-white">Priority</Label>
+              <Select onValueChange={(value) => setQuoteInfo(prev => ({ ...prev, priority: value }))}>
+                <SelectTrigger className="bg-gray-800 border-gray-700 text-white w-full">
+                  <SelectValue placeholder="Select priority" />
+                </SelectTrigger>
+                <SelectContent className="bg-gray-800 border-gray-700">
+                  <SelectItem value="High" className="text-white">High</SelectItem>
+                  <SelectItem value="Medium" className="text-white">Medium</SelectItem>
+                  <SelectItem value="Low" className="text-white">Low</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Input
+                type="checkbox"
+                id="isRepInvolved"
+                name="isRepInvolved"
+                onChange={handleCheckboxChange}
+                className="bg-gray-800 border-gray-700 text-white"
+              />
+              <Label htmlFor="isRepInvolved" className="text-white">Is Rep Involved?</Label>
+            </div>
+            <div>
+              <Label htmlFor="shippingTerms" className="text-white">Shipping Terms</Label>
+              <Input
+                type="text"
+                id="shippingTerms"
+                name="shippingTerms"
+                onChange={handleInputChange}
+                className="bg-gray-800 border-gray-700 text-white"
+              />
+            </div>
+            <div>
+              <Label htmlFor="paymentTerms" className="text-white">Payment Terms (days)</Label>
+              <Input
+                type="number"
+                id="paymentTerms"
+                name="paymentTerms"
+                onChange={handleInputChange}
+                className="bg-gray-800 border-gray-700 text-white"
+              />
+            </div>
+            <div>
+              <Label htmlFor="quoteCurrency" className="text-white">Quote Currency</Label>
+              <Select onValueChange={(value) => setQuoteInfo(prev => ({ ...prev, quoteCurrency: value }))}>
+                <SelectTrigger className="bg-gray-800 border-gray-700 text-white w-full">
+                  <SelectValue placeholder="Select currency" />
+                </SelectTrigger>
+                <SelectContent className="bg-gray-800 border-gray-700">
+                  <SelectItem value="USD" className="text-white">USD</SelectItem>
+                  <SelectItem value="EUR" className="text-white">EUR</SelectItem>
+                  <SelectItem value="GBP" className="text-white">GBP</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </CardContent>
+        </Card>
 
-                {/* Quote Configuration Section */}
-                <div className="space-y-6">
-                  <div className="border-b border-gray-700 pb-2">
-                    <h3 className="text-white font-semibold text-lg">Quote Configuration</h3>
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="priority" className="text-white font-medium mb-2 block">Priority Level</Label>
-                      <Select value={quotePriority} onValueChange={(value: 'High' | 'Medium' | 'Low') => setQuotePriority(value)}>
-                        <SelectTrigger className="bg-gray-800 border-gray-600 text-white focus:border-red-500 focus:ring-red-500">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent className="bg-gray-800 border-gray-600 z-50">
-                          <SelectItem value="High" className="text-white hover:bg-gray-700 focus:bg-gray-700">High Priority</SelectItem>
-                          <SelectItem value="Medium" className="text-white hover:bg-gray-700 focus:bg-gray-700">Medium Priority</SelectItem>
-                          <SelectItem value="Low" className="text-white hover:bg-gray-700 focus:bg-gray-700">Low Priority</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <Label htmlFor="rep-involved" className="text-white font-medium mb-2 block">Rep Involvement</Label>
-                      <Select value={isRepInvolved?.toString() || ''} onValueChange={(value) => setIsRepInvolved(value === 'true')}>
-                        <SelectTrigger className="bg-gray-800 border-gray-600 text-white focus:border-red-500 focus:ring-red-500">
-                          <SelectValue placeholder="Is Rep involved?" />
-                        </SelectTrigger>
-                        <SelectContent className="bg-gray-800 border-gray-600 z-50">
-                          <SelectItem value="true" className="text-white hover:bg-gray-700 focus:bg-gray-700">Yes</SelectItem>
-                          <SelectItem value="false" className="text-white hover:bg-gray-700 focus:bg-gray-700">No</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                </div>
+        <Card className="bg-gray-900 border-gray-800">
+          <CardHeader>
+            <CardTitle className="text-white">Discount</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-col space-y-2">
+              <Label className="text-white">Discount Percentage: {discountPercentage}%</Label>
+              <Slider
+                value={[discountPercentage]}
+                onValueChange={(value) => setDiscountPercentage(value[0])}
+                max={50}
+                step={1}
+              />
+              <div className="text-white">
+                Subtotal: ${subtotal.toLocaleString()}
               </div>
-
-              {/* Terms and Currency Section */}
-              <div className="mt-8 pt-6 border-t border-gray-700">
-                <div className="border-b border-gray-700 pb-2 mb-6">
-                  <h3 className="text-white font-semibold text-lg">Terms & Currency</h3>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  <div>
-                    <Label htmlFor="shipping-terms" className="text-white font-medium mb-2 block">Shipping Terms</Label>
-                    <Select value={shippingTerms} onValueChange={setShippingTerms}>
-                      <SelectTrigger className="bg-gray-800 border-gray-600 text-white focus:border-red-500 focus:ring-red-500">
-                        <SelectValue placeholder="Select shipping terms" />
-                      </SelectTrigger>
-                      <SelectContent className="bg-gray-800 border-gray-600 z-50">
-                        <SelectItem value="Ex-Works" className="text-white hover:bg-gray-700 focus:bg-gray-700">Ex-Works</SelectItem>
-                        <SelectItem value="CFR" className="text-white hover:bg-gray-700 focus:bg-gray-700">CFR</SelectItem>
-                        <SelectItem value="CIF" className="text-white hover:bg-gray-700 focus:bg-gray-700">CIF</SelectItem>
-                        <SelectItem value="CIP" className="text-white hover:bg-gray-700 focus:bg-gray-700">CIP</SelectItem>
-                        <SelectItem value="CPT" className="text-white hover:bg-gray-700 focus:bg-gray-700">CPT</SelectItem>
-                        <SelectItem value="DDP" className="text-white hover:bg-gray-700 focus:bg-gray-700">DDP</SelectItem>
-                        <SelectItem value="DAP" className="text-white hover:bg-gray-700 focus:bg-gray-700">DAP</SelectItem>
-                        <SelectItem value="FCA" className="text-white hover:bg-gray-700 focus:bg-gray-700">FCA</SelectItem>
-                        <SelectItem value="Prepaid" className="text-white hover:bg-gray-700 focus:bg-gray-700">Prepaid</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label htmlFor="payment-terms" className="text-white font-medium mb-2 block">Payment Terms</Label>
-                    <Select value={paymentTerms} onValueChange={setPaymentTerms}>
-                      <SelectTrigger className="bg-gray-800 border-gray-600 text-white focus:border-red-500 focus:ring-red-500">
-                        <SelectValue placeholder="Select payment days" />
-                      </SelectTrigger>
-                      <SelectContent className="bg-gray-800 border-gray-600 z-50">
-                        <SelectItem value="Prepaid" className="text-white hover:bg-gray-700 focus:bg-gray-700">Prepaid</SelectItem>
-                        <SelectItem value="15" className="text-white hover:bg-gray-700 focus:bg-gray-700">15 days</SelectItem>
-                        <SelectItem value="30" className="text-white hover:bg-gray-700 focus:bg-gray-700">30 days</SelectItem>
-                        <SelectItem value="60" className="text-white hover:bg-gray-700 focus:bg-gray-700">60 days</SelectItem>
-                        <SelectItem value="90" className="text-white hover:bg-gray-700 focus:bg-gray-700">90 days</SelectItem>
-                        <SelectItem value="120" className="text-white hover:bg-gray-700 focus:bg-gray-700">120 days</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label htmlFor="quote-currency" className="text-white font-medium mb-2 block">Currency</Label>
-                    <Select value={quoteCurrency} onValueChange={setQuoteCurrency}>
-                      <SelectTrigger className="bg-gray-800 border-gray-600 text-white focus:border-red-500 focus:ring-red-500">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent className="bg-gray-800 border-gray-600 z-50">
-                        <SelectItem value="USD" className="text-white hover:bg-gray-700 focus:bg-gray-700">USD ($)</SelectItem>
-                        <SelectItem value="EURO" className="text-white hover:bg-gray-700 focus:bg-gray-700">EURO (€)</SelectItem>
-                        <SelectItem value="GBP" className="text-white hover:bg-gray-700 focus:bg-gray-700">GBP (£)</SelectItem>
-                        <SelectItem value="CAD" className="text-white hover:bg-gray-700 focus:bg-gray-700">CAD (C$)</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
+              <div className="text-green-500">
+                Discount: ${discountAmount.toLocaleString()}
               </div>
-            </CardContent>
-          </Card>
+              <div className="text-white font-bold">
+                Total: ${total.toLocaleString()}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
-          {/* Product Selection Tabs */}
-          <div className="space-y-4">
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-              <TabsList className="grid w-full grid-cols-3 bg-gray-800">
-                <TabsTrigger value="qtms" className="text-white data-[state=active]:bg-red-600 data-[state=active]:text-white">
-                  1. Select QTMS Model
-                </TabsTrigger>
-                <TabsTrigger value="dga" className="text-white data-[state=active]:bg-red-600 data-[state=active]:text-white">
-                  2. DGA
-                </TabsTrigger>
-                <TabsTrigger value="pd" className="text-white data-[state=active]:bg-red-600 data-[state=active]:text-white">
-                  3. Partial Discharge
-                </TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="qtms" className="mt-4">
-                <ChassisSelector 
-                  onChassisSelect={handleChassisSelect}
-                  selectedChassis={selectedChassis}
-                  canSeePrices={canSeePrices}
-                />
-                
-                {/* Rack Configuration - Only show in QTMS tab */}
-                {selectedChassis && (
-                  <div className="mt-6 space-y-4">
-                    <RackVisualizer 
-                      chassis={selectedChassis}
-                      slotAssignments={slotAssignments}
-                      onSlotClick={handleSlotClick}
-                      onSlotClear={clearSlot}
-                      selectedSlot={selectedSlot}
-                    />
-                    
-                    {/* Remote Display Section */}
-                    <Card className="bg-gray-900 border-gray-800">
-                      <CardHeader>
-                        <CardTitle className="text-white">Remote Display Option</CardTitle>
-                        <CardDescription className="text-gray-400">
-                          Add optional remote display panel (mounted on front panel)
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center space-x-4">
-                            <div 
-                              className={`w-16 h-12 border-2 rounded cursor-pointer transition-all flex items-center justify-center ${
-                                hasRemoteDisplay 
-                                  ? 'border-green-500 bg-green-600' 
-                                  : 'border-gray-600 bg-gray-700 hover:border-red-600'
-                              }`}
-                              onClick={handleRemoteDisplayToggle}
-                            >
-                              <Monitor className={`h-6 w-6 ${hasRemoteDisplay ? 'text-white' : 'text-gray-400'}`} />
-                            </div>
-                            <div>
-                              <p className="text-white font-medium">Remote Display Panel</p>
-                              <p className="text-gray-400 text-sm">Front-mounted LCD display with navigation controls</p>
-                              {canSeePrices && (
-                                <p className="text-white font-bold mt-1">$850</p>
-                              )}
-                            </div>
-                          </div>
-                          <Button
-                            variant={hasRemoteDisplay ? "default" : "outline"}
-                            onClick={handleRemoteDisplayToggle}
-                            className={hasRemoteDisplay 
-                              ? "bg-green-600 hover:bg-green-700 text-white" 
-                              : "border-gray-600 text-black bg-white hover:bg-gray-100 hover:text-black"
-                            }
-                          >
-                            {hasRemoteDisplay ? 'Remove' : 'Add Display'}
-                          </Button>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </div>
-                )}
-              </TabsContent>
-
-              <TabsContent value="dga" className="mt-4">
-                <Level1ProductSelector 
-                  onProductSelect={(product, configuration) => addToBOM(product, undefined, undefined, configuration)}
-                  selectedProduct={null}
-                  canSeePrices={canSeePrices}
-                  productType="DGA"
-                />
-              </TabsContent>
-
-              <TabsContent value="pd" className="mt-4">
-                <Level1ProductSelector 
-                  onProductSelect={(product, configuration) => addToBOM(product, undefined, undefined, configuration)}
-                  selectedProduct={null}
-                  canSeePrices={canSeePrices}
-                  productType="PD"
-                />
-              </TabsContent>
-            </Tabs>
-          </div>
-
-          {/* Slot Card Selector Modal */}
-          {showSlotSelector && selectedSlot && selectedChassis && (
-            <SlotCardSelector
-              chassis={selectedChassis}
-              slot={selectedSlot}
-              onCardSelect={addCardToSlot}
-              onClose={() => setShowSlotSelector(false)}
-              canSeePrices={canSeePrices}
-            />
-          )}
-
-          {/* Analog Card Configurator Modal */}
-          {showAnalogConfigurator && configuringAnalogCard && (
-            <AnalogCardConfigurator
-              bomItem={configuringAnalogCard}
-              onSave={(customizations) => {
-                updateLevel3Customizations(configuringAnalogCard.id, customizations);
-                setShowAnalogConfigurator(false);
-                setConfiguringAnalogCard(null);
-              }}
-              onClose={() => {
-                setShowAnalogConfigurator(false);
-                setConfiguringAnalogCard(null);
-              }}
-            />
-          )}
-        </div>
-
-        {/* BOM Sidebar */}
-        <div className="w-96 bg-gray-900 border-l border-gray-800 p-4">
-          <Card className="bg-gray-800 border-gray-700">
-            <CardHeader>
-              <CardTitle className="text-white flex items-center">
-                <ShoppingCart className="mr-2 h-5 w-5" />
-                Bill of Materials
-              </CardTitle>
-              <CardDescription className="text-gray-400">
-                {bomItems.filter(item => item.enabled).length} items configured
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Tabs defaultValue="items" className="w-full">
-                <TabsList className="grid w-full grid-cols-2 bg-gray-700">
-                  <TabsTrigger value="items" className="text-white data-[state=active]:bg-red-600 data-[state=active]:text-white">Items</TabsTrigger>
-                  <TabsTrigger value="customization" className="text-white data-[state=active]:bg-red-600 data-[state=active]:text-white">Options</TabsTrigger>
-                </TabsList>
-                
-                <TabsContent value="items" className="space-y-3 mt-4">
-                  {bomItems.length === 0 ? (
-                    <p className="text-gray-400 text-sm">No items added yet</p>
-                  ) : (
-                    <>
-                      {/* QTMS Combined Section */}
-                      {bomItems.some(item => 
-                        item.enabled && (
-                          'slots' in item.product || // Chassis
-                          item.product.type === 'relay' || 
-                          item.product.type === 'analog' || 
-                          item.product.type === 'fiber' || 
-                          item.product.type === 'display' ||
-                          item.product.type === 'bushing' ||
-                          item.product.id === 'remote-display'
-                        )
-                      ) && (
-                        <div className="p-3 bg-gray-700 rounded border-l-4 border-red-600">
-                          <div className="flex justify-between items-center mb-2">
-                            <p className="font-medium text-white">QTMS System</p>
-                            <p className="font-bold text-white">
-                              {canSeePrices ? `$${getQTMSTotal().toLocaleString()}` : '—'}
-                            </p>
-                          </div>
-                          <div className="space-y-1 text-xs text-gray-300 mb-2">
-                            {bomItems
-                              .filter(item => 
-                                item.enabled && (
-                                  'slots' in item.product || // Chassis
-                                  item.product.type === 'relay' || 
-                                  item.product.type === 'analog' || 
-                                  item.product.type === 'fiber' || 
-                                  item.product.type === 'display' ||
-                                  item.product.type === 'bushing' ||
-                                  item.product.id === 'remote-display'
-                                )
-                              )
-                              .map((item) => (
-                                <div key={item.id} className="flex justify-between">
-                                  <span>• {item.product.name} {item.slot ? `(Slot ${item.slot})` : ''}</span>
-                                  <span>{canSeePrices ? `$${calculateItemPrice(item).toLocaleString()}` : '—'}</span>
-                                </div>
-                              ))}
-                          </div>
-                          {/* QTMS Part Number */}
-                          {getQTMSPartNumber() && (
-                            <div className="mt-2 pt-2 border-t border-gray-600">
-                              <p className="text-xs text-gray-400">Part Number:</p>
-                              <p className="text-xs font-mono text-white">{getQTMSPartNumber()}</p>
-                            </div>
-                          )}
-                        </div>
-                      )}
-
-                      {/* Individual DGA/PD Products */}
-                      {bomItems
-                        .filter(item => 
-                          item.enabled && 
-                          !('slots' in item.product) && 
-                          item.product.type !== 'relay' && 
-                          item.product.type !== 'analog' && 
-                          item.product.type !== 'fiber' && 
-                          item.product.type !== 'display' && 
-                          item.product.type !== 'bushing' &&
-                          item.product.id !== 'remote-display'
-                        )
-                        .map((item) => (
-                          <div key={item.id} className="p-3 bg-gray-700 rounded">
-                            <div className="flex justify-between items-start">
-                              <div className="flex items-start space-x-3 flex-1">
-                                <ToggleSwitch
-                                  checked={item.enabled}
-                                  onCheckedChange={(enabled) => toggleBOMItem(item.id, enabled)}
-                                  size="sm"
-                                />
-                                <div className="flex-1">
-                                  <p className={`font-medium text-sm ${item.enabled ? 'text-white' : 'text-gray-500'}`}>
-                                    {item.product.name}
-                                  </p>
-
-                                  {/* Configuration details */}
-                                  {item.configuration && Object.keys(item.configuration).length > 0 && (
-                                    <div className="mt-1 text-xs text-gray-400">
-                                      {Object.entries(item.configuration).map(([key, value]) => {
-                                        if (value && key !== 'quantity') {
-                                          return <div key={key}>{key}: {value.toString()}</div>;
-                                        }
-                                        return null;
-                                      })}
-                                      {item.configuration.quantity && (
-                                        <div>Qty: {item.configuration.quantity}</div>
-                                      )}
-                                    </div>
-                                  )}
-
-                                  {isLevel1Product(item.product) && item.product.productInfoUrl && (
-                                    <a
-                                      href={item.product.productInfoUrl}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="text-red-400 underline text-xs block mt-1"
-                                    >
-                                      <ExternalLink className="h-3 w-3 mr-1 inline" />
-                                      Product Info
-                                    </a>
-                                  )}
-
-                                  {item.product.type === 'analog' && item.level3Customizations && item.level3Customizations.length > 0 && (
-                                    <div className="mt-2">
-                                      <p className="text-xs text-gray-400 mb-1">Configured Channels:</p>
-                                      {item.level3Customizations.filter(c => c.enabled).map((config, idx) => (
-                                        <div key={idx} className="text-xs text-white">
-                                          Ch{idx + 1}: {config.name}
-                                        </div>
-                                      ))}
-                                    </div>
-                                  )}
-
-                                  {/* Part Number */}
-                                  {item.partNumber && (
-                                    <div className="mt-2 pt-2 border-t border-gray-600">
-                                      <p className="text-xs text-gray-400">Part Number:</p>
-                                      <p className="text-xs font-mono text-white">{item.partNumber}</p>
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-                              <div className="text-right ml-2">
-                                <p className={`font-bold text-sm ${item.enabled ? 'text-white' : 'text-gray-500'}`}>
-                                  {canSeePrices ? `$${calculateItemPrice(item).toLocaleString()}` : '—'}
-                                </p>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => removeFromBOM(item.id)}
-                                  className="text-red-400 hover:text-red-300 hover:bg-red-900/20 p-1 h-auto text-xs"
-                                >
-                                  Remove
-                                </Button>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                    </>
-                  )}
-                </TabsContent>
-
-                <TabsContent value="customization" className="space-y-4 mt-4">
-                  {bomItems.length === 0 ? (
-                    <p className="text-gray-400 text-sm">No items to customize</p>
-                  ) : (
-                    bomItems.map((item) => (
-                      <div key={item.id} className="p-3 bg-gray-700 rounded">
-                        <div className="flex items-center justify-between mb-2">
-                          <h4 className="text-white font-medium text-sm">{item.product.name}</h4>
-                          <Badge variant={item.enabled ? "default" : "secondary"} className="text-xs">
-                            {item.enabled ? "Enabled" : "Disabled"}
-                          </Badge>
-                        </div>
-                        
-                        {item.level2Options && item.level2Options.length > 0 ? (
-                          <div className="space-y-2">
-                            {item.level2Options.map((option) => (
-                              <div key={option.id} className="flex items-center justify-between p-2 bg-gray-600 rounded">
-                                <div className="flex items-center space-x-2">
-                                  <ToggleSwitch
-                                    checked={option.enabled}
-                                    onCheckedChange={() => toggleLevel2Option(item.id, option.id)}
-                                    size="sm"
-                                  />
-                                  <div>
-                                    <p className={`text-xs font-medium ${option.enabled ? 'text-white' : 'text-gray-400'}`}>
-                                      {option.name}
-                                    </p>
-                                  </div>
-                                </div>
-                                <div className="text-right">
-                                  <p className={`text-xs font-bold ${option.enabled ? 'text-white' : 'text-gray-500'}`}>
-                                    {canSeePrices ? `$${option.price.toLocaleString()}` : '—'}
-                                  </p>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        ) : (
-                          <p className="text-gray-400 text-xs">No options available</p>
-                        )}
-
-                        {item.product.type === 'analog' && (
-                          <div className="mt-2">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="text-white border-gray-500 hover:bg-gray-600"
-                              onClick={() => {
-                                setConfiguringAnalogCard(item);
-                                setShowAnalogConfigurator(true);
-                              }}
-                            >
-                              <Settings className="h-3 w-3 mr-1" />
-                              Configure Channels
-                            </Button>
-                          </div>
-                        )}
-                      </div>
-                    ))
-                  )}
-                </TabsContent>
-              </Tabs>
-              
-              {bomItems.length > 0 && (
-                <div className="border-t border-gray-600 pt-3 mt-4">
-                  <div className="flex justify-between items-center">
-                    <span className="text-white font-bold">Total:</span>
-                    <span className="text-white font-bold text-lg">
-                      {canSeePrices ? `$${calculateTotal().toLocaleString()}` : '—'}
-                    </span>
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+        <div className="flex justify-between">
+          <Button onClick={handleSaveDraft} className="bg-blue-600 hover:bg-blue-700 text-white">
+            Save Draft & Generate PDF
+          </Button>
+          <Button onClick={handleRequestQuote} className="bg-green-600 hover:bg-green-700 text-white">
+            Request Quote
+          </Button>
         </div>
       </div>
     </div>

@@ -75,7 +75,7 @@ const QuoteSearch = ({ onViewQuote, onDownloadQuote, onCloneQuote }: QuoteSearch
       isRepInvolved: true,
       shippingTerms: 'CFR',
       paymentTerms: '90',
-      quoteCurrency: 'EUR'
+      quoteCurrency: 'EURO'
     }
   ];
 

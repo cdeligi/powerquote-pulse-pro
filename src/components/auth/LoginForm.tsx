@@ -126,6 +126,15 @@ const LoginForm = ({ onLogin }: LoginFormProps) => {
           </div>
         </CardContent>
       </Card>
+
+      {/* Qualitrol Logo */}
+      <div className="flex justify-center mt-6">
+        <img 
+          src="/lovable-uploads/c709d992-c3dc-4f58-b9c6-19b56cf1ad71.png" 
+          alt="Qualitrol" 
+          className="h-8 opacity-70"
+        />
+      </div>
     </div>
   );
 };

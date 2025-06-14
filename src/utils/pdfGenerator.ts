@@ -21,8 +21,13 @@ export const generateQuotePDF = (
       <title>Quote Draft - ${quoteInfo.id || 'New Quote'}</title>
       <style>
         body { font-family: Arial, sans-serif; margin: 20px; color: #333; }
-        .header { border-bottom: 2px solid #dc2626; padding-bottom: 20px; margin-bottom: 30px; }
-        .logo { color: #dc2626; font-size: 24px; font-weight: bold; }
+        .header { border-bottom: 2px solid #dc2626; padding-bottom: 20px; margin-bottom: 30px; display: flex; justify-content: space-between; align-items: center; }
+        .logo-section { display: flex; align-items: center; }
+        .logo { height: 60px; }
+        .company-info { text-align: left; margin-left: 20px; }
+        .company-name { color: #dc2626; font-size: 24px; font-weight: bold; margin: 0; }
+        .tagline { color: #666; font-size: 14px; margin: 5px 0 0 0; }
+        .quote-title { text-align: right; }
         .quote-info { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 30px; }
         .info-section { background: #f8f9fa; padding: 15px; border-radius: 8px; }
         .info-title { font-weight: bold; color: #dc2626; margin-bottom: 10px; }
@@ -30,6 +35,7 @@ export const generateQuotePDF = (
         .bom-table th, .bom-table td { border: 1px solid #ddd; padding: 12px; text-align: left; }
         .bom-table th { background-color: #dc2626; color: white; }
         .bom-table tr:nth-child(even) { background-color: #f2f2f2; }
+        .part-number { font-family: monospace; font-size: 11px; color: #666; font-style: italic; }
         .total-section { text-align: right; font-size: 18px; font-weight: bold; }
         .footer { margin-top: 40px; padding-top: 20px; border-top: 1px solid #ddd; font-size: 12px; color: #666; }
         @media print { body { margin: 0; } }
@@ -37,9 +43,17 @@ export const generateQuotePDF = (
     </head>
     <body>
       <div class="header">
-        <div class="logo">QUALITROL</div>
-        <h1>Quote Draft</h1>
-        <p>Generated on: ${new Date().toLocaleDateString()}</p>
+        <div class="logo-section">
+          <img src="/lovable-uploads/bb5b4c17-11a7-4ff6-a4fb-69f957ca6f92.png" alt="Qualitrol" class="logo">
+          <div class="company-info">
+            <h1 class="company-name">QUALITROL</h1>
+            <p class="tagline">Defining Reliability</p>
+          </div>
+        </div>
+        <div class="quote-title">
+          <h1>Quote Draft</h1>
+          <p>Generated on: ${new Date().toLocaleDateString()}</p>
+        </div>
       </div>
 
       <div class="quote-info">
@@ -68,7 +82,6 @@ export const generateQuotePDF = (
           <tr>
             <th>Item</th>
             <th>Description</th>
-            <th>Part Number</th>
             <th>Qty</th>
             <th>Slot</th>
             ${canSeePrices ? '<th>Unit Price</th><th>Total</th>' : ''}
@@ -79,9 +92,11 @@ export const generateQuotePDF = (
             .filter(item => item.enabled)
             .map(item => `
               <tr>
-                <td>${item.product.name}</td>
+                <td>
+                  ${item.product.name}
+                  ${item.partNumber ? `<br><div class="part-number">P/N: ${item.partNumber}</div>` : ''}
+                </td>
                 <td>${item.product.description}</td>
-                <td>${item.partNumber || 'TBD'}</td>
                 <td>${item.quantity}</td>
                 <td>${item.slot || 'N/A'}</td>
                 ${canSeePrices ? `
