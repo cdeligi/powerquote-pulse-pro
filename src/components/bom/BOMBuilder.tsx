@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { User } from "@/types/auth";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,7 +15,7 @@ import RackVisualizer from "./RackVisualizer";
 import SlotCardSelector from "./SlotCardSelector";
 import AnalogCardConfigurator from "./AnalogCardConfigurator";
 import ToggleSwitch from "@/components/ui/toggle-switch";
-import { BOMItem, Chassis, Card as ProductCard, Level1Product, Level2Option, Level3Customization, isLevel1Product, isChassis, isCard, generateQTMSPartNumber, generateProductPartNumber } from "@/types/product";
+import { BOMItem, Chassis, Card as ProductCard, Level1Product, Level2Option, Level3Customization, isLevel1Product, isChassis, isCard, generateQTMSPartNumber, generateProductPartNumber, ShippingTerms, PaymentTerms } from "@/types/product";
 import { Quote } from "@/types/quote";
 import { ShoppingCart, Save, Send, ExternalLink, Settings, Plus, Trash2, Monitor } from "lucide-react";
 import { generateQuotePDF } from '@/utils/pdfGenerator';
@@ -39,8 +40,8 @@ const BOMBuilder = ({ user }: BOMBuilderProps) => {
   const [customerName, setCustomerName] = useState('');
   const [quotePriority, setQuotePriority] = useState<'High' | 'Medium' | 'Low' | 'Urgent'>('Medium');
   const [isRepInvolved, setIsRepInvolved] = useState<boolean | null>(null);
-  const [shippingTerms, setShippingTerms] = useState<string>('');
-  const [paymentTerms, setPaymentTerms] = useState<string>('');
+  const [shippingTerms, setShippingTerms] = useState<ShippingTerms>('Ex-Works');
+  const [paymentTerms, setPaymentTerms] = useState<PaymentTerms>('30');
   const [quoteCurrency, setQuoteCurrency] = useState<'USD' | 'EURO' | 'GBP' | 'CAD'>('USD');
 
   const addToBOM = (product: Chassis | ProductCard | Level1Product, slot?: number, level2Options?: Level2Option[], configuration?: Record<string, any>) => {
@@ -594,7 +595,7 @@ const BOMBuilder = ({ user }: BOMBuilderProps) => {
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   <div>
                     <Label htmlFor="shipping-terms" className="text-white font-medium mb-2 block">Shipping Terms</Label>
-                    <Select value={shippingTerms} onValueChange={setShippingTerms}>
+                    <Select value={shippingTerms} onValueChange={(value: ShippingTerms) => setShippingTerms(value)}>
                       <SelectTrigger className="bg-gray-800 border-gray-600 text-white focus:border-red-500 focus:ring-red-500">
                         <SelectValue placeholder="Select shipping terms" />
                       </SelectTrigger>
@@ -613,7 +614,7 @@ const BOMBuilder = ({ user }: BOMBuilderProps) => {
                   </div>
                   <div>
                     <Label htmlFor="payment-terms" className="text-white font-medium mb-2 block">Payment Terms</Label>
-                    <Select value={paymentTerms} onValueChange={setPaymentTerms}>
+                    <Select value={paymentTerms} onValueChange={(value: PaymentTerms) => setPaymentTerms(value)}>
                       <SelectTrigger className="bg-gray-800 border-gray-600 text-white focus:border-red-500 focus:ring-red-500">
                         <SelectValue placeholder="Select payment days" />
                       </SelectTrigger>

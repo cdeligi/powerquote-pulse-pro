@@ -1,4 +1,3 @@
-
 export interface Chassis {
   id: string;
   name: string;
@@ -60,6 +59,12 @@ export interface Level3Customization {
   enabled: boolean;
 }
 
+// Export shipping terms type
+export type ShippingTerms = 'Ex-Works' | 'CFR' | 'CIF' | 'CIP' | 'CPT' | 'DDP' | 'DAP' | 'FCA' | 'Prepaid';
+
+// Export payment terms type  
+export type PaymentTerms = 'Prepaid' | '15' | '30' | '60' | '90' | '120';
+
 export interface BOMItem {
   id: string;
   product: Chassis | Card | Level1Product;
@@ -90,8 +95,8 @@ export interface Quote {
   priority: 'High' | 'Medium' | 'Low' | 'Urgent';
   termsAndConditions?: string;
   isRepInvolved?: boolean;
-  shippingTerms?: 'Ex-Works' | 'CFR' | 'CIF' | 'CIP' | 'CPT' | 'DDP' | 'DAP' | 'FCA' | 'Prepaid';
-  paymentTerms?: 'Prepaid' | '15' | '30' | '60' | '90' | '120';
+  shippingTerms?: ShippingTerms;
+  paymentTerms?: PaymentTerms;
   quoteCurrency?: 'USD' | 'EURO' | 'GBP' | 'CAD';
 }
 
