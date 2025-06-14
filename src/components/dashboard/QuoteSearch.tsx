@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -19,6 +18,9 @@ const QuoteSearch = ({ onViewQuote, onDownloadQuote, onCloneQuote }: QuoteSearch
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterPriority, setFilterPriority] = useState('all');
   const [searchBy, setSearchBy] = useState('customer');
+  const [filters, setFilters] = useState({
+    currency: ''
+  });
 
   // Mock data - replace with actual data from your backend
   const mockQuotes: Quote[] = [
@@ -88,8 +90,9 @@ const QuoteSearch = ({ onViewQuote, onDownloadQuote, onCloneQuote }: QuoteSearch
 
     const matchesStatus = filterStatus === 'all' || quote.status === filterStatus;
     const matchesPriority = filterPriority === 'all' || quote.priority === filterPriority;
+    const matchesCurrency = filters.currency === '' || quote.quoteCurrency === filters.currency;
 
-    return matchesSearch && matchesStatus && matchesPriority;
+    return matchesSearch && matchesStatus && matchesPriority && matchesCurrency;
   });
 
   const getStatusColor = (status: string) => {
@@ -166,6 +169,20 @@ const QuoteSearch = ({ onViewQuote, onDownloadQuote, onCloneQuote }: QuoteSearch
                   <SelectItem value="High" className="text-white hover:bg-gray-700">High</SelectItem>
                   <SelectItem value="Medium" className="text-white hover:bg-gray-700">Medium</SelectItem>
                   <SelectItem value="Low" className="text-white hover:bg-gray-700">Low</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Select value={filters.currency} onValueChange={(value) => setFilters(prev => ({ ...prev, currency: value }))}>
+                <SelectTrigger className="bg-gray-800 border-gray-700 text-white">
+                  <SelectValue placeholder="All Currencies" />
+                </SelectTrigger>
+                <SelectContent className="bg-gray-800 border-gray-700">
+                  <SelectItem value="" className="text-white hover:bg-gray-700">All Currencies</SelectItem>
+                  <SelectItem value="USD" className="text-white hover:bg-gray-700">USD</SelectItem>
+                  <SelectItem value="EURO" className="text-white hover:bg-gray-700">Euro</SelectItem>
+                  <SelectItem value="GBP" className="text-white hover:bg-gray-700">GBP</SelectItem>
+                  <SelectItem value="CAD" className="text-white hover:bg-gray-700">CAD</SelectItem>
                 </SelectContent>
               </Select>
             </div>

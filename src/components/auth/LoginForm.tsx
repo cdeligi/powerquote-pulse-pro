@@ -65,10 +65,11 @@ const LoginForm = ({ onLogin }: LoginFormProps) => {
     <div className="w-full max-w-md space-y-8">
       <div className="text-center">
         <div className="flex justify-center mb-6">
-          <div className="flex items-center space-x-2 text-white">
-            <Shield className="h-8 w-8 text-red-600" />
-            <Zap className="h-8 w-8 text-red-600" />
-          </div>
+          <img 
+            src="/lovable-uploads/cc373a5b-67a2-4d94-b6bf-cc2883c8d347.png" 
+            alt="Qualitrol Logo"
+            className="h-16 w-auto"
+          />
         </div>
         <h2 className="text-3xl font-bold text-white">PowerQuotePro</h2>
         <p className="mt-2 text-gray-400">Qualitrol Transformer Solutions</p>
