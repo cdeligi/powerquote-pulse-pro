@@ -20,6 +20,8 @@ export type PaymentTerms =
   | '120'
   | (string & {});
 
+export type QuotePriority = 'High' | 'Medium' | 'Low' | 'Urgent';
+
 export interface Quote {
   id: string;
   userId: string;
@@ -34,7 +36,7 @@ export interface Quote {
   rejectionReason?: string;
   oracleCustomerId?: string;
   customerName?: string;
-  priority: 'High' | 'Medium' | 'Low' | 'Urgent';
+  priority: QuotePriority;
   termsAndConditions?: string;
   isRepInvolved?: boolean;
   shippingTerms?: ShippingTerms;

@@ -1,5 +1,6 @@
+
 import { useState, useEffect } from 'react';
-import { Chassis, Card, Level1Product, BOMItem } from "@/types/product";
+import { Chassis, Card, Level1Product, BOMItem, QuotePriority } from "@/types/product";
 import { User } from "@/types/auth";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
@@ -170,7 +171,7 @@ const BOMBuilder = ({ user }: BOMBuilderProps) => {
       id: `QT-${new Date().getTime()}`, // Generate a unique quote ID
       customerName: quoteName,
       oracleCustomerId: 'ORC-12345', // Replace with actual Oracle ID
-      priority: 'Medium', // Default priority
+      priority: 'Medium' as QuotePriority, // Properly typed priority
       isRepInvolved: false, // Default value
       shippingTerms: 'FCA', // Default shipping terms
       paymentTerms: 'Net 30', // Default payment terms
