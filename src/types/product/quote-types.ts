@@ -20,15 +20,6 @@ export type PaymentTerms =
   | '120'
   | (string & {});
 
-export type QuotePriority = 'High' | 'Medium' | 'Low' | 'Urgent';
-
-export type Currency = 
-  | 'USD' 
-  | 'EURO' 
-  | 'GBP' 
-  | 'CAD'
-  | (string & {});
-
 export interface Quote {
   id: string;
   userId: string;
@@ -43,10 +34,10 @@ export interface Quote {
   rejectionReason?: string;
   oracleCustomerId?: string;
   customerName?: string;
-  priority: QuotePriority;
+  priority: 'High' | 'Medium' | 'Low' | 'Urgent';
   termsAndConditions?: string;
   isRepInvolved?: boolean;
   shippingTerms?: ShippingTerms;
   paymentTerms?: PaymentTerms;
-  quoteCurrency?: Currency;
+  quoteCurrency?: 'USD' | 'EURO' | 'GBP' | 'CAD';
 }

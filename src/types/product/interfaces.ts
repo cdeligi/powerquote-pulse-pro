@@ -10,7 +10,6 @@ export interface Chassis {
   image?: string;
   productInfoUrl?: string;
   partNumber?: string;
-  hasQuantitySelection?: boolean;
 }
 
 export interface Card {
@@ -24,8 +23,6 @@ export interface Card {
   specifications: Record<string, any>;
   image?: string;
   partNumber?: string;
-  hasQuantitySelection?: boolean;
-  enabled?: boolean;
 }
 
 export interface Level1Product {
