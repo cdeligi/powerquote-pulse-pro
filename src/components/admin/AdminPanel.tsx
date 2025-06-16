@@ -26,6 +26,8 @@ import {
   Download
 } from "lucide-react";
 import UserManagement from "./UserManagement";
+import QuoteApprovalCard from "./QuoteApprovalCard";
+import { BOMItem } from "@/types/product";
 
 interface AdminPanelProps {
   user: User;
@@ -57,27 +59,117 @@ const AdminPanel = ({ user }: AdminPanelProps) => {
     enabled: true
   });
 
-  // Mock data for demonstration with cost fields
-  const pendingApprovals = [
+  // Enhanced mock data for pending approvals with complete quote information
+  const [pendingApprovals, setPendingApprovals] = useState([
     {
       id: 'Q-2024-001',
       customer: 'ABC Power Company',
+      oracleCustomerId: 'ORC-12345',
       salesperson: 'Sarah Johnson',
       value: 45250,
       discountRequested: 10,
       requestedAt: '2024-01-15',
-      justification: 'Long-term customer with high volume potential'
+      justification: 'Long-term customer with high volume potential. Competitor pricing requires us to match their 10% discount to secure this $45K order.',
+      priority: 'High' as const,
+      isRepInvolved: true,
+      shippingTerms: 'Ex-Works',
+      paymentTerms: '30',
+      quoteCurrency: 'USD' as const,
+      status: 'pending' as const,
+      bomItems: [
+        {
+          id: '1',
+          product: {
+            id: 'ltx-001',
+            name: 'LTX Chassis',
+            type: 'LTX',
+            height: '7U',
+            slots: 14,
+            price: 12500,
+            cost: 7500,
+            description: 'High-capacity chassis for large installations',
+            partNumber: 'QTMS-LTX-001',
+            enabled: true
+          },
+          quantity: 2,
+          enabled: true
+        },
+        {
+          id: '2',
+          product: {
+            id: 'rel-008',
+            name: 'Relay Card - 8 Channel',
+            type: 'relay',
+            description: 'High-performance relay card',
+            price: 2500,
+            cost: 1500,
+            slotRequirement: 1,
+            compatibleChassis: ['ltx-001'],
+            specifications: { channels: 8, voltage: '250V' },
+            partNumber: 'QTMS-REL-008',
+            enabled: true
+          },
+          quantity: 8,
+          slot: 1,
+          enabled: true
+        }
+      ] as BOMItem[]
     },
     {
       id: 'Q-2024-006',
       customer: 'Northern Grid Co',
+      oracleCustomerId: 'ORC-67890',
       salesperson: 'Mike Chen',
       value: 89400,
       discountRequested: 15,
       requestedAt: '2024-01-16',
-      justification: 'Competitive bid situation, need to match competitor pricing'
+      justification: 'Competitive bid situation against Schneider Electric. Customer has committed to 3-year maintenance contract if we can match 15% discount.',
+      priority: 'Urgent' as const,
+      isRepInvolved: false,
+      shippingTerms: 'CIF',
+      paymentTerms: '60',
+      quoteCurrency: 'USD' as const,
+      status: 'pending' as const,
+      bomItems: [
+        {
+          id: '3',
+          product: {
+            id: 'mtx-001',
+            name: 'MTX Chassis',
+            type: 'MTX',
+            height: '4U',
+            slots: 7,
+            price: 8500,
+            cost: 5100,
+            description: 'Medium-capacity chassis',
+            partNumber: 'QTMS-MTX-001',
+            enabled: true
+          },
+          quantity: 4,
+          enabled: true
+        },
+        {
+          id: '4',
+          product: {
+            id: 'ana-008',
+            name: 'Analog Input Card - 8 Channel',
+            type: 'analog',
+            description: 'High-precision analog input card',
+            price: 3200,
+            cost: 1920,
+            slotRequirement: 1,
+            compatibleChassis: ['mtx-001'],
+            specifications: { channels: 8, resolution: '16-bit' },
+            partNumber: 'QTMS-ANA-008',
+            enabled: true
+          },
+          quantity: 12,
+          slot: 1,
+          enabled: true
+        }
+      ] as BOMItem[]
     }
-  ];
+  ]);
 
   const products = [
     { id: 1, name: 'LTX Chassis', sku: 'QTMS-LTX-001', type: 'chassis', price: 12500, cost: 7500, slots: 14, enabled: true },
@@ -110,13 +202,20 @@ const AdminPanel = ({ user }: AdminPanelProps) => {
     }
   ];
 
-  const handleApproveDiscount = (quoteId: string) => {
-    console.log(`Approving discount for quote ${quoteId}`);
-    // In real implementation, this would update the quote status
+  const handleApproveQuote = (quoteId: string, approvedDiscount: number) => {
+    console.log(`Approving quote ${quoteId} with ${approvedDiscount}% discount`);
+    setPendingApprovals(prev => prev.filter(q => q.id !== quoteId));
+    // In real implementation, this would update the quote status in the backend
   };
 
-  const handleRejectWithCounter = (quoteId: string, counterOffer: number) => {
-    console.log(`Counter-offering ${counterOffer}% discount for quote ${quoteId}`);
+  const handleRejectQuote = (quoteId: string, reason: string) => {
+    console.log(`Rejecting quote ${quoteId} with reason: ${reason}`);
+    setPendingApprovals(prev => prev.filter(q => q.id !== quoteId));
+    // In real implementation, this would update the quote status and notify the salesperson
+  };
+
+  const handleCounterOffer = (quoteId: string, counterDiscount: number) => {
+    console.log(`Counter-offering ${counterDiscount}% discount for quote ${quoteId}`);
     // In real implementation, this would create a counter-proposal
   };
 
@@ -389,19 +488,26 @@ const AdminPanel = ({ user }: AdminPanelProps) => {
             <CardHeader>
               <CardTitle className="text-white">Pending Discount Approvals</CardTitle>
               <CardDescription className="text-gray-400">
-                Review and approve discount requests from sales team
+                Comprehensive quote analysis with BOM details, cost breakdown, and margin impact
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                {pendingApprovals.map((approval) => (
-                  <ApprovalCard 
-                    key={approval.id}
-                    approval={approval}
-                    onApprove={handleApproveDiscount}
-                    onRejectWithCounter={handleRejectWithCounter}
+              <div className="space-y-6">
+                {pendingApprovals.map((quote) => (
+                  <QuoteApprovalCard
+                    key={quote.id}
+                    quote={quote}
+                    onApprove={handleApproveQuote}
+                    onReject={handleRejectQuote}
+                    onCounterOffer={handleCounterOffer}
                   />
                 ))}
+                {pendingApprovals.length === 0 && (
+                  <div className="text-center py-8">
+                    <CheckCircle className="mx-auto h-12 w-12 text-green-500 mb-4" />
+                    <p className="text-gray-400">No pending approvals at this time</p>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -543,107 +649,6 @@ const AdminPanel = ({ user }: AdminPanelProps) => {
           </Card>
         </TabsContent>
       </Tabs>
-    </div>
-  );
-};
-
-// Separate component for approval cards to make the main component cleaner
-const ApprovalCard = ({ approval, onApprove, onRejectWithCounter }: {
-  approval: any;
-  onApprove: (id: string) => void;
-  onRejectWithCounter: (id: string, counter: number) => void;
-}) => {
-  const [counterOffer, setCounterOffer] = useState('');
-  const [showCounterForm, setShowCounterForm] = useState(false);
-
-  return (
-    <div className="p-4 bg-gray-800 rounded-lg border border-yellow-600/20">
-      <div className="flex justify-between items-start mb-4">
-        <div>
-          <div className="flex items-center space-x-3 mb-2">
-            <span className="text-white font-medium">{approval.id}</span>
-            <Badge className="bg-yellow-600 text-white">
-              {approval.discountRequested}% discount
-            </Badge>
-          </div>
-          <p className="text-gray-400 text-sm">{approval.customer}</p>
-          <p className="text-gray-400 text-sm">
-            Requested by: {approval.salesperson}
-          </p>
-        </div>
-        <div className="text-right">
-          <p className="text-white font-bold text-lg">
-            ${approval.value.toLocaleString()}
-          </p>
-          <p className="text-gray-400 text-sm">{approval.requestedAt}</p>
-        </div>
-      </div>
-      
-      <div className="mb-4">
-        <p className="text-gray-400 text-sm mb-1">Justification:</p>
-        <p className="text-white text-sm bg-gray-700 p-2 rounded">
-          {approval.justification}
-        </p>
-      </div>
-      
-      {showCounterForm ? (
-        <div className="space-y-3">
-          <div>
-            <Label htmlFor="counter-offer" className="text-white text-sm">Counter Offer (%)</Label>
-            <Input
-              id="counter-offer"
-              type="number"
-              value={counterOffer}
-              onChange={(e) => setCounterOffer(e.target.value)}
-              placeholder="e.g., 5"
-              className="bg-gray-700 border-gray-600 text-white mt-1"
-            />
-          </div>
-          <div className="flex space-x-2">
-            <Button
-              className="bg-orange-600 hover:bg-orange-700 text-white"
-              onClick={() => {
-                onRejectWithCounter(approval.id, Number(counterOffer));
-                setShowCounterForm(false);
-                setCounterOffer('');
-              }}
-            >
-              Send Counter Offer
-            </Button>
-            <Button
-              variant="ghost"
-              onClick={() => setShowCounterForm(false)}
-              className="text-gray-400 hover:text-white"
-            >
-              Cancel
-            </Button>
-          </div>
-        </div>
-      ) : (
-        <div className="flex space-x-2">
-          <Button
-            className="bg-green-600 hover:bg-green-700 text-white"
-            onClick={() => onApprove(approval.id)}
-          >
-            <CheckCircle className="mr-2 h-4 w-4" />
-            Approve
-          </Button>
-          <Button
-            className="bg-orange-600 hover:bg-orange-700 text-white"
-            onClick={() => setShowCounterForm(true)}
-          >
-            <DollarSign className="mr-2 h-4 w-4" />
-            Counter Offer
-          </Button>
-          <Button
-            variant="destructive"
-            onClick={() => console.log('Full reject', approval.id)}
-          >
-            <XCircle className="mr-2 h-4 w-4" />
-            Reject
-          </Button>
-        </div>
-      )}
     </div>
   );
 };

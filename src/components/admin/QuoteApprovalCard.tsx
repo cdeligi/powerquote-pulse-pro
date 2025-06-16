@@ -1,0 +1,390 @@
+
+import { useState } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { 
+  Table, 
+  TableBody, 
+  TableCell, 
+  TableHead, 
+  TableHeader, 
+  TableRow 
+} from '@/components/ui/table';
+import { 
+  CheckCircle, 
+  XCircle, 
+  DollarSign, 
+  TrendingUp, 
+  AlertTriangle,
+  Eye,
+  ChevronDown,
+  ChevronUp
+} from 'lucide-react';
+import { BOMItem } from '@/types/product';
+import { 
+  calculateTotalMargin, 
+  calculateItemMargin, 
+  calculateItemCost, 
+  calculateItemRevenue 
+} from '@/utils/marginCalculations';
+
+interface QuoteApprovalData {
+  id: string;
+  customer: string;
+  oracleCustomerId: string;
+  salesperson: string;
+  value: number;
+  discountRequested: number;
+  requestedAt: string;
+  justification: string;
+  priority: 'High' | 'Medium' | 'Low' | 'Urgent';
+  isRepInvolved: boolean;
+  shippingTerms: string;
+  paymentTerms: string;
+  quoteCurrency: 'USD' | 'EURO' | 'GBP' | 'CAD';
+  bomItems: BOMItem[];
+  status: 'pending' | 'approved' | 'rejected';
+}
+
+interface QuoteApprovalCardProps {
+  quote: QuoteApprovalData;
+  onApprove: (id: string, approvedDiscount: number) => void;
+  onReject: (id: string, reason: string) => void;
+  onCounterOffer: (id: string, counterDiscount: number) => void;
+}
+
+const QuoteApprovalCard = ({ quote, onApprove, onReject, onCounterOffer }: QuoteApprovalCardProps) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [showRejectForm, setShowRejectForm] = useState(false);
+  const [showCounterForm, setShowCounterForm] = useState(false);
+  const [rejectionReason, setRejectionReason] = useState('');
+  const [counterDiscount, setCounterDiscount] = useState('');
+  const [approvedDiscount, setApprovedDiscount] = useState(quote.discountRequested.toString());
+
+  const { totalRevenue, totalCost, marginPercentage, grossProfit } = calculateTotalMargin(quote.bomItems);
+  const discountedPrice = totalRevenue * (1 - quote.discountRequested / 100);
+  const discountedMargin = totalCost > 0 ? ((discountedPrice - totalCost) / discountedPrice) * 100 : 0;
+
+  const getMarginColor = (margin: number) => {
+    if (margin >= 40) return 'text-green-400';
+    if (margin >= 25) return 'text-yellow-400';
+    return 'text-red-400';
+  };
+
+  const getPriorityColor = (priority: string) => {
+    switch (priority) {
+      case 'Urgent': return 'bg-red-600';
+      case 'High': return 'bg-orange-600';
+      case 'Medium': return 'bg-yellow-600';
+      default: return 'bg-gray-600';
+    }
+  };
+
+  const handleApprove = () => {
+    onApprove(quote.id, Number(approvedDiscount));
+    setShowCounterForm(false);
+    setShowRejectForm(false);
+  };
+
+  const handleReject = () => {
+    if (rejectionReason.trim()) {
+      onReject(quote.id, rejectionReason);
+      setShowRejectForm(false);
+    }
+  };
+
+  const handleCounter = () => {
+    if (counterDiscount) {
+      onCounterOffer(quote.id, Number(counterDiscount));
+      setShowCounterForm(false);
+    }
+  };
+
+  return (
+    <Card className="bg-gray-800 border-gray-700">
+      <CardHeader>
+        <div className="flex justify-between items-start">
+          <div className="space-y-2">
+            <div className="flex items-center space-x-3">
+              <CardTitle className="text-white text-lg">{quote.id}</CardTitle>
+              <Badge className={`${getPriorityColor(quote.priority)} text-white`}>
+                {quote.priority}
+              </Badge>
+              {quote.discountRequested > 0 && (
+                <Badge className="bg-yellow-600 text-white">
+                  {quote.discountRequested}% discount requested
+                </Badge>
+              )}
+              {quote.isRepInvolved && (
+                <Badge className="bg-blue-600 text-white">
+                  Rep Involved
+                </Badge>
+              )}
+            </div>
+            <div className="text-gray-300 space-y-1">
+              <p><strong>Customer:</strong> {quote.customer}</p>
+              <p><strong>Oracle ID:</strong> {quote.oracleCustomerId}</p>
+              <p><strong>Salesperson:</strong> {quote.salesperson}</p>
+              <p><strong>Requested:</strong> {quote.requestedAt}</p>
+            </div>
+          </div>
+          
+          <div className="text-right space-y-2">
+            <div>
+              <p className="text-gray-400 text-sm">Quote Value</p>
+              <p className="text-white text-2xl font-bold">
+                {quote.quoteCurrency} {totalRevenue.toLocaleString()}
+              </p>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setIsExpanded(!isExpanded)}
+              className="text-gray-400 hover:text-white"
+            >
+              <Eye className="mr-2 h-4 w-4" />
+              {isExpanded ? 'Hide Details' : 'View Details'}
+              {isExpanded ? <ChevronUp className="ml-2 h-4 w-4" /> : <ChevronDown className="ml-2 h-4 w-4" />}
+            </Button>
+          </div>
+        </div>
+      </CardHeader>
+
+      <CardContent>
+        {/* Financial Summary */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+          <div className="bg-gray-700 p-3 rounded">
+            <p className="text-gray-400 text-sm">Original Margin</p>
+            <p className={`text-lg font-bold ${getMarginColor(marginPercentage)}`}>
+              {marginPercentage.toFixed(1)}%
+            </p>
+          </div>
+          <div className="bg-gray-700 p-3 rounded">
+            <p className="text-gray-400 text-sm">After Discount</p>
+            <p className={`text-lg font-bold ${getMarginColor(discountedMargin)}`}>
+              {discountedMargin.toFixed(1)}%
+            </p>
+          </div>
+          <div className="bg-gray-700 p-3 rounded">
+            <p className="text-gray-400 text-sm">Total Cost</p>
+            <p className="text-orange-400 text-lg font-bold">
+              {quote.quoteCurrency} {totalCost.toLocaleString()}
+            </p>
+          </div>
+          <div className="bg-gray-700 p-3 rounded">
+            <p className="text-gray-400 text-sm">Gross Profit</p>
+            <p className="text-green-400 text-lg font-bold">
+              {quote.quoteCurrency} {(discountedPrice - totalCost).toLocaleString()}
+            </p>
+          </div>
+        </div>
+
+        {/* Quote Details */}
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6 text-sm">
+          <div>
+            <p className="text-gray-400">Payment Terms</p>
+            <p className="text-white">{quote.paymentTerms}</p>
+          </div>
+          <div>
+            <p className="text-gray-400">Shipping Terms</p>
+            <p className="text-white">{quote.shippingTerms}</p>
+          </div>
+          <div>
+            <p className="text-gray-400">Currency</p>
+            <p className="text-white">{quote.quoteCurrency}</p>
+          </div>
+        </div>
+
+        {/* Justification */}
+        <div className="mb-6">
+          <p className="text-gray-400 text-sm mb-2">Discount Justification:</p>
+          <div className="bg-gray-700 p-3 rounded">
+            <p className="text-white">{quote.justification}</p>
+          </div>
+        </div>
+
+        {/* BOM Details - Expandable */}
+        {isExpanded && (
+          <div className="mb-6">
+            <h4 className="text-white font-medium mb-3 flex items-center">
+              <TrendingUp className="mr-2 h-4 w-4" />
+              Bill of Materials & Cost Analysis
+            </h4>
+            <div className="bg-gray-700 rounded-lg overflow-hidden">
+              <Table>
+                <TableHeader>
+                  <TableRow className="border-gray-600">
+                    <TableHead className="text-gray-300">Product</TableHead>
+                    <TableHead className="text-gray-300 text-center">Qty</TableHead>
+                    <TableHead className="text-gray-300 text-right">Unit Price</TableHead>
+                    <TableHead className="text-gray-300 text-right">Unit Cost</TableHead>
+                    <TableHead className="text-gray-300 text-right">Revenue</TableHead>
+                    <TableHead className="text-gray-300 text-right">Cost</TableHead>
+                    <TableHead className="text-gray-300 text-right">Margin %</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {quote.bomItems.filter(item => item.enabled).map((item, index) => {
+                    const itemRevenue = calculateItemRevenue(item);
+                    const itemCost = calculateItemCost(item);
+                    const itemMargin = calculateItemMargin(item);
+                    
+                    return (
+                      <TableRow key={index} className="border-gray-600">
+                        <TableCell className="text-white">
+                          <div>
+                            <p className="font-medium">{item.product.name}</p>
+                            {item.product.partNumber && (
+                              <p className="text-gray-400 text-xs">PN: {item.product.partNumber}</p>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-white text-center">{item.quantity}</TableCell>
+                        <TableCell className="text-white text-right">
+                          {quote.quoteCurrency} {item.product.price.toLocaleString()}
+                        </TableCell>
+                        <TableCell className="text-orange-400 text-right">
+                          {quote.quoteCurrency} {(item.product.cost || 0).toLocaleString()}
+                        </TableCell>
+                        <TableCell className="text-white text-right">
+                          {quote.quoteCurrency} {itemRevenue.toLocaleString()}
+                        </TableCell>
+                        <TableCell className="text-orange-400 text-right">
+                          {quote.quoteCurrency} {itemCost.toLocaleString()}
+                        </TableCell>
+                        <TableCell className={`text-right font-medium ${getMarginColor(itemMargin)}`}>
+                          {itemMargin.toFixed(1)}%
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+          </div>
+        )}
+
+        {/* Margin Alert */}
+        {discountedMargin < 25 && (
+          <div className="mb-6 p-3 bg-red-900/20 border border-red-600/20 rounded flex items-center space-x-2">
+            <AlertTriangle className="h-4 w-4 text-red-400" />
+            <p className="text-red-400 text-sm">
+              Warning: Requested discount will reduce margin to {discountedMargin.toFixed(1)}% (below 25% threshold)
+            </p>
+          </div>
+        )}
+
+        {/* Action Forms */}
+        {showRejectForm && (
+          <div className="mb-4 p-4 bg-red-900/20 border border-red-600/20 rounded">
+            <Label htmlFor="rejection-reason" className="text-white">Rejection Reason</Label>
+            <Textarea
+              id="rejection-reason"
+              value={rejectionReason}
+              onChange={(e) => setRejectionReason(e.target.value)}
+              placeholder="Provide detailed reason for rejection..."
+              className="bg-gray-700 border-gray-600 text-white mt-2"
+              rows={3}
+            />
+            <div className="flex space-x-2 mt-3">
+              <Button
+                variant="destructive"
+                onClick={handleReject}
+                disabled={!rejectionReason.trim()}
+              >
+                Confirm Rejection
+              </Button>
+              <Button
+                variant="ghost"
+                onClick={() => setShowRejectForm(false)}
+                className="text-gray-400 hover:text-white"
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {showCounterForm && (
+          <div className="mb-4 p-4 bg-orange-900/20 border border-orange-600/20 rounded">
+            <Label htmlFor="counter-discount" className="text-white">Counter Offer Discount (%)</Label>
+            <Input
+              id="counter-discount"
+              type="number"
+              value={counterDiscount}
+              onChange={(e) => setCounterDiscount(e.target.value)}
+              placeholder="e.g., 5"
+              className="bg-gray-700 border-gray-600 text-white mt-2"
+              min="0"
+              max="50"
+            />
+            <div className="flex space-x-2 mt-3">
+              <Button
+                className="bg-orange-600 hover:bg-orange-700 text-white"
+                onClick={handleCounter}
+                disabled={!counterDiscount}
+              >
+                Send Counter Offer
+              </Button>
+              <Button
+                variant="ghost"
+                onClick={() => setShowCounterForm(false)}
+                className="text-gray-400 hover:text-white"
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Action Buttons */}
+        {!showRejectForm && !showCounterForm && (
+          <div className="space-y-3">
+            <div className="flex items-center space-x-2">
+              <Label htmlFor="approved-discount" className="text-white">Approve Discount (%):</Label>
+              <Input
+                id="approved-discount"
+                type="number"
+                value={approvedDiscount}
+                onChange={(e) => setApprovedDiscount(e.target.value)}
+                className="bg-gray-700 border-gray-600 text-white w-24"
+                min="0"
+                max="50"
+              />
+            </div>
+            
+            <div className="flex space-x-2">
+              <Button
+                className="bg-green-600 hover:bg-green-700 text-white"
+                onClick={handleApprove}
+              >
+                <CheckCircle className="mr-2 h-4 w-4" />
+                Approve {approvedDiscount}% Discount
+              </Button>
+              <Button
+                className="bg-orange-600 hover:bg-orange-700 text-white"
+                onClick={() => setShowCounterForm(true)}
+              >
+                <DollarSign className="mr-2 h-4 w-4" />
+                Counter Offer
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={() => setShowRejectForm(true)}
+              >
+                <XCircle className="mr-2 h-4 w-4" />
+                Reject Quote
+              </Button>
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+};
+
+export default QuoteApprovalCard;
