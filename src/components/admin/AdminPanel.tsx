@@ -49,6 +49,7 @@ const AdminPanel = ({ user }: AdminPanelProps) => {
     sku: '',
     type: '',
     price: '',
+    cost: '', // Added cost field
     description: '',
     slots: '',
     compatibleChassis: '',
@@ -56,7 +57,7 @@ const AdminPanel = ({ user }: AdminPanelProps) => {
     enabled: true
   });
 
-  // Mock data for demonstration
+  // Mock data for demonstration with cost fields
   const pendingApprovals = [
     {
       id: 'Q-2024-001',
@@ -79,11 +80,11 @@ const AdminPanel = ({ user }: AdminPanelProps) => {
   ];
 
   const products = [
-    { id: 1, name: 'LTX Chassis', sku: 'QTMS-LTX-001', type: 'chassis', price: 12500, slots: 14, enabled: true },
-    { id: 2, name: 'MTX Chassis', sku: 'QTMS-MTX-001', type: 'chassis', price: 8500, slots: 7, enabled: true },
-    { id: 3, name: 'STX Chassis', sku: 'QTMS-STX-001', type: 'chassis', price: 5500, slots: 4, enabled: true },
-    { id: 4, name: 'Relay Card - 8 Channel', sku: 'QTMS-REL-008', type: 'relay', price: 2500, slots: 1, enabled: true },
-    { id: 5, name: 'Analog Input Card - 8 Channel', sku: 'QTMS-ANA-008', type: 'analog', price: 3200, slots: 1, enabled: true }
+    { id: 1, name: 'LTX Chassis', sku: 'QTMS-LTX-001', type: 'chassis', price: 12500, cost: 7500, slots: 14, enabled: true },
+    { id: 2, name: 'MTX Chassis', sku: 'QTMS-MTX-001', type: 'chassis', price: 8500, cost: 5100, slots: 7, enabled: true },
+    { id: 3, name: 'STX Chassis', sku: 'QTMS-STX-001', type: 'chassis', price: 5500, cost: 3300, slots: 4, enabled: true },
+    { id: 4, name: 'Relay Card - 8 Channel', sku: 'QTMS-REL-008', type: 'relay', price: 2500, cost: 1500, slots: 1, enabled: true },
+    { id: 5, name: 'Analog Input Card - 8 Channel', sku: 'QTMS-ANA-008', type: 'analog', price: 3200, cost: 1920, slots: 1, enabled: true }
   ];
 
   const [productList, setProductList] = useState(products);
@@ -126,6 +127,7 @@ const AdminPanel = ({ user }: AdminPanelProps) => {
       sku: newProduct.sku,
       type: newProduct.type,
       price: Number(newProduct.price),
+      cost: Number(newProduct.cost) || 0,
       slots: Number(newProduct.slots) || 1,
       enabled: newProduct.enabled
     };
@@ -139,6 +141,7 @@ const AdminPanel = ({ user }: AdminPanelProps) => {
       sku: '',
       type: '',
       price: '',
+      cost: '',
       description: '',
       slots: '',
       compatibleChassis: '',
@@ -162,16 +165,24 @@ const AdminPanel = ({ user }: AdminPanelProps) => {
 
   const exportProductCatalog = () => {
     const csvContent = "data:text/csv;charset=utf-8," + 
-      "ID,Name,SKU,Type,Price,Slots,Enabled\n" +
-      productList.map(p => `${p.id},${p.name},${p.sku},${p.type},${p.price},${p.slots},${p.enabled}`).join("\n");
+      "ID,Name,SKU,Type,Price,Cost,Margin%,Slots,Enabled\n" +
+      productList.map(p => {
+        const margin = p.cost ? (((p.price - p.cost) / p.price) * 100).toFixed(1) : '0';
+        return `${p.id},${p.name},${p.sku},${p.type},${p.price},${p.cost || 0},${margin},${p.slots},${p.enabled}`;
+      }).join("\n");
     
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
-    link.setAttribute("download", "product_catalog.csv");
+    link.setAttribute("download", "product_catalog_with_costs.csv");
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+  };
+
+  const calculateMargin = (price: number, cost: number) => {
+    if (!cost || price === 0) return 0;
+    return ((price - cost) / price) * 100;
   };
 
   return (
@@ -217,7 +228,7 @@ const AdminPanel = ({ user }: AdminPanelProps) => {
                   </div>
                 </div>
                 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-3 gap-4">
                   <div>
                     <Label htmlFor="product-type" className="text-white">Product Type</Label>
                     <Select value={newProduct.type} onValueChange={(value) => setNewProduct(prev => ({ ...prev, type: value }))}>
@@ -243,6 +254,17 @@ const AdminPanel = ({ user }: AdminPanelProps) => {
                       onChange={(e) => setNewProduct(prev => ({ ...prev, price: e.target.value }))}
                       className="bg-gray-800 border-gray-700 text-white"
                       placeholder="Enter price"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="product-cost" className="text-white">Cost ($)</Label>
+                    <Input
+                      id="product-cost"
+                      type="number"
+                      value={newProduct.cost}
+                      onChange={(e) => setNewProduct(prev => ({ ...prev, cost: e.target.value }))}
+                      className="bg-gray-800 border-gray-700 text-white"
+                      placeholder="Enter cost"
                     />
                   </div>
                 </div>
@@ -396,7 +418,7 @@ const AdminPanel = ({ user }: AdminPanelProps) => {
                 <div>
                   <CardTitle className="text-white">Product Catalog Management</CardTitle>
                   <CardDescription className="text-gray-400">
-                    Manage products, pricing, and inventory
+                    Manage products, pricing, costs, and inventory
                   </CardDescription>
                 </div>
                 <div className="flex space-x-2">
@@ -422,28 +444,31 @@ const AdminPanel = ({ user }: AdminPanelProps) => {
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {productList.map((product) => (
-                  <div key={product.id} className="flex items-center justify-between p-3 bg-gray-800 rounded-lg">
-                    <div className="flex items-center space-x-4">
-                      <ToggleSwitch
-                        checked={product.enabled}
-                        onCheckedChange={(enabled) => toggleProductEnabled(product.id, enabled)}
-                        size="sm"
-                      />
-                      <div>
-                        <p className={`font-medium ${product.enabled ? 'text-white' : 'text-gray-500'}`}>
-                          {product.name}
-                        </p>
-                        <p className="text-gray-400 text-sm">
-                          {product.sku} • {product.type} • ${product.price.toLocaleString()}
-                        </p>
+                {productList.map((product) => {
+                  const margin = calculateMargin(product.price, product.cost || 0);
+                  return (
+                    <div key={product.id} className="flex items-center justify-between p-3 bg-gray-800 rounded-lg">
+                      <div className="flex items-center space-x-4">
+                        <ToggleSwitch
+                          checked={product.enabled}
+                          onCheckedChange={(enabled) => toggleProductEnabled(product.id, enabled)}
+                          size="sm"
+                        />
+                        <div>
+                          <p className={`font-medium ${product.enabled ? 'text-white' : 'text-gray-500'}`}>
+                            {product.name}
+                          </p>
+                          <p className="text-gray-400 text-sm">
+                            {product.sku} • {product.type} • ${product.price.toLocaleString()} • Cost: ${(product.cost || 0).toLocaleString()} • Margin: {margin.toFixed(1)}%
+                          </p>
+                        </div>
                       </div>
+                      <Button variant="ghost" size="sm" className="text-gray-400 hover:text-white">
+                        <Edit className="h-4 w-4" />
+                      </Button>
                     </div>
-                    <Button variant="ghost" size="sm" className="text-gray-400 hover:text-white">
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </CardContent>
           </Card>

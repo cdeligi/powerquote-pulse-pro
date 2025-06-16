@@ -8,6 +8,13 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useState } from 'react';
 import { CheckCircle, XCircle, Percent } from 'lucide-react';
+import { 
+  calculateTotalMargin, 
+  calculateDiscountedMargin, 
+  calculateItemCost, 
+  calculateItemMargin, 
+  calculateItemRevenue 
+} from '@/utils/marginCalculations';
 
 interface QuoteRequestViewProps {
   quote: Quote;
@@ -29,30 +36,8 @@ const QuoteRequestView = ({
   const [discountPercentage, setDiscountPercentage] = useState(0);
   const [showCounterOffer, setShowCounterOffer] = useState(false);
 
-  const calculateItemCost = (item: BOMItem) => {
-    // Assuming 40% margin for cost calculation
-    const costMultiplier = 0.6;
-    return item.product.price * item.quantity * costMultiplier;
-  };
-
-  const calculateItemMargin = (item: BOMItem) => {
-    const revenue = item.product.price * item.quantity;
-    const cost = calculateItemCost(item);
-    return ((revenue - cost) / revenue) * 100;
-  };
-
-  const totalRevenue = bomItems
-    .filter(item => item.enabled)
-    .reduce((total, item) => total + (item.product.price * item.quantity), 0);
-
-  const totalCost = bomItems
-    .filter(item => item.enabled)
-    .reduce((total, item) => total + calculateItemCost(item), 0);
-
-  const overallMargin = ((totalRevenue - totalCost) / totalRevenue) * 100;
-
-  const discountedTotal = totalRevenue * (1 - discountPercentage / 100);
-  const discountedMargin = ((discountedTotal - totalCost) / discountedTotal) * 100;
+  const { totalRevenue, totalCost, marginPercentage, grossProfit } = calculateTotalMargin(bomItems);
+  const { discountedRevenue, discountedMargin, discountAmount } = calculateDiscountedMargin(bomItems, discountPercentage);
 
   const handleReject = () => {
     if (rejectionReason.trim()) {
@@ -133,7 +118,7 @@ const QuoteRequestView = ({
         </Card>
       </div>
 
-      {/* Financial Summary */}
+      {/* Financial Summary with Real-time Margin Analysis */}
       <Card className="bg-gray-900 border-gray-800">
         <CardHeader>
           <CardTitle className="text-white">Financial Analysis</CardTitle>
@@ -146,21 +131,21 @@ const QuoteRequestView = ({
             </div>
             <div className="text-center p-4 bg-gray-800 rounded">
               <p className="text-gray-400 text-sm">Total Cost</p>
-              <p className="text-white text-xl font-bold">${totalCost.toLocaleString()}</p>
+              <p className="text-orange-400 text-xl font-bold">${totalCost.toLocaleString()}</p>
             </div>
             <div className="text-center p-4 bg-gray-800 rounded">
               <p className="text-gray-400 text-sm">Gross Margin</p>
-              <p className="text-green-400 text-xl font-bold">{overallMargin.toFixed(1)}%</p>
+              <p className="text-green-400 text-xl font-bold">{marginPercentage.toFixed(1)}%</p>
             </div>
             <div className="text-center p-4 bg-gray-800 rounded">
               <p className="text-gray-400 text-sm">Gross Profit</p>
-              <p className="text-green-400 text-xl font-bold">${(totalRevenue - totalCost).toLocaleString()}</p>
+              <p className="text-green-400 text-xl font-bold">${grossProfit.toLocaleString()}</p>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* BOM Details */}
+      {/* BOM Details with Cost and Margin */}
       <Card className="bg-gray-900 border-gray-800">
         <CardHeader>
           <CardTitle className="text-white">Bill of Materials</CardTitle>
@@ -194,7 +179,7 @@ const QuoteRequestView = ({
                     <td className="py-3 text-white">${item.product.price.toLocaleString()}</td>
                     <td className="py-3 text-orange-400">${calculateItemCost(item).toLocaleString()}</td>
                     <td className="py-3 text-green-400">{calculateItemMargin(item).toFixed(1)}%</td>
-                    <td className="py-3 text-white font-bold">${(item.product.price * item.quantity).toLocaleString()}</td>
+                    <td className="py-3 text-white font-bold">${calculateItemRevenue(item).toLocaleString()}</td>
                   </tr>
                 ))}
               </tbody>
@@ -203,13 +188,13 @@ const QuoteRequestView = ({
         </CardContent>
       </Card>
 
-      {/* Counter Offer Section */}
+      {/* Counter Offer Section with Real-time Margin Impact */}
       {showCounterOffer && (
         <Card className="bg-gray-900 border-gray-800">
           <CardHeader>
             <CardTitle className="text-white flex items-center">
               <Percent className="mr-2 h-5 w-5" />
-              Counter Offer
+              Counter Offer - Real-time Margin Impact
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -229,17 +214,17 @@ const QuoteRequestView = ({
               <div className="grid grid-cols-3 gap-4 p-4 bg-gray-800 rounded">
                 <div className="text-center">
                   <p className="text-gray-400 text-sm">New Total</p>
-                  <p className="text-white text-lg font-bold">${discountedTotal.toLocaleString()}</p>
+                  <p className="text-white text-lg font-bold">${discountedRevenue.toLocaleString()}</p>
                 </div>
                 <div className="text-center">
                   <p className="text-gray-400 text-sm">New Margin</p>
-                  <p className={`text-lg font-bold ${discountedMargin > 20 ? 'text-green-400' : 'text-yellow-400'}`}>
+                  <p className={`text-lg font-bold ${discountedMargin > 20 ? 'text-green-400' : discountedMargin > 10 ? 'text-yellow-400' : 'text-red-400'}`}>
                     {discountedMargin.toFixed(1)}%
                   </p>
                 </div>
                 <div className="text-center">
                   <p className="text-gray-400 text-sm">Discount Amount</p>
-                  <p className="text-red-400 text-lg font-bold">-${(totalRevenue - discountedTotal).toLocaleString()}</p>
+                  <p className="text-red-400 text-lg font-bold">-${discountAmount.toLocaleString()}</p>
                 </div>
               </div>
             )}

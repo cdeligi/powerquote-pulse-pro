@@ -6,10 +6,12 @@ export interface Chassis {
   height: string;
   slots: number;
   price: number;
+  cost?: number; // Hidden admin-only field
   description: string;
   image?: string;
   productInfoUrl?: string;
   partNumber?: string;
+  enabled?: boolean;
 }
 
 export interface Card {
@@ -18,11 +20,13 @@ export interface Card {
   type: 'relay' | 'analog' | 'fiber' | 'display' | 'bushing';
   description: string;
   price: number;
+  cost?: number; // Hidden admin-only field
   slotRequirement: number;
   compatibleChassis: string[];
   specifications: Record<string, any>;
   image?: string;
   partNumber?: string;
+  enabled?: boolean;
 }
 
 export interface Level1Product {
@@ -31,6 +35,7 @@ export interface Level1Product {
   type: 'QTMS' | 'TM8' | 'TM3' | 'TM1' | 'QPDM';
   description: string;
   price: number;
+  cost?: number; // Hidden admin-only field
   productInfoUrl?: string;
   enabled: boolean;
   image?: string;
@@ -45,6 +50,7 @@ export interface Level2Option {
   parentProductId: string;
   description: string;
   price: number;
+  cost?: number; // Hidden admin-only field
   enabled: boolean;
   specifications?: Record<string, any>;
 }
@@ -56,6 +62,7 @@ export interface Level3Customization {
   type: 'sensor_type' | 'fiber_option' | 'channel_config';
   options: string[];
   price: number;
+  cost?: number; // Hidden admin-only field
   enabled: boolean;
 }
 
