@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -22,6 +23,8 @@ import AdminSettings from "./AdminSettings";
 import QuoteAnalyticsDashboard from "../dashboard/QuoteAnalyticsDashboard";
 import { BOMItem } from "@/types/product";
 import { calculateQuoteAnalytics, QuoteData } from "@/utils/quoteAnalytics";
+import { QuoteStatus } from "@/utils/quotePipeline";
+import { User } from "@/types/auth";
 
 interface QuoteApprovalData {
   id: string;
@@ -39,7 +42,7 @@ interface QuoteApprovalData {
   quoteCurrency: 'USD' | 'EURO' | 'GBP' | 'CAD';
   bomItems: BOMItem[];
   sfdcOpportunity: string;
-  status?: 'pending_approval' | 'approved' | 'rejected' | 'counter_offer' | 'awaiting_customer_response';
+  status?: QuoteStatus;
   counterOfferValue?: number;
   counterOfferTerms?: {
     shippingTerms?: string;
@@ -56,10 +59,10 @@ interface QuoteApprovalData {
 }
 
 interface AdminPanelProps {
-  userRole: 'admin' | 'sales_manager';
+  user: User;
 }
 
-const AdminPanel = ({ userRole }: AdminPanelProps) => {
+const AdminPanel = ({ user }: AdminPanelProps) => {
   const [activeTab, setActiveTab] = useState("overview");
 
   // Mock data for pending approvals
@@ -79,7 +82,8 @@ const AdminPanel = ({ userRole }: AdminPanelProps) => {
       paymentTerms: '30 days',
       quoteCurrency: 'USD',
       sfdcOpportunity: 'SF-001234',
-      bomItems: []
+      bomItems: [],
+      status: 'pending'
     },
     {
       id: "QR-2024-002", 
@@ -96,7 +100,8 @@ const AdminPanel = ({ userRole }: AdminPanelProps) => {
       paymentTerms: '45 days',
       quoteCurrency: 'USD',
       sfdcOpportunity: 'SF-005678',
-      bomItems: []
+      bomItems: [],
+      status: 'pending'
     },
     {
       id: "QR-2024-003",
@@ -113,7 +118,8 @@ const AdminPanel = ({ userRole }: AdminPanelProps) => {
       paymentTerms: '60 days',
       quoteCurrency: 'CAD',
       sfdcOpportunity: 'SF-009012',
-      bomItems: []
+      bomItems: [],
+      status: 'pending'
     },
     {
       id: "QR-2024-004",
@@ -130,7 +136,8 @@ const AdminPanel = ({ userRole }: AdminPanelProps) => {
       paymentTerms: '30 days',
       quoteCurrency: 'EURO',
       sfdcOpportunity: 'SF-003456',
-      bomItems: []
+      bomItems: [],
+      status: 'pending'
     },
     {
       id: "QR-2024-005",
@@ -147,7 +154,8 @@ const AdminPanel = ({ userRole }: AdminPanelProps) => {
       paymentTerms: '30 days',
       quoteCurrency: 'GBP',
       sfdcOpportunity: 'SF-007890',
-      bomItems: []
+      bomItems: [],
+      status: 'pending'
     }
   ];
 
@@ -185,6 +193,9 @@ const AdminPanel = ({ userRole }: AdminPanelProps) => {
   const averageQuoteValue = totalPendingValue / mockQuoteRequests.length;
   const urgentQuotes = mockQuoteRequests.filter(q => q.priority === 'Urgent').length;
 
+  // Mock BOM items for MarginDashboard
+  const mockBOMItems: BOMItem[] = [];
+
   return (
     <div className="min-h-screen bg-black text-white">
       {/* Header */}
@@ -192,11 +203,11 @@ const AdminPanel = ({ userRole }: AdminPanelProps) => {
         <div>
           <h1 className="text-3xl font-bold text-white mb-2">Admin Dashboard</h1>
           <p className="text-gray-400">
-            {userRole === 'admin' ? 'System Administration' : 'Sales Management'} Control Panel
+            {user.role === 'admin' ? 'System Administration' : 'Sales Management'} Control Panel
           </p>
         </div>
         <Badge variant="outline" className="border-red-600 text-red-400">
-          {userRole === 'admin' ? 'System Admin' : 'Sales Manager'}
+          {user.role === 'admin' ? 'System Admin' : 'Sales Manager'}
         </Badge>
       </div>
 
@@ -360,12 +371,12 @@ const AdminPanel = ({ userRole }: AdminPanelProps) => {
           {/* Analytics Tab */}
           <TabsContent value="analytics" className="space-y-6">
             <QuoteAnalyticsDashboard analytics={analytics} isAdmin={true} />
-            <MarginDashboard />
+            <MarginDashboard bomItems={mockBOMItems} user={user} />
           </TabsContent>
 
           {/* User Management Tab */}
           <TabsContent value="users" className="space-y-6">
-            <UserManagement />
+            <UserManagement user={user} />
           </TabsContent>
 
           {/* Settings Tab */}
