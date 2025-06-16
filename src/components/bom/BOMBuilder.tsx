@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { User } from "@/types/auth";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -41,6 +40,7 @@ const BOMBuilder = ({ user }: BOMBuilderProps) => {
   // Quote fields - Updated types to match Quote interface
   const [oracleCustomerId, setOracleCustomerId] = useState('');
   const [customerName, setCustomerName] = useState('');
+  const [sfdcOpportunity, setSfdcOpportunity] = useState(''); // New SFDC Opportunity field
   const [quotePriority, setQuotePriority] = useState<'High' | 'Medium' | 'Low' | 'Urgent'>('Medium');
   const [isRepInvolved, setIsRepInvolved] = useState<boolean | null>(null);
   const [shippingTerms, setShippingTerms] = useState<ShippingTerms>('Ex-Works');
@@ -462,6 +462,7 @@ const BOMBuilder = ({ user }: BOMBuilderProps) => {
       id: `DRAFT-${Date.now()}`,
       customerName,
       oracleCustomerId,
+      sfdcOpportunity, // Include SFDC Opportunity
       priority: quotePriority,
       isRepInvolved: isRepInvolved ?? false,
       shippingTerms: shippingTerms as ShippingTerms,
@@ -480,6 +481,7 @@ const BOMBuilder = ({ user }: BOMBuilderProps) => {
       id: `QR-${Date.now()}`,
       customerName,
       oracleCustomerId,
+      sfdcOpportunity, // Include SFDC Opportunity
       priority: quotePriority,
       isRepInvolved: isRepInvolved ?? false,
       shippingTerms: shippingTerms as ShippingTerms,
@@ -520,7 +522,7 @@ const BOMBuilder = ({ user }: BOMBuilderProps) => {
           <Button 
             className="bg-red-600 hover:bg-red-700 text-white"
             onClick={handleRequestQuote}
-            disabled={bomItems.length === 0 || !customerName || !oracleCustomerId}
+            disabled={bomItems.length === 0 || !customerName || !oracleCustomerId || !sfdcOpportunity}
           >
             <Send className="mr-2 h-4 w-4" />
             Request Quote
@@ -565,6 +567,16 @@ const BOMBuilder = ({ user }: BOMBuilderProps) => {
                         onChange={(e) => setCustomerName(e.target.value)}
                         className="bg-gray-800 border-gray-600 text-white placeholder:text-gray-400 focus:border-red-500 focus:ring-red-500"
                         placeholder="Enter customer name"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="sfdc-opportunity" className="text-white font-medium mb-2 block">SFDC Opportunity *</Label>
+                      <Input
+                        id="sfdc-opportunity"
+                        value={sfdcOpportunity}
+                        onChange={(e) => setSfdcOpportunity(e.target.value)}
+                        className="bg-gray-800 border-gray-600 text-white placeholder:text-gray-400 focus:border-red-500 focus:ring-red-500"
+                        placeholder="Enter Salesforce Opportunity ID"
                       />
                     </div>
                   </div>
