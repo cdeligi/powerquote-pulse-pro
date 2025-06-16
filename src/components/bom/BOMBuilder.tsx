@@ -15,7 +15,7 @@ import SlotCardSelector from "./SlotCardSelector";
 import AnalogCardConfigurator from "./AnalogCardConfigurator";
 import BushingCardConfigurator from "./BushingCardConfigurator";
 import ToggleSwitch from "@/components/ui/toggle-switch";
-import { BOMItem, Chassis, Card as ProductCard, Level1Product, Level2Option, Level3Customization, isLevel1Product, isChassis, isCard, generateQTMSPartNumber, generateProductPartNumber, ShippingTerms, PaymentTerms } from "@/types/product";
+import { BOMItem, Chassis, Card as ProductCard, Level1Product, Level2Product, Level3Product, Level3Customization, isLevel1Product, isChassis, isCard, generateQTMSPartNumber, generateProductPartNumber, ShippingTerms, PaymentTerms } from "@/types/product";
 import { Quote } from "@/types/quote";
 import { ShoppingCart, Save, Send, ExternalLink, Settings, Plus, Trash2, Monitor } from "lucide-react";
 import { generateQuotePDF } from '@/utils/pdfGenerator';
@@ -47,7 +47,7 @@ const BOMBuilder = ({ user }: BOMBuilderProps) => {
   const [paymentTerms, setPaymentTerms] = useState<PaymentTerms>('30');
   const [quoteCurrency, setQuoteCurrency] = useState<'USD' | 'EURO' | 'GBP' | 'CAD'>('USD');
 
-  const addToBOM = (product: Chassis | ProductCard | Level1Product, slot?: number, level2Options?: Level2Option[], configuration?: Record<string, any>) => {
+  const addToBOM = (product: Chassis | ProductCard | Level1Product, slot?: number, level2Options?: Level2Product[], configuration?: Record<string, any>) => {
     let partNumber = '';
     
     // Generate part number based on product type
@@ -88,16 +88,15 @@ const BOMBuilder = ({ user }: BOMBuilderProps) => {
     
     if (newHasRemoteDisplay) {
       // Add remote display to BOM
-      const remoteDisplay = {
+      const remoteDisplay: Level3Product = {
         id: 'remote-display',
         name: 'Remote Display Panel',
-        type: 'display' as const,
+        parentProductId: 'qtms-main',
+        type: 'display',
         description: 'Front panel remote display',
         price: 850,
-        slotRequirement: 0, // No slot required
-        compatibleChassis: ['LTX', 'MTX', 'STX'],
+        enabled: true,
         specifications: {},
-        productInfoUrl: 'https://www.qualitrolcorp.com/products/remote-display',
         partNumber: 'RDP-001'
       };
       addToBOM(remoteDisplay);
@@ -336,7 +335,7 @@ const BOMBuilder = ({ user }: BOMBuilderProps) => {
     }));
   };
 
-  const updateLevel3Customizations = (bomItemId: string, customizations: Level3Customization[]) => {
+  const updateLevel3Customizations = (bomItemId: string, customizations: Level3Product[]) => {
     setBomItems(prev => prev.map(item =>
       item.id === bomItemId ? { ...item, level3Customizations: customizations } : item
     ));
