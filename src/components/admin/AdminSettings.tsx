@@ -1,9 +1,10 @@
+
 import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Settings, Save, Mail } from "lucide-react";
+import { Settings, Save, Mail, AlertTriangle } from "lucide-react";
 
 interface AdminSettingsProps {
   onSettingsSave?: (settings: AdminSettings) => void;
@@ -13,6 +14,7 @@ interface AdminSettings {
   ordersTeamEmail: string;
   ccEmails: string[];
   emailSubjectPrefix: string;
+  marginWarningThreshold: number;
 }
 
 const AdminSettings = ({ onSettingsSave }: AdminSettingsProps) => {
@@ -20,6 +22,7 @@ const AdminSettings = ({ onSettingsSave }: AdminSettingsProps) => {
   const [ccEmails, setCcEmails] = useState<string[]>(['orders-backup@qualitrolcorp.com']);
   const [newCcEmail, setNewCcEmail] = useState('');
   const [emailSubjectPrefix, setEmailSubjectPrefix] = useState('[PowerQuotePro]');
+  const [marginWarningThreshold, setMarginWarningThreshold] = useState(25);
 
   const handleAddCcEmail = () => {
     if (newCcEmail && !ccEmails.includes(newCcEmail)) {
@@ -36,7 +39,8 @@ const AdminSettings = ({ onSettingsSave }: AdminSettingsProps) => {
     const settings: AdminSettings = {
       ordersTeamEmail,
       ccEmails,
-      emailSubjectPrefix
+      emailSubjectPrefix,
+      marginWarningThreshold
     };
     
     // Save to localStorage or send to backend
@@ -59,6 +63,51 @@ const AdminSettings = ({ onSettingsSave }: AdminSettingsProps) => {
           Configure system-wide settings and email notifications
         </p>
       </div>
+
+      {/* Margin Warning Threshold Settings */}
+      <Card className="bg-gray-900 border-gray-800">
+        <CardHeader>
+          <CardTitle className="text-white flex items-center">
+            <AlertTriangle className="mr-2 h-5 w-5" />
+            Margin Warning Configuration
+          </CardTitle>
+          <CardDescription className="text-gray-400">
+            Configure when discount warnings should appear in the quote approval process
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div>
+            <Label htmlFor="margin-threshold" className="text-white font-medium mb-2 block">
+              Margin Warning Threshold (%) *
+            </Label>
+            <Input
+              id="margin-threshold"
+              type="number"
+              min="0"
+              max="100"
+              value={marginWarningThreshold}
+              onChange={(e) => setMarginWarningThreshold(Number(e.target.value))}
+              className="bg-gray-800 border-gray-600 text-white placeholder:text-gray-400 focus:border-red-500 focus:ring-red-500"
+              placeholder="25"
+            />
+            <p className="text-gray-400 text-sm mt-1">
+              Warning will appear when requested discount reduces margin below this percentage. 
+              Current setting: {marginWarningThreshold}%
+            </p>
+          </div>
+
+          {/* Preview warning message */}
+          <div className="bg-gray-800 p-4 rounded border border-yellow-600">
+            <div className="flex items-center space-x-2">
+              <AlertTriangle className="h-4 w-4 text-yellow-500" />
+              <span className="text-yellow-500 font-medium">Preview Warning Message:</span>
+            </div>
+            <p className="text-yellow-400 mt-2 text-sm">
+              "Warning: Requested discount will reduce margin to X.X% (below {marginWarningThreshold}% threshold)"
+            </p>
+          </div>
+        </CardContent>
+      </Card>
 
       <Card className="bg-gray-900 border-gray-800">
         <CardHeader>

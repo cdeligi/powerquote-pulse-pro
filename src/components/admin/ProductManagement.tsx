@@ -5,133 +5,55 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
 import { 
   Plus, 
   Edit2, 
   Trash2, 
   Package, 
-  Cpu, 
-  Monitor, 
+  Layers, 
   Settings,
-  Upload,
-  ExternalLink
+  ExternalLink,
+  ChevronRight
 } from "lucide-react";
 import { User } from "@/types/auth";
-import { Chassis, Card as ProductCard, Level1Product, Level2Option } from "@/types/product";
-import ChassisForm from "./product-forms/ChassisForm";
-import CardForm from "./product-forms/CardForm";
-import Level1ProductForm from "./product-forms/Level1ProductForm";
-import Level2OptionForm from "./product-forms/Level2OptionForm";
+import { Level1Product, Level2Product, Level3Product } from "@/types/product";
 
 interface ProductManagementProps {
   user: User;
 }
 
 const ProductManagement = ({ user }: ProductManagementProps) => {
-  const [activeTab, setActiveTab] = useState("chassis");
+  const [activeTab, setActiveTab] = useState("level1");
 
-  // Mock data - in a real app, this would come from a database
-  const [chassisData, setChassisData] = useState<Chassis[]>([
-    {
-      id: 'ltx-chassis',
-      name: 'LTX Chassis',
-      type: 'LTX',
-      height: '6U • 14 slots',
-      slots: 14,
-      price: 4200,
-      cost: 2100,
-      description: 'Large capacity transformer monitoring system',
-      productInfoUrl: 'https://www.qualitrolcorp.com/products/ltx-chassis',
-      partNumber: 'LTX-6U-14S',
-      enabled: true
-    },
-    {
-      id: 'mtx-chassis',
-      name: 'MTX Chassis',
-      type: 'MTX',
-      height: '3U • 7 slots',
-      slots: 7,
-      price: 2800,
-      cost: 1400,
-      description: 'Medium capacity transformer monitoring system',
-      productInfoUrl: 'https://www.qualitrolcorp.com/products/mtx-chassis',
-      partNumber: 'MTX-3U-7S',
-      enabled: true
-    },
-    {
-      id: 'stx-chassis',
-      name: 'STX Chassis',
-      type: 'STX',
-      height: '1.5U • 4 slots',
-      slots: 4,
-      price: 1900,
-      cost: 950,
-      description: 'Compact transformer monitoring system',
-      productInfoUrl: 'https://www.qualitrolcorp.com/products/stx-chassis',
-      partNumber: 'STX-1.5U-4S',
-      enabled: true
-    }
-  ]);
-
-  const [cardsData, setCardsData] = useState<ProductCard[]>([
-    {
-      id: 'relay-8in-2out',
-      name: 'Relay Protection Card',
-      type: 'relay',
-      description: '8 digital inputs + 2 analog outputs for comprehensive protection',
-      price: 2500,
-      cost: 1250,
-      slotRequirement: 1,
-      compatibleChassis: ['ltx-chassis', 'mtx-chassis', 'stx-chassis'],
-      specifications: {
-        inputs: 8,
-        outputs: 2,
-        protocols: ['DNP3', 'IEC 61850']
-      },
-      partNumber: 'RPC-8I2O-001',
-      enabled: true
-    },
-    {
-      id: 'analog-8ch',
-      name: 'Analog Input Card',
-      type: 'analog',
-      description: '8-channel analog input with configurable input types',
-      price: 1800,
-      cost: 900,
-      slotRequirement: 1,
-      compatibleChassis: ['ltx-chassis', 'mtx-chassis', 'stx-chassis'],
-      specifications: {
-        channels: 8,
-        inputTypes: ['4-20mA', 'CT', 'RTD', 'Thermocouple']
-      },
-      partNumber: 'AIC-8CH-001',
-      enabled: true
-    }
-  ]);
-
+  // Mock data reflecting the new 3-level hierarchy
   const [level1Products, setLevel1Products] = useState<Level1Product[]>([
+    {
+      id: 'qtms-main',
+      name: 'QTMS',
+      type: 'QTMS',
+      description: 'Qualitrol Transformer Monitoring System - Complete monitoring solution',
+      price: 0, // Base price, actual pricing comes from Level 2/3 selections
+      cost: 0,
+      productInfoUrl: 'https://www.qualitrolcorp.com/products/qtms',
+      enabled: true,
+      partNumber: 'QTMS-BASE-001'
+    },
     {
       id: 'tm8-dga',
       name: 'TM8',
       type: 'TM8',
-      description: 'Dissolved Gases (9 gases)',
+      description: 'Dissolved Gas Analysis Monitor - Standalone DGA solution',
       price: 12500,
       cost: 6250,
       productInfoUrl: 'https://www.qualitrolcorp.com/products/tm8',
       enabled: true,
-      customizations: ['CalGas', 'Helium Bottle', 'Moisture Sensor'],
       partNumber: 'TM8-DGA-001'
     },
     {
       id: 'qpdm-pd',
       name: 'QPDM',
       type: 'QPDM',
-      description: 'Partial Discharge Monitor',
+      description: 'Partial Discharge Monitor - Advanced PD detection',
       price: 8500,
       cost: 4250,
       productInfoUrl: 'https://www.qualitrolcorp.com/products/qpdm',
@@ -140,427 +62,491 @@ const ProductManagement = ({ user }: ProductManagementProps) => {
     }
   ]);
 
-  const [level2Options, setLevel2Options] = useState<Level2Option[]>([
+  const [level2Products, setLevel2Products] = useState<Level2Product[]>([
+    {
+      id: 'ltx-chassis',
+      name: 'LTX Chassis',
+      parentProductId: 'qtms-main',
+      type: 'LTX',
+      description: 'Large capacity transformer monitoring chassis - 6U, 14 slots',
+      price: 4200,
+      cost: 2100,
+      enabled: true,
+      specifications: {
+        height: '6U',
+        slots: 14,
+        capacity: 'Large'
+      },
+      partNumber: 'LTX-6U-14S'
+    },
+    {
+      id: 'mtx-chassis',
+      name: 'MTX Chassis',
+      parentProductId: 'qtms-main',
+      type: 'MTX',
+      description: 'Medium capacity transformer monitoring chassis - 3U, 7 slots',
+      price: 2800,
+      cost: 1400,
+      enabled: true,
+      specifications: {
+        height: '3U',
+        slots: 7,
+        capacity: 'Medium'
+      },
+      partNumber: 'MTX-3U-7S'
+    },
+    {
+      id: 'stx-chassis',
+      name: 'STX Chassis',
+      parentProductId: 'qtms-main',
+      type: 'STX',
+      description: 'Compact transformer monitoring chassis - 1.5U, 4 slots',
+      price: 1900,
+      cost: 950,
+      enabled: true,
+      specifications: {
+        height: '1.5U',
+        slots: 4,
+        capacity: 'Compact'
+      },
+      partNumber: 'STX-1.5U-4S'
+    },
     {
       id: 'calgas-tm8',
-      name: 'CalGas Calibration System',
+      name: 'CalGas System',
       parentProductId: 'tm8-dga',
-      description: 'Automated calibration gas system',
+      type: 'CalGas',
+      description: 'Automated calibration gas system for TM8',
       price: 3500,
       cost: 1750,
-      enabled: true
+      enabled: true,
+      partNumber: 'CALGAS-TM8-001'
     },
     {
       id: 'moisture-tm8',
       name: 'Moisture Sensor',
       parentProductId: 'tm8-dga',
-      description: 'Oil moisture content monitoring',
+      type: 'Moisture',
+      description: 'Oil moisture content monitoring for TM8',
       price: 2200,
       cost: 1100,
-      enabled: true
+      enabled: true,
+      partNumber: 'MOISTURE-TM8-001'
     }
   ]);
+
+  const [level3Products, setLevel3Products] = useState<Level3Product[]>([
+    {
+      id: 'relay-8in-2out',
+      name: 'Relay Protection Card',
+      parentProductId: 'ltx-chassis',
+      type: 'relay',
+      description: '8 digital inputs + 2 analog outputs for comprehensive protection',
+      price: 2500,
+      cost: 1250,
+      enabled: true,
+      specifications: {
+        slotRequirement: 1,
+        inputs: 8,
+        outputs: 2,
+        protocols: ['DNP3', 'IEC 61850']
+      },
+      partNumber: 'RPC-8I2O-001'
+    },
+    {
+      id: 'analog-8ch-ltx',
+      name: 'Analog Input Card (LTX)',
+      parentProductId: 'ltx-chassis',
+      type: 'analog',
+      description: '8-channel analog input with configurable input types for LTX',
+      price: 1800,
+      cost: 900,
+      enabled: true,
+      specifications: {
+        slotRequirement: 1,
+        channels: 8,
+        inputTypes: ['4-20mA', 'CT', 'RTD', 'Thermocouple']
+      },
+      partNumber: 'AIC-8CH-LTX-001'
+    },
+    {
+      id: 'analog-8ch-mtx',
+      name: 'Analog Input Card (MTX)',
+      parentProductId: 'mtx-chassis',
+      type: 'analog',
+      description: '8-channel analog input with configurable input types for MTX',
+      price: 1800,
+      cost: 900,
+      enabled: true,
+      specifications: {
+        slotRequirement: 1,
+        channels: 8,
+        inputTypes: ['4-20mA', 'CT', 'RTD', 'Thermocouple']
+      },
+      partNumber: 'AIC-8CH-MTX-001'
+    },
+    {
+      id: 'analog-4ch-stx',
+      name: 'Analog Input Card (STX)',
+      parentProductId: 'stx-chassis',
+      type: 'analog',
+      description: '4-channel analog input optimized for STX compact chassis',
+      price: 1200,
+      cost: 600,
+      enabled: true,
+      specifications: {
+        slotRequirement: 1,
+        channels: 4,
+        inputTypes: ['4-20mA', 'CT', 'RTD']
+      },
+      partNumber: 'AIC-4CH-STX-001'
+    }
+  ]);
+
+  const getLevel2ProductsForLevel1 = (level1Id: string) => {
+    return level2Products.filter(p => p.parentProductId === level1Id);
+  };
+
+  const getLevel3ProductsForLevel2 = (level2Id: string) => {
+    return level3Products.filter(p => p.parentProductId === level2Id);
+  };
+
+  const getParentProduct = (parentId: string, level: number) => {
+    if (level === 2) {
+      return level1Products.find(p => p.id === parentId);
+    }
+    if (level === 3) {
+      return level2Products.find(p => p.id === parentId);
+    }
+    return null;
+  };
 
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-2xl font-bold text-white">Product Management</h2>
-          <p className="text-gray-400">Manage your product catalog and pricing</p>
+          <h2 className="text-2xl font-bold text-white">Product Catalog Management</h2>
+          <p className="text-gray-400">Manage your 3-level product hierarchy: Categories → Variants → Components</p>
         </div>
         <Badge variant="outline" className="border-green-600 text-green-400">
-          {chassisData.length + cardsData.length + level1Products.length} Products
+          {level1Products.length + level2Products.length + level3Products.length} Total Products
         </Badge>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-4 bg-gray-800">
-          <TabsTrigger 
-            value="chassis" 
-            className="text-white data-[state=active]:bg-red-600 data-[state=active]:text-white"
-          >
-            <Package className="h-4 w-4 mr-2" />
-            Chassis ({chassisData.length})
-          </TabsTrigger>
-          <TabsTrigger 
-            value="cards" 
-            className="text-white data-[state=active]:bg-red-600 data-[state=active]:text-white"
-          >
-            <Cpu className="h-4 w-4 mr-2" />
-            Cards ({cardsData.length})
-          </TabsTrigger>
+        <TabsList className="grid w-full grid-cols-3 bg-gray-800">
           <TabsTrigger 
             value="level1" 
             className="text-white data-[state=active]:bg-red-600 data-[state=active]:text-white"
           >
-            <Monitor className="h-4 w-4 mr-2" />
-            Level 1 ({level1Products.length})
+            <Package className="h-4 w-4 mr-2" />
+            Level 1: Categories ({level1Products.length})
           </TabsTrigger>
           <TabsTrigger 
             value="level2" 
             className="text-white data-[state=active]:bg-red-600 data-[state=active]:text-white"
           >
+            <Layers className="h-4 w-4 mr-2" />
+            Level 2: Variants ({level2Products.length})
+          </TabsTrigger>
+          <TabsTrigger 
+            value="level3" 
+            className="text-white data-[state=active]:bg-red-600 data-[state=active]:text-white"
+          >
             <Settings className="h-4 w-4 mr-2" />
-            Level 2 ({level2Options.length})
+            Level 3: Components ({level3Products.length})
           </TabsTrigger>
         </TabsList>
 
-        {/* Chassis Management */}
-        <TabsContent value="chassis" className="space-y-6">
-          <div className="flex justify-between items-center">
-            <h3 className="text-xl font-medium text-white">Chassis Products</h3>
-            <Dialog>
-              <DialogTrigger asChild>
-                <Button className="bg-red-600 hover:bg-red-700">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Chassis
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="bg-gray-900 border-gray-800 max-w-2xl">
-                <DialogHeader>
-                  <DialogTitle className="text-white">Add New Chassis</DialogTitle>
-                </DialogHeader>
-                <ChassisForm 
-                  onSubmit={(chassis) => {
-                    setChassisData([...chassisData, { ...chassis, id: `chassis-${Date.now()}` }]);
-                  }}
-                />
-              </DialogContent>
-            </Dialog>
-          </div>
-
-          <div className="grid gap-4">
-            {chassisData.map((chassis) => (
-              <Card key={chassis.id} className="bg-gray-900 border-gray-800">
-                <CardHeader>
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <CardTitle className="text-white">{chassis.name}</CardTitle>
-                      <CardDescription className="text-gray-400">
-                        {chassis.description}
-                      </CardDescription>
-                      <div className="flex items-center space-x-2 mt-2">
-                        <Badge variant="outline" className="text-xs">
-                          {chassis.height}
-                        </Badge>
-                        <Badge variant="outline" className="text-xs">
-                          {chassis.partNumber}
-                        </Badge>
-                        <Badge 
-                          variant="outline" 
-                          className={chassis.enabled ? "border-green-500 text-green-400" : "border-red-500 text-red-400"}
-                        >
-                          {chassis.enabled ? "Enabled" : "Disabled"}
-                        </Badge>
-                      </div>
-                    </div>
-                    <div className="flex space-x-2">
-                      <Button variant="ghost" size="sm" className="text-blue-400 hover:text-blue-300">
-                        <Edit2 className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="sm" className="text-red-400 hover:text-red-300">
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                    <div>
-                      <p className="text-gray-400">Price</p>
-                      <p className="text-white font-medium">${chassis.price.toLocaleString()}</p>
-                    </div>
-                    {user.role === 'admin' && chassis.cost && (
-                      <div>
-                        <p className="text-gray-400">Cost</p>
-                        <p className="text-white font-medium">${chassis.cost.toLocaleString()}</p>
-                      </div>
-                    )}
-                    <div>
-                      <p className="text-gray-400">Slots</p>
-                      <p className="text-white font-medium">{chassis.slots}</p>
-                    </div>
-                    <div>
-                      <p className="text-gray-400">Type</p>
-                      <p className="text-white font-medium">{chassis.type}</p>
-                    </div>
-                  </div>
-                  {chassis.productInfoUrl && (
-                    <div className="mt-4">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-blue-400 hover:text-blue-300"
-                        onClick={() => window.open(chassis.productInfoUrl, '_blank')}
-                      >
-                        <ExternalLink className="h-4 w-4 mr-1" />
-                        Product Info
-                      </Button>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </TabsContent>
-
-        {/* Cards Management */}
-        <TabsContent value="cards" className="space-y-6">
-          <div className="flex justify-between items-center">
-            <h3 className="text-xl font-medium text-white">Card Products</h3>
-            <Dialog>
-              <DialogTrigger asChild>
-                <Button className="bg-red-600 hover:bg-red-700">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Card
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="bg-gray-900 border-gray-800 max-w-2xl">
-                <DialogHeader>
-                  <DialogTitle className="text-white">Add New Card</DialogTitle>
-                </DialogHeader>
-                <CardForm 
-                  chassisOptions={chassisData}
-                  onSubmit={(card) => {
-                    setCardsData([...cardsData, { ...card, id: `card-${Date.now()}` }]);
-                  }}
-                />
-              </DialogContent>
-            </Dialog>
-          </div>
-
-          <div className="grid gap-4">
-            {cardsData.map((card) => (
-              <Card key={card.id} className="bg-gray-900 border-gray-800">
-                <CardHeader>
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <CardTitle className="text-white">{card.name}</CardTitle>
-                      <CardDescription className="text-gray-400">
-                        {card.description}
-                      </CardDescription>
-                      <div className="flex items-center space-x-2 mt-2">
-                        <Badge variant="outline" className="text-xs capitalize">
-                          {card.type}
-                        </Badge>
-                        <Badge variant="outline" className="text-xs">
-                          {card.partNumber}
-                        </Badge>
-                        <Badge 
-                          variant="outline" 
-                          className={card.enabled ? "border-green-500 text-green-400" : "border-red-500 text-red-400"}
-                        >
-                          {card.enabled ? "Enabled" : "Disabled"}
-                        </Badge>
-                      </div>
-                    </div>
-                    <div className="flex space-x-2">
-                      <Button variant="ghost" size="sm" className="text-blue-400 hover:text-blue-300">
-                        <Edit2 className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="sm" className="text-red-400 hover:text-red-300">
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                    <div>
-                      <p className="text-gray-400">Price</p>
-                      <p className="text-white font-medium">${card.price.toLocaleString()}</p>
-                    </div>
-                    {user.role === 'admin' && card.cost && (
-                      <div>
-                        <p className="text-gray-400">Cost</p>
-                        <p className="text-white font-medium">${card.cost.toLocaleString()}</p>
-                      </div>
-                    )}
-                    <div>
-                      <p className="text-gray-400">Slot Requirement</p>
-                      <p className="text-white font-medium">{card.slotRequirement}</p>
-                    </div>
-                    <div>
-                      <p className="text-gray-400">Compatible Chassis</p>
-                      <p className="text-white font-medium">{card.compatibleChassis.length}</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </TabsContent>
-
-        {/* Level 1 Products Management */}
+        {/* Level 1 Products */}
         <TabsContent value="level1" className="space-y-6">
           <div className="flex justify-between items-center">
-            <h3 className="text-xl font-medium text-white">Level 1 Products</h3>
-            <Dialog>
-              <DialogTrigger asChild>
-                <Button className="bg-red-600 hover:bg-red-700">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Level 1 Product
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="bg-gray-900 border-gray-800 max-w-2xl">
-                <DialogHeader>
-                  <DialogTitle className="text-white">Add New Level 1 Product</DialogTitle>
-                </DialogHeader>
-                <Level1ProductForm 
-                  onSubmit={(product) => {
-                    setLevel1Products([...level1Products, { ...product, id: `l1-${Date.now()}` }]);
-                  }}
-                />
-              </DialogContent>
-            </Dialog>
+            <div>
+              <h3 className="text-xl font-medium text-white">Level 1: Main Product Categories</h3>
+              <p className="text-gray-400">Core product families (QTMS, TM8, QPDM, etc.)</p>
+            </div>
+            <Button className="bg-red-600 hover:bg-red-700">
+              <Plus className="h-4 w-4 mr-2" />
+              Add Level 1 Product
+            </Button>
           </div>
 
           <div className="grid gap-4">
-            {level1Products.map((product) => (
-              <Card key={product.id} className="bg-gray-900 border-gray-800">
-                <CardHeader>
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <CardTitle className="text-white">{product.name}</CardTitle>
-                      <CardDescription className="text-gray-400">
-                        {product.description}
-                      </CardDescription>
-                      <div className="flex items-center space-x-2 mt-2">
-                        <Badge variant="outline" className="text-xs">
-                          {product.type}
-                        </Badge>
-                        <Badge variant="outline" className="text-xs">
-                          {product.partNumber}
-                        </Badge>
-                        <Badge 
-                          variant="outline" 
-                          className={product.enabled ? "border-green-500 text-green-400" : "border-red-500 text-red-400"}
-                        >
-                          {product.enabled ? "Enabled" : "Disabled"}
-                        </Badge>
+            {level1Products.map((product) => {
+              const level2Count = getLevel2ProductsForLevel1(product.id).length;
+              const level3Count = getLevel2ProductsForLevel1(product.id)
+                .reduce((count, l2) => count + getLevel3ProductsForLevel2(l2.id).length, 0);
+              
+              return (
+                <Card key={product.id} className="bg-gray-900 border-gray-800">
+                  <CardHeader>
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <CardTitle className="text-white flex items-center">
+                          {product.name}
+                          <ChevronRight className="h-4 w-4 mx-2 text-gray-500" />
+                          <span className="text-sm text-gray-400">{level2Count} variants</span>
+                          <ChevronRight className="h-4 w-4 mx-2 text-gray-500" />
+                          <span className="text-sm text-gray-400">{level3Count} components</span>
+                        </CardTitle>
+                        <CardDescription className="text-gray-400">
+                          {product.description}
+                        </CardDescription>
+                        <div className="flex items-center space-x-2 mt-2">
+                          <Badge variant="outline" className="text-xs">
+                            {product.type}
+                          </Badge>
+                          <Badge variant="outline" className="text-xs">
+                            {product.partNumber}
+                          </Badge>
+                          <Badge 
+                            variant="outline" 
+                            className={product.enabled ? "border-green-500 text-green-400" : "border-red-500 text-red-400"}
+                          >
+                            {product.enabled ? "Enabled" : "Disabled"}
+                          </Badge>
+                        </div>
+                      </div>
+                      <div className="flex space-x-2">
+                        <Button variant="ghost" size="sm" className="text-blue-400 hover:text-blue-300">
+                          <Edit2 className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="sm" className="text-red-400 hover:text-red-300">
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
                       </div>
                     </div>
-                    <div className="flex space-x-2">
-                      <Button variant="ghost" size="sm" className="text-blue-400 hover:text-blue-300">
-                        <Edit2 className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="sm" className="text-red-400 hover:text-red-300">
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
-                    <div>
-                      <p className="text-gray-400">Price</p>
-                      <p className="text-white font-medium">${product.price.toLocaleString()}</p>
-                    </div>
-                    {user.role === 'admin' && product.cost && (
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                       <div>
-                        <p className="text-gray-400">Cost</p>
-                        <p className="text-white font-medium">${product.cost.toLocaleString()}</p>
+                        <p className="text-gray-400">Base Price</p>
+                        <p className="text-white font-medium">${product.price.toLocaleString()}</p>
+                      </div>
+                      {user.role === 'admin' && product.cost !== undefined && (
+                        <div>
+                          <p className="text-gray-400">Base Cost</p>
+                          <p className="text-white font-medium">${product.cost.toLocaleString()}</p>
+                        </div>
+                      )}
+                      <div>
+                        <p className="text-gray-400">Level 2 Variants</p>
+                        <p className="text-white font-medium">{level2Count}</p>
+                      </div>
+                      <div>
+                        <p className="text-gray-400">Level 3 Components</p>
+                        <p className="text-white font-medium">{level3Count}</p>
+                      </div>
+                    </div>
+                    {product.productInfoUrl && (
+                      <div className="mt-4">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-blue-400 hover:text-blue-300"
+                          onClick={() => window.open(product.productInfoUrl, '_blank')}
+                        >
+                          <ExternalLink className="h-4 w-4 mr-1" />
+                          Product Info
+                        </Button>
                       </div>
                     )}
-                    <div>
-                      <p className="text-gray-400">Customizations</p>
-                      <p className="text-white font-medium">
-                        {product.customizations ? product.customizations.length : 0}
-                      </p>
-                    </div>
-                  </div>
-                  {product.productInfoUrl && (
-                    <div className="mt-4">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-blue-400 hover:text-blue-300"
-                        onClick={() => window.open(product.productInfoUrl, '_blank')}
-                      >
-                        <ExternalLink className="h-4 w-4 mr-1" />
-                        Product Info
-                      </Button>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            ))}
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
         </TabsContent>
 
-        {/* Level 2 Options Management */}
+        {/* Level 2 Products */}
         <TabsContent value="level2" className="space-y-6">
           <div className="flex justify-between items-center">
-            <h3 className="text-xl font-medium text-white">Level 2 Options</h3>
-            <Dialog>
-              <DialogTrigger asChild>
-                <Button className="bg-red-600 hover:bg-red-700">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Level 2 Option
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="bg-gray-900 border-gray-800 max-w-2xl">
-                <DialogHeader>
-                  <DialogTitle className="text-white">Add New Level 2 Option</DialogTitle>
-                </DialogHeader>
-                <Level2OptionForm 
-                  level1Products={level1Products}
-                  onSubmit={(option) => {
-                    setLevel2Options([...level2Options, { ...option, id: `l2-${Date.now()}` }]);
-                  }}
-                />
-              </DialogContent>
-            </Dialog>
+            <div>
+              <h3 className="text-xl font-medium text-white">Level 2: Product Variants</h3>
+              <p className="text-gray-400">Chassis types, options, and variants (LTX/MTX/STX, CalGas, etc.)</p>
+            </div>
+            <Button className="bg-red-600 hover:bg-red-700">
+              <Plus className="h-4 w-4 mr-2" />
+              Add Level 2 Product
+            </Button>
           </div>
 
           <div className="grid gap-4">
-            {level2Options.map((option) => (
-              <Card key={option.id} className="bg-gray-900 border-gray-800">
-                <CardHeader>
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <CardTitle className="text-white">{option.name}</CardTitle>
-                      <CardDescription className="text-gray-400">
-                        {option.description}
-                      </CardDescription>
-                      <div className="flex items-center space-x-2 mt-2">
-                        <Badge variant="outline" className="text-xs">
-                          Parent: {level1Products.find(p => p.id === option.parentProductId)?.name}
-                        </Badge>
-                        <Badge 
-                          variant="outline" 
-                          className={option.enabled ? "border-green-500 text-green-400" : "border-red-500 text-red-400"}
-                        >
-                          {option.enabled ? "Enabled" : "Disabled"}
-                        </Badge>
+            {level2Products.map((product) => {
+              const parentProduct = getParentProduct(product.parentProductId, 2);
+              const level3Count = getLevel3ProductsForLevel2(product.id).length;
+              
+              return (
+                <Card key={product.id} className="bg-gray-900 border-gray-800">
+                  <CardHeader>
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <CardTitle className="text-white flex items-center">
+                          <span className="text-gray-400 text-sm mr-2">
+                            {parentProduct?.name} →
+                          </span>
+                          {product.name}
+                          <ChevronRight className="h-4 w-4 mx-2 text-gray-500" />
+                          <span className="text-sm text-gray-400">{level3Count} components</span>
+                        </CardTitle>
+                        <CardDescription className="text-gray-400">
+                          {product.description}
+                        </CardDescription>
+                        <div className="flex items-center space-x-2 mt-2">
+                          <Badge variant="outline" className="text-xs">
+                            {product.type}
+                          </Badge>
+                          <Badge variant="outline" className="text-xs">
+                            {product.partNumber}
+                          </Badge>
+                          <Badge 
+                            variant="outline" 
+                            className={product.enabled ? "border-green-500 text-green-400" : "border-red-500 text-red-400"}
+                          >
+                            {product.enabled ? "Enabled" : "Disabled"}
+                          </Badge>
+                        </div>
+                      </div>
+                      <div className="flex space-x-2">
+                        <Button variant="ghost" size="sm" className="text-blue-400 hover:text-blue-300">
+                          <Edit2 className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="sm" className="text-red-400 hover:text-red-300">
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
                       </div>
                     </div>
-                    <div className="flex space-x-2">
-                      <Button variant="ghost" size="sm" className="text-blue-400 hover:text-blue-300">
-                        <Edit2 className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="sm" className="text-red-400 hover:text-red-300">
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div>
-                      <p className="text-gray-400">Price</p>
-                      <p className="text-white font-medium">${option.price.toLocaleString()}</p>
-                    </div>
-                    {user.role === 'admin' && option.cost && (
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                       <div>
-                        <p className="text-gray-400">Cost</p>
-                        <p className="text-white font-medium">${option.cost.toLocaleString()}</p>
+                        <p className="text-gray-400">Price</p>
+                        <p className="text-white font-medium">${product.price.toLocaleString()}</p>
+                      </div>
+                      {user.role === 'admin' && product.cost !== undefined && (
+                        <div>
+                          <p className="text-gray-400">Cost</p>
+                          <p className="text-white font-medium">${product.cost.toLocaleString()}</p>
+                        </div>
+                      )}
+                      <div>
+                        <p className="text-gray-400">Parent Product</p>
+                        <p className="text-white font-medium">{parentProduct?.name}</p>
+                      </div>
+                      <div>
+                        <p className="text-gray-400">Components</p>
+                        <p className="text-white font-medium">{level3Count}</p>
+                      </div>
+                    </div>
+                    {product.specifications && (
+                      <div className="mt-4">
+                        <p className="text-gray-400 text-xs mb-2">Specifications:</p>
+                        <div className="flex flex-wrap gap-2">
+                          {Object.entries(product.specifications).map(([key, value]) => (
+                            <Badge key={key} variant="outline" className="text-xs">
+                              {key}: {value}
+                            </Badge>
+                          ))}
+                        </div>
                       </div>
                     )}
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        </TabsContent>
+
+        {/* Level 3 Products */}
+        <TabsContent value="level3" className="space-y-6">
+          <div className="flex justify-between items-center">
+            <div>
+              <h3 className="text-xl font-medium text-white">Level 3: Components & Cards</h3>
+              <p className="text-gray-400">Individual cards, sensors, and components for specific variants</p>
+            </div>
+            <Button className="bg-red-600 hover:bg-red-700">
+              <Plus className="h-4 w-4 mr-2" />
+              Add Level 3 Component
+            </Button>
+          </div>
+
+          <div className="grid gap-4">
+            {level3Products.map((product) => {
+              const parentProduct = getParentProduct(product.parentProductId, 3);
+              const grandParentProduct = parentProduct ? getParentProduct(parentProduct.parentProductId, 2) : null;
+              
+              return (
+                <Card key={product.id} className="bg-gray-900 border-gray-800">
+                  <CardHeader>
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <CardTitle className="text-white flex items-center">
+                          <span className="text-gray-400 text-sm mr-2">
+                            {grandParentProduct?.name} → {parentProduct?.name} →
+                          </span>
+                          {product.name}
+                        </CardTitle>
+                        <CardDescription className="text-gray-400">
+                          {product.description}
+                        </CardDescription>
+                        <div className="flex items-center space-x-2 mt-2">
+                          <Badge variant="outline" className="text-xs capitalize">
+                            {product.type}
+                          </Badge>
+                          <Badge variant="outline" className="text-xs">
+                            {product.partNumber}
+                          </Badge>
+                          <Badge 
+                            variant="outline" 
+                            className={product.enabled ? "border-green-500 text-green-400" : "border-red-500 text-red-400"}
+                          >
+                            {product.enabled ? "Enabled" : "Disabled"}
+                          </Badge>
+                        </div>
+                      </div>
+                      <div className="flex space-x-2">
+                        <Button variant="ghost" size="sm" className="text-blue-400 hover:text-blue-300">
+                          <Edit2 className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="sm" className="text-red-400 hover:text-red-300">
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
+                      <div>
+                        <p className="text-gray-400">Price</p>
+                        <p className="text-white font-medium">${product.price.toLocaleString()}</p>
+                      </div>
+                      {user.role === 'admin' && product.cost !== undefined && (
+                        <div>
+                          <p className="text-gray-400">Cost</p>
+                          <p className="text-white font-medium">${product.cost.toLocaleString()}</p>
+                        </div>
+                      )}
+                      <div>
+                        <p className="text-gray-400">Parent Variant</p>
+                        <p className="text-white font-medium">{parentProduct?.name}</p>
+                      </div>
+                    </div>
+                    {product.specifications && (
+                      <div className="mt-4">
+                        <p className="text-gray-400 text-xs mb-2">Specifications:</p>
+                        <div className="flex flex-wrap gap-2">
+                          {Object.entries(product.specifications).map(([key, value]) => (
+                            <Badge key={key} variant="outline" className="text-xs">
+                              {key}: {Array.isArray(value) ? value.join(', ') : value}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
         </TabsContent>
       </Tabs>
