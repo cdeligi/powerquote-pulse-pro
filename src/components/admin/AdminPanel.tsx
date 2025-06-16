@@ -44,18 +44,10 @@ interface QuoteApprovalData {
   bomItems: BOMItem[];
   sfdcOpportunity: string;
   status: QuoteStatus;
-  counterOfferValue?: number;
-  counterOfferTerms?: {
-    shippingTerms?: string;
-    paymentTerms?: string;
-    quoteCurrency?: 'USD' | 'EURO' | 'GBP' | 'CAD';
-  };
-  adminNotes?: string;
   counterOfferHistory?: Array<{
-    value: number;
-    terms: any;
-    timestamp: string;
-    adminNotes: string;
+    discountOffered: number;
+    offeredAt: string;
+    status: 'pending' | 'accepted' | 'rejected';
   }>;
 }
 
@@ -84,7 +76,14 @@ const AdminPanel = ({ user }: AdminPanelProps) => {
       quoteCurrency: 'USD',
       sfdcOpportunity: 'SF-001234',
       bomItems: [],
-      status: 'pending'
+      status: 'pending',
+      counterOfferHistory: [
+        {
+          discountOffered: 8,
+          offeredAt: "2024-01-14T09:00:00Z",
+          status: 'rejected'
+        }
+      ]
     },
     {
       id: "QR-2024-002", 
@@ -174,19 +173,20 @@ const AdminPanel = ({ user }: AdminPanelProps) => {
 
   const analytics = calculateQuoteAnalytics(mockQuoteData);
 
-  const handleApprove = (quoteId: string, approvalData: any) => {
-    console.log('Approving quote:', quoteId, approvalData);
-    // Handle approval logic
+  const handleApprove = (quoteId: string, approvedDiscount: number, updatedTerms: any) => {
+    console.log('Approving quote:', quoteId, { approvedDiscount, updatedTerms });
   };
 
   const handleReject = (quoteId: string, reason: string) => {
     console.log('Rejecting quote:', quoteId, 'Reason:', reason);
-    // Handle rejection logic
   };
 
-  const handleCounterOffer = (quoteId: string, counterOfferData: any) => {
-    console.log('Sending counter offer for quote:', quoteId, counterOfferData);
-    // Handle counter offer logic
+  const handleCounterOffer = (quoteId: string, counterDiscount: number, updatedTerms: any) => {
+    console.log('Sending counter offer for quote:', quoteId, { counterDiscount, updatedTerms });
+  };
+
+  const handleUpdateTerms = (quoteId: string, updatedTerms: any) => {
+    console.log('Updating terms for quote:', quoteId, updatedTerms);
   };
 
   // Calculate overview metrics
@@ -371,6 +371,7 @@ const AdminPanel = ({ user }: AdminPanelProps) => {
                   onApprove={handleApprove}
                   onReject={handleReject}
                   onCounterOffer={handleCounterOffer}
+                  onUpdateTerms={handleUpdateTerms}
                 />
               ))}
             </div>
