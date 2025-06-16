@@ -23,7 +23,8 @@ import {
   Eye,
   ChevronDown,
   ChevronUp,
-  Calculator
+  Calculator,
+  TrendingDown
 } from 'lucide-react';
 import { BOMItem } from '@/types/product';
 import { 
@@ -140,12 +141,30 @@ const QuoteApprovalCard = ({ quote, onApprove, onReject, onCounterOffer }: Quote
           </div>
           
           <div className="text-right space-y-2">
+            {/* Original Quote Value */}
             <div>
-              <p className="text-gray-400 text-sm">Quote Value</p>
+              <p className="text-gray-400 text-sm">Original Quote Value</p>
               <p className="text-white text-2xl font-bold">
                 {quote.quoteCurrency} {totalRevenue.toLocaleString()}
               </p>
             </div>
+            
+            {/* Requested Discounted Value */}
+            {quote.discountRequested > 0 && (
+              <div className="border-t border-gray-600 pt-2">
+                <p className="text-orange-400 text-sm flex items-center">
+                  <TrendingDown className="mr-1 h-3 w-3" />
+                  With Requested Discount ({quote.discountRequested}%)
+                </p>
+                <p className="text-orange-300 text-xl font-bold">
+                  {quote.quoteCurrency} {discountedPrice.toLocaleString()}
+                </p>
+                <p className="text-red-400 text-sm">
+                  -{quote.quoteCurrency} {(totalRevenue - discountedPrice).toLocaleString()}
+                </p>
+              </div>
+            )}
+            
             <Button
               variant="ghost"
               size="sm"
