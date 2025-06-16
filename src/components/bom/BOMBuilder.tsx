@@ -15,7 +15,7 @@ import SlotCardSelector from "./SlotCardSelector";
 import AnalogCardConfigurator from "./AnalogCardConfigurator";
 import BushingCardConfigurator from "./BushingCardConfigurator";
 import ToggleSwitch from "@/components/ui/toggle-switch";
-import { BOMItem, Chassis, Card as ProductCard, Level1Product, Level2Product, Level3Product, Level3Customization, isLevel1Product, isChassis, isCard, generateQTMSPartNumber, generateProductPartNumber, ShippingTerms, PaymentTerms } from "@/types/product";
+import { BOMItem, Chassis, Card as ProductCard, Level1Product, Level2Product, Level3Product, isLevel1Product, isChassis, isCard, generateQTMSPartNumber, generateProductPartNumber, ShippingTerms, PaymentTerms } from "@/types/product";
 import { Quote } from "@/types/quote";
 import { ShoppingCart, Save, Send, ExternalLink, Settings, Plus, Trash2, Monitor } from "lucide-react";
 import { generateQuotePDF } from '@/utils/pdfGenerator';
@@ -47,13 +47,13 @@ const BOMBuilder = ({ user }: BOMBuilderProps) => {
   const [paymentTerms, setPaymentTerms] = useState<PaymentTerms>('30');
   const [quoteCurrency, setQuoteCurrency] = useState<'USD' | 'EURO' | 'GBP' | 'CAD'>('USD');
 
-  const addToBOM = (product: Chassis | ProductCard | Level1Product, slot?: number, level2Options?: Level2Product[], configuration?: Record<string, any>) => {
+  const addToBOM = (product: Level1Product | Level2Product | Level3Product, slot?: number, level2Options?: Level2Product[], configuration?: Record<string, any>) => {
     let partNumber = '';
     
     // Generate part number based on product type
     if (isLevel1Product(product)) {
       partNumber = generateProductPartNumber(product, configuration);
-    } else if (isChassis(product) || isCard(product)) {
+    } else {
       partNumber = product.partNumber || product.id.toUpperCase();
     }
     
