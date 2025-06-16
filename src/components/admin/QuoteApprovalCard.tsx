@@ -22,14 +22,16 @@ import {
   AlertTriangle,
   Eye,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Calculator
 } from 'lucide-react';
 import { BOMItem } from '@/types/product';
 import { 
   calculateTotalMargin, 
   calculateItemMargin, 
   calculateItemCost, 
-  calculateItemRevenue 
+  calculateItemRevenue,
+  calculateDiscountedMargin
 } from '@/utils/marginCalculations';
 
 interface QuoteApprovalData {
@@ -68,6 +70,10 @@ const QuoteApprovalCard = ({ quote, onApprove, onReject, onCounterOffer }: Quote
   const { totalRevenue, totalCost, marginPercentage, grossProfit } = calculateTotalMargin(quote.bomItems);
   const discountedPrice = totalRevenue * (1 - quote.discountRequested / 100);
   const discountedMargin = totalCost > 0 ? ((discountedPrice - totalCost) / discountedPrice) * 100 : 0;
+
+  // Calculate counter offer metrics in real-time
+  const counterDiscountNum = Number(counterDiscount) || 0;
+  const counterOfferMetrics = calculateDiscountedMargin(quote.bomItems, counterDiscountNum);
 
   const getMarginColor = (margin: number) => {
     if (margin >= 40) return 'text-green-400';
@@ -311,18 +317,69 @@ const QuoteApprovalCard = ({ quote, onApprove, onReject, onCounterOffer }: Quote
 
         {showCounterForm && (
           <div className="mb-4 p-4 bg-orange-900/20 border border-orange-600/20 rounded">
-            <Label htmlFor="counter-discount" className="text-white">Counter Offer Discount (%)</Label>
-            <Input
-              id="counter-discount"
-              type="number"
-              value={counterDiscount}
-              onChange={(e) => setCounterDiscount(e.target.value)}
-              placeholder="e.g., 5"
-              className="bg-gray-700 border-gray-600 text-white mt-2"
-              min="0"
-              max="50"
-            />
-            <div className="flex space-x-2 mt-3">
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="counter-discount" className="text-white">Counter Offer Discount (%)</Label>
+                <Input
+                  id="counter-discount"
+                  type="number"
+                  value={counterDiscount}
+                  onChange={(e) => setCounterDiscount(e.target.value)}
+                  placeholder="e.g., 5"
+                  className="bg-gray-700 border-gray-600 text-white mt-2"
+                  min="0"
+                  max="50"
+                />
+              </div>
+
+              {/* Real-time Counter Offer Impact */}
+              {counterDiscount && !isNaN(counterDiscountNum) && counterDiscountNum > 0 && (
+                <div className="bg-gray-700 p-4 rounded border border-orange-500/30">
+                  <h5 className="text-orange-400 font-medium mb-3 flex items-center">
+                    <Calculator className="mr-2 h-4 w-4" />
+                    Counter Offer Impact ({counterDiscountNum}% Discount)
+                  </h5>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                    <div>
+                      <p className="text-gray-400">New Revenue</p>
+                      <p className="text-white font-semibold">
+                        {quote.quoteCurrency} {counterOfferMetrics.discountedRevenue.toLocaleString()}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-gray-400">New Margin</p>
+                      <p className={`font-semibold ${getMarginColor(counterOfferMetrics.discountedMargin)}`}>
+                        {counterOfferMetrics.discountedMargin.toFixed(1)}%
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-gray-400">Discount Amount</p>
+                      <p className="text-red-400 font-semibold">
+                        -{quote.quoteCurrency} {counterOfferMetrics.discountAmount.toLocaleString()}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-gray-400">New Profit</p>
+                      <p className="text-green-400 font-semibold">
+                        {quote.quoteCurrency} {(counterOfferMetrics.discountedRevenue - totalCost).toLocaleString()}
+                      </p>
+                    </div>
+                  </div>
+                  
+                  {/* Counter Offer Margin Warning */}
+                  {counterOfferMetrics.discountedMargin < 25 && (
+                    <div className="mt-3 p-2 bg-red-900/30 border border-red-600/30 rounded flex items-center space-x-2">
+                      <AlertTriangle className="h-3 w-3 text-red-400 flex-shrink-0" />
+                      <p className="text-red-400 text-xs">
+                        Counter offer will reduce margin below 25% threshold
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+            
+            <div className="flex space-x-2 mt-4">
               <Button
                 className="bg-orange-600 hover:bg-orange-700 text-white"
                 onClick={handleCounter}
