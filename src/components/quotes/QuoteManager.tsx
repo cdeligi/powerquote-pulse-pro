@@ -112,8 +112,12 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
         type: 'relay',
         description: '8-Channel Relay Card',
         price: 450,
+        slotRequirement: 1,
+        compatibleChassis: ['101', '102', '103'],
+        specifications: { channels: 8, voltage: '24VDC', current: '2A' },
         enabled: true,
-        hasQuantitySelection: false
+        hasQuantitySelection: false,
+        partNumber: 'RELAY-8-001'
       },
       quantity: 4,
       enabled: true,

@@ -25,7 +25,7 @@ export interface Card {
   image?: string;
   partNumber?: string;
   hasQuantitySelection?: boolean;
-  enabled: boolean;
+  enabled?: boolean;
 }
 
 export interface Level1Product {

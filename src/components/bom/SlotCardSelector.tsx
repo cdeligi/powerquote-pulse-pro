@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Chassis, Card as ProductCard } from "@/types/product";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -29,7 +28,9 @@ const SlotCardSelector = ({ chassis, slot, onCardSelect, onClose, canSeePrices }
         slotRequirement: 1,
         compatibleChassis: ['LTX', 'MTX', 'STX'],
         specifications: { channels: 8, voltage: '250VAC', current: '5A' },
-        partNumber: 'ROC-8CH-001'
+        partNumber: 'ROC-8CH-001',
+        enabled: true,
+        hasQuantitySelection: false
       },
       {
         id: 'analog-card-1',
@@ -40,7 +41,9 @@ const SlotCardSelector = ({ chassis, slot, onCardSelect, onClose, canSeePrices }
         slotRequirement: 1,
         compatibleChassis: ['LTX', 'MTX', 'STX'],
         specifications: { channels: 8, resolution: '16-bit', inputRange: '0-10V' },
-        partNumber: 'AIC-8CH-001'
+        partNumber: 'AIC-8CH-001',
+        enabled: true,
+        hasQuantitySelection: false
       },
       {
         id: 'fiber-card-1',
@@ -51,7 +54,9 @@ const SlotCardSelector = ({ chassis, slot, onCardSelect, onClose, canSeePrices }
         slotRequirement: 1,
         compatibleChassis: ['LTX', 'MTX', 'STX'],
         specifications: { ports: 2, speed: '1Gbps', connector: 'LC' },
-        partNumber: 'FOC-2P-001'
+        partNumber: 'FOC-2P-001',
+        enabled: true,
+        hasQuantitySelection: false
       },
       {
         id: 'display-card-1',
@@ -62,7 +67,9 @@ const SlotCardSelector = ({ chassis, slot, onCardSelect, onClose, canSeePrices }
         slotRequirement: 1,
         compatibleChassis: ['LTX', 'MTX', 'STX'],
         specifications: { display: 'LCD', resolution: '320x240', backlight: 'LED' },
-        partNumber: 'DIC-LCD-001'
+        partNumber: 'DIC-LCD-001',
+        enabled: true,
+        hasQuantitySelection: false
       },
       {
         id: 'bushing-card-1',
@@ -73,7 +80,9 @@ const SlotCardSelector = ({ chassis, slot, onCardSelect, onClose, canSeePrices }
         slotRequirement: 2,
         compatibleChassis: ['LTX', 'MTX', 'STX'],
         specifications: { channels: 6, measurement: 'Capacitance & Power Factor' },
-        partNumber: 'BMC-6CH-001'
+        partNumber: 'BMC-6CH-001',
+        enabled: true,
+        hasQuantitySelection: false
       }
     ];
 
