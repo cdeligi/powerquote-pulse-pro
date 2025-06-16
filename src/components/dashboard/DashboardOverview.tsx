@@ -3,13 +3,28 @@ import { User } from "@/types/auth";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { FileText, Clock, CheckCircle, AlertCircle } from "lucide-react";
+import QuoteAnalyticsDashboard from "./QuoteAnalyticsDashboard";
+import { calculateQuoteAnalytics } from "@/utils/quoteAnalytics";
 
 interface DashboardOverviewProps {
   user: User;
 }
 
 const DashboardOverview = ({ user }: DashboardOverviewProps) => {
-  // Mock data for demonstration
+  // Mock data for demonstration - in production, this would come from your API
+  const mockQuoteData = [
+    { id: 'Q-2024-001', status: 'pending_approval' as const, total: 45250, createdAt: '2024-01-15' },
+    { id: 'Q-2024-002', status: 'approved' as const, total: 78900, createdAt: '2024-01-14' },
+    { id: 'Q-2024-003', status: 'draft' as const, total: 32100, createdAt: '2024-01-13' },
+    { id: 'Q-2024-004', status: 'finalized' as const, total: 89400, createdAt: '2024-01-10' },
+    { id: 'Q-2024-005', status: 'rejected' as const, total: 25600, createdAt: '2024-01-08' },
+    { id: 'Q-2023-087', status: 'finalized' as const, total: 156700, createdAt: '2023-12-20' },
+    { id: 'Q-2023-088', status: 'approved' as const, total: 67300, createdAt: '2023-12-18' }
+  ];
+
+  const analytics = calculateQuoteAnalytics(mockQuoteData);
+
+  // Mock data for recent quotes
   const stats = {
     totalQuotes: 12,
     pendingApproval: 3,
@@ -62,7 +77,10 @@ const DashboardOverview = ({ user }: DashboardOverviewProps) => {
         </p>
       </div>
 
-      {/* Stats Grid */}
+      {/* Analytics Dashboard */}
+      <QuoteAnalyticsDashboard analytics={analytics} isAdmin={user.role === 'admin'} />
+
+      {/* Quick Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <Card className="bg-gray-900 border-gray-800">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">

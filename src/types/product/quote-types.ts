@@ -34,6 +34,7 @@ export interface Quote {
   rejectionReason?: string;
   oracleCustomerId?: string;
   customerName?: string;
+  sfdcOpportunity: string; // Mandatory SFDC Opportunity ID
   priority: 'High' | 'Medium' | 'Low' | 'Urgent';
   termsAndConditions?: string;
   isRepInvolved?: boolean;

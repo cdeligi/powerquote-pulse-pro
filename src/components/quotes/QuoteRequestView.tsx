@@ -15,6 +15,7 @@ import {
   calculateItemMargin, 
   calculateItemRevenue 
 } from '@/utils/marginCalculations';
+import POSubmissionForm, { POSubmissionData } from './POSubmissionForm';
 
 interface QuoteRequestViewProps {
   quote: Quote;
@@ -55,6 +56,44 @@ const QuoteRequestView = ({
     }
   };
 
+  const handlePOSubmission = async (poData: POSubmissionData) => {
+    console.log('PO Submission Data:', poData);
+    
+    // In a real application, this would send to your backend API
+    // Example API call:
+    // await fetch('/api/submit-po', {
+    //   method: 'POST',
+    //   body: formData, // FormData with file
+    //   headers: { 'Authorization': `Bearer ${token}` }
+    // });
+    
+    // Mock implementation - send email to orders team
+    const emailData = {
+      to: 'orders@company.com', // This would come from admin configuration
+      cc: 'sales@company.com', // User copy
+      subject: `New PO Submission - Quote ${quote.id} - SFDC: ${poData.sfdcOpportunity}`,
+      body: `
+        New Purchase Order submitted for processing:
+        
+        Quote ID: ${quote.id}
+        SFDC Opportunity: ${poData.sfdcOpportunity}
+        PO Number: ${poData.poNumber}
+        PO Value: $${poData.poValue.toLocaleString()}
+        Customer: ${quote.customerName}
+        
+        BOM attached for booking.
+        
+        ${poData.notes ? `Additional Notes: ${poData.notes}` : ''}
+      `,
+      attachments: [poData.poFile, /* BOM file would be generated */]
+    };
+    
+    console.log('Email would be sent:', emailData);
+    
+    // Simulate API success
+    return Promise.resolve();
+  };
+
   return (
     <div className="space-y-6">
       {/* Quote Header */}
@@ -65,12 +104,23 @@ const QuoteRequestView = ({
               <CardTitle className="text-white text-xl">Quote Request #{quote.id}</CardTitle>
               <p className="text-gray-400">Submitted: {new Date(quote.createdAt).toLocaleDateString()}</p>
             </div>
-            <Badge 
-              variant={quote.priority === 'High' ? 'destructive' : 'secondary'}
-              className={quote.priority === 'High' ? 'bg-red-600' : ''}
-            >
-              {quote.priority} Priority
-            </Badge>
+            <div className="flex space-x-2">
+              <Badge 
+                variant={quote.priority === 'High' ? 'destructive' : 'secondary'}
+                className={quote.priority === 'High' ? 'bg-red-600' : ''}
+              >
+                {quote.priority} Priority
+              </Badge>
+              {quote.status === 'approved' && (
+                <POSubmissionForm
+                  quoteId={quote.id}
+                  quoteBOM={bomItems}
+                  quoteTotal={quote.total}
+                  customerName={quote.customerName || 'Unknown Customer'}
+                  onSubmit={handlePOSubmission}
+                />
+              )}
+            </div>
           </div>
         </CardHeader>
       </Card>
@@ -89,6 +139,10 @@ const QuoteRequestView = ({
             <div>
               <Label className="text-gray-400">Oracle Customer ID</Label>
               <p className="text-white font-medium">{quote.oracleCustomerId}</p>
+            </div>
+            <div>
+              <Label className="text-gray-400">SFDC Opportunity</Label>
+              <p className="text-white font-medium">{quote.sfdcOpportunity}</p>
             </div>
             <div>
               <Label className="text-gray-400">Rep Involved</Label>

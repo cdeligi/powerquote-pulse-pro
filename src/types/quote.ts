@@ -10,6 +10,7 @@ export interface Quote {
   status: 'draft' | 'pending_approval' | 'approved' | 'rejected';
   customerName: string;
   oracleCustomerId: string;
+  sfdcOpportunity: string; // Mandatory SFDC Opportunity ID
   priority: 'High' | 'Medium' | 'Low' | 'Urgent';
   isRepInvolved: boolean;
   shippingTerms: string;
