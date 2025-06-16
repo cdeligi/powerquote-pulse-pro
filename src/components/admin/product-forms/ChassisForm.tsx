@@ -6,25 +6,28 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { Chassis } from "@/types/product";
+import { Level2Product, Level1Product } from "@/types/product";
 
 interface ChassisFormProps {
-  onSubmit: (chassis: Omit<Chassis, 'id'>) => void;
-  initialData?: Chassis;
+  onSubmit: (chassis: Omit<Level2Product, 'id'>) => void;
+  level1Products: Level1Product[];
+  initialData?: Level2Product;
 }
 
-const ChassisForm = ({ onSubmit, initialData }: ChassisFormProps) => {
+const ChassisForm = ({ onSubmit, level1Products, initialData }: ChassisFormProps) => {
   const [formData, setFormData] = useState({
     name: initialData?.name || '',
-    type: initialData?.type || 'LTX' as 'LTX' | 'MTX' | 'STX',
-    height: initialData?.height || '',
-    slots: initialData?.slots || 0,
+    parentProductId: initialData?.parentProductId || '',
+    type: initialData?.type || 'LTX' as 'LTX' | 'MTX' | 'STX' | 'CalGas' | 'Moisture' | 'Standard',
+    description: initialData?.description || '',
     price: initialData?.price || 0,
     cost: initialData?.cost || 0,
-    description: initialData?.description || '',
-    productInfoUrl: initialData?.productInfoUrl || '',
-    partNumber: initialData?.partNumber || '',
-    enabled: initialData?.enabled ?? true
+    enabled: initialData?.enabled ?? true,
+    specifications: initialData?.specifications || {
+      height: '',
+      slots: 0
+    },
+    partNumber: initialData?.partNumber || ''
   });
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -46,10 +49,31 @@ const ChassisForm = ({ onSubmit, initialData }: ChassisFormProps) => {
           />
         </div>
         <div>
+          <Label htmlFor="parentProductId" className="text-white">Parent Product</Label>
+          <Select
+            value={formData.parentProductId}
+            onValueChange={(value) => setFormData({ ...formData, parentProductId: value })}
+          >
+            <SelectTrigger className="bg-gray-800 border-gray-700 text-white">
+              <SelectValue placeholder="Select parent product" />
+            </SelectTrigger>
+            <SelectContent className="bg-gray-800 border-gray-700">
+              {level1Products.map((product) => (
+                <SelectItem key={product.id} value={product.id} className="text-white">
+                  {product.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div>
           <Label htmlFor="type" className="text-white">Type</Label>
           <Select
             value={formData.type}
-            onValueChange={(value: 'LTX' | 'MTX' | 'STX') => setFormData({ ...formData, type: value })}
+            onValueChange={(value: 'LTX' | 'MTX' | 'STX' | 'CalGas' | 'Moisture' | 'Standard') => setFormData({ ...formData, type: value })}
           >
             <SelectTrigger className="bg-gray-800 border-gray-700 text-white">
               <SelectValue />
@@ -58,8 +82,27 @@ const ChassisForm = ({ onSubmit, initialData }: ChassisFormProps) => {
               <SelectItem value="LTX" className="text-white">LTX</SelectItem>
               <SelectItem value="MTX" className="text-white">MTX</SelectItem>
               <SelectItem value="STX" className="text-white">STX</SelectItem>
+              <SelectItem value="CalGas" className="text-white">CalGas</SelectItem>
+              <SelectItem value="Moisture" className="text-white">Moisture</SelectItem>
+              <SelectItem value="Standard" className="text-white">Standard</SelectItem>
             </SelectContent>
           </Select>
+        </div>
+        <div>
+          <Label htmlFor="slots" className="text-white">Slots</Label>
+          <Input
+            id="slots"
+            type="number"
+            value={formData.specifications?.slots || 0}
+            onChange={(e) => setFormData({ 
+              ...formData, 
+              specifications: { 
+                ...formData.specifications,
+                slots: parseInt(e.target.value) 
+              }
+            })}
+            className="bg-gray-800 border-gray-700 text-white"
+          />
         </div>
       </div>
 
@@ -68,22 +111,25 @@ const ChassisForm = ({ onSubmit, initialData }: ChassisFormProps) => {
           <Label htmlFor="height" className="text-white">Height</Label>
           <Input
             id="height"
-            value={formData.height}
-            onChange={(e) => setFormData({ ...formData, height: e.target.value })}
+            value={formData.specifications?.height || ''}
+            onChange={(e) => setFormData({ 
+              ...formData, 
+              specifications: { 
+                ...formData.specifications,
+                height: e.target.value 
+              }
+            })}
             className="bg-gray-800 border-gray-700 text-white"
-            placeholder="e.g., 6U • 14 slots"
-            required
+            placeholder="e.g., 6U"
           />
         </div>
         <div>
-          <Label htmlFor="slots" className="text-white">Slots</Label>
+          <Label htmlFor="partNumber" className="text-white">Part Number</Label>
           <Input
-            id="slots"
-            type="number"
-            value={formData.slots}
-            onChange={(e) => setFormData({ ...formData, slots: parseInt(e.target.value) })}
+            id="partNumber"
+            value={formData.partNumber}
+            onChange={(e) => setFormData({ ...formData, partNumber: e.target.value })}
             className="bg-gray-800 border-gray-700 text-white"
-            required
           />
         </div>
       </div>
@@ -118,28 +164,6 @@ const ChassisForm = ({ onSubmit, initialData }: ChassisFormProps) => {
             type="number"
             value={formData.cost}
             onChange={(e) => setFormData({ ...formData, cost: parseFloat(e.target.value) })}
-            className="bg-gray-800 border-gray-700 text-white"
-          />
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <Label htmlFor="partNumber" className="text-white">Part Number</Label>
-          <Input
-            id="partNumber"
-            value={formData.partNumber}
-            onChange={(e) => setFormData({ ...formData, partNumber: e.target.value })}
-            className="bg-gray-800 border-gray-700 text-white"
-          />
-        </div>
-        <div>
-          <Label htmlFor="productInfoUrl" className="text-white">Product Info URL</Label>
-          <Input
-            id="productInfoUrl"
-            type="url"
-            value={formData.productInfoUrl}
-            onChange={(e) => setFormData({ ...formData, productInfoUrl: e.target.value })}
             className="bg-gray-800 border-gray-700 text-white"
           />
         </div>

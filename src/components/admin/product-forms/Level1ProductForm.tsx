@@ -22,9 +22,8 @@ const Level1ProductForm = ({ onSubmit, initialData }: Level1ProductFormProps) =>
     cost: initialData?.cost || 0,
     productInfoUrl: initialData?.productInfoUrl || '',
     enabled: initialData?.enabled ?? true,
-    customizations: initialData?.customizations || [],
-    hasQuantitySelection: initialData?.hasQuantitySelection ?? false,
-    partNumber: initialData?.partNumber || ''
+    partNumber: initialData?.partNumber || '',
+    image: initialData?.image || ''
   });
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -124,25 +123,24 @@ const Level1ProductForm = ({ onSubmit, initialData }: Level1ProductFormProps) =>
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
-        <div className="flex items-center space-x-2">
-          <Switch
-            id="enabled"
-            checked={formData.enabled}
-            onCheckedChange={(enabled) => setFormData({ ...formData, enabled })}
-          />
-          <Label htmlFor="enabled" className="text-white">Enabled</Label>
-        </div>
-        <div className="flex items-center space-x-2">
-          <Switch
-            id="hasQuantitySelection"
-            checked={formData.hasQuantitySelection}
-            onCheckedChange={(hasQuantitySelection) => 
-              setFormData({ ...formData, hasQuantitySelection })
-            }
-          />
-          <Label htmlFor="hasQuantitySelection" className="text-white">Has Quantity Selection</Label>
-        </div>
+      <div>
+        <Label htmlFor="image" className="text-white">Image URL</Label>
+        <Input
+          id="image"
+          type="url"
+          value={formData.image}
+          onChange={(e) => setFormData({ ...formData, image: e.target.value })}
+          className="bg-gray-800 border-gray-700 text-white"
+        />
+      </div>
+
+      <div className="flex items-center space-x-2">
+        <Switch
+          id="enabled"
+          checked={formData.enabled}
+          onCheckedChange={(enabled) => setFormData({ ...formData, enabled })}
+        />
+        <Label htmlFor="enabled" className="text-white">Enabled</Label>
       </div>
 
       <div className="flex justify-end space-x-3 pt-4">

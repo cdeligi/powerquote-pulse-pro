@@ -221,6 +221,10 @@ const ProductManagement = ({ user }: ProductManagementProps) => {
     return null;
   };
 
+  const getGrandParentProduct = (level2Product: Level2Product) => {
+    return level1Products.find(p => p.id === level2Product.parentProductId);
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -473,7 +477,7 @@ const ProductManagement = ({ user }: ProductManagementProps) => {
           <div className="grid gap-4">
             {level3Products.map((product) => {
               const parentProduct = getParentProduct(product.parentProductId, 3);
-              const grandParentProduct = parentProduct ? getParentProduct(parentProduct.parentProductId, 2) : null;
+              const grandParentProduct = parentProduct ? getGrandParentProduct(parentProduct) : null;
               
               return (
                 <Card key={product.id} className="bg-gray-900 border-gray-800">

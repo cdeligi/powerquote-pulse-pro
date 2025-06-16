@@ -1,6 +1,6 @@
 
 import { useState } from "react";
-import { Chassis, Card as ProductCard } from "@/types/product";
+import { Level2Product, Level3Product } from "@/types/product";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -8,100 +8,118 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Plus } from "lucide-react";
 
 interface CardLibraryProps {
-  chassis: Chassis;
-  onCardSelect: (card: ProductCard, slot?: number) => void;
+  chassis: Level2Product;
+  onCardSelect: (card: Level3Product, slot?: number) => void;
   canSeePrices: boolean;
 }
 
 const CardLibrary = ({ chassis, onCardSelect, canSeePrices }: CardLibraryProps) => {
   const [selectedSlot, setSelectedSlot] = useState<number>(2); // Default to slot 2 (CPU is always slot 1)
 
-  const cardLibrary: ProductCard[] = [
+  const cardLibrary: Level3Product[] = [
     {
       id: 'relay-8in-2out',
       name: 'Relay Protection Card',
+      parentProductId: chassis.id,
       type: 'relay',
       description: '8 digital inputs + 2 analog outputs for comprehensive protection',
       price: 2500,
-      slotRequirement: 1,
-      compatibleChassis: ['ltx-6u', 'mtx-3u', 'stx-1.5u'],
+      cost: 1250,
+      enabled: true,
       specifications: {
+        slotRequirement: 1,
         inputs: 8,
         outputs: 2,
         protocols: ['DNP3', 'IEC 61850']
-      }
+      },
+      partNumber: 'RPC-8I2O-001'
     },
     {
       id: 'analog-8ch',
       name: 'Analog Input Card',
+      parentProductId: chassis.id,
       type: 'analog',
       description: '8-channel analog input with configurable input types',
       price: 1800,
-      slotRequirement: 1,
-      compatibleChassis: ['ltx-6u', 'mtx-3u', 'stx-1.5u'],
+      cost: 900,
+      enabled: true,
       specifications: {
+        slotRequirement: 1,
         channels: 8,
         inputTypes: ['4-20mA', 'CT', 'RTD', 'Thermocouple']
-      }
+      },
+      partNumber: 'AIC-8CH-001'
     },
     {
       id: 'fiber-4port',
       name: 'Fiber Optic Card (4-port)',
+      parentProductId: chassis.id,
       type: 'fiber',
       description: '4-port fiber optic communication card',
       price: 3200,
-      slotRequirement: 1,
-      compatibleChassis: ['ltx-6u', 'mtx-3u', 'stx-1.5u'],
+      cost: 1600,
+      enabled: true,
       specifications: {
+        slotRequirement: 1,
         ports: 4,
         protocols: ['IEC 61850', 'GOOSE']
-      }
+      },
+      partNumber: 'FOC-4P-001'
     },
     {
       id: 'fiber-6port',
       name: 'Fiber Optic Card (6-port)',
+      parentProductId: chassis.id,
       type: 'fiber',
       description: '6-port fiber optic communication card',
       price: 4200,
-      slotRequirement: 1,
-      compatibleChassis: ['ltx-6u', 'mtx-3u'],
+      cost: 2100,
+      enabled: true,
       specifications: {
+        slotRequirement: 1,
         ports: 6,
         protocols: ['IEC 61850', 'GOOSE']
-      }
+      },
+      partNumber: 'FOC-6P-001'
     },
     {
       id: 'display-oncard',
       name: 'On-Card Display Module',
+      parentProductId: chassis.id,
       type: 'display',
       description: 'Integrated display module for local monitoring',
       price: 1200,
-      slotRequirement: 1,
-      compatibleChassis: ['ltx-6u', 'mtx-3u', 'stx-1.5u'],
+      cost: 600,
+      enabled: true,
       specifications: {
+        slotRequirement: 1,
         type: 'LCD',
         size: '3.5"',
         resolution: '320x240'
-      }
+      },
+      partNumber: 'DCM-LCD-001'
     },
     {
       id: 'bushing-monitor',
       name: 'Bushing Monitoring Module',
+      parentProductId: chassis.id,
       type: 'bushing',
       description: 'Dual-slot bushing monitoring for transformer health',
       price: 5800,
-      slotRequirement: 2,
-      compatibleChassis: ['ltx-6u'], // Only compatible with LTX
+      cost: 2900,
+      enabled: true,
       specifications: {
+        slotRequirement: 2,
         channels: 6,
         measurements: ['Capacitance', 'Tan Delta', 'Temperature']
-      }
+      },
+      partNumber: 'BMM-6CH-001'
     }
   ];
 
   const getCompatibleCards = () => {
     return cardLibrary.filter(card => 
-      card.compatibleChassis.includes(chassis.id)
+      card.parentProductId === chassis.id && card.enabled
     );
   };
 
@@ -118,7 +136,7 @@ const CardLibrary = ({ chassis, onCardSelect, canSeePrices }: CardLibraryProps) 
 
   const cardGroups = groupCardsByType();
 
-  const renderCardGrid = (cards: ProductCard[]) => (
+  const renderCardGrid = (cards: Level3Product[]) => (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
       {cards.map((card) => (
         <Card key={card.id} className="bg-gray-900 border-gray-800">
@@ -127,7 +145,7 @@ const CardLibrary = ({ chassis, onCardSelect, canSeePrices }: CardLibraryProps) 
               <div>
                 <CardTitle className="text-white text-lg">{card.name}</CardTitle>
                 <CardDescription className="text-gray-400">
-                  {card.slotRequirement} slot{card.slotRequirement > 1 ? 's' : ''} required
+                  {card.specifications?.slotRequirement || 1} slot{(card.specifications?.slotRequirement || 1) > 1 ? 's' : ''} required
                 </CardDescription>
               </div>
               <Badge variant="outline" className="text-xs capitalize">
@@ -139,7 +157,7 @@ const CardLibrary = ({ chassis, onCardSelect, canSeePrices }: CardLibraryProps) 
             <p className="text-gray-400 text-sm mb-4">{card.description}</p>
             
             <div className="space-y-2 mb-4">
-              {Object.entries(card.specifications).map(([key, value]) => (
+              {card.specifications && Object.entries(card.specifications).map(([key, value]) => (
                 <div key={key} className="flex justify-between text-sm">
                   <span className="text-gray-400 capitalize">{key}:</span>
                   <span className="text-white">

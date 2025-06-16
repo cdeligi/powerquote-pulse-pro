@@ -6,22 +6,26 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { Level2Option, Level1Product } from "@/types/product";
+import { Level2Product, Level1Product } from "@/types/product";
 
 interface Level2OptionFormProps {
-  onSubmit: (option: Omit<Level2Option, 'id'>) => void;
+  onSubmit: (option: Omit<Level2Product, 'id'>) => void;
   level1Products: Level1Product[];
-  initialData?: Level2Option;
+  initialData?: Level2Product;
 }
 
 const Level2OptionForm = ({ onSubmit, level1Products, initialData }: Level2OptionFormProps) => {
   const [formData, setFormData] = useState({
     name: initialData?.name || '',
     parentProductId: initialData?.parentProductId || '',
+    type: initialData?.type || 'LTX' as 'LTX' | 'MTX' | 'STX' | 'CalGas' | 'Moisture' | 'Standard',
     description: initialData?.description || '',
     price: initialData?.price || 0,
     cost: initialData?.cost || 0,
-    enabled: initialData?.enabled ?? true
+    enabled: initialData?.enabled ?? true,
+    specifications: initialData?.specifications || {},
+    partNumber: initialData?.partNumber || '',
+    image: initialData?.image || ''
   });
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -63,6 +67,28 @@ const Level2OptionForm = ({ onSubmit, level1Products, initialData }: Level2Optio
       </div>
 
       <div>
+        <Label htmlFor="type" className="text-white">Type</Label>
+        <Select
+          value={formData.type}
+          onValueChange={(value: 'LTX' | 'MTX' | 'STX' | 'CalGas' | 'Moisture' | 'Standard') => 
+            setFormData({ ...formData, type: value })
+          }
+        >
+          <SelectTrigger className="bg-gray-800 border-gray-700 text-white">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent className="bg-gray-800 border-gray-700">
+            <SelectItem value="LTX" className="text-white">LTX</SelectItem>
+            <SelectItem value="MTX" className="text-white">MTX</SelectItem>
+            <SelectItem value="STX" className="text-white">STX</SelectItem>
+            <SelectItem value="CalGas" className="text-white">CalGas</SelectItem>
+            <SelectItem value="Moisture" className="text-white">Moisture</SelectItem>
+            <SelectItem value="Standard" className="text-white">Standard</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div>
         <Label htmlFor="description" className="text-white">Description</Label>
         <Textarea
           id="description"
@@ -92,6 +118,28 @@ const Level2OptionForm = ({ onSubmit, level1Products, initialData }: Level2Optio
             type="number"
             value={formData.cost}
             onChange={(e) => setFormData({ ...formData, cost: parseFloat(e.target.value) })}
+            className="bg-gray-800 border-gray-700 text-white"
+          />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <Label htmlFor="partNumber" className="text-white">Part Number</Label>
+          <Input
+            id="partNumber"
+            value={formData.partNumber}
+            onChange={(e) => setFormData({ ...formData, partNumber: e.target.value })}
+            className="bg-gray-800 border-gray-700 text-white"
+          />
+        </div>
+        <div>
+          <Label htmlFor="image" className="text-white">Image URL</Label>
+          <Input
+            id="image"
+            type="url"
+            value={formData.image}
+            onChange={(e) => setFormData({ ...formData, image: e.target.value })}
             className="bg-gray-800 border-gray-700 text-white"
           />
         </div>
