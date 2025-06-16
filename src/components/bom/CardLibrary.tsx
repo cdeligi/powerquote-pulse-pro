@@ -29,9 +29,7 @@ const CardLibrary = ({ chassis, onCardSelect, canSeePrices }: CardLibraryProps) 
         inputs: 8,
         outputs: 2,
         protocols: ['DNP3', 'IEC 61850']
-      },
-      enabled: true,
-      hasQuantitySelection: false
+      }
     },
     {
       id: 'analog-8ch',
@@ -44,9 +42,7 @@ const CardLibrary = ({ chassis, onCardSelect, canSeePrices }: CardLibraryProps) 
       specifications: {
         channels: 8,
         inputTypes: ['4-20mA', 'CT', 'RTD', 'Thermocouple']
-      },
-      enabled: true,
-      hasQuantitySelection: false
+      }
     },
     {
       id: 'fiber-4port',
@@ -59,9 +55,7 @@ const CardLibrary = ({ chassis, onCardSelect, canSeePrices }: CardLibraryProps) 
       specifications: {
         ports: 4,
         protocols: ['IEC 61850', 'GOOSE']
-      },
-      enabled: true,
-      hasQuantitySelection: false
+      }
     },
     {
       id: 'fiber-6port',
@@ -74,9 +68,7 @@ const CardLibrary = ({ chassis, onCardSelect, canSeePrices }: CardLibraryProps) 
       specifications: {
         ports: 6,
         protocols: ['IEC 61850', 'GOOSE']
-      },
-      enabled: true,
-      hasQuantitySelection: false
+      }
     },
     {
       id: 'display-oncard',
@@ -90,9 +82,7 @@ const CardLibrary = ({ chassis, onCardSelect, canSeePrices }: CardLibraryProps) 
         type: 'LCD',
         size: '3.5"',
         resolution: '320x240'
-      },
-      enabled: true,
-      hasQuantitySelection: false
+      }
     },
     {
       id: 'bushing-monitor',
@@ -105,9 +95,7 @@ const CardLibrary = ({ chassis, onCardSelect, canSeePrices }: CardLibraryProps) 
       specifications: {
         channels: 6,
         measurements: ['Capacitance', 'Tan Delta', 'Temperature']
-      },
-      enabled: true,
-      hasQuantitySelection: false
+      }
     }
   ];
 
