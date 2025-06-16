@@ -14,6 +14,7 @@ import Level2OptionsSelector from "./Level2OptionsSelector";
 import RackVisualizer from "./RackVisualizer";
 import SlotCardSelector from "./SlotCardSelector";
 import AnalogCardConfigurator from "./AnalogCardConfigurator";
+import BushingCardConfigurator from "./BushingCardConfigurator";
 import ToggleSwitch from "@/components/ui/toggle-switch";
 import { BOMItem, Chassis, Card as ProductCard, Level1Product, Level2Option, Level3Customization, isLevel1Product, isChassis, isCard, generateQTMSPartNumber, generateProductPartNumber, ShippingTerms, PaymentTerms } from "@/types/product";
 import { Quote } from "@/types/quote";
@@ -31,7 +32,9 @@ const BOMBuilder = ({ user }: BOMBuilderProps) => {
   const [selectedSlot, setSelectedSlot] = useState<number | null>(null);
   const [showSlotSelector, setShowSlotSelector] = useState(false);
   const [showAnalogConfigurator, setShowAnalogConfigurator] = useState(false);
+  const [showBushingConfigurator, setShowBushingConfigurator] = useState(false);
   const [configuringAnalogCard, setConfiguringAnalogCard] = useState<BOMItem | null>(null);
+  const [configuringBushingCard, setConfiguringBushingCard] = useState<BOMItem | null>(null);
   const [hasRemoteDisplay, setHasRemoteDisplay] = useState(false);
   const [activeTab, setActiveTab] = useState("qtms");
   
@@ -188,6 +191,10 @@ const BOMBuilder = ({ user }: BOMBuilderProps) => {
       
       // Close the slot selector
       setShowSlotSelector(false);
+      
+      // Open bushing configurator
+      setConfiguringBushingCard(newBomItem);
+      setShowBushingConfigurator(true);
       
       // Find next available slot
       const nextSlot = findNextAvailableSlot(slot2);
@@ -414,9 +421,21 @@ const BOMBuilder = ({ user }: BOMBuilderProps) => {
           analogConfigurations[item.product.id] = { sensorTypes };
         }
       });
+
+    // Get bushing configurations for part number generation
+    const bushingConfigurations: Record<string, any> = {};
+    bomItems
+      .filter(item => isCard(item.product) && item.product.type === 'bushing')
+      .forEach(item => {
+        if (item.level3Customizations && item.level3Customizations.length > 0) {
+          bushingConfigurations[item.product.id] = { 
+            numberOfBushings: item.level3Customizations.length 
+          };
+        }
+      });
     
     if (chassis) {
-      return generateQTMSPartNumber(chassis, cards, hasRemoteDisplay, slotAssignments, analogConfigurations);
+      return generateQTMSPartNumber(chassis, cards, hasRemoteDisplay, slotAssignments, analogConfigurations, bushingConfigurations);
     }
     return '';
   };
@@ -772,6 +791,22 @@ const BOMBuilder = ({ user }: BOMBuilderProps) => {
               }}
             />
           )}
+
+          {/* Bushing Card Configurator Modal */}
+          {showBushingConfigurator && configuringBushingCard && (
+            <BushingCardConfigurator
+              bomItem={configuringBushingCard}
+              onSave={(customizations) => {
+                updateLevel3Customizations(configuringBushingCard.id, customizations);
+                setShowBushingConfigurator(false);
+                setConfiguringBushingCard(null);
+              }}
+              onClose={() => {
+                setShowBushingConfigurator(false);
+                setConfiguringBushingCard(null);
+              }}
+            />
+          )}
         </div>
 
         {/* BOM Sidebar */}
@@ -986,7 +1021,7 @@ const BOMBuilder = ({ user }: BOMBuilderProps) => {
                             <Button
                               size="sm"
                               variant="outline"
-                              className="text-white border-gray-500 hover:bg-gray-600"
+                              className="text-black border-gray-500 hover:bg-gray-600 hover:text-white bg-white"
                               onClick={() => {
                                 setConfiguringAnalogCard(item);
                                 setShowAnalogConfigurator(true);
@@ -994,6 +1029,23 @@ const BOMBuilder = ({ user }: BOMBuilderProps) => {
                             >
                               <Settings className="h-3 w-3 mr-1" />
                               Configure Channels
+                            </Button>
+                          </div>
+                        )}
+
+                        {item.product.type === 'bushing' && (
+                          <div className="mt-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="text-black border-gray-500 hover:bg-gray-600 hover:text-white bg-white"
+                              onClick={() => {
+                                setConfiguringBushingCard(item);
+                                setShowBushingConfigurator(true);
+                              }}
+                            >
+                              <Settings className="h-3 w-3 mr-1" />
+                              Configure Bushings
                             </Button>
                           </div>
                         )}

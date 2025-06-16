@@ -166,7 +166,8 @@ export const generateQTMSPartNumber = (
   cards: Card[], 
   hasRemoteDisplay: boolean,
   slotAssignments: Record<number, Card>,
-  analogConfigurations?: Record<string, any>
+  analogConfigurations?: Record<string, any>,
+  bushingConfigurations?: Record<string, any>
 ): string => {
   let partNumber = '';
   
@@ -212,7 +213,13 @@ export const generateQTMSPartNumber = (
           slotCode = 'D';
           break;
         case 'bushing': 
-          slotCode = 'B';
+          // Check for bushing configuration
+          const bushingConfig = bushingConfigurations?.[card.id];
+          if (bushingConfig && bushingConfig.numberOfBushings) {
+            slotCode = `B${bushingConfig.numberOfBushings}`;
+          } else {
+            slotCode = 'B';
+          }
           // Check if this is the second slot of a bushing card
           if (i > 1 && slotAssignments[i-1]?.type === 'bushing' && slotAssignments[i-1]?.id === card.id) {
             continue; // Skip second slot of bushing card
