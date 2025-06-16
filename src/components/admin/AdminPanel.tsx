@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -14,12 +13,14 @@ import {
   CheckCircle,
   XCircle,
   Clock,
-  AlertTriangle
+  AlertTriangle,
+  Package
 } from "lucide-react";
 import QuoteApprovalCard from "./QuoteApprovalCard";
 import UserManagement from "./UserManagement";
 import MarginDashboard from "./MarginDashboard";
 import AdminSettings from "./AdminSettings";
+import ProductManagement from "./ProductManagement";
 import QuoteAnalyticsDashboard from "../dashboard/QuoteAnalyticsDashboard";
 import { BOMItem } from "@/types/product";
 import { calculateQuoteAnalytics, QuoteData } from "@/utils/quoteAnalytics";
@@ -42,7 +43,7 @@ interface QuoteApprovalData {
   quoteCurrency: 'USD' | 'EURO' | 'GBP' | 'CAD';
   bomItems: BOMItem[];
   sfdcOpportunity: string;
-  status?: QuoteStatus;
+  status: QuoteStatus;
   counterOfferValue?: number;
   counterOfferTerms?: {
     shippingTerms?: string;
@@ -214,7 +215,7 @@ const AdminPanel = ({ user }: AdminPanelProps) => {
       {/* Main Content */}
       <div className="p-6">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-5 bg-gray-800 mb-6">
+          <TabsList className="grid w-full grid-cols-6 bg-gray-800 mb-6">
             <TabsTrigger 
               value="overview" 
               className="text-white data-[state=active]:bg-red-600 data-[state=active]:text-white"
@@ -232,6 +233,13 @@ const AdminPanel = ({ user }: AdminPanelProps) => {
               className="text-white data-[state=active]:bg-red-600 data-[state=active]:text-white"
             >
               Analytics
+            </TabsTrigger>
+            <TabsTrigger 
+              value="products" 
+              className="text-white data-[state=active]:bg-red-600 data-[state=active]:text-white"
+            >
+              <Package className="h-4 w-4 mr-2" />
+              Product Management
             </TabsTrigger>
             <TabsTrigger 
               value="users" 
@@ -372,6 +380,11 @@ const AdminPanel = ({ user }: AdminPanelProps) => {
           <TabsContent value="analytics" className="space-y-6">
             <QuoteAnalyticsDashboard analytics={analytics} isAdmin={true} />
             <MarginDashboard bomItems={mockBOMItems} user={user} />
+          </TabsContent>
+
+          {/* NEW: Product Management Tab */}
+          <TabsContent value="products" className="space-y-6">
+            <ProductManagement user={user} />
           </TabsContent>
 
           {/* User Management Tab */}
