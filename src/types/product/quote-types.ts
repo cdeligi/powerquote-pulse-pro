@@ -22,6 +22,13 @@ export type PaymentTerms =
 
 export type QuotePriority = 'High' | 'Medium' | 'Low' | 'Urgent';
 
+export type Currency = 
+  | 'USD' 
+  | 'EURO' 
+  | 'GBP' 
+  | 'CAD'
+  | (string & {});
+
 export interface Quote {
   id: string;
   userId: string;
@@ -41,5 +48,5 @@ export interface Quote {
   isRepInvolved?: boolean;
   shippingTerms?: ShippingTerms;
   paymentTerms?: PaymentTerms;
-  quoteCurrency?: 'USD' | 'EURO' | 'GBP' | 'CAD';
+  quoteCurrency?: Currency;
 }

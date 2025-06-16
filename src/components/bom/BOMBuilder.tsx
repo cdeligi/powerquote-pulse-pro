@@ -1,6 +1,6 @@
 
 import { useState, useEffect } from 'react';
-import { Chassis, Card, Level1Product, BOMItem, QuotePriority } from "@/types/product";
+import { Chassis, Card, Level1Product, BOMItem, QuotePriority, Currency } from "@/types/product";
 import { User } from "@/types/auth";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
@@ -175,7 +175,7 @@ const BOMBuilder = ({ user }: BOMBuilderProps) => {
       isRepInvolved: false, // Default value
       shippingTerms: 'FCA', // Default shipping terms
       paymentTerms: 'Net 30', // Default payment terms
-      quoteCurrency: 'USD', // Default currency
+      quoteCurrency: 'USD' as Currency, // Properly typed currency
     };
 
     // Generate the PDF
