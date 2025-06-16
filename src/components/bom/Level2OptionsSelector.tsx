@@ -1,6 +1,6 @@
 
 import { useState } from "react";
-import { Level1Product, Level2Option } from "@/types/product";
+import { Level1Product, Level3Product } from "@/types/product";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -10,8 +10,8 @@ import { Plus, Settings } from "lucide-react";
 
 interface Level2OptionsSelectorProps {
   level1Product: Level1Product;
-  onOptionsSelect: (options: Level2Option[]) => void;
-  selectedOptions: Level2Option[];
+  onOptionsSelect: (options: Level3Product[]) => void;
+  selectedOptions: Level3Product[];
   canSeePrices: boolean;
   isOpen: boolean;
   onClose: () => void;
@@ -25,10 +25,10 @@ const Level2OptionsSelector = ({
   isOpen,
   onClose 
 }: Level2OptionsSelectorProps) => {
-  const [localOptions, setLocalOptions] = useState<Level2Option[]>(selectedOptions);
+  const [localOptions, setLocalOptions] = useState<Level3Product[]>(selectedOptions);
 
-  const getAvailableOptions = (): Level2Option[] => {
-    const baseOptions: Level2Option[] = [];
+  const getAvailableOptions = (): Level3Product[] => {
+    const baseOptions: Level3Product[] = [];
     
     switch (level1Product.type) {
       case 'TM8':
@@ -38,6 +38,7 @@ const Level2OptionsSelector = ({
             id: `calgas-${level1Product.id}`,
             name: 'CalGas Calibration System',
             parentProductId: level1Product.id,
+            type: 'accessory',
             description: 'Automated calibration gas system',
             price: 3500,
             enabled: true
@@ -46,6 +47,7 @@ const Level2OptionsSelector = ({
             id: `helium-${level1Product.id}`,
             name: 'Helium Bottle',
             parentProductId: level1Product.id,
+            type: 'accessory',
             description: 'Helium reference bottle for calibration',
             price: 850,
             enabled: true
@@ -54,6 +56,7 @@ const Level2OptionsSelector = ({
             id: `moisture-${level1Product.id}`,
             name: 'Moisture Sensor',
             parentProductId: level1Product.id,
+            type: 'sensor',
             description: 'Oil moisture content monitoring',
             price: 2200,
             enabled: true
@@ -67,6 +70,7 @@ const Level2OptionsSelector = ({
             id: `bridge-${level1Product.id}`,
             name: '4-20 mA Bridge',
             parentProductId: level1Product.id,
+            type: 'accessory',
             description: 'Current loop interface bridge',
             price: 1200,
             enabled: true
@@ -75,6 +79,7 @@ const Level2OptionsSelector = ({
             id: `moisture-tm1-${level1Product.id}`,
             name: 'Moisture Sensor',
             parentProductId: level1Product.id,
+            type: 'sensor',
             description: 'Oil moisture content monitoring',
             price: 2200,
             enabled: true
@@ -88,6 +93,7 @@ const Level2OptionsSelector = ({
             id: `qpdm-3ch-${level1Product.id}`,
             name: '3-Channel Configuration',
             parentProductId: level1Product.id,
+            type: 'accessory',
             description: '3-channel partial discharge monitoring',
             price: 0,
             enabled: true
@@ -96,6 +102,7 @@ const Level2OptionsSelector = ({
             id: `qpdm-6ch-${level1Product.id}`,
             name: '6-Channel Configuration',
             parentProductId: level1Product.id,
+            type: 'accessory',
             description: '6-channel partial discharge monitoring',
             price: 4500,
             enabled: true
@@ -109,6 +116,7 @@ const Level2OptionsSelector = ({
             id: `relay-card-${level1Product.id}`,
             name: 'Relay Card',
             parentProductId: level1Product.id,
+            type: 'relay',
             description: '8-channel relay output card',
             price: 1800,
             enabled: true
@@ -117,6 +125,7 @@ const Level2OptionsSelector = ({
             id: `analog-card-${level1Product.id}`,
             name: 'Analog Card',
             parentProductId: level1Product.id,
+            type: 'analog',
             description: '8-channel analog input card',
             price: 2200,
             enabled: true
@@ -125,6 +134,7 @@ const Level2OptionsSelector = ({
             id: `fiber-card-${level1Product.id}`,
             name: 'Fiber Card',
             parentProductId: level1Product.id,
+            type: 'fiber',
             description: 'Fiber optic communication card',
             price: 3200,
             enabled: true
@@ -133,6 +143,7 @@ const Level2OptionsSelector = ({
             id: `display-card-${level1Product.id}`,
             name: 'Display Card',
             parentProductId: level1Product.id,
+            type: 'display',
             description: 'LCD display interface card',
             price: 1500,
             enabled: true
@@ -141,6 +152,7 @@ const Level2OptionsSelector = ({
             id: `bushing-card-${level1Product.id}`,
             name: 'Bushing Card',
             parentProductId: level1Product.id,
+            type: 'bushing',
             description: 'Bushing monitoring interface card',
             price: 2800,
             enabled: true
@@ -154,7 +166,7 @@ const Level2OptionsSelector = ({
 
   const availableOptions = getAvailableOptions();
 
-  const toggleOption = (option: Level2Option) => {
+  const toggleOption = (option: Level3Product) => {
     const exists = localOptions.find(opt => opt.id === option.id);
     if (exists) {
       setLocalOptions(localOptions.filter(opt => opt.id !== option.id));

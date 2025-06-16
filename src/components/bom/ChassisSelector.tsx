@@ -1,47 +1,62 @@
 
 import { useState } from "react";
-import { Chassis } from "@/types/product";
+import { Level2Product } from "@/types/product";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ExternalLink } from "lucide-react";
 
 interface ChassisSelectorProps {
-  onChassisSelect: (chassis: Chassis) => void;
-  selectedChassis: Chassis | null;
+  onChassisSelect: (chassis: Level2Product) => void;
+  selectedChassis: Level2Product | null;
   canSeePrices: boolean;
 }
 
 const ChassisSelector = ({ onChassisSelect, selectedChassis, canSeePrices }: ChassisSelectorProps) => {
-  const chassisOptions: Chassis[] = [
+  const chassisOptions: Level2Product[] = [
     {
       id: 'ltx-chassis',
       name: 'LTX Chassis',
+      parentProductId: 'qtms-main',
       type: 'LTX',
-      height: '6U • 14 slots',
-      slots: 14,
-      price: 4200,
       description: 'Large capacity transformer monitoring system',
+      price: 4200,
+      enabled: true,
+      specifications: {
+        height: '6U',
+        slots: 14
+      },
+      partNumber: 'LTX-6U-14S',
       productInfoUrl: 'https://www.qualitrolcorp.com/products/ltx-chassis'
     },
     {
       id: 'mtx-chassis',
       name: 'MTX Chassis',
+      parentProductId: 'qtms-main',
       type: 'MTX',
-      height: '3U • 7 slots',
-      slots: 7,
-      price: 2800,
       description: 'Medium capacity transformer monitoring system',
+      price: 2800,
+      enabled: true,
+      specifications: {
+        height: '3U',
+        slots: 7
+      },
+      partNumber: 'MTX-3U-7S',
       productInfoUrl: 'https://www.qualitrolcorp.com/products/mtx-chassis'
     },
     {
       id: 'stx-chassis',
       name: 'STX Chassis',
+      parentProductId: 'qtms-main',
       type: 'STX',
-      height: '1.5U • 4 slots',
-      slots: 4,
-      price: 1900,
       description: 'Compact transformer monitoring system',
+      price: 1900,
+      enabled: true,
+      specifications: {
+        height: '1.5U',
+        slots: 4
+      },
+      partNumber: 'STX-1.5U-4S',
       productInfoUrl: 'https://www.qualitrolcorp.com/products/stx-chassis'
     }
   ];
@@ -63,7 +78,7 @@ const ChassisSelector = ({ onChassisSelect, selectedChassis, canSeePrices }: Cha
                 {chassis.description}
               </CardDescription>
               <Badge variant="outline" className="w-fit text-white border-gray-500">
-                {chassis.height}
+                {chassis.specifications?.height} • {chassis.specifications?.slots} slots
               </Badge>
             </CardHeader>
             <CardContent className="flex-1 flex flex-col">

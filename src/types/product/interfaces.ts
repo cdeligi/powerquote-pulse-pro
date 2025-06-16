@@ -11,6 +11,8 @@ export interface Level1Product {
   enabled: boolean;
   image?: string;
   partNumber?: string;
+  customizations?: string[]; // For DGA products
+  hasQuantitySelection?: boolean; // For PD couplers
 }
 
 // Level 2: Product Variants/Chassis (LTX, MTX, STX for QTMS)
@@ -31,6 +33,7 @@ export interface Level2Product {
   };
   partNumber?: string;
   image?: string;
+  productInfoUrl?: string; // Add this for chassis
 }
 
 // Level 3: Components/Cards/Options (Cards for chassis, accessories for others)
@@ -56,10 +59,11 @@ export interface Level3Product {
   image?: string;
 }
 
-// Legacy interfaces for backward compatibility
+// Legacy interfaces for backward compatibility - extend from new hierarchy
 export interface Chassis extends Level2Product {
   height: string;
   slots: number;
+  productInfoUrl?: string;
 }
 
 export interface Card extends Level3Product {
@@ -68,7 +72,7 @@ export interface Card extends Level3Product {
 }
 
 export interface Level2Option extends Level3Product {
-  // Kept for compatibility
+  // Level2Option is now Level3Product for backward compatibility
 }
 
 export interface Level3Customization {

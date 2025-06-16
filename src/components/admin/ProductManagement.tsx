@@ -377,7 +377,7 @@ const ProductManagement = ({ user }: ProductManagementProps) => {
 
           <div className="grid gap-4">
             {level2Products.map((product) => {
-              const parentProduct = getParentProduct(product.parentProductId, 2);
+              const parentProduct = getParentProduct(product.parentProductId, 2) as Level1Product;
               const level3Count = getLevel3ProductsForLevel2(product.id).length;
               
               return (
@@ -476,7 +476,7 @@ const ProductManagement = ({ user }: ProductManagementProps) => {
 
           <div className="grid gap-4">
             {level3Products.map((product) => {
-              const parentProduct = getParentProduct(product.parentProductId, 3);
+              const parentProduct = getParentProduct(product.parentProductId, 3) as Level2Product;
               const grandParentProduct = parentProduct ? getGrandParentProduct(parentProduct) : null;
               
               return (
