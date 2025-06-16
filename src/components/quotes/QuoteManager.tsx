@@ -1,11 +1,12 @@
-
 import { User } from "@/types/auth";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Search, FileText, Eye, Download, ExternalLink } from "lucide-react";
+import { Search, FileText, Eye, Download, ExternalLink, Settings } from "lucide-react";
 import { useState } from "react";
+import QuoteRequestModal from "./QuoteRequestModal";
+import { Quote, BOMItem } from "@/types/product";
 
 interface QuoteManagerProps {
   user: User;
@@ -14,6 +15,8 @@ interface QuoteManagerProps {
 const QuoteManager = ({ user }: QuoteManagerProps) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [priorityFilter, setPriorityFilter] = useState<'All' | 'High' | 'Medium' | 'Low'>('All');
+  const [selectedQuote, setSelectedQuote] = useState<Quote | null>(null);
+  const [isQuoteModalOpen, setIsQuoteModalOpen] = useState(false);
 
   // Mock quotes data with new fields
   const quotes = [
@@ -84,6 +87,41 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
     }
   ];
 
+  // Mock BOM items for the selected quote
+  const mockBOMItems: BOMItem[] = [
+    {
+      id: 'bom-1',
+      product: {
+        id: '1',
+        name: 'QTMS Base Unit',
+        type: 'QTMS',
+        description: 'Qualitrol Transformer Monitoring System',
+        price: 12000,
+        enabled: true,
+        hasQuantitySelection: true
+      },
+      quantity: 2,
+      enabled: true,
+      partNumber: 'QTMS-001'
+    },
+    {
+      id: 'bom-2',
+      product: {
+        id: '201',
+        name: 'Relay Card',
+        type: 'relay',
+        description: '8-Channel Relay Card',
+        price: 450,
+        enabled: true,
+        hasQuantitySelection: false
+      },
+      quantity: 4,
+      enabled: true,
+      partNumber: 'RELAY-8-001',
+      slot: 1
+    }
+  ];
+
   const getStatusBadge = (status: string) => {
     const statusConfig = {
       draft: { color: 'bg-gray-600', text: 'Draft' },
@@ -115,15 +153,49 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
   const canSeePrices = user.role !== 'level1';
 
   const handleViewQuote = (quote: any) => {
-    if (quote.pdfUrl) {
-      // In a real implementation, this would open the actual PDF
-      console.log(`Opening quote PDF: ${quote.pdfUrl}`);
-      // For demo purposes, we'll show an alert
-      alert(`Opening quote ${quote.id} PDF in new window. In production, this would open: ${quote.pdfUrl}`);
-      // window.open(quote.pdfUrl, '_blank');
-    } else {
-      alert('PDF not yet generated for this quote.');
-    }
+    // Convert mock quote to proper Quote type
+    const properQuote: Quote = {
+      id: quote.id,
+      userId: 'user-123',
+      items: mockBOMItems,
+      subtotal: quote.value,
+      discount: quote.discountRequested,
+      total: quote.value * (1 - quote.discountRequested / 100),
+      status: quote.status as Quote['status'],
+      createdAt: quote.createdAt,
+      updatedAt: quote.updatedAt,
+      customerName: quote.customer,
+      oracleCustomerId: quote.oracleCustomerId,
+      priority: quote.priority as Quote['priority'],
+      isRepInvolved: false,
+      shippingTerms: 'FCA',
+      paymentTerms: '30',
+      quoteCurrency: 'USD'
+    };
+    
+    setSelectedQuote(properQuote);
+    setIsQuoteModalOpen(true);
+  };
+
+  const handleApproveQuote = (quoteId: string) => {
+    console.log(`Approving quote: ${quoteId}`);
+    // In a real app, this would make an API call
+    alert(`Quote ${quoteId} has been approved!`);
+    setIsQuoteModalOpen(false);
+  };
+
+  const handleRejectQuote = (quoteId: string, reason: string) => {
+    console.log(`Rejecting quote: ${quoteId} with reason: ${reason}`);
+    // In a real app, this would make an API call
+    alert(`Quote ${quoteId} has been rejected. Reason: ${reason}`);
+    setIsQuoteModalOpen(false);
+  };
+
+  const handleCounterOffer = (quoteId: string, discountPercentage: number) => {
+    console.log(`Counter offer for quote: ${quoteId} with ${discountPercentage}% discount`);
+    // In a real app, this would make an API call
+    alert(`Counter offer sent for quote ${quoteId} with ${discountPercentage}% discount`);
+    setIsQuoteModalOpen(false);
   };
 
   const handleDownloadQuote = (quote: any) => {
@@ -271,9 +343,9 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
                       size="sm"
                       className="text-blue-400 hover:text-blue-300 hover:bg-gray-700"
                       onClick={() => handleViewQuote(quote)}
-                      title="View Quote PDF"
+                      title="View Quote Details"
                     >
-                      <Eye className="h-4 w-4" />
+                      <Settings className="h-4 w-4" />
                     </Button>
                     {(quote.status === 'finalized' || quote.status === 'approved') && quote.pdfUrl && (
                       <Button
@@ -293,6 +365,18 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
           </div>
         </CardContent>
       </Card>
+
+      {/* Quote Request Modal */}
+      <QuoteRequestModal
+        isOpen={isQuoteModalOpen}
+        onClose={() => setIsQuoteModalOpen(false)}
+        quote={selectedQuote}
+        bomItems={mockBOMItems}
+        user={user}
+        onApprove={handleApproveQuote}
+        onReject={handleRejectQuote}
+        onCounterOffer={handleCounterOffer}
+      />
     </div>
   );
 };
