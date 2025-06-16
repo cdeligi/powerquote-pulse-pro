@@ -23,11 +23,15 @@ import {
   Edit,
   FileText,
   Upload,
-  Download
+  Download,
+  MessageSquare,
+  TrendingUp,
+  Filter
 } from "lucide-react";
 import UserManagement from "./UserManagement";
 import QuoteApprovalCard from "./QuoteApprovalCard";
 import { BOMItem } from "@/types/product";
+import { QuoteStatus, getStatusDisplayName, getStatusColor } from "@/utils/quotePipeline";
 
 interface AdminPanelProps {
   user: User;
@@ -35,6 +39,9 @@ interface AdminPanelProps {
 
 const AdminPanel = ({ user }: AdminPanelProps) => {
   const [isAddProductOpen, setIsAddProductOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState('approvals');
+  const [statusFilter, setStatusFilter] = useState<QuoteStatus | 'all'>('all');
+  
   const [termsAndConditions, setTermsAndConditions] = useState(`
 1. Payment Terms: Net 30 days from invoice date
 2. Delivery: FOB shipping point
@@ -51,7 +58,7 @@ const AdminPanel = ({ user }: AdminPanelProps) => {
     sku: '',
     type: '',
     price: '',
-    cost: '', // Added cost field
+    cost: '',
     description: '',
     slots: '',
     compatibleChassis: '',
@@ -59,7 +66,7 @@ const AdminPanel = ({ user }: AdminPanelProps) => {
     enabled: true
   });
 
-  // Enhanced mock data for pending approvals with complete quote information
+  // Enhanced mock data with quote pipeline statuses
   const [pendingApprovals, setPendingApprovals] = useState([
     {
       id: 'Q-2024-001',
@@ -75,7 +82,7 @@ const AdminPanel = ({ user }: AdminPanelProps) => {
       shippingTerms: 'Ex-Works',
       paymentTerms: '30',
       quoteCurrency: 'USD' as const,
-      status: 'pending' as const,
+      status: 'pending' as QuoteStatus,
       bomItems: [
         {
           id: '1',
@@ -129,7 +136,14 @@ const AdminPanel = ({ user }: AdminPanelProps) => {
       shippingTerms: 'CIF',
       paymentTerms: '60',
       quoteCurrency: 'USD' as const,
-      status: 'pending' as const,
+      status: 'counter_pending' as QuoteStatus,
+      counterOfferHistory: [
+        {
+          discountOffered: 10,
+          offeredAt: '2024-01-17',
+          status: 'pending' as const
+        }
+      ],
       bomItems: [
         {
           id: '3',
@@ -168,6 +182,48 @@ const AdminPanel = ({ user }: AdminPanelProps) => {
           enabled: true
         }
       ] as BOMItem[]
+    },
+    {
+      id: 'Q-2024-007',
+      customer: 'Metro Utilities',
+      oracleCustomerId: 'ORC-54321',
+      salesperson: 'Lisa Park',
+      value: 32750,
+      discountRequested: 0,
+      requestedAt: '2024-01-18',
+      justification: 'Standard pricing request - no discount needed',
+      priority: 'Medium' as const,
+      isRepInvolved: true,
+      shippingTerms: 'DDP',
+      paymentTerms: '30',
+      quoteCurrency: 'EUR' as const,
+      status: 'counter_accepted' as QuoteStatus,
+      counterOfferHistory: [
+        {
+          discountOffered: 5,
+          offeredAt: '2024-01-19',
+          status: 'accepted' as const
+        }
+      ],
+      bomItems: [
+        {
+          id: '5',
+          product: {
+            id: 'stx-001',
+            name: 'STX Chassis',
+            type: 'STX',
+            height: '2U',
+            slots: 4,
+            price: 5500,
+            cost: 3300,
+            description: 'Compact chassis for small installations',
+            partNumber: 'QTMS-STX-001',
+            enabled: true
+          },
+          quantity: 3,
+          enabled: true
+        }
+      ] as BOMItem[]
     }
   ]);
 
@@ -190,7 +246,7 @@ const AdminPanel = ({ user }: AdminPanelProps) => {
     },
     {
       id: '2',
-      action: 'Product catalog updated',
+      action: 'Counter offer sent for Q-2024-006',
       user: 'Jennifer Martinez',
       timestamp: '2024-01-16 09:15 AM'
     },
@@ -202,21 +258,44 @@ const AdminPanel = ({ user }: AdminPanelProps) => {
     }
   ];
 
-  const handleApproveQuote = (quoteId: string, approvedDiscount: number) => {
-    console.log(`Approving quote ${quoteId} with ${approvedDiscount}% discount`);
-    setPendingApprovals(prev => prev.filter(q => q.id !== quoteId));
-    // In real implementation, this would update the quote status in the backend
+  const handleApproveQuote = (quoteId: string, approvedDiscount: number, updatedTerms: any) => {
+    console.log(`Approving quote ${quoteId} with ${approvedDiscount}% discount`, updatedTerms);
+    setPendingApprovals(prev => prev.map(q => 
+      q.id === quoteId ? { ...q, status: 'approved' as QuoteStatus, ...updatedTerms } : q
+    ));
   };
 
   const handleRejectQuote = (quoteId: string, reason: string) => {
     console.log(`Rejecting quote ${quoteId} with reason: ${reason}`);
-    setPendingApprovals(prev => prev.filter(q => q.id !== quoteId));
-    // In real implementation, this would update the quote status and notify the salesperson
+    setPendingApprovals(prev => prev.map(q => 
+      q.id === quoteId ? { ...q, status: 'rejected' as QuoteStatus } : q
+    ));
   };
 
-  const handleCounterOffer = (quoteId: string, counterDiscount: number) => {
-    console.log(`Counter-offering ${counterDiscount}% discount for quote ${quoteId}`);
-    // In real implementation, this would create a counter-proposal
+  const handleCounterOffer = (quoteId: string, counterDiscount: number, updatedTerms: any) => {
+    console.log(`Counter-offering ${counterDiscount}% discount for quote ${quoteId}`, updatedTerms);
+    setPendingApprovals(prev => prev.map(q => 
+      q.id === quoteId ? { 
+        ...q, 
+        status: 'counter_pending' as QuoteStatus,
+        counterOfferHistory: [
+          ...(q.counterOfferHistory || []),
+          {
+            discountOffered: counterDiscount,
+            offeredAt: new Date().toISOString(),
+            status: 'pending' as const
+          }
+        ],
+        ...updatedTerms
+      } : q
+    ));
+  };
+
+  const handleUpdateTerms = (quoteId: string, updatedTerms: any) => {
+    console.log(`Updating terms for quote ${quoteId}`, updatedTerms);
+    setPendingApprovals(prev => prev.map(q => 
+      q.id === quoteId ? { ...q, ...updatedTerms } : q
+    ));
   };
 
   const handleAddProduct = () => {
@@ -282,6 +361,20 @@ const AdminPanel = ({ user }: AdminPanelProps) => {
   const calculateMargin = (price: number, cost: number) => {
     if (!cost || price === 0) return 0;
     return ((price - cost) / price) * 100;
+  };
+
+  // Filter quotes based on status
+  const filteredQuotes = statusFilter === 'all' 
+    ? pendingApprovals 
+    : pendingApprovals.filter(q => q.status === statusFilter);
+
+  // Calculate pipeline statistics
+  const pipelineStats = {
+    pending: pendingApprovals.filter(q => q.status === 'pending').length,
+    counterPending: pendingApprovals.filter(q => q.status === 'counter_pending').length,
+    counterAccepted: pendingApprovals.filter(q => q.status === 'counter_accepted').length,
+    approved: pendingApprovals.filter(q => q.status === 'approved').length,
+    rejected: pendingApprovals.filter(q => q.status === 'rejected').length
   };
 
   return (
@@ -412,17 +505,41 @@ const AdminPanel = ({ user }: AdminPanelProps) => {
         </div>
       </div>
 
-      {/* Quick Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+      {/* Enhanced Quick Stats with Pipeline Metrics */}
+      <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
         <Card className="bg-gray-900 border-gray-800">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-gray-400">
-              Pending Approvals
+              Pending Review
             </CardTitle>
             <Clock className="h-4 w-4 text-yellow-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-white">{pendingApprovals.length}</div>
+            <div className="text-2xl font-bold text-white">{pipelineStats.pending}</div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-gray-900 border-gray-800">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-gray-400">
+              Counter Pending
+            </CardTitle>
+            <MessageSquare className="h-4 w-4 text-blue-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-white">{pipelineStats.counterPending}</div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-gray-900 border-gray-800">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-gray-400">
+              Counter Accepted
+            </CardTitle>
+            <TrendingUp className="h-4 w-4 text-emerald-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-white">{pipelineStats.counterAccepted}</div>
           </CardContent>
         </Card>
 
@@ -464,10 +581,13 @@ const AdminPanel = ({ user }: AdminPanelProps) => {
       </div>
 
       {/* Main Content Tabs */}
-      <Tabs defaultValue="approvals" className="w-full">
-        <TabsList className="grid w-full grid-cols-5 bg-gray-800">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="grid w-full grid-cols-6 bg-gray-800">
           <TabsTrigger value="approvals" className="text-white data-[state=active]:bg-red-600">
-            Discount Approvals
+            Quote Pipeline
+          </TabsTrigger>
+          <TabsTrigger value="pipeline" className="text-white data-[state=active]:bg-red-600">
+            Pipeline Overview
           </TabsTrigger>
           <TabsTrigger value="users" className="text-white data-[state=active]:bg-red-600">
             User Management
@@ -486,28 +606,99 @@ const AdminPanel = ({ user }: AdminPanelProps) => {
         <TabsContent value="approvals">
           <Card className="bg-gray-900 border-gray-800">
             <CardHeader>
-              <CardTitle className="text-white">Pending Discount Approvals</CardTitle>
-              <CardDescription className="text-gray-400">
-                Comprehensive quote analysis with BOM details, cost breakdown, and margin impact
-              </CardDescription>
+              <div className="flex justify-between items-center">
+                <div>
+                  <CardTitle className="text-white">Quote Pipeline Management</CardTitle>
+                  <CardDescription className="text-gray-400">
+                    Comprehensive quote analysis with BOM details, cost breakdown, margin impact, and pipeline status
+                  </CardDescription>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Label htmlFor="status-filter" className="text-white text-sm">Filter by Status:</Label>
+                  <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as any)}>
+                    <SelectTrigger className="bg-gray-800 border-gray-700 text-white w-48">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-gray-800 border-gray-700">
+                      <SelectItem value="all">All Quotes</SelectItem>
+                      <SelectItem value="pending">Pending Review</SelectItem>
+                      <SelectItem value="counter_pending">Counter Offer Pending</SelectItem>
+                      <SelectItem value="counter_accepted">Counter Accepted</SelectItem>
+                      <SelectItem value="approved">Approved</SelectItem>
+                      <SelectItem value="rejected">Rejected</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
             </CardHeader>
             <CardContent>
               <div className="space-y-6">
-                {pendingApprovals.map((quote) => (
+                {filteredQuotes.map((quote) => (
                   <QuoteApprovalCard
                     key={quote.id}
                     quote={quote}
                     onApprove={handleApproveQuote}
                     onReject={handleRejectQuote}
                     onCounterOffer={handleCounterOffer}
+                    onUpdateTerms={handleUpdateTerms}
                   />
                 ))}
-                {pendingApprovals.length === 0 && (
+                {filteredQuotes.length === 0 && (
                   <div className="text-center py-8">
-                    <CheckCircle className="mx-auto h-12 w-12 text-green-500 mb-4" />
-                    <p className="text-gray-400">No pending approvals at this time</p>
+                    <Filter className="mx-auto h-12 w-12 text-gray-500 mb-4" />
+                    <p className="text-gray-400">No quotes match the selected filter</p>
                   </div>
                 )}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="pipeline">
+          <Card className="bg-gray-900 border-gray-800">
+            <CardHeader>
+              <CardTitle className="text-white">Pipeline Overview</CardTitle>
+              <CardDescription className="text-gray-400">
+                Visual overview of all quotes in the approval pipeline
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {pendingApprovals.map((quote) => (
+                  <Card key={quote.id} className="bg-gray-800 border-gray-700">
+                    <CardHeader className="pb-3">
+                      <div className="flex justify-between items-start">
+                        <CardTitle className="text-white text-sm">{quote.id}</CardTitle>
+                        <Badge className={`${getStatusColor(quote.status)} text-white text-xs`}>
+                          {getStatusDisplayName(quote.status)}
+                        </Badge>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="pt-0">
+                      <div className="space-y-2 text-sm">
+                        <p className="text-gray-300">
+                          <strong>Customer:</strong> {quote.customer}
+                        </p>
+                        <p className="text-gray-300">
+                          <strong>Value:</strong> {quote.quoteCurrency} {quote.value.toLocaleString()}
+                        </p>
+                        <p className="text-gray-300">
+                          <strong>Discount:</strong> {quote.discountRequested}%
+                        </p>
+                        <p className="text-gray-300">
+                          <strong>Sales:</strong> {quote.salesperson}
+                        </p>
+                        {quote.counterOfferHistory && quote.counterOfferHistory.length > 0 && (
+                          <div className="pt-2 border-t border-gray-600">
+                            <p className="text-blue-400 text-xs">
+                              Last Counter: {quote.counterOfferHistory[quote.counterOfferHistory.length - 1].discountOffered}%
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
               </div>
             </CardContent>
           </Card>
