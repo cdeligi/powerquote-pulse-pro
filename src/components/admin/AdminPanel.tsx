@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { User } from "@/types/auth";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -196,7 +197,7 @@ const AdminPanel = ({ user }: AdminPanelProps) => {
       isRepInvolved: true,
       shippingTerms: 'DDP',
       paymentTerms: '30',
-      quoteCurrency: 'EUR' as const,
+      quoteCurrency: 'EURO' as const,
       status: 'counter_accepted' as QuoteStatus,
       counterOfferHistory: [
         {
