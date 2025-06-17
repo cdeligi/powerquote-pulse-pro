@@ -689,48 +689,50 @@ const BOMBuilder = ({ user }: BOMBuilderProps) => {
                       selectedSlot={selectedSlot}
                     />
                     
-                    {/* Remote Display Section */}
-                    <Card className="bg-gray-900 border-gray-800">
-                      <CardHeader>
-                        <CardTitle className="text-white">Remote Display Option</CardTitle>
-                        <CardDescription className="text-gray-400">
-                          Add optional remote display panel (mounted on front panel)
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center space-x-4">
-                            <div 
-                              className={`w-16 h-12 border-2 rounded cursor-pointer transition-all flex items-center justify-center ${
-                                hasRemoteDisplay 
-                                  ? 'border-green-500 bg-green-600' 
-                                  : 'border-gray-600 bg-gray-700 hover:border-red-600'
-                              }`}
+                    {/* Remote Display Section - Only show for LTX */}
+                    {selectedChassis.type === 'LTX' && (
+                      <Card className="bg-gray-900 border-gray-800">
+                        <CardHeader>
+                          <CardTitle className="text-white">Remote Display Option</CardTitle>
+                          <CardDescription className="text-gray-400">
+                            Add optional remote display panel (mounted on front panel)
+                          </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center space-x-4">
+                              <div 
+                                className={`w-16 h-12 border-2 rounded cursor-pointer transition-all flex items-center justify-center ${
+                                  hasRemoteDisplay 
+                                    ? 'border-green-500 bg-green-600' 
+                                    : 'border-gray-600 bg-gray-700 hover:border-red-600'
+                                }`}
+                                onClick={handleRemoteDisplayToggle}
+                              >
+                                <Monitor className={`h-6 w-6 ${hasRemoteDisplay ? 'text-white' : 'text-gray-400'}`} />
+                              </div>
+                              <div>
+                                <p className="text-white font-medium">Remote Display Panel</p>
+                                <p className="text-gray-400 text-sm">Front-mounted LCD display with navigation controls</p>
+                                {canSeePrices && (
+                                  <p className="text-white font-bold mt-1">$850</p>
+                                )}
+                              </div>
+                            </div>
+                            <Button
+                              variant={hasRemoteDisplay ? "default" : "outline"}
                               onClick={handleRemoteDisplayToggle}
+                              className={hasRemoteDisplay 
+                                ? "bg-green-600 hover:bg-green-700 text-white" 
+                                : "border-gray-600 text-black bg-white hover:bg-gray-100 hover:text-black"
+                              }
                             >
-                              <Monitor className={`h-6 w-6 ${hasRemoteDisplay ? 'text-white' : 'text-gray-400'}`} />
-                            </div>
-                            <div>
-                              <p className="text-white font-medium">Remote Display Panel</p>
-                              <p className="text-gray-400 text-sm">Front-mounted LCD display with navigation controls</p>
-                              {canSeePrices && (
-                                <p className="text-white font-bold mt-1">$850</p>
-                              )}
-                            </div>
+                              {hasRemoteDisplay ? 'Remove' : 'Add Display'}
+                            </Button>
                           </div>
-                          <Button
-                            variant={hasRemoteDisplay ? "default" : "outline"}
-                            onClick={handleRemoteDisplayToggle}
-                            className={hasRemoteDisplay 
-                              ? "bg-green-600 hover:bg-green-700 text-white" 
-                              : "border-gray-600 text-black bg-white hover:bg-gray-100 hover:text-black"
-                            }
-                          >
-                            {hasRemoteDisplay ? 'Remove' : 'Add Display'}
-                          </Button>
-                        </div>
-                      </CardContent>
-                    </Card>
+                        </CardContent>
+                      </Card>
+                    )}
                   </div>
                 )}
               </TabsContent>

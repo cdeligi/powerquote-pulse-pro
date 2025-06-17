@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -81,7 +82,7 @@ const SlotCardSelector = ({ chassis, slot, onCardSelect, onClose, canSeePrices }
       price: 950,
       enabled: true,
       slotRequirement: 1,
-      compatibleChassis: ['LTX', 'MTX', 'STX'],
+      compatibleChassis: ['LTX'], // Only available for LTX
       specifications: {
         display: 'LCD',
         resolution: '320x240',
@@ -148,15 +149,17 @@ const SlotCardSelector = ({ chassis, slot, onCardSelect, onClose, canSeePrices }
     }
   ];
 
-  // Show display cards for all chassis types and all slots
+  // Show display cards only for LTX chassis
   const getAvailableCards = () => {
     let cards = [];
     
     // Always show basic cards and fiber cards for all slots
     cards = [...getBasicCards(), ...getFiberCards()];
     
-    // Always show display cards for all chassis types and slots
-    cards = [...cards, ...getDisplayCards()];
+    // Only show display cards for LTX chassis
+    if (chassis.type === 'LTX') {
+      cards = [...cards, ...getDisplayCards()];
+    }
     
     return cards;
   };
@@ -183,7 +186,7 @@ const SlotCardSelector = ({ chassis, slot, onCardSelect, onClose, canSeePrices }
         <DialogHeader>
           <DialogTitle className="text-white flex items-center justify-between">
             Select Card for Slot {slot}
-            {slot !== 8 && chassis.type === 'LTX' && (
+            {slot !== 8 && chassis.type === 'LTX' && compatibleCards.some(card => card.type === 'display') && (
               <span className="text-sm text-gray-400">
                 (Display cards will auto-route to slot 8)
               </span>
