@@ -318,7 +318,12 @@ const BOMBuilder = ({ user }: BOMBuilderProps) => {
     setBomItems(prev => prev.map(item =>
       item.id === bomItemId ? { 
         ...item, 
-        level3Customizations: customizations as Level3Product[] 
+        level3Customizations: customizations.map(customization => ({
+          ...customization,
+          parentProductId: item.product.id,
+          description: customization.name,
+          type: customization.type as 'sensor_type' | 'fiber_option' | 'channel_config'
+        })) as Level3Product[]
       } : item
     ));
   };
