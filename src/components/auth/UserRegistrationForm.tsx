@@ -8,13 +8,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { UserRegistrationRequest } from "@/types/user-management";
-import { Shield, User, Mail, Phone, Building, FileText } from "lucide-react";
+import { Shield, User, Mail, Phone, Building, FileText, ArrowLeft } from "lucide-react";
 
 interface UserRegistrationFormProps {
   onSubmit?: (data: Partial<UserRegistrationRequest>) => void;
+  onBack?: () => void;
 }
 
-const UserRegistrationForm = ({ onSubmit }: UserRegistrationFormProps) => {
+const UserRegistrationForm = ({ onSubmit, onBack }: UserRegistrationFormProps) => {
   const [formData, setFormData] = useState({
     email: '',
     firstName: '',
@@ -52,7 +53,7 @@ const UserRegistrationForm = ({ onSubmit }: UserRegistrationFormProps) => {
         id: `REQ-${Date.now()}`,
         status: 'pending',
         createdAt: new Date().toISOString(),
-        ipAddress: '192.168.1.1', // Would be actual IP in production
+        ipAddress: '192.168.1.1',
         userAgent: navigator.userAgent,
         loginAttempts: 0,
         isLocked: false,
@@ -63,7 +64,6 @@ const UserRegistrationForm = ({ onSubmit }: UserRegistrationFormProps) => {
         onSubmit(registrationData);
       }
 
-      // Here you would typically send to backend
       console.log('Registration request submitted:', registrationData);
       
       alert('Registration request submitted successfully! You will receive an email once your request has been reviewed.');
@@ -110,6 +110,19 @@ const UserRegistrationForm = ({ onSubmit }: UserRegistrationFormProps) => {
     <div className="min-h-screen bg-black flex items-center justify-center p-6">
       <Card className="w-full max-w-2xl bg-gray-900 border-gray-800">
         <CardHeader className="text-center">
+          <div className="flex items-center justify-between mb-4">
+            {onBack && (
+              <Button
+                variant="ghost"
+                onClick={onBack}
+                className="text-white hover:bg-gray-800"
+              >
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Back to Login
+              </Button>
+            )}
+            <div className="flex-1" />
+          </div>
           <CardTitle className="text-2xl font-bold text-white flex items-center justify-center">
             <Shield className="mr-2 h-6 w-6 text-red-600" />
             Request Access to PowerQuotePro

@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -138,7 +139,7 @@ const LoginForm = ({ onLogin }: LoginFormProps) => {
             <Button
               variant="outline"
               onClick={() => setShowRegistration(true)}
-              className="w-full border-gray-600 text-white hover:bg-gray-800 hover:text-white"
+              className="w-full border-gray-600 text-gray-300 hover:bg-gray-800 hover:text-white bg-gray-900"
             >
               Request Account Access
             </Button>

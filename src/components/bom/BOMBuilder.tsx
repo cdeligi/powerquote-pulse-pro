@@ -8,8 +8,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import ChassisSelector from "./ChassisSelector";
-import Level1ProductSelector from "./Level1ProductSelector";
-import Level2OptionsSelector from "./Level2OptionsSelector";
+import DGAProductSelector from "./DGAProductSelector";
+import PDProductSelector from "./PDProductSelector";
 import RackVisualizer from "./RackVisualizer";
 import SlotCardSelector from "./SlotCardSelector";
 import AnalogCardConfigurator from "./AnalogCardConfigurator";
@@ -143,7 +143,7 @@ const BOMBuilder = ({ user }: BOMBuilderProps) => {
   };
 
   const addCardToSlot = (card: ProductCard, slot: number) => {
-    // Special handling for display cards in LTX chassis - always go to slot 8
+    // Special handling for display cards - always go to slot 8 in LTX
     if (card.type === 'display' && selectedChassis?.type === 'LTX') {
       slot = 8;
       
@@ -204,12 +204,6 @@ const BOMBuilder = ({ user }: BOMBuilderProps) => {
       return;
     }
     
-    // Prevent non-display cards from being placed in slot 8 on LTX chassis
-    if (selectedChassis?.type === 'LTX' && slot === 8 && card.type !== 'display') {
-      console.log("Slot 8 is reserved for display cards only in LTX chassis");
-      return;
-    }
-    
     // Normal card handling
     const newBomItem = addToBOM(card, slot);
     
@@ -249,21 +243,6 @@ const BOMBuilder = ({ user }: BOMBuilderProps) => {
   };
 
   const handleSlotClick = (slot: number) => {
-    // Prevent non-display cards from being selected for slot 8 in LTX chassis
-    if (selectedChassis?.type === 'LTX' && slot === 8) {
-      // Only allow if it's for clearing or if we're going to add a display card
-      if (slotAssignments[slot]) {
-        // Allow clearing
-        setSelectedSlot(slot);
-        setShowSlotSelector(true);
-      } else {
-        // Only show display cards for slot 8
-        setSelectedSlot(slot);
-        setShowSlotSelector(true);
-      }
-      return;
-    }
-    
     setSelectedSlot(slot);
     setShowSlotSelector(true);
   };
@@ -757,20 +736,16 @@ const BOMBuilder = ({ user }: BOMBuilderProps) => {
               </TabsContent>
 
               <TabsContent value="dga" className="mt-4">
-                <Level1ProductSelector 
-                  onProductSelect={(product, configuration) => addToBOM(product, undefined, undefined, configuration)}
-                  selectedProduct={null}
+                <DGAProductSelector 
+                  onProductSelect={(product, configuration, level2Options) => addToBOM(product, undefined, level2Options, configuration)}
                   canSeePrices={canSeePrices}
-                  productType="DGA"
                 />
               </TabsContent>
 
               <TabsContent value="pd" className="mt-4">
-                <Level1ProductSelector 
-                  onProductSelect={(product, configuration) => addToBOM(product, undefined, undefined, configuration)}
-                  selectedProduct={null}
+                <PDProductSelector 
+                  onProductSelect={(product, configuration, level2Options) => addToBOM(product, undefined, level2Options, configuration)}
                   canSeePrices={canSeePrices}
-                  productType="PD"
                 />
               </TabsContent>
             </Tabs>

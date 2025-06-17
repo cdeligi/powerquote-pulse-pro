@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -149,22 +148,15 @@ const SlotCardSelector = ({ chassis, slot, onCardSelect, onClose, canSeePrices }
     }
   ];
 
-  // Determine which cards to show based on chassis type and slot
+  // Show display cards for all chassis types and all slots
   const getAvailableCards = () => {
     let cards = [];
     
-    // For LTX chassis slot 8, only show display cards
-    if (chassis.type === 'LTX' && slot === 8) {
-      cards = getDisplayCards();
-    } else {
-      // For all other slots and chassis types, show basic cards and fiber cards
-      cards = [...getBasicCards(), ...getFiberCards()];
-      
-      // Add display cards for non-slot-8 positions in MTX and STX
-      if (chassis.type !== 'LTX') {
-        cards = [...cards, ...getDisplayCards()];
-      }
-    }
+    // Always show basic cards and fiber cards for all slots
+    cards = [...getBasicCards(), ...getFiberCards()];
+    
+    // Always show display cards for all chassis types and slots
+    cards = [...cards, ...getDisplayCards()];
     
     return cards;
   };
@@ -177,7 +169,12 @@ const SlotCardSelector = ({ chassis, slot, onCardSelect, onClose, canSeePrices }
   });
 
   const handleCardSelect = (card: any) => {
-    onCardSelect(card, slot);
+    // For display cards, automatically route to slot 8 in LTX chassis
+    if (card.type === 'display' && chassis.type === 'LTX') {
+      onCardSelect(card, 8);
+    } else {
+      onCardSelect(card, slot);
+    }
   };
 
   return (
@@ -186,6 +183,11 @@ const SlotCardSelector = ({ chassis, slot, onCardSelect, onClose, canSeePrices }
         <DialogHeader>
           <DialogTitle className="text-white flex items-center justify-between">
             Select Card for Slot {slot}
+            {slot !== 8 && chassis.type === 'LTX' && (
+              <span className="text-sm text-gray-400">
+                (Display cards will auto-route to slot 8)
+              </span>
+            )}
             <Button variant="ghost" size="sm" onClick={onClose}>
               <X className="h-4 w-4" />
             </Button>
@@ -212,6 +214,11 @@ const SlotCardSelector = ({ chassis, slot, onCardSelect, onClose, canSeePrices }
                       {card.specifications.inputs} inputs
                     </Badge>
                   )}
+                  {card.type === 'display' && chassis.type === 'LTX' && slot !== 8 && (
+                    <Badge variant="outline" className="text-yellow-400 border-yellow-400">
+                      → Slot 8
+                    </Badge>
+                  )}
                 </div>
               </CardHeader>
               <CardContent>
@@ -219,7 +226,7 @@ const SlotCardSelector = ({ chassis, slot, onCardSelect, onClose, canSeePrices }
                   {Object.entries(card.specifications || {}).map(([key, value]) => (
                     <div key={key} className="flex justify-between text-sm">
                       <span className="text-gray-400 capitalize">{key}:</span>
-                      <span className="text-white">{value}</span>
+                      <span className="text-white">{String(value)}</span>
                     </div>
                   ))}
                 </div>
