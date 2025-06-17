@@ -1,21 +1,20 @@
+
 import { useState } from "react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { UserRegistrationRequest } from "@/types/user-management";
-import { Shield, Lock, AlertTriangle, CheckCircle } from "lucide-react";
+import { Shield, User, Mail, Phone, Building, FileText } from "lucide-react";
 
 interface UserRegistrationFormProps {
-  onSubmit: (request: UserRegistrationRequest) => void;
-  onBack: () => void;
+  onSubmit?: (data: Partial<UserRegistrationRequest>) => void;
 }
 
-const UserRegistrationForm = ({ onSubmit, onBack }: UserRegistrationFormProps) => {
+const UserRegistrationForm = ({ onSubmit }: UserRegistrationFormProps) => {
   const [formData, setFormData] = useState({
     email: '',
     firstName: '',
@@ -27,367 +26,339 @@ const UserRegistrationForm = ({ onSubmit, onBack }: UserRegistrationFormProps) =
     requestedRole: 'level1' as 'level1' | 'level2',
     managerEmail: '',
     companyName: '',
-    securityClearanceLevel: '',
     agreedToTerms: false,
     agreedToPrivacyPolicy: false
   });
 
-  const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isSubmitted, setIsSubmitted] = useState(false);
 
-  const validateEmail = (email: string) => {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(email);
-  };
-
-  const validatePhone = (phone: string) => {
-    const phoneRegex = /^\+?[\d\s\-\(\)]{10,}$/;
-    return phoneRegex.test(phone);
-  };
-
-  const validateForm = () => {
-    const newErrors: Record<string, string> = {};
-
-    if (!formData.firstName.trim()) newErrors.firstName = 'First name is required';
-    if (!formData.lastName.trim()) newErrors.lastName = 'Last name is required';
-    if (!formData.email || !validateEmail(formData.email)) {
-      newErrors.email = 'Valid email address is required';
-    }
-    if (!formData.phoneNumber || !validatePhone(formData.phoneNumber)) {
-      newErrors.phoneNumber = 'Valid phone number is required';
-    }
-    if (!formData.department.trim()) newErrors.department = 'Department is required';
-    if (!formData.jobTitle.trim()) newErrors.jobTitle = 'Job title is required';
-    if (!formData.companyName.trim()) newErrors.companyName = 'Company name is required';
-    if (!formData.requestedRole) newErrors.requestedRole = 'Please select a role';
-    if (!formData.managerEmail || !validateEmail(formData.managerEmail)) {
-      newErrors.managerEmail = 'Valid manager email is required';
-    }
-    if (!formData.businessJustification.trim() || formData.businessJustification.length < 50) {
-      newErrors.businessJustification = 'Business justification must be at least 50 characters';
-    }
-    if (!formData.agreedToTerms) {
-      newErrors.agreedToTerms = 'You must agree to the terms and conditions';
-    }
-    if (!formData.agreedToPrivacyPolicy) {
-      newErrors.agreedToPrivacyPolicy = 'You must agree to the privacy policy';
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+  const handleInputChange = (field: string, value: string | boolean) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!validateForm()) return;
+    if (!formData.agreedToTerms || !formData.agreedToPrivacyPolicy) {
+      alert('Please agree to the Terms of Service and Privacy Policy');
+      return;
+    }
 
     setIsSubmitting(true);
+    
+    try {
+      const registrationData: Partial<UserRegistrationRequest> = {
+        ...formData,
+        id: `REQ-${Date.now()}`,
+        status: 'pending',
+        createdAt: new Date().toISOString(),
+        ipAddress: '192.168.1.1', // Would be actual IP in production
+        userAgent: navigator.userAgent,
+        loginAttempts: 0,
+        isLocked: false,
+        twoFactorEnabled: false
+      };
 
-    // Simulate security audit logging
-    const auditData = {
-      ipAddress: 'simulated-ip',
-      userAgent: navigator.userAgent
-    };
+      if (onSubmit) {
+        onSubmit(registrationData);
+      }
 
-    const registrationRequest: UserRegistrationRequest = {
-      id: `REG-${Date.now()}`,
-      email: formData.email.toLowerCase().trim(),
-      firstName: formData.firstName.trim(),
-      lastName: formData.lastName.trim(),
-      department: formData.department.trim(),
-      jobTitle: formData.jobTitle.trim(),
-      phoneNumber: formData.phoneNumber.trim(),
-      businessJustification: formData.businessJustification.trim(),
-      requestedRole: formData.requestedRole,
-      managerEmail: formData.managerEmail.toLowerCase().trim(),
-      companyName: formData.companyName.trim(),
-      status: 'pending',
-      createdAt: new Date().toISOString(),
-      securityClearanceLevel: formData.securityClearanceLevel,
-      ipAddress: auditData.ipAddress,
-      userAgent: auditData.userAgent,
-      loginAttempts: 0,
-      isLocked: false,
-      twoFactorEnabled: false,
-      agreedToTerms: formData.agreedToTerms,
-      agreedToPrivacyPolicy: formData.agreedToPrivacyPolicy
-    };
-
-    // Simulate API call
-    setTimeout(() => {
-      onSubmit(registrationRequest);
+      // Here you would typically send to backend
+      console.log('Registration request submitted:', registrationData);
+      
+      alert('Registration request submitted successfully! You will receive an email once your request has been reviewed.');
+      
+      // Reset form
+      setFormData({
+        email: '',
+        firstName: '',
+        lastName: '',
+        department: '',
+        jobTitle: '',
+        phoneNumber: '',
+        businessJustification: '',
+        requestedRole: 'level1',
+        managerEmail: '',
+        companyName: '',
+        agreedToTerms: false,
+        agreedToPrivacyPolicy: false
+      });
+      
+    } catch (error) {
+      console.error('Registration error:', error);
+      alert('An error occurred during registration. Please try again.');
+    } finally {
       setIsSubmitting(false);
-      setIsSubmitted(true);
-    }, 2000);
+    }
   };
 
-  if (isSubmitted) {
-    return (
-      <Card className="w-full max-w-2xl mx-auto bg-gray-900 border-gray-800">
-        <CardContent className="pt-6">
-          <div className="text-center space-y-4">
-            <CheckCircle className="h-16 w-16 text-green-500 mx-auto" />
-            <h2 className="text-2xl font-bold text-white">Registration Request Submitted</h2>
-            <p className="text-gray-400">
-              Your account creation request has been submitted for administrative approval.
-              You will receive an email notification once your request has been reviewed.
-            </p>
-            <p className="text-sm text-gray-500">
-              Request ID: REG-{Date.now()}
-            </p>
-            <Button onClick={onBack} className="bg-red-600 hover:bg-red-700">
-              Return to Login
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
+  const isFormValid = () => {
+    return formData.email &&
+           formData.firstName &&
+           formData.lastName &&
+           formData.department &&
+           formData.jobTitle &&
+           formData.phoneNumber &&
+           formData.businessJustification &&
+           formData.managerEmail &&
+           formData.companyName &&
+           formData.agreedToTerms &&
+           formData.agreedToPrivacyPolicy;
+  };
 
   return (
-    <Card className="w-full max-w-2xl mx-auto bg-gray-900 border-gray-800">
-      <CardHeader>
-        <div className="flex items-center space-x-2 mb-4">
-          <Shield className="h-6 w-6 text-red-600" />
-          <CardTitle className="text-white">Request Account Access</CardTitle>
-        </div>
-        <CardDescription className="text-gray-400">
-          Complete this form to request access to the PowerQuotePro system. All requests require administrative approval.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <Alert className="mb-6 border-yellow-600 bg-yellow-600/10">
-          <AlertTriangle className="h-4 w-4 text-yellow-600" />
-          <AlertDescription className="text-yellow-200">
-            <strong>Security Notice:</strong> This system is for authorized personnel only. 
-            Unauthorized access attempts are monitored and logged.
-          </AlertDescription>
-        </Alert>
+    <div className="min-h-screen bg-black flex items-center justify-center p-6">
+      <Card className="w-full max-w-2xl bg-gray-900 border-gray-800">
+        <CardHeader className="text-center">
+          <CardTitle className="text-2xl font-bold text-white flex items-center justify-center">
+            <Shield className="mr-2 h-6 w-6 text-red-600" />
+            Request Access to PowerQuotePro
+          </CardTitle>
+          <CardDescription className="text-gray-400">
+            Complete this form to request access to the system. Your request will be reviewed by an administrator.
+          </CardDescription>
+        </CardHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Personal Information */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-white flex items-center">
-              <Lock className="h-4 w-4 mr-2" />
-              Personal Information
-            </h3>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="firstName" className="text-white">First Name *</Label>
-                <Input
-                  id="firstName"
-                  value={formData.firstName}
-                  onChange={(e) => setFormData(prev => ({ ...prev, firstName: e.target.value }))}
-                  className={`bg-gray-800 border-gray-700 text-white ${errors.firstName ? 'border-red-500' : ''}`}
-                  placeholder="Enter your first name"
-                />
-                {errors.firstName && <p className="text-red-400 text-sm mt-1">{errors.firstName}</p>}
+        <CardContent>
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Personal Information Section */}
+            <div className="space-y-4">
+              <div className="border-b border-gray-700 pb-2">
+                <h3 className="text-white font-semibold text-lg flex items-center">
+                  <User className="mr-2 h-5 w-5 text-red-600" />
+                  Personal Information
+                </h3>
               </div>
               
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="firstName" className="text-white font-medium mb-2 block">
+                    First Name *
+                  </Label>
+                  <Input
+                    id="firstName"
+                    value={formData.firstName}
+                    onChange={(e) => handleInputChange('firstName', e.target.value)}
+                    className="bg-gray-800 border-gray-600 text-white placeholder:text-gray-400 focus:border-red-500 focus:ring-red-500"
+                    placeholder="Enter your first name"
+                    required
+                  />
+                </div>
+                
+                <div>
+                  <Label htmlFor="lastName" className="text-white font-medium mb-2 block">
+                    Last Name *
+                  </Label>
+                  <Input
+                    id="lastName"
+                    value={formData.lastName}
+                    onChange={(e) => handleInputChange('lastName', e.target.value)}
+                    className="bg-gray-800 border-gray-600 text-white placeholder:text-gray-400 focus:border-red-500 focus:ring-red-500"
+                    placeholder="Enter your last name"
+                    required
+                  />
+                </div>
+              </div>
+
               <div>
-                <Label htmlFor="lastName" className="text-white">Last Name *</Label>
+                <Label htmlFor="email" className="text-white font-medium mb-2 block">
+                  Email Address *
+                </Label>
                 <Input
-                  id="lastName"
-                  value={formData.lastName}
-                  onChange={(e) => setFormData(prev => ({ ...prev, lastName: e.target.value }))}
-                  className={`bg-gray-800 border-gray-700 text-white ${errors.lastName ? 'border-red-500' : ''}`}
-                  placeholder="Enter your last name"
+                  id="email"
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) => handleInputChange('email', e.target.value)}
+                  className="bg-gray-800 border-gray-600 text-white placeholder:text-gray-400 focus:border-red-500 focus:ring-red-500"
+                  placeholder="Enter your email address"
+                  required
                 />
-                {errors.lastName && <p className="text-red-400 text-sm mt-1">{errors.lastName}</p>}
+              </div>
+
+              <div>
+                <Label htmlFor="phoneNumber" className="text-white font-medium mb-2 block">
+                  Phone Number *
+                </Label>
+                <Input
+                  id="phoneNumber"
+                  type="tel"
+                  value={formData.phoneNumber}
+                  onChange={(e) => handleInputChange('phoneNumber', e.target.value)}
+                  className="bg-gray-800 border-gray-600 text-white placeholder:text-gray-400 focus:border-red-500 focus:ring-red-500"
+                  placeholder="Enter your phone number"
+                  required
+                />
               </div>
             </div>
 
-            <div>
-              <Label htmlFor="email" className="text-white">Business Email Address *</Label>
-              <Input
-                id="email"
-                type="email"
-                value={formData.email}
-                onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
-                className={`bg-gray-800 border-gray-700 text-white ${errors.email ? 'border-red-500' : ''}`}
-                placeholder="your.name@company.com"
-              />
-              {errors.email && <p className="text-red-400 text-sm mt-1">{errors.email}</p>}
-            </div>
+            {/* Company Information Section */}
+            <div className="space-y-4">
+              <div className="border-b border-gray-700 pb-2">
+                <h3 className="text-white font-semibold text-lg flex items-center">
+                  <Building className="mr-2 h-5 w-5 text-red-600" />
+                  Company Information
+                </h3>
+              </div>
 
-            <div>
-              <Label htmlFor="phoneNumber" className="text-white">Phone Number *</Label>
-              <Input
-                id="phoneNumber"
-                value={formData.phoneNumber}
-                onChange={(e) => setFormData(prev => ({ ...prev, phoneNumber: e.target.value }))}
-                className={`bg-gray-800 border-gray-700 text-white ${errors.phoneNumber ? 'border-red-500' : ''}`}
-                placeholder="+1 (555) 123-4567"
-              />
-              {errors.phoneNumber && <p className="text-red-400 text-sm mt-1">{errors.phoneNumber}</p>}
-            </div>
-          </div>
-
-          {/* Professional Information */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-white">Professional Information</h3>
-            
-            <div>
-              <Label htmlFor="companyName" className="text-white">Company Name *</Label>
-              <Input
-                id="companyName"
-                value={formData.companyName}
-                onChange={(e) => setFormData(prev => ({ ...prev, companyName: e.target.value }))}
-                className={`bg-gray-800 border-gray-700 text-white ${errors.companyName ? 'border-red-500' : ''}`}
-                placeholder="Enter your company name"
-              />
-              {errors.companyName && <p className="text-red-400 text-sm mt-1">{errors.companyName}</p>}
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="department" className="text-white">Department *</Label>
-                <Select value={formData.department} onValueChange={(value) => setFormData(prev => ({ ...prev, department: value }))}>
-                  <SelectTrigger className={`bg-gray-800 border-gray-700 text-white ${errors.department ? 'border-red-500' : ''}`}>
-                    <SelectValue placeholder="Select your department" />
+                <Label htmlFor="companyName" className="text-white font-medium mb-2 block">
+                  Company Name *
+                </Label>
+                <Input
+                  id="companyName"
+                  value={formData.companyName}
+                  onChange={(e) => handleInputChange('companyName', e.target.value)}
+                  className="bg-gray-800 border-gray-600 text-white placeholder:text-gray-400 focus:border-red-500 focus:ring-red-500"
+                  placeholder="Enter your company name"
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="department" className="text-white font-medium mb-2 block">
+                    Department *
+                  </Label>
+                  <Input
+                    id="department"
+                    value={formData.department}
+                    onChange={(e) => handleInputChange('department', e.target.value)}
+                    className="bg-gray-800 border-gray-600 text-white placeholder:text-gray-400 focus:border-red-500 focus:ring-red-500"
+                    placeholder="e.g., Sales, Engineering"
+                    required
+                  />
+                </div>
+                
+                <div>
+                  <Label htmlFor="jobTitle" className="text-white font-medium mb-2 block">
+                    Job Title *
+                  </Label>
+                  <Input
+                    id="jobTitle"
+                    value={formData.jobTitle}
+                    onChange={(e) => handleInputChange('jobTitle', e.target.value)}
+                    className="bg-gray-800 border-gray-600 text-white placeholder:text-gray-400 focus:border-red-500 focus:ring-red-500"
+                    placeholder="Enter your job title"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div>
+                <Label htmlFor="managerEmail" className="text-white font-medium mb-2 block">
+                  Manager Email *
+                </Label>
+                <Input
+                  id="managerEmail"
+                  type="email"
+                  value={formData.managerEmail}
+                  onChange={(e) => handleInputChange('managerEmail', e.target.value)}
+                  className="bg-gray-800 border-gray-600 text-white placeholder:text-gray-400 focus:border-red-500 focus:ring-red-500"
+                  placeholder="Enter your manager's email"
+                  required
+                />
+              </div>
+            </div>
+
+            {/* Access Request Section */}
+            <div className="space-y-4">
+              <div className="border-b border-gray-700 pb-2">
+                <h3 className="text-white font-semibold text-lg flex items-center">
+                  <FileText className="mr-2 h-5 w-5 text-red-600" />
+                  Access Request Details
+                </h3>
+              </div>
+
+              <div>
+                <Label htmlFor="requestedRole" className="text-white font-medium mb-2 block">
+                  Requested Access Level *
+                </Label>
+                <Select value={formData.requestedRole} onValueChange={(value: 'level1' | 'level2') => handleInputChange('requestedRole', value)}>
+                  <SelectTrigger className="bg-gray-800 border-gray-600 text-white focus:border-red-500 focus:ring-red-500">
+                    <SelectValue placeholder="Select access level" />
                   </SelectTrigger>
-                  <SelectContent className="bg-gray-800 border-gray-700">
-                    <SelectItem value="sales">Sales</SelectItem>
-                    <SelectItem value="engineering">Engineering</SelectItem>
-                    <SelectItem value="operations">Operations</SelectItem>
-                    <SelectItem value="management">Management</SelectItem>
-                    <SelectItem value="other">Other</SelectItem>
+                  <SelectContent className="bg-gray-800 border-gray-600 z-50">
+                    <SelectItem value="level1" className="text-white hover:bg-gray-700 focus:bg-gray-700">
+                      Level 1 (Basic Access)
+                    </SelectItem>
+                    <SelectItem value="level2" className="text-white hover:bg-gray-700 focus:bg-gray-700">
+                      Level 2 (Full Access with Pricing)
+                    </SelectItem>
                   </SelectContent>
                 </Select>
-                {errors.department && <p className="text-red-400 text-sm mt-1">{errors.department}</p>}
+                <p className="text-gray-400 text-sm mt-1">
+                  Level 1: Can create quotes without seeing prices. Level 2: Full access including pricing information.
+                </p>
               </div>
 
               <div>
-                <Label htmlFor="jobTitle" className="text-white">Job Title *</Label>
-                <Input
-                  id="jobTitle"
-                  value={formData.jobTitle}
-                  onChange={(e) => setFormData(prev => ({ ...prev, jobTitle: e.target.value }))}
-                  className={`bg-gray-800 border-gray-700 text-white ${errors.jobTitle ? 'border-red-500' : ''}`}
-                  placeholder="Enter your job title"
+                <Label htmlFor="businessJustification" className="text-white font-medium mb-2 block">
+                  Business Justification *
+                </Label>
+                <Textarea
+                  id="businessJustification"
+                  value={formData.businessJustification}
+                  onChange={(e) => handleInputChange('businessJustification', e.target.value)}
+                  className="bg-gray-800 border-gray-600 text-white placeholder:text-gray-400 focus:border-red-500 focus:ring-red-500 min-h-[100px]"
+                  placeholder="Please explain why you need access to this system and how you plan to use it..."
+                  required
                 />
-                {errors.jobTitle && <p className="text-red-400 text-sm mt-1">{errors.jobTitle}</p>}
               </div>
             </div>
 
-            <div>
-              <Label htmlFor="managerEmail" className="text-white">Manager Email Address *</Label>
-              <Input
-                id="managerEmail"
-                type="email"
-                value={formData.managerEmail}
-                onChange={(e) => setFormData(prev => ({ ...prev, managerEmail: e.target.value }))}
-                className={`bg-gray-800 border-gray-700 text-white ${errors.managerEmail ? 'border-red-500' : ''}`}
-                placeholder="manager@company.com"
-              />
-              {errors.managerEmail && <p className="text-red-400 text-sm mt-1">{errors.managerEmail}</p>}
-            </div>
-          </div>
+            {/* Terms and Conditions */}
+            <div className="space-y-4">
+              <div className="border-b border-gray-700 pb-2">
+                <h3 className="text-white font-semibold text-lg">Terms and Conditions</h3>
+              </div>
 
-          {/* Access Request */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-white">Access Request</h3>
-            
-            <div>
-              <Label htmlFor="requestedRole" className="text-white">Requested Access Level *</Label>
-              <Select value={formData.requestedRole} onValueChange={(value: 'level1' | 'level2') => setFormData(prev => ({ ...prev, requestedRole: value }))}>
-                <SelectTrigger className={`bg-gray-800 border-gray-700 text-white ${errors.requestedRole ? 'border-red-500' : ''}`}>
-                  <SelectValue placeholder="Select access level" />
-                </SelectTrigger>
-                <SelectContent className="bg-gray-800 border-gray-700">
-                  <SelectItem value="level1">Level 1 Sales - Basic quoting access</SelectItem>
-                  <SelectItem value="level2">Level 2 Sales - Advanced quoting with discount authority</SelectItem>
-                </SelectContent>
-              </Select>
-              {errors.requestedRole && <p className="text-red-400 text-sm mt-1">{errors.requestedRole}</p>}
-            </div>
+              <div className="space-y-3">
+                <div className="flex items-start space-x-3">
+                  <Checkbox
+                    id="terms"
+                    checked={formData.agreedToTerms}
+                    onCheckedChange={(checked) => handleInputChange('agreedToTerms', checked as boolean)}
+                    className="border-gray-600 data-[state=checked]:bg-red-600 data-[state=checked]:border-red-600"
+                  />
+                  <Label htmlFor="terms" className="text-white text-sm leading-relaxed">
+                    I agree to the Terms of Service and understand that this system is for authorized business use only. 
+                    I acknowledge that all activities may be monitored and logged for security purposes.
+                  </Label>
+                </div>
 
-            <div>
-              <Label htmlFor="securityClearanceLevel" className="text-white">Security Clearance Level (if applicable)</Label>
-              <Input
-                id="securityClearanceLevel"
-                value={formData.securityClearanceLevel}
-                onChange={(e) => setFormData(prev => ({ ...prev, securityClearanceLevel: e.target.value }))}
-                className="bg-gray-800 border-gray-700 text-white"
-                placeholder="e.g., Confidential, Secret, etc."
-              />
+                <div className="flex items-start space-x-3">
+                  <Checkbox
+                    id="privacy"
+                    checked={formData.agreedToPrivacyPolicy}
+                    onCheckedChange={(checked) => handleInputChange('agreedToPrivacyPolicy', checked as boolean)}
+                    className="border-gray-600 data-[state=checked]:bg-red-600 data-[state=checked]:border-red-600"
+                  />
+                  <Label htmlFor="privacy" className="text-white text-sm leading-relaxed">
+                    I agree to the Privacy Policy and understand how my personal information will be collected, 
+                    used, and protected in accordance with applicable privacy laws.
+                  </Label>
+                </div>
+              </div>
             </div>
 
-            <div>
-              <Label htmlFor="businessJustification" className="text-white">Business Justification *</Label>
-              <Textarea
-                id="businessJustification"
-                value={formData.businessJustification}
-                onChange={(e) => setFormData(prev => ({ ...prev, businessJustification: e.target.value }))}
-                className={`bg-gray-800 border-gray-700 text-white ${errors.businessJustification ? 'border-red-500' : ''}`}
-                placeholder="Please provide a detailed business justification for requiring access to this system (minimum 50 characters)"
-                rows={4}
-              />
-              <p className="text-gray-400 text-sm mt-1">
-                {formData.businessJustification.length}/50 characters minimum
+            {/* Submit Button */}
+            <div className="pt-6">
+              <Button
+                type="submit"
+                disabled={!isFormValid() || isSubmitting}
+                className="w-full bg-red-600 hover:bg-red-700 text-white disabled:bg-gray-600 disabled:text-gray-400 disabled:cursor-not-allowed"
+              >
+                {isSubmitting ? 'Submitting Request...' : 'Request Access'}
+              </Button>
+              
+              <p className="text-gray-400 text-sm text-center mt-3">
+                Your request will be reviewed by an administrator. You will receive an email notification once your request has been processed.
               </p>
-              {errors.businessJustification && <p className="text-red-400 text-sm mt-1">{errors.businessJustification}</p>}
             </div>
-          </div>
-
-          {/* Agreements */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-white">Legal Agreements</h3>
-            
-            <div className="flex items-start space-x-2">
-              <Checkbox
-                id="agreedToTerms"
-                checked={formData.agreedToTerms}
-                onCheckedChange={(checked) => setFormData(prev => ({ ...prev, agreedToTerms: checked as boolean }))}
-                className="mt-1"
-              />
-              <div className="flex-1">
-                <Label htmlFor="agreedToTerms" className="text-white text-sm cursor-pointer">
-                  I agree to the Terms and Conditions and Acceptable Use Policy *
-                </Label>
-                {errors.agreedToTerms && <p className="text-red-400 text-sm mt-1">{errors.agreedToTerms}</p>}
-              </div>
-            </div>
-
-            <div className="flex items-start space-x-2">
-              <Checkbox
-                id="agreedToPrivacyPolicy"
-                checked={formData.agreedToPrivacyPolicy}
-                onCheckedChange={(checked) => setFormData(prev => ({ ...prev, agreedToPrivacyPolicy: checked as boolean }))}
-                className="mt-1"
-              />
-              <div className="flex-1">
-                <Label htmlFor="agreedToPrivacyPolicy" className="text-white text-sm cursor-pointer">
-                  I acknowledge that I have read and understand the Privacy Policy *
-                </Label>
-                {errors.agreedToPrivacyPolicy && <p className="text-red-400 text-sm mt-1">{errors.agreedToPrivacyPolicy}</p>}
-              </div>
-            </div>
-          </div>
-
-          <div className="flex space-x-4 pt-4">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={onBack}
-              className="flex-1 border-gray-600 text-white hover:bg-gray-800"
-            >
-              Back to Login
-            </Button>
-            <Button
-              type="submit"
-              disabled={isSubmitting}
-              className="flex-1 bg-red-600 hover:bg-red-700 text-white"
-            >
-              {isSubmitting ? "Submitting Request..." : "Submit Request"}
-            </Button>
-          </div>
-        </form>
-      </CardContent>
-    </Card>
+          </form>
+        </CardContent>
+      </Card>
+    </div>
   );
 };
 

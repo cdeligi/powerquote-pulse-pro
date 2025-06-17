@@ -15,7 +15,7 @@ import SlotCardSelector from "./SlotCardSelector";
 import AnalogCardConfigurator from "./AnalogCardConfigurator";
 import BushingCardConfigurator from "./BushingCardConfigurator";
 import ToggleSwitch from "@/components/ui/toggle-switch";
-import { BOMItem, Chassis, Card as ProductCard, Level1Product, Level2Product, Level3Product, Level3Customization, isLevel1Product, isChassis, isCard, generateQTMSPartNumber, generateProductPartNumber, ShippingTerms, PaymentTerms } from "@/types/product";
+import { BOMItem, Chassis, Card as ProductCard, Level1Product, Level2Product, Level3Product, isLevel1Product, isChassis, isCard, generateQTMSPartNumber, generateProductPartNumber, ShippingTerms, PaymentTerms } from "@/types/product";
 import { Quote } from "@/types/quote";
 import { ShoppingCart, Save, Send, ExternalLink, Settings, Plus, Trash2, Monitor } from "lucide-react";
 import { generateQuotePDF } from '@/utils/pdfGenerator';
@@ -335,7 +335,7 @@ const BOMBuilder = ({ user }: BOMBuilderProps) => {
     }));
   };
 
-  const updateLevel3Customizations = (bomItemId: string, customizations: Level3Customization[]) => {
+  const updateLevel3Customizations = (bomItemId: string, customizations: Level3Product[]) => {
     setBomItems(prev => prev.map(item =>
       item.id === bomItemId ? { ...item, level3Customizations: customizations } : item
     ));

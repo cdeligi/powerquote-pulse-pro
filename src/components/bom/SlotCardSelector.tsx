@@ -55,23 +55,6 @@ const SlotCardSelector = ({ chassis, slot, onCardSelect, onClose, canSeePrices }
       partNumber: 'ANA-16CH-001'
     },
     {
-      id: 'display-card-1',
-      name: 'Local Display Interface',
-      parentProductId: chassis.id,
-      type: 'display' as const,
-      description: 'Local HMI display interface card',
-      price: 950,
-      enabled: true,
-      slotRequirement: 1,
-      compatibleChassis: ['LTX'],
-      specifications: {
-        display: 'LCD',
-        resolution: '320x240',
-        backlight: 'LED'
-      },
-      partNumber: 'DIS-LCD-001'
-    },
-    {
       id: 'bushing-card-1',
       name: 'Bushing Monitoring Card',
       parentProductId: chassis.id,
@@ -86,6 +69,26 @@ const SlotCardSelector = ({ chassis, slot, onCardSelect, onClose, canSeePrices }
         measurement: 'Capacitance & Tan Delta'
       },
       partNumber: 'BSH-12CH-001'
+    }
+  ];
+
+  const getDisplayCards = () => [
+    {
+      id: 'display-card-1',
+      name: 'Local Display Interface',
+      parentProductId: chassis.id,
+      type: 'display' as const,
+      description: 'Local HMI display interface card',
+      price: 950,
+      enabled: true,
+      slotRequirement: 1,
+      compatibleChassis: ['LTX', 'MTX', 'STX'],
+      specifications: {
+        display: 'LCD',
+        resolution: '320x240',
+        backlight: 'LED'
+      },
+      partNumber: 'DIS-LCD-001'
     }
   ];
 
@@ -146,23 +149,31 @@ const SlotCardSelector = ({ chassis, slot, onCardSelect, onClose, canSeePrices }
     }
   ];
 
-  const availableCards = [...getBasicCards(), ...getFiberCards()];
-
-  // Filter cards based on chassis compatibility and slot restrictions
-  const compatibleCards = availableCards.filter(card => {
-    if (!card.compatibleChassis.includes(chassis.type)) return false;
+  // Determine which cards to show based on chassis type and slot
+  const getAvailableCards = () => {
+    let cards = [];
     
-    // Special handling for display cards in LTX chassis
+    // For LTX chassis slot 8, only show display cards
     if (chassis.type === 'LTX' && slot === 8) {
-      return card.type === 'display';
+      cards = getDisplayCards();
+    } else {
+      // For all other slots and chassis types, show basic cards and fiber cards
+      cards = [...getBasicCards(), ...getFiberCards()];
+      
+      // Add display cards for non-slot-8 positions in MTX and STX
+      if (chassis.type !== 'LTX') {
+        cards = [...cards, ...getDisplayCards()];
+      }
     }
     
-    // Prevent display cards from being placed in non-slot-8 positions in LTX
-    if (chassis.type === 'LTX' && card.type === 'display' && slot !== 8) {
-      return false;
-    }
-    
-    return true;
+    return cards;
+  };
+
+  const availableCards = getAvailableCards();
+
+  // Filter cards based on chassis compatibility
+  const compatibleCards = availableCards.filter(card => {
+    return card.compatibleChassis.includes(chassis.type);
   });
 
   const handleCardSelect = (card: any) => {
