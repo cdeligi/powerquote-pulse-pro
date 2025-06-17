@@ -116,6 +116,34 @@ const Level2OptionsSelector = ({
               frequency: '5 kHz - 2 MHz',
               sensitivity: 'Ultra-high'
             }
+          },
+          {
+            id: `dn50-drain-coupler-${level1Product.id}`,
+            name: 'DN50 Drain Type Coupler',
+            parentProductId: level1Product.id,
+            type: 'Standard',
+            description: 'DN50 drain type partial discharge coupler',
+            price: 3200,
+            enabled: true,
+            specifications: {
+              couplerType: 'DN50',
+              connectionType: 'Drain Type',
+              diameter: '50mm'
+            }
+          },
+          {
+            id: `dn25-drain-coupler-${level1Product.id}`,
+            name: 'DN25 Drain Type Coupler',
+            parentProductId: level1Product.id,
+            type: 'Standard',
+            description: 'DN25 drain type partial discharge coupler',
+            price: 2900,
+            enabled: true,
+            specifications: {
+              couplerType: 'DN25',
+              connectionType: 'Drain Type',
+              diameter: '25mm'
+            }
           }
         );
         break;
@@ -126,7 +154,7 @@ const Level2OptionsSelector = ({
             id: `relay-card-${level1Product.id}`,
             name: 'Relay Card',
             parentProductId: level1Product.id,
-            type: 'relay',
+            type: 'Standard',
             description: '8-channel relay output card',
             price: 1800,
             enabled: true
@@ -135,7 +163,7 @@ const Level2OptionsSelector = ({
             id: `analog-card-${level1Product.id}`,
             name: 'Analog Card',
             parentProductId: level1Product.id,
-            type: 'analog',
+            type: 'Standard',
             description: '8-channel analog input card',
             price: 2200,
             enabled: true
@@ -144,7 +172,7 @@ const Level2OptionsSelector = ({
             id: `fiber-card-${level1Product.id}`,
             name: 'Fiber Card',
             parentProductId: level1Product.id,
-            type: 'fiber',
+            type: 'Standard',
             description: 'Fiber optic communication card',
             price: 3200,
             enabled: true
@@ -153,7 +181,7 @@ const Level2OptionsSelector = ({
             id: `display-card-${level1Product.id}`,
             name: 'Display Card',
             parentProductId: level1Product.id,
-            type: 'display',
+            type: 'Standard',
             description: 'LCD display interface card',
             price: 1500,
             enabled: true
@@ -162,7 +190,7 @@ const Level2OptionsSelector = ({
             id: `bushing-card-${level1Product.id}`,
             name: 'Bushing Card',
             parentProductId: level1Product.id,
-            type: 'bushing',
+            type: 'Standard',
             description: 'Bushing monitoring interface card',
             price: 2800,
             enabled: true

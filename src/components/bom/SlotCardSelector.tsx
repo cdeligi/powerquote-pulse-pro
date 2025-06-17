@@ -4,6 +4,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { X } from "lucide-react";
 
 interface SlotCardSelectorProps {
@@ -15,7 +16,9 @@ interface SlotCardSelectorProps {
 }
 
 const SlotCardSelector = ({ chassis, slot, onCardSelect, onClose, canSeePrices }: SlotCardSelectorProps) => {
-  const availableCards = [
+  const [selectedFiberInputs, setSelectedFiberInputs] = useState<number>(4);
+
+  const getBasicCards = () => [
     {
       id: 'relay-card-1',
       name: 'Basic Relay Card',
@@ -49,23 +52,6 @@ const SlotCardSelector = ({ chassis, slot, onCardSelect, onClose, canSeePrices }
         inputRange: '±10V, 4-20mA'
       },
       partNumber: 'ANA-16CH-001'
-    },
-    {
-      id: 'fiber-card-1',
-      name: 'Fiber Optic Communication Card',
-      parentProductId: chassis.id,
-      type: 'fiber' as const,
-      description: 'High-speed fiber optic interface',
-      price: 1850,
-      enabled: true,
-      slotRequirement: 1,
-      compatibleChassis: ['LTX', 'MTX', 'STX'],
-      specifications: {
-        ports: 2,
-        speed: '1Gbps',
-        connector: 'LC'
-      },
-      partNumber: 'FIB-2P-001'
     },
     {
       id: 'display-card-1',
@@ -102,6 +88,65 @@ const SlotCardSelector = ({ chassis, slot, onCardSelect, onClose, canSeePrices }
     }
   ];
 
+  const getFiberCards = () => [
+    {
+      id: 'fiber-card-4-input',
+      name: 'Fiber Optic Communication Card (4 Inputs)',
+      parentProductId: chassis.id,
+      type: 'fiber' as const,
+      description: 'High-speed fiber optic interface with 4 inputs',
+      price: 1850,
+      enabled: true,
+      slotRequirement: 1,
+      compatibleChassis: ['LTX', 'MTX', 'STX'],
+      specifications: {
+        ports: 2,
+        inputs: 4,
+        speed: '1Gbps',
+        connector: 'LC'
+      },
+      partNumber: 'FIB-4I-001'
+    },
+    {
+      id: 'fiber-card-6-input',
+      name: 'Fiber Optic Communication Card (6 Inputs)',
+      parentProductId: chassis.id,
+      type: 'fiber' as const,
+      description: 'High-speed fiber optic interface with 6 inputs',
+      price: 2150,
+      enabled: true,
+      slotRequirement: 1,
+      compatibleChassis: ['LTX', 'MTX', 'STX'],
+      specifications: {
+        ports: 2,
+        inputs: 6,
+        speed: '1Gbps',
+        connector: 'LC'
+      },
+      partNumber: 'FIB-6I-001'
+    },
+    {
+      id: 'fiber-card-8-input',
+      name: 'Fiber Optic Communication Card (8 Inputs)',
+      parentProductId: chassis.id,
+      type: 'fiber' as const,
+      description: 'High-speed fiber optic interface with 8 inputs',
+      price: 2450,
+      enabled: true,
+      slotRequirement: 1,
+      compatibleChassis: ['LTX', 'MTX', 'STX'],
+      specifications: {
+        ports: 2,
+        inputs: 8,
+        speed: '1Gbps',
+        connector: 'LC'
+      },
+      partNumber: 'FIB-8I-001'
+    }
+  ];
+
+  const availableCards = [...getBasicCards(), ...getFiberCards()];
+
   // Filter cards based on chassis compatibility and slot restrictions
   const compatibleCards = availableCards.filter(card => {
     if (!card.compatibleChassis.includes(chassis.type)) return false;
@@ -119,9 +164,13 @@ const SlotCardSelector = ({ chassis, slot, onCardSelect, onClose, canSeePrices }
     return true;
   });
 
+  const handleCardSelect = (card: any) => {
+    onCardSelect(card, slot);
+  };
+
   return (
     <Dialog open={true} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl bg-gray-900 border-gray-800 text-white">
+      <DialogContent className="max-w-5xl bg-gray-900 border-gray-800 text-white max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-white flex items-center justify-between">
             Select Card for Slot {slot}
@@ -139,13 +188,18 @@ const SlotCardSelector = ({ chassis, slot, onCardSelect, onClose, canSeePrices }
                 <CardDescription className="text-gray-400">
                   {card.description}
                 </CardDescription>
-                <div className="flex gap-2">
+                <div className="flex gap-2 flex-wrap">
                   <Badge variant="outline" className="text-white border-gray-500">
                     {card.slotRequirement} slot{card.slotRequirement > 1 ? 's' : ''}
                   </Badge>
                   <Badge variant="outline" className="text-white border-gray-500">
                     {card.type}
                   </Badge>
+                  {card.specifications.inputs && (
+                    <Badge variant="outline" className="text-white border-gray-500">
+                      {card.specifications.inputs} inputs
+                    </Badge>
+                  )}
                 </div>
               </CardHeader>
               <CardContent>
@@ -167,7 +221,7 @@ const SlotCardSelector = ({ chassis, slot, onCardSelect, onClose, canSeePrices }
                 
                 <Button 
                   className="w-full bg-red-600 hover:bg-red-700 text-white"
-                  onClick={() => onCardSelect(card, slot)}
+                  onClick={() => handleCardSelect(card)}
                 >
                   Select Card
                 </Button>

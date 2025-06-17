@@ -74,42 +74,6 @@ const Level1ProductSelector = ({ onProductSelect, selectedProduct, canSeePrices,
     }
   };
 
-  const getLevel2Products = (parentProductId: string): Level2Product[] => {
-    if (parentProductId === 'qpdm') {
-      return [
-        {
-          id: 'ic43-coupler',
-          name: 'IC43 Coupler',
-          parentProductId: 'qpdm',
-          type: 'Standard',
-          description: 'IC43 partial discharge coupler for transformer monitoring',
-          price: 2500,
-          enabled: true,
-          specifications: {
-            couplerType: 'IC43',
-            frequency: '10 kHz - 1 MHz',
-            sensitivity: 'High'
-          }
-        },
-        {
-          id: 'ic44-coupler',
-          name: 'IC44 Coupler',
-          parentProductId: 'qpdm',
-          type: 'Standard',
-          description: 'IC44 partial discharge coupler for enhanced detection',
-          price: 2800,
-          enabled: true,
-          specifications: {
-            couplerType: 'IC44',
-            frequency: '5 kHz - 2 MHz',
-            sensitivity: 'Ultra-high'
-          }
-        }
-      ];
-    }
-    return [];
-  };
-
   const products = getProducts();
   const [dgaConfiguration, setDgaConfiguration] = useState<Record<string, any>>({});
   const [pdConfiguration, setPdConfiguration] = useState<Record<string, any>>({});
@@ -132,11 +96,12 @@ const Level1ProductSelector = ({ onProductSelect, selectedProduct, canSeePrices,
     const configuration = productType === 'DGA' ? dgaConfiguration : pdConfiguration;
     onProductSelect(configuringProduct, configuration);
     setShowConfiguration(false);
-    setConfiguringProduct(null);
     
     // Open Level 2 options for QPDM
     if (configuringProduct.type === 'QPDM') {
       setShowLevel2Options(true);
+    } else {
+      setConfiguringProduct(null);
     }
   };
 
@@ -150,6 +115,7 @@ const Level1ProductSelector = ({ onProductSelect, selectedProduct, canSeePrices,
   const handleLevel2OptionsSelect = (options: Level2Product[]) => {
     setSelectedLevel2Options(options);
     setShowLevel2Options(false);
+    setConfiguringProduct(null);
     
     // Add each selected Level 2 option as a separate product
     options.filter(opt => opt.enabled).forEach(option => {
@@ -167,7 +133,7 @@ const Level1ProductSelector = ({ onProductSelect, selectedProduct, canSeePrices,
           <CardDescription className="text-gray-400">
             {productType === 'DGA' 
               ? 'Select dissolved gas analysis monitoring systems'
-              : 'Select partial discharge monitoring systems'
+              : 'Select partial discharge monitoring systems and their couplers'
             }
           </CardDescription>
         </CardHeader>
@@ -202,8 +168,13 @@ const Level1ProductSelector = ({ onProductSelect, selectedProduct, canSeePrices,
 
                     {product.hasQuantitySelection && (
                       <div className="mb-3">
-                        <p className="text-sm text-gray-400 mb-1">Configurable Channels:</p>
-                        <Badge variant="secondary" className="text-xs">3-6 Channels</Badge>
+                        <p className="text-sm text-gray-400 mb-1">Available Couplers:</p>
+                        <div className="flex flex-wrap gap-1">
+                          <Badge variant="secondary" className="text-xs">IC43 Coupler</Badge>
+                          <Badge variant="secondary" className="text-xs">IC44 Coupler</Badge>
+                          <Badge variant="secondary" className="text-xs">DN50 Drain Type</Badge>
+                          <Badge variant="secondary" className="text-xs">DN25 Drain Type</Badge>
+                        </div>
                       </div>
                     )}
 
@@ -342,7 +313,7 @@ const Level1ProductSelector = ({ onProductSelect, selectedProduct, canSeePrices,
                 onClick={handleConfigurationSave}
                 className="bg-red-600 hover:bg-red-700"
               >
-                Add to BOM
+                {productType === 'PD' ? 'Next: Select Couplers' : 'Add to BOM'}
               </Button>
             </div>
           </div>
@@ -357,7 +328,10 @@ const Level1ProductSelector = ({ onProductSelect, selectedProduct, canSeePrices,
           selectedOptions={selectedLevel2Options}
           canSeePrices={canSeePrices}
           isOpen={showLevel2Options}
-          onClose={() => setShowLevel2Options(false)}
+          onClose={() => {
+            setShowLevel2Options(false);
+            setConfiguringProduct(null);
+          }}
         />
       )}
     </>
