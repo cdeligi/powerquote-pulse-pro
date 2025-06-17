@@ -1,10 +1,9 @@
-
 import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Settings, Save, Mail, AlertTriangle } from "lucide-react";
+import { Settings, Save, Mail, AlertTriangle, Calendar } from "lucide-react";
 
 interface AdminSettingsProps {
   onSettingsSave?: (settings: AdminSettings) => void;
@@ -15,6 +14,7 @@ interface AdminSettings {
   ccEmails: string[];
   emailSubjectPrefix: string;
   marginWarningThreshold: number;
+  quoteValidityDays: number; // New field for quote validity
 }
 
 const AdminSettings = ({ onSettingsSave }: AdminSettingsProps) => {
@@ -23,6 +23,7 @@ const AdminSettings = ({ onSettingsSave }: AdminSettingsProps) => {
   const [newCcEmail, setNewCcEmail] = useState('');
   const [emailSubjectPrefix, setEmailSubjectPrefix] = useState('[PowerQuotePro]');
   const [marginWarningThreshold, setMarginWarningThreshold] = useState(25);
+  const [quoteValidityDays, setQuoteValidityDays] = useState(30); // New state for quote validity
 
   const handleAddCcEmail = () => {
     if (newCcEmail && !ccEmails.includes(newCcEmail)) {
@@ -40,7 +41,8 @@ const AdminSettings = ({ onSettingsSave }: AdminSettingsProps) => {
       ordersTeamEmail,
       ccEmails,
       emailSubjectPrefix,
-      marginWarningThreshold
+      marginWarningThreshold,
+      quoteValidityDays
     };
     
     // Save to localStorage or send to backend
@@ -63,6 +65,51 @@ const AdminSettings = ({ onSettingsSave }: AdminSettingsProps) => {
           Configure system-wide settings and email notifications
         </p>
       </div>
+
+      {/* Quote Validity Settings */}
+      <Card className="bg-gray-900 border-gray-800">
+        <CardHeader>
+          <CardTitle className="text-white flex items-center">
+            <Calendar className="mr-2 h-5 w-5" />
+            Quote Validity Configuration
+          </CardTitle>
+          <CardDescription className="text-gray-400">
+            Configure quote expiration settings
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div>
+            <Label htmlFor="quote-validity" className="text-white font-medium mb-2 block">
+              Quote Validity Period (Days) *
+            </Label>
+            <Input
+              id="quote-validity"
+              type="number"
+              min="1"
+              max="365"
+              value={quoteValidityDays}
+              onChange={(e) => setQuoteValidityDays(Number(e.target.value))}
+              className="bg-gray-800 border-gray-600 text-white placeholder:text-gray-400 focus:border-red-500 focus:ring-red-500"
+              placeholder="30"
+            />
+            <p className="text-gray-400 text-sm mt-1">
+              All quotes will be valid for this number of days from creation date. 
+              Current setting: {quoteValidityDays} days
+            </p>
+          </div>
+
+          {/* Preview validity message */}
+          <div className="bg-gray-800 p-4 rounded border border-blue-600">
+            <div className="flex items-center space-x-2">
+              <Calendar className="h-4 w-4 text-blue-500" />
+              <span className="text-blue-500 font-medium">Preview Quote Validity:</span>
+            </div>
+            <p className="text-blue-400 mt-2 text-sm">
+              "Valid Until: {new Date(Date.now() + quoteValidityDays * 24 * 60 * 60 * 1000).toLocaleDateString()}"
+            </p>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Margin Warning Threshold Settings */}
       <Card className="bg-gray-900 border-gray-800">
@@ -109,6 +156,7 @@ const AdminSettings = ({ onSettingsSave }: AdminSettingsProps) => {
         </CardContent>
       </Card>
 
+      {/* Orders Team Email Configuration */}
       <Card className="bg-gray-900 border-gray-800">
         <CardHeader>
           <CardTitle className="text-white flex items-center">

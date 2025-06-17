@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { User } from "@/types/auth";
 import { UserRegistrationRequest, SecurityAuditLog } from "@/types/user-management";
@@ -8,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -23,17 +23,53 @@ import {
   Unlock,
   UserCheck,
   UserX,
-  Activity
+  Activity,
+  Settings
 } from "lucide-react";
 
 interface UserManagementProps {
   user: User;
 }
 
+// Extended user interface for active users
+interface ActiveUser extends User {
+  status: 'active' | 'suspended' | 'terminated';
+  lastLogin: string;
+  createdAt: string;
+}
+
 const UserManagement = ({ user }: UserManagementProps) => {
   const [selectedRequest, setSelectedRequest] = useState<UserRegistrationRequest | null>(null);
+  const [selectedUser, setSelectedUser] = useState<ActiveUser | null>(null);
   const [rejectionReason, setRejectionReason] = useState('');
+  const [terminationReason, setTerminationReason] = useState('');
   const [isReviewDialogOpen, setIsReviewDialogOpen] = useState(false);
+  const [isUserManagementDialogOpen, setIsUserManagementDialogOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState("requests");
+
+  // Mock active users data
+  const [activeUsers, setActiveUsers] = useState<ActiveUser[]>([
+    {
+      id: 'user-001',
+      name: 'John Smith',
+      email: 'john.smith@acmepower.com',
+      role: 'level2',
+      department: 'sales',
+      status: 'active',
+      lastLogin: '2024-01-16T14:30:00Z',
+      createdAt: '2024-01-10T09:00:00Z'
+    },
+    {
+      id: 'user-002',
+      name: 'Sarah Jones',
+      email: 'sarah.jones@gridtech.com',
+      role: 'level1',
+      department: 'engineering',
+      status: 'active',
+      lastLogin: '2024-01-15T16:45:00Z',
+      createdAt: '2024-01-12T11:30:00Z'
+    }
+  ]);
 
   // Mock data - in real app this would come from API
   const [pendingRequests, setPendingRequests] = useState<UserRegistrationRequest[]>([
@@ -53,30 +89,6 @@ const UserManagement = ({ user }: UserManagementProps) => {
       createdAt: '2024-01-16T10:30:00Z',
       ipAddress: '192.168.1.100',
       userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-      loginAttempts: 0,
-      isLocked: false,
-      twoFactorEnabled: false,
-      agreedToTerms: true,
-      agreedToPrivacyPolicy: true
-    },
-    {
-      id: 'REG-2024-002',
-      email: 'sarah.jones@gridtech.com',
-      firstName: 'Sarah',
-      lastName: 'Jones',
-      department: 'engineering',
-      jobTitle: 'Application Engineer',
-      phoneNumber: '+1 (555) 987-6543',
-      businessJustification: 'As an application engineer, I require access to create detailed technical quotes and BOMs for our transformer monitoring projects. This access is essential for my daily responsibilities.',
-      requestedRole: 'level1',
-      managerEmail: 'eng.manager@gridtech.com',
-      companyName: 'GridTech Engineering',
-      status: 'under_review',
-      createdAt: '2024-01-15T14:15:00Z',
-      reviewedAt: '2024-01-16T09:00:00Z',
-      reviewedBy: user.id,
-      ipAddress: '10.0.1.50',
-      userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)',
       loginAttempts: 0,
       isLocked: false,
       twoFactorEnabled: false,
@@ -118,6 +130,23 @@ const UserManagement = ({ user }: UserManagementProps) => {
   ];
 
   const handleApproveRequest = (requestId: string) => {
+    const request = pendingRequests.find(req => req.id === requestId);
+    if (!request) return;
+
+    // Create new active user
+    const newUser: ActiveUser = {
+      id: `user-${Date.now()}`,
+      name: `${request.firstName} ${request.lastName}`,
+      email: request.email,
+      role: request.requestedRole,
+      department: request.department,
+      status: 'active',
+      lastLogin: 'Never',
+      createdAt: new Date().toISOString()
+    };
+
+    setActiveUsers(prev => [...prev, newUser]);
+    
     setPendingRequests(prev => 
       prev.map(req => 
         req.id === requestId 
@@ -131,7 +160,6 @@ const UserManagement = ({ user }: UserManagementProps) => {
       )
     );
     console.log(`Approved registration request: ${requestId}`);
-    // In real app, would create user account and send welcome email
   };
 
   const handleRejectRequest = () => {
@@ -155,6 +183,43 @@ const UserManagement = ({ user }: UserManagementProps) => {
     setSelectedRequest(null);
     setRejectionReason('');
     console.log(`Rejected registration request: ${selectedRequest.id}`);
+  };
+
+  const handleChangeUserRole = (userId: string, newRole: 'level1' | 'level2') => {
+    setActiveUsers(prev => 
+      prev.map(user => 
+        user.id === userId ? { ...user, role: newRole } : user
+      )
+    );
+    console.log(`Changed user ${userId} role to ${newRole}`);
+  };
+
+  const handleTerminateUser = () => {
+    if (!selectedUser || !terminationReason.trim()) return;
+
+    setActiveUsers(prev => 
+      prev.map(user => 
+        user.id === selectedUser.id 
+          ? { ...user, status: 'terminated' as const }
+          : user
+      )
+    );
+    
+    setIsUserManagementDialogOpen(false);
+    setSelectedUser(null);
+    setTerminationReason('');
+    console.log(`Terminated user: ${selectedUser.id}`);
+  };
+
+  const handleSuspendUser = (userId: string) => {
+    setActiveUsers(prev => 
+      prev.map(user => 
+        user.id === userId 
+          ? { ...user, status: user.status === 'suspended' ? 'active' : 'suspended' }
+          : user
+      )
+    );
+    console.log(`Toggled suspension for user: ${userId}`);
   };
 
   const getStatusBadge = (status: UserRegistrationRequest['status']) => {
@@ -187,6 +252,36 @@ const UserManagement = ({ user }: UserManagementProps) => {
     return (
       <Badge className={`${colors[severity]} text-white text-xs`}>
         {severity.toUpperCase()}
+      </Badge>
+    );
+  };
+
+  const getUserStatusBadge = (status: ActiveUser['status']) => {
+    const badges = {
+      active: { color: 'bg-green-600', text: 'Active' },
+      suspended: { color: 'bg-yellow-600', text: 'Suspended' },
+      terminated: { color: 'bg-red-600', text: 'Terminated' }
+    };
+    
+    const badge = badges[status];
+    
+    return (
+      <Badge className={`${badge.color} text-white`}>
+        {badge.text}
+      </Badge>
+    );
+  };
+
+  const getRoleBadge = (role: 'level1' | 'level2' | 'admin') => {
+    const colors = {
+      level1: 'bg-blue-600',
+      level2: 'bg-purple-600',
+      admin: 'bg-red-600'
+    };
+    
+    return (
+      <Badge className={`${colors[role]} text-white`}>
+        {role === 'level1' ? 'Level 1 Sales' : role === 'level2' ? 'Level 2 Sales' : 'Admin'}
       </Badge>
     );
   };
@@ -267,10 +362,13 @@ const UserManagement = ({ user }: UserManagementProps) => {
         </Card>
       </div>
 
-      <Tabs defaultValue="requests" className="w-full">
-        <TabsList className="grid w-full grid-cols-2 bg-gray-800">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="grid w-full grid-cols-3 bg-gray-800">
           <TabsTrigger value="requests" className="text-white data-[state=active]:bg-red-600">
             Registration Requests
+          </TabsTrigger>
+          <TabsTrigger value="users" className="text-white data-[state=active]:bg-red-600">
+            Active Users
           </TabsTrigger>
           <TabsTrigger value="audit" className="text-white data-[state=active]:bg-red-600">
             Security Audit Log
@@ -422,6 +520,103 @@ const UserManagement = ({ user }: UserManagementProps) => {
           </Card>
         </TabsContent>
 
+        <TabsContent value="users">
+          <Card className="bg-gray-900 border-gray-800">
+            <CardHeader>
+              <CardTitle className="text-white flex items-center">
+                <Users className="h-5 w-5 mr-2" />
+                Active Users Management
+              </CardTitle>
+              <CardDescription className="text-gray-400">
+                Manage user roles, permissions, and access status
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow className="border-gray-800">
+                    <TableHead className="text-gray-300">User</TableHead>
+                    <TableHead className="text-gray-300">Role</TableHead>
+                    <TableHead className="text-gray-300">Status</TableHead>
+                    <TableHead className="text-gray-300">Last Login</TableHead>
+                    <TableHead className="text-gray-300">Created</TableHead>
+                    <TableHead className="text-gray-300">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {activeUsers.map((activeUser) => (
+                    <TableRow key={activeUser.id} className="border-gray-800">
+                      <TableCell>
+                        <div>
+                          <p className="font-medium text-white">{activeUser.name}</p>
+                          <p className="text-sm text-gray-400">{activeUser.email}</p>
+                          <p className="text-xs text-gray-500">{activeUser.department}</p>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center space-x-2">
+                          {getRoleBadge(activeUser.role)}
+                          <Select
+                            value={activeUser.role}
+                            onValueChange={(newRole: 'level1' | 'level2') => 
+                              handleChangeUserRole(activeUser.id, newRole)
+                            }
+                          >
+                            <SelectTrigger className="w-32 h-8 bg-gray-800 border-gray-600 text-white">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent className="bg-gray-800 border-gray-600">
+                              <SelectItem value="level1" className="text-white">Level 1</SelectItem>
+                              <SelectItem value="level2" className="text-white">Level 2</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        {getUserStatusBadge(activeUser.status)}
+                      </TableCell>
+                      <TableCell className="text-gray-300">
+                        {activeUser.lastLogin === 'Never' ? 'Never' : new Date(activeUser.lastLogin).toLocaleDateString()}
+                      </TableCell>
+                      <TableCell className="text-gray-300">
+                        {new Date(activeUser.createdAt).toLocaleDateString()}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex space-x-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleSuspendUser(activeUser.id)}
+                            disabled={activeUser.status === 'terminated'}
+                            className="text-white border-gray-600"
+                          >
+                            {activeUser.status === 'suspended' ? (
+                              <Unlock className="h-4 w-4" />
+                            ) : (
+                              <Lock className="h-4 w-4" />
+                            )}
+                          </Button>
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            onClick={() => {
+                              setSelectedUser(activeUser);
+                              setIsUserManagementDialogOpen(true);
+                            }}
+                            disabled={activeUser.status === 'terminated'}
+                          >
+                            <UserX className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
         <TabsContent value="audit">
           <Card className="bg-gray-900 border-gray-800">
             <CardHeader>
@@ -470,6 +665,62 @@ const UserManagement = ({ user }: UserManagementProps) => {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* User Termination Dialog */}
+      <Dialog open={isUserManagementDialogOpen} onOpenChange={setIsUserManagementDialogOpen}>
+        <DialogContent className="bg-gray-900 border-gray-800">
+          <DialogHeader>
+            <DialogTitle className="text-white">Terminate User Access</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <Alert className="border-red-600 bg-red-600/10">
+              <AlertTriangle className="h-4 w-4 text-red-600" />
+              <AlertDescription className="text-red-200">
+                This action will permanently terminate the user's access to the system.
+              </AlertDescription>
+            </Alert>
+            
+            {selectedUser && (
+              <div className="bg-gray-800 p-4 rounded">
+                <p className="text-white"><strong>User:</strong> {selectedUser.name}</p>
+                <p className="text-gray-400"><strong>Email:</strong> {selectedUser.email}</p>
+                <p className="text-gray-400"><strong>Current Role:</strong> {selectedUser.role}</p>
+              </div>
+            )}
+            
+            <div>
+              <Label htmlFor="termination-reason" className="text-white">
+                Termination Reason *
+              </Label>
+              <Textarea
+                id="termination-reason"
+                value={terminationReason}
+                onChange={(e) => setTerminationReason(e.target.value)}
+                className="bg-gray-800 border-gray-700 text-white mt-2"
+                placeholder="Please provide a reason for terminating this user's access..."
+                rows={4}
+              />
+            </div>
+            
+            <div className="flex justify-end space-x-2">
+              <Button
+                variant="outline"
+                onClick={() => setIsUserManagementDialogOpen(false)}
+                className="border-gray-600 text-white hover:bg-gray-800"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleTerminateUser}
+                disabled={!terminationReason.trim()}
+                variant="destructive"
+              >
+                Terminate Access
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Rejection Dialog */}
       <Dialog open={isReviewDialogOpen} onOpenChange={setIsReviewDialogOpen}>

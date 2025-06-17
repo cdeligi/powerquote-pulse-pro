@@ -94,6 +94,6 @@ export interface BOMItem {
   configuration?: Record<string, any>;
   enabled: boolean;
   level2Options?: Level2Product[];
-  level3Customizations?: Level3Product[];
+  level3Customizations?: Level3Customization[]; // Fixed: Use Level3Customization instead of Level3Product
   partNumber?: string;
 }
