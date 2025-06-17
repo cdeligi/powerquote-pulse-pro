@@ -1080,6 +1080,7 @@ const BOMBuilder = ({ user }: BOMBuilderProps) => {
           </Card>
         </div>
       </div>
+    </div>
   );
 };
 
