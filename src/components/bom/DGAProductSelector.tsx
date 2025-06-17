@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -17,7 +18,6 @@ const DGAProductSelector = ({ onProductSelect, canSeePrices }: DGAProductSelecto
   const [selectedProducts, setSelectedProducts] = useState<Set<string>>(new Set());
   const [selectedLevel2Options, setSelectedLevel2Options] = useState<Record<string, Level2Product[]>>({});
   const [standaloneLevel2Options, setStandaloneLevel2Options] = useState<Level2Product[]>([]);
-  const [productConfigurations, setProductConfigurations] = useState<Record<string, Record<string, any>>>({});
 
   const dgaProducts: Level1Product[] = [
     {
@@ -103,10 +103,6 @@ const DGAProductSelector = ({ onProductSelect, canSeePrices }: DGAProductSelecto
       const updatedLevel2 = { ...selectedLevel2Options };
       delete updatedLevel2[productId];
       setSelectedLevel2Options(updatedLevel2);
-      // Remove configuration
-      const updatedConfigs = { ...productConfigurations };
-      delete updatedConfigs[productId];
-      setProductConfigurations(updatedConfigs);
     } else {
       newSelected.add(productId);
     }
@@ -145,34 +141,8 @@ const DGAProductSelector = ({ onProductSelect, canSeePrices }: DGAProductSelecto
     setStandaloneLevel2Options(updatedOptions);
   };
 
-  const handleProductConfigurationChange = (productId: string, key: string, value: any) => {
-    setProductConfigurations(prev => ({
-      ...prev,
-      [productId]: {
-        ...prev[productId],
-        [key]: value
-      }
-    }));
-  };
-
   const calculateProductPrice = (product: Level1Product, productId: string) => {
     let totalPrice = product.price;
-    
-    // Add configuration-based pricing
-    const config = productConfigurations[productId] || {};
-    Object.entries(config).forEach(([key, value]) => {
-      if (value) {
-        const incrementalPrices = {
-          'CalGas': 450,
-          'Helium Bottle': 280,
-          'Moisture Sensor': 320,
-          '4-20mA bridge': 180
-        };
-        if (incrementalPrices[key as keyof typeof incrementalPrices]) {
-          totalPrice += incrementalPrices[key as keyof typeof incrementalPrices];
-        }
-      }
-    });
     
     // Add level 2 options pricing
     const level2Total = (selectedLevel2Options[productId] || [])
@@ -189,13 +159,12 @@ const DGAProductSelector = ({ onProductSelect, canSeePrices }: DGAProductSelecto
   };
 
   const handleAddSelectedProducts = () => {
-    // Add selected Level 1 products with their configurations and Level 2 options
+    // Add selected Level 1 products with their Level 2 options
     selectedProducts.forEach(productId => {
       const product = dgaProducts.find(p => p.id === productId);
       if (product) {
-        const config = productConfigurations[productId] || {};
         const level2Opts = selectedLevel2Options[productId] || [];
-        onProductSelect(product, config, level2Opts);
+        onProductSelect(product, {}, level2Opts);
       }
     });
 
@@ -210,13 +179,12 @@ const DGAProductSelector = ({ onProductSelect, canSeePrices }: DGAProductSelecto
     setSelectedProducts(new Set());
     setSelectedLevel2Options({});
     setStandaloneLevel2Options([]);
-    setProductConfigurations({});
   };
 
   const getTotalPrice = () => {
     let total = 0;
     
-    // Level 1 products with their configurations and Level 2 options
+    // Level 1 products with their Level 2 options
     selectedProducts.forEach(productId => {
       const product = dgaProducts.find(p => p.id === productId);
       if (product) {
@@ -307,40 +275,6 @@ const DGAProductSelector = ({ onProductSelect, canSeePrices }: DGAProductSelecto
                       Product Information
                     </a>
                   )}
-
-                  {/* Level 2 Options for this product */}
-                  {isSelected && (
-                    <div className="mt-4 pt-4 border-t border-gray-700">
-                      <h4 className="text-white font-medium mb-3 text-sm">Add-on Options</h4>
-                      <div className="space-y-2">
-                        {level2Options.map((option) => {
-                          const isOptionSelected = (selectedLevel2Options[product.id] || [])
-                            .some(opt => opt.id === option.id && opt.enabled);
-                          
-                          return (
-                            <div key={option.id} className="flex items-center justify-between p-2 bg-gray-700 rounded">
-                              <div className="flex items-center space-x-2 flex-1">
-                                <Checkbox
-                                  checked={isOptionSelected}
-                                  onCheckedChange={() => handleLevel2OptionToggle(product.id, option)}
-                                  className="border-gray-600 data-[state=checked]:bg-red-600 data-[state=checked]:border-red-600"
-                                />
-                                <div className="flex-1">
-                                  <Label className="text-white font-medium text-xs">
-                                    {option.name}
-                                  </Label>
-                                  <p className="text-gray-400 text-xs">{option.description}</p>
-                                </div>
-                              </div>
-                              <span className="text-white font-bold text-xs ml-2">
-                                {canSeePrices ? `$${option.price.toLocaleString()}` : '—'}
-                              </span>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
                 </CardContent>
               </Card>
             );
@@ -353,7 +287,7 @@ const DGAProductSelector = ({ onProductSelect, canSeePrices }: DGAProductSelecto
       {/* Standalone Level 2 Products */}
       <div className="space-y-6">
         <div className="flex items-center justify-between">
-          <h3 className="text-xl font-semibold text-white">Standalone Add-ons</h3>
+          <h3 className="text-xl font-semibold text-white">Optional Add-ons</h3>
           <Badge variant="outline" className="text-white border-gray-500">
             {standaloneLevel2Options.filter(opt => opt.enabled).length} selected
           </Badge>
@@ -361,9 +295,9 @@ const DGAProductSelector = ({ onProductSelect, canSeePrices }: DGAProductSelecto
         
         <Card className="bg-gray-800 border-gray-700">
           <CardHeader>
-            <CardTitle className="text-white">Optional Accessories</CardTitle>
+            <CardTitle className="text-white">Select Add-on Options</CardTitle>
             <CardDescription className="text-gray-400">
-              These items can be ordered independently without a main product
+              Choose accessories to combine with your main DGA products or order separately
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -400,6 +334,54 @@ const DGAProductSelector = ({ onProductSelect, canSeePrices }: DGAProductSelecto
             </div>
           </CardContent>
         </Card>
+
+        {/* Selection Summary for Selected Add-ons */}
+        {selectedProducts.size > 0 && (
+          <Card className="bg-gray-700 border-gray-600">
+            <CardHeader>
+              <CardTitle className="text-white text-sm">Add-ons for Selected Products</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {Array.from(selectedProducts).map((productId) => {
+                  const product = dgaProducts.find(p => p.id === productId);
+                  const selectedOptions = selectedLevel2Options[productId] || [];
+                  
+                  return (
+                    <div key={productId} className="border border-gray-600 rounded p-3">
+                      <h4 className="text-white font-medium text-sm mb-2">{product?.name}</h4>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                        {level2Options.map((option) => {
+                          const isSelected = selectedOptions.some(opt => opt.id === option.id && opt.enabled);
+                          
+                          return (
+                            <div key={option.id} className="flex items-center justify-between p-2 bg-gray-800 rounded">
+                              <div className="flex items-center space-x-2 flex-1">
+                                <Checkbox
+                                  checked={isSelected}
+                                  onCheckedChange={() => handleLevel2OptionToggle(productId, option)}
+                                  className="border-gray-600 data-[state=checked]:bg-red-600 data-[state=checked]:border-red-600"
+                                />
+                                <div className="flex-1">
+                                  <Label className="text-white font-medium text-xs">
+                                    {option.name}
+                                  </Label>
+                                </div>
+                              </div>
+                              <span className="text-white font-bold text-xs ml-2">
+                                {canSeePrices ? `$${option.price.toLocaleString()}` : '—'}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       {/* Selection Summary and Add Button */}

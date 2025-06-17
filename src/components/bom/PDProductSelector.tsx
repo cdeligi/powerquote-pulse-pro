@@ -18,7 +18,6 @@ interface PDProductSelectorProps {
 
 const PDProductSelector = ({ onProductSelect, canSeePrices }: PDProductSelectorProps) => {
   const [selectedProducts, setSelectedProducts] = useState<Set<string>>(new Set());
-  const [selectedLevel2Options, setSelectedLevel2Options] = useState<Record<string, Level2Product[]>>({});
   const [standaloneLevel2Options, setStandaloneLevel2Options] = useState<Level2Product[]>([]);
   const [productConfigurations, setProductConfigurations] = useState<Record<string, Record<string, any>>>({});
 
@@ -36,16 +35,6 @@ const PDProductSelector = ({ onProductSelect, canSeePrices }: PDProductSelectorP
   ];
 
   const level2Options: Level2Product[] = [
-    {
-      id: 'channel-upgrade',
-      name: '6-Channel Upgrade',
-      parentProductId: '',
-      type: 'Standard' as Level2ProductType,
-      description: 'Upgrade QPDM to 6-channel monitoring',
-      price: 2500,
-      enabled: false,
-      partNumber: 'QPDM-6CH'
-    },
     {
       id: 'analysis-software',
       name: 'Advanced Analysis Software',
@@ -102,10 +91,6 @@ const PDProductSelector = ({ onProductSelect, canSeePrices }: PDProductSelectorP
     const newSelected = new Set(selectedProducts);
     if (newSelected.has(productId)) {
       newSelected.delete(productId);
-      // Remove associated level 2 options
-      const updatedLevel2 = { ...selectedLevel2Options };
-      delete updatedLevel2[productId];
-      setSelectedLevel2Options(updatedLevel2);
       // Remove configuration
       const updatedConfigs = { ...productConfigurations };
       delete updatedConfigs[productId];
@@ -114,24 +99,6 @@ const PDProductSelector = ({ onProductSelect, canSeePrices }: PDProductSelectorP
       newSelected.add(productId);
     }
     setSelectedProducts(newSelected);
-  };
-
-  const handleLevel2OptionToggle = (productId: string, option: Level2Product) => {
-    const currentOptions = selectedLevel2Options[productId] || [];
-    const existingIndex = currentOptions.findIndex(opt => opt.id === option.id);
-    
-    let updatedOptions;
-    if (existingIndex >= 0) {
-      updatedOptions = [...currentOptions];
-      updatedOptions[existingIndex] = { ...option, enabled: !option.enabled };
-    } else {
-      updatedOptions = [...currentOptions, { ...option, enabled: true }];
-    }
-    
-    setSelectedLevel2Options({
-      ...selectedLevel2Options,
-      [productId]: updatedOptions
-    });
   };
 
   const handleStandaloneLevel2Toggle = (option: Level2Product) => {
@@ -189,12 +156,7 @@ const PDProductSelector = ({ onProductSelect, canSeePrices }: PDProductSelectorP
       totalPrice += 2500; // Additional cost for 6-channel
     }
     
-    // Add level 2 options pricing
-    const level2Total = (selectedLevel2Options[productId] || [])
-      .filter(opt => opt.enabled)
-      .reduce((sum, opt) => sum + opt.price, 0);
-    
-    return totalPrice + level2Total;
+    return totalPrice;
   };
 
   const calculateStandaloneLevel2Price = () => {
@@ -211,13 +173,12 @@ const PDProductSelector = ({ onProductSelect, canSeePrices }: PDProductSelectorP
   };
 
   const handleAddSelectedProducts = () => {
-    // Add selected Level 1 products with their configurations and Level 2 options
+    // Add selected Level 1 products with their configurations
     selectedProducts.forEach(productId => {
       const product = pdProducts.find(p => p.id === productId);
       if (product) {
         const config = productConfigurations[productId] || {};
-        const level2Opts = selectedLevel2Options[productId] || [];
-        onProductSelect(product, config, level2Opts);
+        onProductSelect(product, config, []);
       }
     });
 
@@ -231,7 +192,6 @@ const PDProductSelector = ({ onProductSelect, canSeePrices }: PDProductSelectorP
 
     // Reset selections
     setSelectedProducts(new Set());
-    setSelectedLevel2Options({});
     setStandaloneLevel2Options([]);
     setProductConfigurations({});
   };
@@ -239,7 +199,7 @@ const PDProductSelector = ({ onProductSelect, canSeePrices }: PDProductSelectorP
   const getTotalPrice = () => {
     let total = 0;
     
-    // Level 1 products with their configurations and Level 2 options
+    // Level 1 products with their configurations
     selectedProducts.forEach(productId => {
       const product = pdProducts.find(p => p.id === productId);
       if (product) {
@@ -354,40 +314,6 @@ const PDProductSelector = ({ onProductSelect, canSeePrices }: PDProductSelectorP
                       </div>
                     </div>
                   )}
-
-                  {/* Level 2 Options for this product */}
-                  {isSelected && (
-                    <div className="mt-4 pt-4 border-t border-gray-700">
-                      <h4 className="text-white font-medium mb-3 text-sm">Add-on Options</h4>
-                      <div className="space-y-2">
-                        {level2Options.slice(0, 2).map((option) => {
-                          const isOptionSelected = (selectedLevel2Options[product.id] || [])
-                            .some(opt => opt.id === option.id && opt.enabled);
-                          
-                          return (
-                            <div key={option.id} className="flex items-center justify-between p-2 bg-gray-700 rounded">
-                              <div className="flex items-center space-x-2 flex-1">
-                                <Checkbox
-                                  checked={isOptionSelected}
-                                  onCheckedChange={() => handleLevel2OptionToggle(product.id, option)}
-                                  className="border-gray-600 data-[state=checked]:bg-red-600 data-[state=checked]:border-red-600"
-                                />
-                                <div className="flex-1">
-                                  <Label className="text-white font-medium text-xs">
-                                    {option.name}
-                                  </Label>
-                                  <p className="text-gray-400 text-xs">{option.description}</p>
-                                </div>
-                              </div>
-                              <span className="text-white font-bold text-xs ml-2">
-                                {canSeePrices ? `$${option.price.toLocaleString()}` : '—'}
-                              </span>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
                 </CardContent>
               </Card>
             );
@@ -400,7 +326,7 @@ const PDProductSelector = ({ onProductSelect, canSeePrices }: PDProductSelectorP
       {/* Standalone Level 2 Products */}
       <div className="space-y-6">
         <div className="flex items-center justify-between">
-          <h3 className="text-xl font-semibold text-white">Standalone Components</h3>
+          <h3 className="text-xl font-semibold text-white">Sensors & Accessories</h3>
           <Badge variant="outline" className="text-white border-gray-500">
             {standaloneLevel2Options.filter(opt => opt.enabled).length} selected
           </Badge>
@@ -408,9 +334,9 @@ const PDProductSelector = ({ onProductSelect, canSeePrices }: PDProductSelectorP
         
         <Card className="bg-gray-800 border-gray-700">
           <CardHeader>
-            <CardTitle className="text-white">Sensors & Accessories</CardTitle>
+            <CardTitle className="text-white">Available Components</CardTitle>
             <CardDescription className="text-gray-400">
-              These items can be ordered independently without a main product
+              These items can be ordered independently or with a main product
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -484,10 +410,8 @@ const PDProductSelector = ({ onProductSelect, canSeePrices }: PDProductSelectorP
                 <h4 className="text-white font-semibold text-lg">Selection Summary</h4>
                 <p className="text-gray-400">
                   {selectedProducts.size} main product{selectedProducts.size !== 1 ? 's' : ''} + {
-                    Object.values(selectedLevel2Options).flat().filter(opt => opt.enabled).length +
                     standaloneLevel2Options.filter(opt => opt.enabled).length
-                  } add-on{Object.values(selectedLevel2Options).flat().filter(opt => opt.enabled).length +
-                    standaloneLevel2Options.filter(opt => opt.enabled).length !== 1 ? 's' : ''}
+                  } component{standaloneLevel2Options.filter(opt => opt.enabled).length !== 1 ? 's' : ''}
                 </p>
               </div>
               <div className="text-right">
