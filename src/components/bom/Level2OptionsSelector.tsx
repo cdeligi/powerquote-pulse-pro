@@ -1,6 +1,6 @@
 
 import { useState } from "react";
-import { Level1Product, Level3Product } from "@/types/product";
+import { Level1Product, Level2Product } from "@/types/product";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -10,8 +10,8 @@ import { Plus, Settings } from "lucide-react";
 
 interface Level2OptionsSelectorProps {
   level1Product: Level1Product;
-  onOptionsSelect: (options: Level3Product[]) => void;
-  selectedOptions: Level3Product[];
+  onOptionsSelect: (options: Level2Product[]) => void;
+  selectedOptions: Level2Product[];
   canSeePrices: boolean;
   isOpen: boolean;
   onClose: () => void;
@@ -25,10 +25,10 @@ const Level2OptionsSelector = ({
   isOpen,
   onClose 
 }: Level2OptionsSelectorProps) => {
-  const [localOptions, setLocalOptions] = useState<Level3Product[]>(selectedOptions);
+  const [localOptions, setLocalOptions] = useState<Level2Product[]>(selectedOptions);
 
-  const getAvailableOptions = (): Level3Product[] => {
-    const baseOptions: Level3Product[] = [];
+  const getAvailableOptions = (): Level2Product[] => {
+    const baseOptions: Level2Product[] = [];
     
     switch (level1Product.type) {
       case 'TM8':
@@ -38,7 +38,7 @@ const Level2OptionsSelector = ({
             id: `calgas-${level1Product.id}`,
             name: 'CalGas Calibration System',
             parentProductId: level1Product.id,
-            type: 'accessory',
+            type: 'CalGas',
             description: 'Automated calibration gas system',
             price: 3500,
             enabled: true
@@ -47,7 +47,7 @@ const Level2OptionsSelector = ({
             id: `helium-${level1Product.id}`,
             name: 'Helium Bottle',
             parentProductId: level1Product.id,
-            type: 'accessory',
+            type: 'Standard',
             description: 'Helium reference bottle for calibration',
             price: 850,
             enabled: true
@@ -56,7 +56,7 @@ const Level2OptionsSelector = ({
             id: `moisture-${level1Product.id}`,
             name: 'Moisture Sensor',
             parentProductId: level1Product.id,
-            type: 'sensor',
+            type: 'Moisture',
             description: 'Oil moisture content monitoring',
             price: 2200,
             enabled: true
@@ -70,7 +70,7 @@ const Level2OptionsSelector = ({
             id: `bridge-${level1Product.id}`,
             name: '4-20 mA Bridge',
             parentProductId: level1Product.id,
-            type: 'accessory',
+            type: 'Standard',
             description: 'Current loop interface bridge',
             price: 1200,
             enabled: true
@@ -79,7 +79,7 @@ const Level2OptionsSelector = ({
             id: `moisture-tm1-${level1Product.id}`,
             name: 'Moisture Sensor',
             parentProductId: level1Product.id,
-            type: 'sensor',
+            type: 'Moisture',
             description: 'Oil moisture content monitoring',
             price: 2200,
             enabled: true
@@ -90,22 +90,32 @@ const Level2OptionsSelector = ({
       case 'QPDM':
         baseOptions.push(
           {
-            id: `qpdm-3ch-${level1Product.id}`,
-            name: '3-Channel Configuration',
+            id: `ic43-coupler-${level1Product.id}`,
+            name: 'IC43 Coupler',
             parentProductId: level1Product.id,
-            type: 'accessory',
-            description: '3-channel partial discharge monitoring',
-            price: 0,
-            enabled: true
+            type: 'Standard',
+            description: 'IC43 partial discharge coupler for transformer monitoring',
+            price: 2500,
+            enabled: true,
+            specifications: {
+              couplerType: 'IC43',
+              frequency: '10 kHz - 1 MHz',
+              sensitivity: 'High'
+            }
           },
           {
-            id: `qpdm-6ch-${level1Product.id}`,
-            name: '6-Channel Configuration',
+            id: `ic44-coupler-${level1Product.id}`,
+            name: 'IC44 Coupler',
             parentProductId: level1Product.id,
-            type: 'accessory',
-            description: '6-channel partial discharge monitoring',
-            price: 4500,
-            enabled: true
+            type: 'Standard',
+            description: 'IC44 partial discharge coupler for enhanced detection',
+            price: 2800,
+            enabled: true,
+            specifications: {
+              couplerType: 'IC44',
+              frequency: '5 kHz - 2 MHz',
+              sensitivity: 'Ultra-high'
+            }
           }
         );
         break;
@@ -166,7 +176,7 @@ const Level2OptionsSelector = ({
 
   const availableOptions = getAvailableOptions();
 
-  const toggleOption = (option: Level3Product) => {
+  const toggleOption = (option: Level2Product) => {
     const exists = localOptions.find(opt => opt.id === option.id);
     if (exists) {
       setLocalOptions(localOptions.filter(opt => opt.id !== option.id));
@@ -222,6 +232,13 @@ const Level2OptionsSelector = ({
                           {isSelected && <Badge variant="outline" className="text-xs">Selected</Badge>}
                         </div>
                         <p className="text-sm text-gray-400 mb-2">{option.description}</p>
+                        {option.specifications && (
+                          <div className="text-xs text-gray-500 mb-2">
+                            {Object.entries(option.specifications).map(([key, value]) => (
+                              <div key={key}>{key}: {value}</div>
+                            ))}
+                          </div>
+                        )}
                         <p className="text-sm font-bold text-white">
                           {canSeePrices ? `$${option.price.toLocaleString()}` : '—'}
                         </p>
