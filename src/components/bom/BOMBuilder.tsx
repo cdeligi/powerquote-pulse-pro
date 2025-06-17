@@ -335,7 +335,7 @@ const BOMBuilder = ({ user }: BOMBuilderProps) => {
     }));
   };
 
-  const updateLevel3Customizations = (bomItemId: string, customizations: Level3Product[]) => {
+  const updateLevel3Customizations = (bomItemId: string, customizations: Level3Customization[]) => {
     setBomItems(prev => prev.map(item =>
       item.id === bomItemId ? { ...item, level3Customizations: customizations } : item
     ));
