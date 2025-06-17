@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -14,9 +13,7 @@ interface DGAProductSelectorProps {
   canSeePrices: boolean;
 }
 
-const D
-
-GAProductSelector = ({ onProductSelect, canSeePrices }: DGAProductSelectorProps) => {
+const DGAProductSelector = ({ onProductSelect, canSeePrices }: DGAProductSelectorProps) => {
   const [selectedProducts, setSelectedProducts] = useState<Set<string>>(new Set());
   const [selectedLevel2Options, setSelectedLevel2Options] = useState<Record<string, Level2Product[]>>({});
   const [standaloneLevel2Options, setStandaloneLevel2Options] = useState<Level2Product[]>([]);

@@ -1,9 +1,12 @@
 
 // Level 1: Main Product Categories (QTMS, etc.)
+export type ProductType = 'QTMS' | 'TM8' | 'TM3' | 'TM1' | 'QPDM';
+export type Level2ProductType = 'LTX' | 'MTX' | 'STX' | 'CalGas' | 'Moisture' | 'Standard';
+
 export interface Level1Product {
   id: string;
   name: string;
-  type: 'QTMS' | 'TM8' | 'TM3' | 'TM1' | 'QPDM';
+  type: ProductType;
   description: string;
   price: number;
   cost?: number; // Hidden admin-only field
@@ -20,7 +23,7 @@ export interface Level2Product {
   id: string;
   name: string;
   parentProductId: string; // Links to Level1Product
-  type: 'LTX' | 'MTX' | 'STX' | 'CalGas' | 'Moisture' | 'Standard';
+  type: Level2ProductType;
   description: string;
   price: number;
   cost?: number;
