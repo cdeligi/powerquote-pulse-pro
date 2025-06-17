@@ -49,7 +49,8 @@ const SlotCardSelector = ({ chassis, slot, onCardSelect, onClose, canSeePrices }
       specifications: {
         channels: 16,
         resolution: '16-bit',
-        inputRange: '±10V, 4-20mA'
+        inputRange: '±10V, 4-20mA',
+        inputs: 16
       },
       partNumber: 'ANA-16CH-001'
     },
@@ -195,7 +196,7 @@ const SlotCardSelector = ({ chassis, slot, onCardSelect, onClose, canSeePrices }
                   <Badge variant="outline" className="text-white border-gray-500">
                     {card.type}
                   </Badge>
-                  {card.specifications.inputs && (
+                  {card.specifications?.inputs && (
                     <Badge variant="outline" className="text-white border-gray-500">
                       {card.specifications.inputs} inputs
                     </Badge>
@@ -204,7 +205,7 @@ const SlotCardSelector = ({ chassis, slot, onCardSelect, onClose, canSeePrices }
               </CardHeader>
               <CardContent>
                 <div className="space-y-2 mb-4">
-                  {Object.entries(card.specifications).map(([key, value]) => (
+                  {Object.entries(card.specifications || {}).map(([key, value]) => (
                     <div key={key} className="flex justify-between text-sm">
                       <span className="text-gray-400 capitalize">{key}:</span>
                       <span className="text-white">{value}</span>
