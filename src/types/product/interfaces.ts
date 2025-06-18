@@ -3,6 +3,7 @@
 export interface Level1Product {
   id: string;
   name: string;
+  type?: string; // Restored as optional for backward compatibility
   category?: string; // Optional internal category for organization
   description: string;
   price: number;
@@ -58,6 +59,10 @@ export interface Level3Product {
   partNumber?: string;
   image?: string;
 }
+
+// Type unions for backward compatibility
+export type ProductType = 'QTMS' | 'TM8' | 'TM3' | 'TM1' | 'QPDM';
+export type Level2ProductType = 'LTX' | 'MTX' | 'STX' | 'CalGas' | 'Standard' | 'Moisture';
 
 // Type management interfaces
 export interface ProductTypeConfig {

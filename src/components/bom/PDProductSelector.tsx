@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
-import { Level1Product, Level2Product, ProductType, Level2ProductType } from "@/types/product";
+import { Level1Product, Level2Product } from "@/types/product";
 import { ExternalLink, Plus, CheckCircle2 } from "lucide-react";
 
 interface PDProductSelectorProps {
@@ -25,7 +24,7 @@ const PDProductSelector = ({ onProductSelect, canSeePrices }: PDProductSelectorP
     {
       id: 'qpdm',
       name: 'QPDM - Partial Discharge Monitor',
-      type: 'QPDM' as ProductType,
+      type: 'QPDM',
       description: 'Advanced partial discharge monitoring system',
       price: 18500,
       enabled: true,
@@ -39,7 +38,7 @@ const PDProductSelector = ({ onProductSelect, canSeePrices }: PDProductSelectorP
       id: 'analysis-software',
       name: 'Advanced Analysis Software',
       parentProductId: '',
-      type: 'Standard' as Level2ProductType,
+      type: 'Standard',
       description: 'Enhanced PD pattern analysis software',
       price: 1200,
       enabled: false,
@@ -49,7 +48,7 @@ const PDProductSelector = ({ onProductSelect, canSeePrices }: PDProductSelectorP
       id: 'pd-sensor',
       name: 'PD Sensor Array',
       parentProductId: '',
-      type: 'Standard' as Level2ProductType,
+      type: 'Standard',
       description: 'External PD sensor for transformer monitoring',
       price: 3200,
       enabled: false,
@@ -59,7 +58,7 @@ const PDProductSelector = ({ onProductSelect, canSeePrices }: PDProductSelectorP
       id: 'uhf-sensor',
       name: 'UHF PD Sensor',
       parentProductId: '',
-      type: 'Standard' as Level2ProductType,
+      type: 'Standard',
       description: 'Ultra-high frequency PD detection sensor',
       price: 4800,
       enabled: false,
@@ -69,7 +68,7 @@ const PDProductSelector = ({ onProductSelect, canSeePrices }: PDProductSelectorP
       id: 'calibrator',
       name: 'PD Calibrator',
       parentProductId: '',
-      type: 'Standard' as Level2ProductType,
+      type: 'Standard',
       description: 'Portable PD calibration source',
       price: 850,
       enabled: false,
@@ -79,7 +78,7 @@ const PDProductSelector = ({ onProductSelect, canSeePrices }: PDProductSelectorP
       id: 'uhf-amplifier',
       name: 'UHF Signal Amplifier',
       parentProductId: '',
-      type: 'Standard' as Level2ProductType,
+      type: 'Standard',
       description: 'Low-noise UHF signal amplifier',
       price: 680,
       enabled: false,

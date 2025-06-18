@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Level1Product } from "@/types/product";
 
 interface Level1ProductFormProps {
@@ -15,6 +16,7 @@ interface Level1ProductFormProps {
 const Level1ProductForm = ({ onSubmit, initialData }: Level1ProductFormProps) => {
   const [formData, setFormData] = useState({
     name: initialData?.name || '',
+    type: initialData?.type || '',
     category: initialData?.category || '',
     description: initialData?.description || '',
     price: initialData?.price || 0,
@@ -44,15 +46,34 @@ const Level1ProductForm = ({ onSubmit, initialData }: Level1ProductFormProps) =>
           />
         </div>
         <div>
-          <Label htmlFor="category" className="text-white">Category (Optional)</Label>
-          <Input
-            id="category"
-            value={formData.category}
-            onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-            className="bg-gray-800 border-gray-700 text-white"
-            placeholder="e.g., Monitoring Systems, DGA Monitors"
-          />
+          <Label htmlFor="type" className="text-white">Product Type</Label>
+          <Select 
+            value={formData.type} 
+            onValueChange={(value) => setFormData({ ...formData, type: value })}
+          >
+            <SelectTrigger className="bg-gray-800 border-gray-700 text-white">
+              <SelectValue placeholder="Select product type" />
+            </SelectTrigger>
+            <SelectContent className="bg-gray-800 border-gray-700">
+              <SelectItem value="QTMS" className="text-white">QTMS</SelectItem>
+              <SelectItem value="TM8" className="text-white">TM8</SelectItem>
+              <SelectItem value="TM3" className="text-white">TM3</SelectItem>
+              <SelectItem value="TM1" className="text-white">TM1</SelectItem>
+              <SelectItem value="QPDM" className="text-white">QPDM</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
+      </div>
+
+      <div>
+        <Label htmlFor="category" className="text-white">Category (Optional)</Label>
+        <Input
+          id="category"
+          value={formData.category}
+          onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+          className="bg-gray-800 border-gray-700 text-white"
+          placeholder="e.g., Monitoring Systems, DGA Monitors"
+        />
       </div>
 
       <div>

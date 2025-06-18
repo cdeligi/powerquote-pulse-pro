@@ -88,7 +88,7 @@ export const generateProductPartNumber = (product: Level1Product, configuration?
   let partNumber = product.partNumber || product.id.toUpperCase();
   
   // Add configuration suffix for DGA products
-  if (['TM8', 'TM3', 'TM1'].includes(product.type) && configuration) {
+  if (product.type && ['TM8', 'TM3', 'TM1'].includes(product.type) && configuration) {
     const options = [];
     if (configuration['CalGas']) options.push('CG');
     if (configuration['Helium Bottle']) options.push('HB');

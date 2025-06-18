@@ -279,7 +279,9 @@ const Level1ProductSelector = ({ onProductSelect, selectedProduct, canSeePrices,
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent className="bg-gray-800 border-gray-600">
-                        <SelectItem value="3-channel" className="text-white">3-Channel</SelectItem>
+                        <SelectItem value="3-channel"
+
+ className="text-white">3-Channel</SelectItem>
                         <SelectItem value="6-channel" className="text-white">6-Channel (+$2,500)</SelectItem>
                       </SelectContent>
                     </Select>

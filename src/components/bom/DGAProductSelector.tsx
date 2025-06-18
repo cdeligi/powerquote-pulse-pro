@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -6,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { Level1Product, Level2Product, ProductType, Level2ProductType } from "@/types/product";
+import { Level1Product, Level2Product } from "@/types/product";
 import { ExternalLink, Plus, CheckCircle2 } from "lucide-react";
 
 interface DGAProductSelectorProps {
@@ -23,7 +22,7 @@ const DGAProductSelector = ({ onProductSelect, canSeePrices }: DGAProductSelecto
     {
       id: 'tm8',
       name: 'TM8 - Advanced DGA Monitor',
-      type: 'TM8' as ProductType,
+      type: 'TM8',
       description: 'Multi-gas transformer monitoring system',
       price: 24500,
       enabled: true,
@@ -33,7 +32,7 @@ const DGAProductSelector = ({ onProductSelect, canSeePrices }: DGAProductSelecto
     {
       id: 'tm3',
       name: 'TM3 - Compact DGA Monitor',
-      type: 'TM3' as ProductType,
+      type: 'TM3',
       description: 'Essential dissolved gas analysis monitoring',
       price: 18200,
       enabled: true,
@@ -43,7 +42,7 @@ const DGAProductSelector = ({ onProductSelect, canSeePrices }: DGAProductSelecto
     {
       id: 'tm1',
       name: 'TM1 - Basic DGA Monitor',
-      type: 'TM1' as ProductType,
+      type: 'TM1',
       description: 'Single-gas hydrogen monitoring system',
       price: 12800,
       enabled: true,
@@ -57,7 +56,7 @@ const DGAProductSelector = ({ onProductSelect, canSeePrices }: DGAProductSelecto
       id: 'calgas-bottle',
       name: 'Calibration Gas Bottle',
       parentProductId: '',
-      type: 'CalGas' as Level2ProductType,
+      type: 'CalGas',
       description: 'Precision calibration gas for DGA monitors',
       price: 450,
       enabled: false,
@@ -67,7 +66,7 @@ const DGAProductSelector = ({ onProductSelect, canSeePrices }: DGAProductSelecto
       id: 'helium-bottle',
       name: 'Helium Carrier Gas Bottle',
       parentProductId: '',
-      type: 'Standard' as Level2ProductType,
+      type: 'Standard',
       description: 'High-purity helium carrier gas supply',
       price: 280,
       enabled: false,
@@ -77,7 +76,7 @@ const DGAProductSelector = ({ onProductSelect, canSeePrices }: DGAProductSelecto
       id: 'moisture-sensor',
       name: 'Moisture Sensor Add-on',
       parentProductId: '',
-      type: 'Moisture' as Level2ProductType,
+      type: 'Moisture',
       description: 'Additional moisture detection capability',
       price: 320,
       enabled: false,
@@ -87,7 +86,7 @@ const DGAProductSelector = ({ onProductSelect, canSeePrices }: DGAProductSelecto
       id: '4-20ma-bridge',
       name: '4-20mA Bridge Interface',
       parentProductId: '',
-      type: 'Standard' as Level2ProductType,
+      type: 'Standard',
       description: 'Analog output interface module',
       price: 180,
       enabled: false,

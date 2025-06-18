@@ -448,9 +448,11 @@ const ProductManagement = ({ user }: ProductManagementProps) => {
                           {product.description}
                         </CardDescription>
                         <div className="flex items-center space-x-2 mt-2">
-                          <Badge variant="outline" className="text-xs">
-                            {product.type}
-                          </Badge>
+                          {product.type && (
+                            <Badge variant="outline" className="text-xs">
+                              {product.type}
+                            </Badge>
+                          )}
                           <Badge variant="outline" className="text-xs">
                             {product.partNumber}
                           </Badge>

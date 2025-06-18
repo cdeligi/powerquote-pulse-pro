@@ -2,8 +2,8 @@
 import { Chassis, Card, Level1Product, Level2Product, Level3Product } from './interfaces';
 
 export function isLevel1Product(product: Chassis | Card | Level1Product | Level2Product | Level3Product): product is Level1Product {
-  return 'productInfoUrl' in product && 'type' in product && 
-    ['QTMS', 'TM8', 'TM3', 'TM1', 'QPDM'].includes((product as Level1Product).type);
+  return 'productInfoUrl' in product && (!('parentProductId' in product)) && 
+    (!product.type || ['QTMS', 'TM8', 'TM3', 'TM1', 'QPDM'].includes(product.type));
 }
 
 export function isChassis(product: Chassis | Card | Level1Product | Level2Product | Level3Product): product is Chassis {
