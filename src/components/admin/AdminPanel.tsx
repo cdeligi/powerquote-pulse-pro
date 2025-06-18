@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { User } from "@/types/auth";
+import { BOMItem, Level1Product } from "@/types/product";
 import ProductManagement from "./ProductManagement";
 import UserManagement from "./UserManagement";
 import QuoteFieldConfiguration from "./QuoteFieldConfiguration";
@@ -43,16 +44,38 @@ const AdminPanel = ({ user }: AdminPanelProps) => {
   };
 
   // Mock BOM items for margin dashboard
-  const mockBomItems = [
+  const mockBomItems: BOMItem[] = [
     {
       id: '1',
-      product: { id: '1', name: 'Sample Product 1', price: 1000, cost: 600 },
+      product: {
+        id: '1',
+        name: 'QTMS System',
+        type: 'QTMS',
+        description: 'Qualitrol Transformer Monitoring System',
+        price: 1000,
+        cost: 600,
+        productInfoUrl: '',
+        enabled: true,
+        image: '',
+        partNumber: 'QTMS-001'
+      } as Level1Product,
       quantity: 2,
       enabled: true
     },
     {
       id: '2', 
-      product: { id: '2', name: 'Sample Product 2', price: 500, cost: 300 },
+      product: {
+        id: '2',
+        name: 'TM8 System', 
+        type: 'TM8',
+        description: 'Transformer Monitor 8-channel',
+        price: 500,
+        cost: 300,
+        productInfoUrl: '',
+        enabled: true,
+        image: '',
+        partNumber: 'TM8-001'
+      } as Level1Product,
       quantity: 1,
       enabled: true
     }
