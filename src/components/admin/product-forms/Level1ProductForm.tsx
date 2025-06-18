@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -46,15 +45,18 @@ const Level1ProductForm = ({ onSubmit, initialData }: Level1ProductFormProps) =>
           />
         </div>
         <div>
-          <Label htmlFor="type" className="text-white">Product Type</Label>
+          <Label htmlFor="type" className="text-white">Asset Type</Label>
           <Select 
             value={formData.type} 
             onValueChange={(value) => setFormData({ ...formData, type: value })}
           >
             <SelectTrigger className="bg-gray-800 border-gray-700 text-white">
-              <SelectValue placeholder="Select product type" />
+              <SelectValue placeholder="Select asset type" />
             </SelectTrigger>
             <SelectContent className="bg-gray-800 border-gray-700">
+              <SelectItem value="Power Transformer" className="text-white">Power Transformer</SelectItem>
+              <SelectItem value="Gas Insulated Switchgear" className="text-white">Gas Insulated Switchgear</SelectItem>
+              <SelectItem value="Breakers" className="text-white">Breakers</SelectItem>
               <SelectItem value="QTMS" className="text-white">QTMS</SelectItem>
               <SelectItem value="TM8" className="text-white">TM8</SelectItem>
               <SelectItem value="TM3" className="text-white">TM3</SelectItem>
