@@ -1,4 +1,3 @@
-
 import { Level1Product, Level2Product, Level3Product, ProductTypeConfig } from "@/types/product";
 
 const STORAGE_KEYS = {
@@ -10,31 +9,17 @@ const STORAGE_KEYS = {
 
 // Default product types
 const DEFAULT_TYPES: ProductTypeConfig[] = [
-  { id: 'qtms', name: 'QTMS', level: 1, description: 'Qualitrol Transformer Monitoring System', enabled: true },
-  { id: 'tm8', name: 'TM8', level: 1, description: 'Transformer Monitor 8-channel', enabled: true },
-  { id: 'tm3', name: 'TM3', level: 1, description: 'Transformer Monitor 3-channel', enabled: true },
-  { id: 'tm1', name: 'TM1', level: 1, description: 'Transformer Monitor Single Channel', enabled: true },
-  { id: 'qpdm', name: 'QPDM', level: 1, description: 'Partial Discharge Monitor', enabled: true },
-  { id: 'ltx', name: 'LTX', level: 2, description: 'Large Chassis', enabled: true },
-  { id: 'mtx', name: 'MTX', level: 2, description: 'Medium Chassis', enabled: true },
-  { id: 'stx', name: 'STX', level: 2, description: 'Small Chassis', enabled: true },
-  { id: 'calgas', name: 'CalGas', level: 2, description: 'Calibration Gas System', enabled: true },
-  { id: 'moisture', name: 'Moisture', level: 2, description: 'Moisture Sensor', enabled: true },
-  { id: 'standard', name: 'Standard', level: 2, description: 'Standard Configuration', enabled: true },
-  { id: 'relay', name: 'Relay', level: 3, description: 'Relay Protection Card', enabled: true },
-  { id: 'analog', name: 'Analog', level: 3, description: 'Analog Input Card', enabled: true },
-  { id: 'fiber', name: 'Fiber', level: 3, description: 'Fiber Communication Card', enabled: true },
-  { id: 'display', name: 'Display', level: 3, description: 'Display Module', enabled: true },
-  { id: 'bushing', name: 'Bushing', level: 3, description: 'Bushing Monitor', enabled: true },
-  { id: 'accessory', name: 'Accessory', level: 3, description: 'General Accessory', enabled: true },
-  { id: 'sensor', name: 'Sensor', level: 3, description: 'Sensor Component', enabled: true }
+  { id: 'power-transformer', name: 'Power Transformer', level: 1, description: 'Power Transformer Assets', enabled: true },
+  { id: 'gas-insulated-switchgear', name: 'Gas Insulated Switchgear', level: 1, description: 'GIS Assets', enabled: true },
+  { id: 'breakers', name: 'Breakers', level: 1, description: 'Circuit Breaker Assets', enabled: true }
 ];
 
-// Default products
+// Updated Level 1 products with proper structure
 const DEFAULT_LEVEL1_PRODUCTS: Level1Product[] = [
   {
-    id: 'qtms-main',
+    id: 'qtms',
     name: 'QTMS',
+    type: 'Power Transformer',
     category: 'Monitoring Systems',
     description: 'Qualitrol Transformer Monitoring System - Complete monitoring solution',
     price: 0,
@@ -44,24 +29,63 @@ const DEFAULT_LEVEL1_PRODUCTS: Level1Product[] = [
     partNumber: 'QTMS-BASE-001'
   },
   {
-    id: 'tm8-dga',
+    id: 'tm8',
     name: 'TM8',
+    type: 'Power Transformer',
     category: 'DGA Monitors',
-    description: 'Dissolved Gas Analysis Monitor - Standalone DGA solution',
+    description: 'Dissolved Gas Analysis Monitor - 8 Channel',
     price: 12500,
     cost: 6250,
     productInfoUrl: 'https://www.qualitrolcorp.com/products/tm8',
     enabled: true,
     partNumber: 'TM8-DGA-001'
+  },
+  {
+    id: 'tm3',
+    name: 'TM3',
+    type: 'Power Transformer',
+    category: 'DGA Monitors',
+    description: 'Dissolved Gas Analysis Monitor - 3 Channel',
+    price: 8500,
+    cost: 4250,
+    productInfoUrl: 'https://www.qualitrolcorp.com/products/tm3',
+    enabled: true,
+    partNumber: 'TM3-DGA-001'
+  },
+  {
+    id: 'tm1',
+    name: 'TM1',
+    type: 'Power Transformer',
+    category: 'DGA Monitors',
+    description: 'Dissolved Gas Analysis Monitor - Single Channel',
+    price: 5500,
+    cost: 2750,
+    productInfoUrl: 'https://www.qualitrolcorp.com/products/tm1',
+    enabled: true,
+    partNumber: 'TM1-DGA-001'
+  },
+  {
+    id: 'qpdm',
+    name: 'QPDM',
+    type: 'Power Transformer',
+    category: 'Partial Discharge Monitors',
+    description: 'Qualitrol Partial Discharge Monitor',
+    price: 15000,
+    cost: 7500,
+    productInfoUrl: 'https://www.qualitrolcorp.com/products/qpdm',
+    enabled: true,
+    partNumber: 'QPDM-001'
   }
 ];
 
+// Updated Level 2 products with proper parent relationships
 const DEFAULT_LEVEL2_PRODUCTS: Level2Product[] = [
+  // QTMS variants
   {
-    id: 'ltx-chassis',
-    name: 'LTX Chassis',
-    parentProductId: 'qtms-main',
-    type: 'LTX',
+    id: 'ltx-qtms',
+    name: 'LTX',
+    parentProductId: 'qtms',
+    type: 'QTMS',
     description: 'Large capacity transformer monitoring chassis - 6U, 14 slots',
     price: 4200,
     cost: 2100,
@@ -72,14 +96,186 @@ const DEFAULT_LEVEL2_PRODUCTS: Level2Product[] = [
       capacity: 'Large'
     },
     partNumber: 'LTX-6U-14S'
+  },
+  {
+    id: 'mtx-qtms',
+    name: 'MTX',
+    parentProductId: 'qtms',
+    type: 'QTMS',
+    description: 'Medium capacity transformer monitoring chassis - 3U, 7 slots',
+    price: 3200,
+    cost: 1600,
+    enabled: true,
+    specifications: {
+      height: '3U',
+      slots: 7,
+      capacity: 'Medium'
+    },
+    partNumber: 'MTX-3U-7S'
+  },
+  {
+    id: 'stx-qtms',
+    name: 'STX',
+    parentProductId: 'qtms',
+    type: 'QTMS',
+    description: 'Small capacity transformer monitoring chassis - 1.5U, 4 slots',
+    price: 2400,
+    cost: 1200,
+    enabled: true,
+    specifications: {
+      height: '1.5U',
+      slots: 4,
+      capacity: 'Small'
+    },
+    partNumber: 'STX-1.5U-4S'
+  },
+  // TM8 variants
+  {
+    id: 'calgas-tm8',
+    name: 'CalGas',
+    parentProductId: 'tm8',
+    type: 'TM8',
+    description: 'Calibration Gas System for TM8 DGA Monitor',
+    price: 2500,
+    cost: 1250,
+    enabled: true,
+    specifications: {
+      gasType: 'Mixed Calibration Gas',
+      capacity: 'Standard'
+    },
+    partNumber: 'TM8-CALGAS-001'
+  },
+  {
+    id: 'helium-bottle-tm8',
+    name: 'Helium Bottle',
+    parentProductId: 'tm8',
+    type: 'TM8',
+    description: 'Helium Gas Bottle for TM8 System',
+    price: 800,
+    cost: 400,
+    enabled: true,
+    specifications: {
+      gasType: 'Helium',
+      volume: '5L'
+    },
+    partNumber: 'TM8-HE-BOTTLE-001'
+  },
+  // TM3 variants
+  {
+    id: 'calgas-tm3',
+    name: 'CalGas',
+    parentProductId: 'tm3',
+    type: 'TM3',
+    description: 'Calibration Gas System for TM3 DGA Monitor',
+    price: 2200,
+    cost: 1100,
+    enabled: true,
+    specifications: {
+      gasType: 'Mixed Calibration Gas',
+      capacity: 'Compact'
+    },
+    partNumber: 'TM3-CALGAS-001'
+  },
+  {
+    id: 'helium-bottle-calgas-tm3',
+    name: 'Helium Bottle/CalGas',
+    parentProductId: 'tm3',
+    type: 'TM3',
+    description: 'Combined Helium Bottle and CalGas System for TM3',
+    price: 2800,
+    cost: 1400,
+    enabled: true,
+    specifications: {
+      gasType: 'Helium + CalGas',
+      configuration: 'Combined'
+    },
+    partNumber: 'TM3-HE-CALGAS-001'
+  },
+  // TM1 variants
+  {
+    id: '4-20ma-bridge-tm1',
+    name: '4-20mA Bridge',
+    parentProductId: 'tm1',
+    type: 'TM1',
+    description: '4-20mA Analog Output Bridge for TM1',
+    price: 650,
+    cost: 325,
+    enabled: true,
+    specifications: {
+      outputType: '4-20mA',
+      channels: 1
+    },
+    partNumber: 'TM1-4-20MA-001'
+  },
+  // QPDM variants
+  {
+    id: 'ic43-qpdm',
+    name: 'IC43',
+    parentProductId: 'qpdm',
+    type: 'QPDM',
+    description: 'IC43 Interface Card for QPDM',
+    price: 1800,
+    cost: 900,
+    enabled: true,
+    specifications: {
+      cardType: 'Interface',
+      model: 'IC43'
+    },
+    partNumber: 'QPDM-IC43-001'
+  },
+  {
+    id: 'ic44-qpdm',
+    name: 'IC44',
+    parentProductId: 'qpdm',
+    type: 'QPDM',
+    description: 'IC44 Interface Card for QPDM',
+    price: 2100,
+    cost: 1050,
+    enabled: true,
+    specifications: {
+      cardType: 'Interface',
+      model: 'IC44'
+    },
+    partNumber: 'QPDM-IC44-001'
+  },
+  {
+    id: 'drain-sensor-dn50-qpdm',
+    name: 'Drain Type Sensor DN50',
+    parentProductId: 'qpdm',
+    type: 'QPDM',
+    description: 'Drain Type Sensor DN50 for QPDM',
+    price: 3200,
+    cost: 1600,
+    enabled: true,
+    specifications: {
+      sensorType: 'Drain',
+      diameter: 'DN50'
+    },
+    partNumber: 'QPDM-DRAIN-DN50-001'
+  },
+  {
+    id: 'drain-sensor-dn25-qpdm',
+    name: 'Drain Type Sensor DN25',
+    parentProductId: 'qpdm',
+    type: 'QPDM',
+    description: 'Drain Type Sensor DN25 for QPDM',
+    price: 2800,
+    cost: 1400,
+    enabled: true,
+    specifications: {
+      sensorType: 'Drain',
+      diameter: 'DN25'
+    },
+    partNumber: 'QPDM-DRAIN-DN25-001'
   }
 ];
 
+// Default Level 3 products - keeping existing structure for cards/components
 const DEFAULT_LEVEL3_PRODUCTS: Level3Product[] = [
   {
     id: 'relay-8in-2out',
     name: 'Relay Protection Card',
-    parentProductId: 'ltx-chassis',
+    parentProductId: 'ltx-qtms',
     type: 'relay',
     description: '8 digital inputs + 2 analog outputs for comprehensive protection',
     price: 2500,

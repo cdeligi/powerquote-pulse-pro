@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { User } from "@/types/auth";
@@ -8,6 +9,7 @@ import QuoteFieldConfiguration from "./QuoteFieldConfiguration";
 import AdminSettings from "./AdminSettings";
 import MarginDashboard from "./MarginDashboard";
 import QuoteAnalyticsDashboard from "../dashboard/QuoteAnalyticsDashboard";
+import QuoteApprovalDashboard from "./QuoteApprovalDashboard";
 import { productDataService } from "@/services/productDataService";
 import { 
   Package, 
@@ -15,7 +17,8 @@ import {
   Settings, 
   BarChart3, 
   TrendingUp,
-  FileText
+  FileText,
+  CheckCircle
 } from "lucide-react";
 
 interface AdminPanelProps {
@@ -64,7 +67,7 @@ const AdminPanel = ({ user }: AdminPanelProps) => {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-6 bg-gray-800">
+        <TabsList className="grid w-full grid-cols-7 bg-gray-800">
           <TabsTrigger 
             value="products" 
             className="text-white data-[state=active]:bg-red-600 data-[state=active]:text-white"
@@ -78,6 +81,13 @@ const AdminPanel = ({ user }: AdminPanelProps) => {
           >
             <FileText className="h-4 w-4 mr-2" />
             Quote Fields
+          </TabsTrigger>
+          <TabsTrigger 
+            value="quote-approval" 
+            className="text-white data-[state=active]:bg-red-600 data-[state=active]:text-white"
+          >
+            <CheckCircle className="h-4 w-4 mr-2" />
+            Quote Approval
           </TabsTrigger>
           <TabsTrigger 
             value="users" 
@@ -115,6 +125,10 @@ const AdminPanel = ({ user }: AdminPanelProps) => {
 
         <TabsContent value="quote-fields" className="mt-6">
           <QuoteFieldConfiguration user={user} />
+        </TabsContent>
+
+        <TabsContent value="quote-approval" className="mt-6">
+          <QuoteApprovalDashboard user={user} />
         </TabsContent>
 
         <TabsContent value="users" className="mt-6">

@@ -44,6 +44,9 @@ const Level2OptionForm = ({ onSubmit, level1Products, initialData }: Level2Optio
     });
   };
 
+  // Get the parent product name for the type field
+  const selectedParent = level1Products.find(p => p.id === formData.parentProductId);
+
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="grid grid-cols-2 gap-4">
@@ -61,7 +64,14 @@ const Level2OptionForm = ({ onSubmit, level1Products, initialData }: Level2Optio
           <Label htmlFor="parentProductId" className="text-white">Parent Product (Level 1)</Label>
           <Select 
             value={formData.parentProductId} 
-            onValueChange={(value) => setFormData({ ...formData, parentProductId: value })}
+            onValueChange={(value) => {
+              const parentProduct = level1Products.find(p => p.id === value);
+              setFormData({ 
+                ...formData, 
+                parentProductId: value,
+                type: parentProduct?.name || ''
+              });
+            }}
           >
             <SelectTrigger className="bg-gray-800 border-gray-700 text-white">
               <SelectValue placeholder="Select parent product" />
@@ -78,14 +88,13 @@ const Level2OptionForm = ({ onSubmit, level1Products, initialData }: Level2Optio
       </div>
 
       <div>
-        <Label htmlFor="type" className="text-white">Type/Variant</Label>
+        <Label htmlFor="type" className="text-white">Type (Auto-filled from Parent)</Label>
         <Input
           id="type"
-          value={formData.type}
-          onChange={(e) => setFormData({ ...formData, type: e.target.value })}
-          className="bg-gray-800 border-gray-700 text-white"
-          placeholder="e.g., LTX, MTX, STX, CalGas, Standard"
-          required
+          value={selectedParent?.name || formData.type}
+          readOnly
+          className="bg-gray-700 border-gray-600 text-gray-300"
+          placeholder="Select parent product first"
         />
       </div>
 
@@ -206,7 +215,7 @@ const Level2OptionForm = ({ onSubmit, level1Products, initialData }: Level2Optio
 
       <div className="flex justify-end space-x-3 pt-4">
         <Button type="submit" className="bg-red-600 hover:bg-red-700">
-          {initialData ? 'Update' : 'Create'} Level 2 Product
+          {initialData ? 'Update' : 'Create'} Product
         </Button>
       </div>
     </form>

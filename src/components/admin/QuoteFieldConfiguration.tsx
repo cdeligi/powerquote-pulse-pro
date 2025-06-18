@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -145,7 +144,6 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
   const { toast } = useToast();
 
   const sections = [
-    { id: 'all', label: 'All Fields', color: 'bg-gray-600' },
     { id: 'customer', label: 'Customer Info', color: 'bg-blue-600' },
     { id: 'project', label: 'Project Details', color: 'bg-green-600' },
     { id: 'technical', label: 'Technical Specs', color: 'bg-purple-600' },
@@ -214,7 +212,7 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
       <div className="flex justify-between items-center">
         <div>
           <h2 className="text-2xl font-bold text-white">Quote Field Configuration</h2>
-          <p className="text-gray-400">Configure and manage quote request form fields</p>
+          <p className="text-gray-400">Configure and manage quote request form fields for the BOM Builder</p>
         </div>
         <Button 
           className="bg-red-600 hover:bg-red-700"
@@ -236,11 +234,9 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
             className={activeSection === section.id ? `${section.color} hover:opacity-80` : "border-gray-600 text-gray-300 hover:bg-gray-800"}
           >
             {section.label}
-            {section.id !== 'all' && (
-              <Badge variant="secondary" className="ml-2 text-xs">
-                {quoteFields.filter(f => f.section === section.id).length}
-              </Badge>
-            )}
+            <Badge variant="secondary" className="ml-2 text-xs">
+              {quoteFields.filter(f => f.section === section.id).length}
+            </Badge>
           </Button>
         ))}
       </div>
