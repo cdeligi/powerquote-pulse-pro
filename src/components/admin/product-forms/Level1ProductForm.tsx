@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -58,11 +57,6 @@ const Level1ProductForm = ({ onSubmit, initialData }: Level1ProductFormProps) =>
               <SelectItem value="Power Transformer" className="text-white">Power Transformer</SelectItem>
               <SelectItem value="Gas Insulated Switchgear" className="text-white">Gas Insulated Switchgear</SelectItem>
               <SelectItem value="Breakers" className="text-white">Breakers</SelectItem>
-              <SelectItem value="QTMS" className="text-white">Power Transformer - QTMS</SelectItem>
-              <SelectItem value="TM8" className="text-white">Power Transformer - TM8</SelectItem>
-              <SelectItem value="TM3" className="text-white">Power Transformer - TM3</SelectItem>
-              <SelectItem value="TM1" className="text-white">Power Transformer - TM1</SelectItem>
-              <SelectItem value="QPDM" className="text-white">Power Transformer - QPDM</SelectItem>
             </SelectContent>
           </Select>
         </div>
