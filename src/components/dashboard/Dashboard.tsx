@@ -31,7 +31,7 @@ const Dashboard = ({ user, onLogout }: DashboardProps) => {
         return (
           <BOMBuilder 
             onBOMUpdate={handleBOMUpdate}
-            canSeePrices={user.role === 'admin' || user.role === 'sales'}
+            canSeePrices={user.role === 'admin'}
           />
         );
       case 'quotes':

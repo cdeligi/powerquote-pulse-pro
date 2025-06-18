@@ -10,7 +10,6 @@ import ChassisSelector from './ChassisSelector';
 import CardLibrary from './CardLibrary';
 import DGAProductSelector from './DGAProductSelector';
 import PDProductSelector from './PDProductSelector';
-import RackVisualizer from './RackVisualizer';
 import { productDataService } from '@/services/productDataService';
 
 interface BOMBuilderProps {
@@ -212,14 +211,21 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
       </Tabs>
 
       {bomItems.length > 0 && (
-        <RackVisualizer
-          bomItems={bomItems}
-          onBOMItemsUpdate={(updatedItems) => {
-            setBomItems(updatedItems);
-            onBOMUpdate(updatedItems);
-          }}
-          canSeePrices={canSeePrices}
-        />
+        <Card className="bg-gray-900 border-gray-800">
+          <CardHeader>
+            <CardTitle className="text-white">Selected Items</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {bomItems.map((item) => (
+                <div key={item.id} className="flex justify-between items-center p-2 bg-gray-800 rounded">
+                  <span className="text-white">{item.product.name}</span>
+                  <span className="text-gray-400">Qty: {item.quantity}</span>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
       )}
     </div>
   );
