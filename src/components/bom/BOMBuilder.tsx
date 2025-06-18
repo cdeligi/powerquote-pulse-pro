@@ -8,6 +8,8 @@ import Level1ProductSelector from './Level1ProductSelector';
 import Level2OptionsSelector from './Level2OptionsSelector';
 import ChassisSelector from './ChassisSelector';
 import CardLibrary from './CardLibrary';
+import RackVisualizer from './RackVisualizer';
+import SlotCardSelector from './SlotCardSelector';
 import DGAProductSelector from './DGAProductSelector';
 import PDProductSelector from './PDProductSelector';
 import { productDataService } from '@/services/productDataService';
@@ -20,6 +22,9 @@ interface BOMBuilderProps {
 const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
   const [selectedLevel1Product, setSelectedLevel1Product] = useState<Level1Product | null>(null);
   const [selectedLevel2Options, setSelectedLevel2Options] = useState<Level2Product[]>([]);
+  const [selectedChassis, setSelectedChassis] = useState<Level2Product | null>(null);
+  const [slotAssignments, setSlotAssignments] = useState<Record<number, Level3Product>>({});
+  const [selectedSlot, setSelectedSlot] = useState<number | null>(null);
   const [bomItems, setBomItems] = useState<BOMItem[]>([]);
   const [activeTab, setActiveTab] = useState<string>('');
 
@@ -40,6 +45,9 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
       if (product && selectedLevel1Product?.id !== activeTab) {
         setSelectedLevel1Product(product);
         setSelectedLevel2Options([]);
+        setSelectedChassis(null);
+        setSlotAssignments({});
+        setSelectedSlot(null);
       }
     }
   }, [activeTab, level1Products, selectedLevel1Product?.id]);
@@ -47,6 +55,9 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
   const handleLevel1ProductSelect = (product: Level1Product) => {
     setSelectedLevel1Product(product);
     setSelectedLevel2Options([]);
+    setSelectedChassis(null);
+    setSlotAssignments({});
+    setSelectedSlot(null);
   };
 
   const handleLevel2OptionToggle = (option: Level2Product) => {
@@ -60,18 +71,46 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
     });
   };
 
+  const handleChassisSelect = (chassis: Level2Product) => {
+    setSelectedChassis(chassis);
+    setSlotAssignments({});
+    setSelectedSlot(null);
+  };
+
+  const handleSlotClick = (slot: number) => {
+    setSelectedSlot(slot);
+  };
+
+  const handleSlotClear = (slot: number) => {
+    setSlotAssignments(prev => {
+      const updated = { ...prev };
+      delete updated[slot];
+      return updated;
+    });
+  };
+
   const handleCardSelect = (card: Level3Product, slot?: number) => {
-    const newItem: BOMItem = {
-      id: `${Date.now()}-${Math.random()}`,
-      product: card,
-      quantity: 1,
-      slot,
-      enabled: true
-    };
-    
-    const updatedItems = [...bomItems, newItem];
-    setBomItems(updatedItems);
-    onBOMUpdate(updatedItems);
+    if (selectedSlot !== null || slot !== undefined) {
+      const targetSlot = slot !== undefined ? slot : selectedSlot!;
+      setSlotAssignments(prev => ({
+        ...prev,
+        [targetSlot]: card
+      }));
+      setSelectedSlot(null);
+    } else {
+      // Add directly to BOM for non-chassis items
+      const newItem: BOMItem = {
+        id: `${Date.now()}-${Math.random()}`,
+        product: card,
+        quantity: 1,
+        slot,
+        enabled: true
+      };
+      
+      const updatedItems = [...bomItems, newItem];
+      setBomItems(updatedItems);
+      onBOMUpdate(updatedItems);
+    }
   };
 
   const handleDGAProductSelect = (product: Level1Product, configuration?: Record<string, any>, level2Options?: Level2Product[]) => {
@@ -103,6 +142,29 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
     onBOMUpdate(updatedItems);
   };
 
+  const handleAddChassisAndCardsToBOM = () => {
+    if (!selectedChassis) return;
+
+    const chassisItem: BOMItem = {
+      id: `${Date.now()}-chassis`,
+      product: selectedChassis,
+      quantity: 1,
+      enabled: true
+    };
+
+    const cardItems: BOMItem[] = Object.entries(slotAssignments).map(([slot, card]) => ({
+      id: `${Date.now()}-card-${slot}`,
+      product: card,
+      quantity: 1,
+      slot: parseInt(slot),
+      enabled: true
+    }));
+
+    const updatedItems = [...bomItems, chassisItem, ...cardItems];
+    setBomItems(updatedItems);
+    onBOMUpdate(updatedItems);
+  };
+
   const renderProductContent = (productId: string) => {
     const product = level1Products.find(p => p.id === productId);
     if (!product) return null;
@@ -126,19 +188,53 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
             
             {selectedLevel2Options.length > 0 && (
               <div className="space-y-6">
-                {selectedLevel2Options.map((chassis) => (
-                  <div key={chassis.id}>
-                    <h3 className="text-lg font-medium text-white mb-4">
-                      Cards for {chassis.name}
-                    </h3>
+                <ChassisSelector
+                  onChassisSelect={handleChassisSelect}
+                  selectedChassis={selectedChassis}
+                  canSeePrices={canSeePrices}
+                />
+                
+                {selectedChassis && (
+                  <div className="space-y-6">
+                    <RackVisualizer
+                      chassis={selectedChassis as any}
+                      slotAssignments={slotAssignments as any}
+                      onSlotClick={handleSlotClick}
+                      onSlotClear={handleSlotClear}
+                      selectedSlot={selectedSlot}
+                    />
+                    
                     <CardLibrary
-                      chassis={chassis}
+                      chassis={selectedChassis}
                       onCardSelect={handleCardSelect}
                       canSeePrices={canSeePrices}
                     />
+                    
+                    {Object.keys(slotAssignments).length > 0 && (
+                      <Card className="bg-gray-900 border-gray-800">
+                        <CardContent className="pt-6">
+                          <button
+                            onClick={handleAddChassisAndCardsToBOM}
+                            className="w-full bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded font-medium"
+                          >
+                            Add Chassis & Cards to BOM
+                          </button>
+                        </CardContent>
+                      </Card>
+                    )}
                   </div>
-                ))}
+                )}
               </div>
+            )}
+            
+            {selectedSlot !== null && selectedChassis && (
+              <SlotCardSelector
+                chassis={selectedChassis as any}
+                slot={selectedSlot}
+                onCardSelect={handleCardSelect}
+                onClose={() => setSelectedSlot(null)}
+                canSeePrices={canSeePrices}
+              />
             )}
           </div>
         );
@@ -218,14 +314,26 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
       {bomItems.length > 0 && (
         <Card className="bg-gray-900 border-gray-800">
           <CardHeader>
-            <CardTitle className="text-white">Selected Items</CardTitle>
+            <CardTitle className="text-white">Bill of Materials</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
               {bomItems.map((item) => (
-                <div key={item.id} className="flex justify-between items-center p-2 bg-gray-800 rounded">
-                  <span className="text-white">{item.product.name}</span>
-                  <span className="text-gray-400">Qty: {item.quantity}</span>
+                <div key={item.id} className="flex justify-between items-center p-3 bg-gray-800 rounded">
+                  <div className="flex flex-col">
+                    <span className="text-white font-medium">{item.product.name}</span>
+                    {item.slot && (
+                      <span className="text-gray-400 text-sm">Slot {item.slot}</span>
+                    )}
+                  </div>
+                  <div className="flex items-center space-x-4">
+                    <span className="text-gray-400">Qty: {item.quantity}</span>
+                    {canSeePrices && (
+                      <span className="text-white font-medium">
+                        ${item.product.price?.toLocaleString() || '—'}
+                      </span>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
