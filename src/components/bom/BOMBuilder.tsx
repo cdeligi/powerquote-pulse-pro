@@ -4,7 +4,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { BOMItem, Level1Product, Level2Product, Level3Product } from '@/types/product';
-import Level1ProductSelector from './Level1ProductSelector';
 import Level2OptionsSelector from './Level2OptionsSelector';
 import ChassisSelector from './ChassisSelector';
 import CardLibrary from './CardLibrary';
@@ -51,14 +50,6 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
       }
     }
   }, [activeTab, level1Products, selectedLevel1Product?.id]);
-
-  const handleLevel1ProductSelect = (product: Level1Product) => {
-    setSelectedLevel1Product(product);
-    setSelectedLevel2Options([]);
-    setSelectedChassis(null);
-    setSlotAssignments({});
-    setSelectedSlot(null);
-  };
 
   const handleLevel2OptionToggle = (option: Level2Product) => {
     setSelectedLevel2Options(prev => {
@@ -173,11 +164,6 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
       case 'qtms':
         return (
           <div className="space-y-6">
-            <Level1ProductSelector 
-              onProductSelect={handleLevel1ProductSelect}
-              selectedProduct={selectedLevel1Product}
-            />
-            
             {selectedLevel1Product && (
               <Level2OptionsSelector
                 level1Product={selectedLevel1Product}
@@ -258,11 +244,6 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
       default:
         return (
           <div className="space-y-6">
-            <Level1ProductSelector 
-              onProductSelect={handleLevel1ProductSelect}
-              selectedProduct={selectedLevel1Product}
-            />
-            
             {selectedLevel1Product && (
               <Level2OptionsSelector
                 level1Product={selectedLevel1Product}
