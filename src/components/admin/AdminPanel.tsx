@@ -50,7 +50,7 @@ const AdminPanel = ({ user }: AdminPanelProps) => {
       product: {
         id: '1',
         name: 'QTMS System',
-        type: 'QTMS',
+        category: 'Monitoring Systems',
         description: 'Qualitrol Transformer Monitoring System',
         price: 1000,
         cost: 600,
@@ -66,8 +66,8 @@ const AdminPanel = ({ user }: AdminPanelProps) => {
       id: '2', 
       product: {
         id: '2',
-        name: 'TM8 System', 
-        type: 'TM8',
+        name: 'TM8 System',
+        category: 'DGA Monitors', 
         description: 'Transformer Monitor 8-channel',
         price: 500,
         cost: 300,

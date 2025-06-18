@@ -1,12 +1,9 @@
 
 // Level 1: Main Product Categories (QTMS, etc.)
-export type ProductType = 'QTMS' | 'TM8' | 'TM3' | 'TM1' | 'QPDM';
-export type Level2ProductType = 'LTX' | 'MTX' | 'STX' | 'CalGas' | 'Moisture' | 'Standard';
-
 export interface Level1Product {
   id: string;
   name: string;
-  type: ProductType;
+  category?: string; // Optional internal category for organization
   description: string;
   price: number;
   cost?: number; // Hidden admin-only field
@@ -23,7 +20,7 @@ export interface Level2Product {
   id: string;
   name: string;
   parentProductId: string; // Links to Level1Product
-  type: Level2ProductType;
+  type: string; // Dynamic type instead of hardcoded union
   description: string;
   price: number;
   cost?: number;
@@ -36,7 +33,7 @@ export interface Level2Product {
   };
   partNumber?: string;
   image?: string;
-  productInfoUrl?: string; // Add this for chassis
+  productInfoUrl?: string;
 }
 
 // Level 3: Components/Cards/Options (Cards for chassis, accessories for others)
@@ -44,7 +41,7 @@ export interface Level3Product {
   id: string;
   name: string;
   parentProductId: string; // Links to Level2Product
-  type: 'relay' | 'analog' | 'fiber' | 'display' | 'bushing' | 'accessory' | 'sensor';
+  type: string; // Dynamic type instead of hardcoded union
   description: string;
   price: number;
   cost?: number;
@@ -60,6 +57,15 @@ export interface Level3Product {
   };
   partNumber?: string;
   image?: string;
+}
+
+// Type management interfaces
+export interface ProductTypeConfig {
+  id: string;
+  name: string;
+  level: 1 | 2 | 3;
+  description?: string;
+  enabled: boolean;
 }
 
 // Legacy interfaces for backward compatibility - extend from new hierarchy
