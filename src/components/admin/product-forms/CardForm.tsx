@@ -4,12 +4,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { Level3Product, Level2Product } from "@/types/product";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Level2Product, Level3Product } from "@/types/product";
 
 interface CardFormProps {
-  onSubmit: (card: Omit<Level3Product, 'id'>) => void;
+  onSubmit: (product: Omit<Level3Product, 'id'>) => void;
   level2Products: Level2Product[];
   initialData?: Level3Product;
 }
@@ -18,13 +18,14 @@ const CardForm = ({ onSubmit, level2Products, initialData }: CardFormProps) => {
   const [formData, setFormData] = useState({
     name: initialData?.name || '',
     parentProductId: initialData?.parentProductId || '',
-    type: initialData?.type || 'relay' as 'relay' | 'analog' | 'fiber' | 'display' | 'bushing' | 'accessory' | 'sensor',
+    type: initialData?.type || '',
     description: initialData?.description || '',
     price: initialData?.price || 0,
     cost: initialData?.cost || 0,
     enabled: initialData?.enabled ?? true,
     specifications: initialData?.specifications || {},
-    partNumber: initialData?.partNumber || ''
+    partNumber: initialData?.partNumber || '',
+    image: initialData?.image || ''
   });
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -32,11 +33,21 @@ const CardForm = ({ onSubmit, level2Products, initialData }: CardFormProps) => {
     onSubmit(formData);
   };
 
+  const handleSpecificationChange = (key: string, value: any) => {
+    setFormData({
+      ...formData,
+      specifications: {
+        ...formData.specifications,
+        [key]: value
+      }
+    });
+  };
+
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <Label htmlFor="name" className="text-white">Name</Label>
+          <Label htmlFor="name" className="text-white">Component Name</Label>
           <Input
             id="name"
             value={formData.name}
@@ -47,8 +58,8 @@ const CardForm = ({ onSubmit, level2Products, initialData }: CardFormProps) => {
         </div>
         <div>
           <Label htmlFor="parentProductId" className="text-white">Parent Product (Level 2)</Label>
-          <Select
-            value={formData.parentProductId}
+          <Select 
+            value={formData.parentProductId} 
             onValueChange={(value) => setFormData({ ...formData, parentProductId: value })}
           >
             <SelectTrigger className="bg-gray-800 border-gray-700 text-white">
@@ -66,15 +77,13 @@ const CardForm = ({ onSubmit, level2Products, initialData }: CardFormProps) => {
       </div>
 
       <div>
-        <Label htmlFor="type" className="text-white">Type</Label>
-        <Select
-          value={formData.type}
-          onValueChange={(value: 'relay' | 'analog' | 'fiber' | 'display' | 'bushing' | 'accessory' | 'sensor') => 
-            setFormData({ ...formData, type: value })
-          }
+        <Label htmlFor="type" className="text-white">Component Type</Label>
+        <Select 
+          value={formData.type} 
+          onValueChange={(value) => setFormData({ ...formData, type: value })}
         >
           <SelectTrigger className="bg-gray-800 border-gray-700 text-white">
-            <SelectValue />
+            <SelectValue placeholder="Select component type" />
           </SelectTrigger>
           <SelectContent className="bg-gray-800 border-gray-700">
             <SelectItem value="relay" className="text-white">Relay</SelectItem>
@@ -99,7 +108,7 @@ const CardForm = ({ onSubmit, level2Products, initialData }: CardFormProps) => {
         />
       </div>
 
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 gap-4">
         <div>
           <Label htmlFor="price" className="text-white">Price ($)</Label>
           <Input
@@ -121,6 +130,9 @@ const CardForm = ({ onSubmit, level2Products, initialData }: CardFormProps) => {
             className="bg-gray-800 border-gray-700 text-white"
           />
         </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
         <div>
           <Label htmlFor="partNumber" className="text-white">Part Number</Label>
           <Input
@@ -128,6 +140,87 @@ const CardForm = ({ onSubmit, level2Products, initialData }: CardFormProps) => {
             value={formData.partNumber}
             onChange={(e) => setFormData({ ...formData, partNumber: e.target.value })}
             className="bg-gray-800 border-gray-700 text-white"
+          />
+        </div>
+        <div>
+          <Label htmlFor="image" className="text-white">Image URL</Label>
+          <Input
+            id="image"
+            type="url"
+            value={formData.image}
+            onChange={(e) => setFormData({ ...formData, image: e.target.value })}
+            className="bg-gray-800 border-gray-700 text-white"
+          />
+        </div>
+      </div>
+
+      {/* Specifications Section */}
+      <div className="space-y-2">
+        <Label className="text-white">Specifications (Optional)</Label>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <Label htmlFor="slotRequirement" className="text-white text-sm">Slot Requirement</Label>
+            <Input
+              id="slotRequirement"
+              type="number"
+              value={formData.specifications?.slotRequirement || ''}
+              onChange={(e) => handleSpecificationChange('slotRequirement', parseInt(e.target.value) || 0)}
+              className="bg-gray-800 border-gray-700 text-white"
+              placeholder="e.g., 1, 2"
+            />
+          </div>
+          <div>
+            <Label htmlFor="channels" className="text-white text-sm">Channels</Label>
+            <Input
+              id="channels"
+              type="number"
+              value={formData.specifications?.channels || ''}
+              onChange={(e) => handleSpecificationChange('channels', parseInt(e.target.value) || 0)}
+              className="bg-gray-800 border-gray-700 text-white"
+              placeholder="e.g., 8, 4"
+            />
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <Label htmlFor="inputs" className="text-white text-sm">Inputs</Label>
+            <Input
+              id="inputs"
+              type="number"
+              value={formData.specifications?.inputs || ''}
+              onChange={(e) => handleSpecificationChange('inputs', parseInt(e.target.value) || 0)}
+              className="bg-gray-800 border-gray-700 text-white"
+            />
+          </div>
+          <div>
+            <Label htmlFor="outputs" className="text-white text-sm">Outputs</Label>
+            <Input
+              id="outputs"
+              type="number"
+              value={formData.specifications?.outputs || ''}
+              onChange={(e) => handleSpecificationChange('outputs', parseInt(e.target.value) || 0)}
+              className="bg-gray-800 border-gray-700 text-white"
+            />
+          </div>
+        </div>
+        <div>
+          <Label htmlFor="protocols" className="text-white text-sm">Protocols (comma-separated)</Label>
+          <Input
+            id="protocols"
+            value={formData.specifications?.protocols?.join(', ') || ''}
+            onChange={(e) => handleSpecificationChange('protocols', e.target.value.split(',').map(s => s.trim()))}
+            className="bg-gray-800 border-gray-700 text-white"
+            placeholder="e.g., DNP3, IEC 61850"
+          />
+        </div>
+        <div>
+          <Label htmlFor="inputTypes" className="text-white text-sm">Input Types (comma-separated)</Label>
+          <Input
+            id="inputTypes"
+            value={formData.specifications?.inputTypes?.join(', ') || ''}
+            onChange={(e) => handleSpecificationChange('inputTypes', e.target.value.split(',').map(s => s.trim()))}
+            className="bg-gray-800 border-gray-700 text-white"
+            placeholder="e.g., 4-20mA, CT, RTD"
           />
         </div>
       </div>
@@ -143,7 +236,7 @@ const CardForm = ({ onSubmit, level2Products, initialData }: CardFormProps) => {
 
       <div className="flex justify-end space-x-3 pt-4">
         <Button type="submit" className="bg-red-600 hover:bg-red-700">
-          {initialData ? 'Update' : 'Create'} Card
+          {initialData ? 'Update' : 'Create'} Level 3 Component
         </Button>
       </div>
     </form>

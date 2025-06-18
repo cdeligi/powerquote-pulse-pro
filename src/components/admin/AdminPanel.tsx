@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { User } from "@/types/auth";
@@ -9,6 +8,7 @@ import QuoteFieldConfiguration from "./QuoteFieldConfiguration";
 import AdminSettings from "./AdminSettings";
 import MarginDashboard from "./MarginDashboard";
 import QuoteAnalyticsDashboard from "../dashboard/QuoteAnalyticsDashboard";
+import { productDataService } from "@/services/productDataService";
 import { 
   Package, 
   Users, 
@@ -43,43 +43,16 @@ const AdminPanel = ({ user }: AdminPanelProps) => {
     }
   };
 
-  // Mock BOM items for margin dashboard
-  const mockBomItems: BOMItem[] = [
-    {
-      id: '1',
-      product: {
-        id: '1',
-        name: 'QTMS System',
-        category: 'Monitoring Systems',
-        description: 'Qualitrol Transformer Monitoring System',
-        price: 1000,
-        cost: 600,
-        productInfoUrl: '',
-        enabled: true,
-        image: '',
-        partNumber: 'QTMS-001'
-      } as Level1Product,
-      quantity: 2,
+  // Get mock BOM items from actual product data
+  const getMockBomItems = (): BOMItem[] => {
+    const level1Products = productDataService.getLevel1Products();
+    return level1Products.slice(0, 2).map((product, index) => ({
+      id: `${index + 1}`,
+      product,
+      quantity: index === 0 ? 2 : 1,
       enabled: true
-    },
-    {
-      id: '2', 
-      product: {
-        id: '2',
-        name: 'TM8 System',
-        category: 'DGA Monitors', 
-        description: 'Transformer Monitor 8-channel',
-        price: 500,
-        cost: 300,
-        productInfoUrl: '',
-        enabled: true,
-        image: '',
-        partNumber: 'TM8-001'
-      } as Level1Product,
-      quantity: 1,
-      enabled: true
-    }
-  ];
+    }));
+  };
 
   return (
     <div className="space-y-6">
@@ -153,7 +126,7 @@ const AdminPanel = ({ user }: AdminPanelProps) => {
         </TabsContent>
 
         <TabsContent value="margins" className="mt-6">
-          <MarginDashboard bomItems={mockBomItems} user={user} />
+          <MarginDashboard bomItems={getMockBomItems()} user={user} />
         </TabsContent>
 
         <TabsContent value="settings" className="mt-6">

@@ -4,12 +4,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { Level2Product, Level1Product } from "@/types/product";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Level1Product, Level2Product } from "@/types/product";
 
 interface Level2OptionFormProps {
-  onSubmit: (option: Omit<Level2Product, 'id'>) => void;
+  onSubmit: (product: Omit<Level2Product, 'id'>) => void;
   level1Products: Level1Product[];
   initialData?: Level2Product;
 }
@@ -18,14 +18,15 @@ const Level2OptionForm = ({ onSubmit, level1Products, initialData }: Level2Optio
   const [formData, setFormData] = useState({
     name: initialData?.name || '',
     parentProductId: initialData?.parentProductId || '',
-    type: initialData?.type || 'LTX' as 'LTX' | 'MTX' | 'STX' | 'CalGas' | 'Moisture' | 'Standard',
+    type: initialData?.type || '',
     description: initialData?.description || '',
     price: initialData?.price || 0,
     cost: initialData?.cost || 0,
     enabled: initialData?.enabled ?? true,
     specifications: initialData?.specifications || {},
     partNumber: initialData?.partNumber || '',
-    image: initialData?.image || ''
+    image: initialData?.image || '',
+    productInfoUrl: initialData?.productInfoUrl || ''
   });
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -33,11 +34,21 @@ const Level2OptionForm = ({ onSubmit, level1Products, initialData }: Level2Optio
     onSubmit(formData);
   };
 
+  const handleSpecificationChange = (key: string, value: any) => {
+    setFormData({
+      ...formData,
+      specifications: {
+        ...formData.specifications,
+        [key]: value
+      }
+    });
+  };
+
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <Label htmlFor="name" className="text-white">Name</Label>
+          <Label htmlFor="name" className="text-white">Product Name</Label>
           <Input
             id="name"
             value={formData.name}
@@ -47,9 +58,9 @@ const Level2OptionForm = ({ onSubmit, level1Products, initialData }: Level2Optio
           />
         </div>
         <div>
-          <Label htmlFor="parentProductId" className="text-white">Parent Product</Label>
-          <Select
-            value={formData.parentProductId}
+          <Label htmlFor="parentProductId" className="text-white">Parent Product (Level 1)</Label>
+          <Select 
+            value={formData.parentProductId} 
             onValueChange={(value) => setFormData({ ...formData, parentProductId: value })}
           >
             <SelectTrigger className="bg-gray-800 border-gray-700 text-white">
@@ -67,25 +78,15 @@ const Level2OptionForm = ({ onSubmit, level1Products, initialData }: Level2Optio
       </div>
 
       <div>
-        <Label htmlFor="type" className="text-white">Type</Label>
-        <Select
+        <Label htmlFor="type" className="text-white">Type/Variant</Label>
+        <Input
+          id="type"
           value={formData.type}
-          onValueChange={(value: 'LTX' | 'MTX' | 'STX' | 'CalGas' | 'Moisture' | 'Standard') => 
-            setFormData({ ...formData, type: value })
-          }
-        >
-          <SelectTrigger className="bg-gray-800 border-gray-700 text-white">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent className="bg-gray-800 border-gray-700">
-            <SelectItem value="LTX" className="text-white">LTX</SelectItem>
-            <SelectItem value="MTX" className="text-white">MTX</SelectItem>
-            <SelectItem value="STX" className="text-white">STX</SelectItem>
-            <SelectItem value="CalGas" className="text-white">CalGas</SelectItem>
-            <SelectItem value="Moisture" className="text-white">Moisture</SelectItem>
-            <SelectItem value="Standard" className="text-white">Standard</SelectItem>
-          </SelectContent>
-        </Select>
+          onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+          className="bg-gray-800 border-gray-700 text-white"
+          placeholder="e.g., LTX, MTX, STX, CalGas, Standard"
+          required
+        />
       </div>
 
       <div>
@@ -134,13 +135,62 @@ const Level2OptionForm = ({ onSubmit, level1Products, initialData }: Level2Optio
           />
         </div>
         <div>
-          <Label htmlFor="image" className="text-white">Image URL</Label>
+          <Label htmlFor="productInfoUrl" className="text-white">Product Info URL</Label>
           <Input
-            id="image"
+            id="productInfoUrl"
             type="url"
-            value={formData.image}
-            onChange={(e) => setFormData({ ...formData, image: e.target.value })}
+            value={formData.productInfoUrl}
+            onChange={(e) => setFormData({ ...formData, productInfoUrl: e.target.value })}
             className="bg-gray-800 border-gray-700 text-white"
+          />
+        </div>
+      </div>
+
+      <div>
+        <Label htmlFor="image" className="text-white">Image URL</Label>
+        <Input
+          id="image"
+          type="url"
+          value={formData.image}
+          onChange={(e) => setFormData({ ...formData, image: e.target.value })}
+          className="bg-gray-800 border-gray-700 text-white"
+        />
+      </div>
+
+      {/* Specifications Section */}
+      <div className="space-y-2">
+        <Label className="text-white">Specifications (Optional)</Label>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <Label htmlFor="height" className="text-white text-sm">Height</Label>
+            <Input
+              id="height"
+              value={formData.specifications?.height || ''}
+              onChange={(e) => handleSpecificationChange('height', e.target.value)}
+              className="bg-gray-800 border-gray-700 text-white"
+              placeholder="e.g., 6U, 3U, 1.5U"
+            />
+          </div>
+          <div>
+            <Label htmlFor="slots" className="text-white text-sm">Slots</Label>
+            <Input
+              id="slots"
+              type="number"
+              value={formData.specifications?.slots || ''}
+              onChange={(e) => handleSpecificationChange('slots', parseInt(e.target.value) || 0)}
+              className="bg-gray-800 border-gray-700 text-white"
+              placeholder="e.g., 14, 7, 4"
+            />
+          </div>
+        </div>
+        <div>
+          <Label htmlFor="capacity" className="text-white text-sm">Capacity</Label>
+          <Input
+            id="capacity"
+            value={formData.specifications?.capacity || ''}
+            onChange={(e) => handleSpecificationChange('capacity', e.target.value)}
+            className="bg-gray-800 border-gray-700 text-white"
+            placeholder="e.g., Large, Medium, Compact"
           />
         </div>
       </div>
@@ -156,7 +206,7 @@ const Level2OptionForm = ({ onSubmit, level1Products, initialData }: Level2Optio
 
       <div className="flex justify-end space-x-3 pt-4">
         <Button type="submit" className="bg-red-600 hover:bg-red-700">
-          {initialData ? 'Update' : 'Create'} Option
+          {initialData ? 'Update' : 'Create'} Level 2 Product
         </Button>
       </div>
     </form>

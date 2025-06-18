@@ -20,6 +20,7 @@ import Level1ProductForm from "./product-forms/Level1ProductForm";
 import Level2OptionForm from "./product-forms/Level2OptionForm";
 import CardForm from "./product-forms/CardForm";
 import { useToast } from "@/hooks/use-toast";
+import { productDataService } from "@/services/productDataService";
 
 interface ProductManagementProps {
   user: User;
@@ -30,185 +31,13 @@ const ProductManagement = ({ user }: ProductManagementProps) => {
   const [editingProduct, setEditingProduct] = useState<any>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogType, setDialogType] = useState<'level1' | 'level2' | 'level3'>('level1');
+  const [refreshKey, setRefreshKey] = useState(0);
   const { toast } = useToast();
 
-  // Mock data reflecting the new 3-level hierarchy
-  const [level1Products, setLevel1Products] = useState<Level1Product[]>([
-    {
-      id: 'qtms-main',
-      name: 'QTMS',
-      type: 'QTMS',
-      description: 'Qualitrol Transformer Monitoring System - Complete monitoring solution',
-      price: 0, // Base price, actual pricing comes from Level 2/3 selections
-      cost: 0,
-      productInfoUrl: 'https://www.qualitrolcorp.com/products/qtms',
-      enabled: true,
-      partNumber: 'QTMS-BASE-001'
-    },
-    {
-      id: 'tm8-dga',
-      name: 'TM8',
-      type: 'TM8',
-      description: 'Dissolved Gas Analysis Monitor - Standalone DGA solution',
-      price: 12500,
-      cost: 6250,
-      productInfoUrl: 'https://www.qualitrolcorp.com/products/tm8',
-      enabled: true,
-      partNumber: 'TM8-DGA-001'
-    },
-    {
-      id: 'qpdm-pd',
-      name: 'QPDM',
-      type: 'QPDM',
-      description: 'Partial Discharge Monitor - Advanced PD detection',
-      price: 8500,
-      cost: 4250,
-      productInfoUrl: 'https://www.qualitrolcorp.com/products/qpdm',
-      enabled: true,
-      partNumber: 'QPDM-PD-001'
-    }
-  ]);
-
-  const [level2Products, setLevel2Products] = useState<Level2Product[]>([
-    {
-      id: 'ltx-chassis',
-      name: 'LTX Chassis',
-      parentProductId: 'qtms-main',
-      type: 'LTX',
-      description: 'Large capacity transformer monitoring chassis - 6U, 14 slots',
-      price: 4200,
-      cost: 2100,
-      enabled: true,
-      specifications: {
-        height: '6U',
-        slots: 14,
-        capacity: 'Large'
-      },
-      partNumber: 'LTX-6U-14S'
-    },
-    {
-      id: 'mtx-chassis',
-      name: 'MTX Chassis',
-      parentProductId: 'qtms-main',
-      type: 'MTX',
-      description: 'Medium capacity transformer monitoring chassis - 3U, 7 slots',
-      price: 2800,
-      cost: 1400,
-      enabled: true,
-      specifications: {
-        height: '3U',
-        slots: 7,
-        capacity: 'Medium'
-      },
-      partNumber: 'MTX-3U-7S'
-    },
-    {
-      id: 'stx-chassis',
-      name: 'STX Chassis',
-      parentProductId: 'qtms-main',
-      type: 'STX',
-      description: 'Compact transformer monitoring chassis - 1.5U, 4 slots',
-      price: 1900,
-      cost: 950,
-      enabled: true,
-      specifications: {
-        height: '1.5U',
-        slots: 4,
-        capacity: 'Compact'
-      },
-      partNumber: 'STX-1.5U-4S'
-    },
-    {
-      id: 'calgas-tm8',
-      name: 'CalGas System',
-      parentProductId: 'tm8-dga',
-      type: 'CalGas',
-      description: 'Automated calibration gas system for TM8',
-      price: 3500,
-      cost: 1750,
-      enabled: true,
-      partNumber: 'CALGAS-TM8-001'
-    },
-    {
-      id: 'moisture-tm8',
-      name: 'Moisture Sensor',
-      parentProductId: 'tm8-dga',
-      type: 'Moisture',
-      description: 'Oil moisture content monitoring for TM8',
-      price: 2200,
-      cost: 1100,
-      enabled: true,
-      partNumber: 'MOISTURE-TM8-001'
-    }
-  ]);
-
-  const [level3Products, setLevel3Products] = useState<Level3Product[]>([
-    {
-      id: 'relay-8in-2out',
-      name: 'Relay Protection Card',
-      parentProductId: 'ltx-chassis',
-      type: 'relay',
-      description: '8 digital inputs + 2 analog outputs for comprehensive protection',
-      price: 2500,
-      cost: 1250,
-      enabled: true,
-      specifications: {
-        slotRequirement: 1,
-        inputs: 8,
-        outputs: 2,
-        protocols: ['DNP3', 'IEC 61850']
-      },
-      partNumber: 'RPC-8I2O-001'
-    },
-    {
-      id: 'analog-8ch-ltx',
-      name: 'Analog Input Card (LTX)',
-      parentProductId: 'ltx-chassis',
-      type: 'analog',
-      description: '8-channel analog input with configurable input types for LTX',
-      price: 1800,
-      cost: 900,
-      enabled: true,
-      specifications: {
-        slotRequirement: 1,
-        channels: 8,
-        inputTypes: ['4-20mA', 'CT', 'RTD', 'Thermocouple']
-      },
-      partNumber: 'AIC-8CH-LTX-001'
-    },
-    {
-      id: 'analog-8ch-mtx',
-      name: 'Analog Input Card (MTX)',
-      parentProductId: 'mtx-chassis',
-      type: 'analog',
-      description: '8-channel analog input with configurable input types for MTX',
-      price: 1800,
-      cost: 900,
-      enabled: true,
-      specifications: {
-        slotRequirement: 1,
-        channels: 8,
-        inputTypes: ['4-20mA', 'CT', 'RTD', 'Thermocouple']
-      },
-      partNumber: 'AIC-8CH-MTX-001'
-    },
-    {
-      id: 'analog-4ch-stx',
-      name: 'Analog Input Card (STX)',
-      parentProductId: 'stx-chassis',
-      type: 'analog',
-      description: '4-channel analog input optimized for STX compact chassis',
-      price: 1200,
-      cost: 600,
-      enabled: true,
-      specifications: {
-        slotRequirement: 1,
-        channels: 4,
-        inputTypes: ['4-20mA', 'CT', 'RTD']
-      },
-      partNumber: 'AIC-4CH-STX-001'
-    }
-  ]);
+  // Use productDataService instead of local state
+  const level1Products = productDataService.getLevel1Products();
+  const level2Products = productDataService.getLevel2Products();
+  const level3Products = productDataService.getLevel3Products();
 
   // Helper functions
   const getLevel2ProductsForLevel1 = (level1Id: string) => {
@@ -233,15 +62,20 @@ const ProductManagement = ({ user }: ProductManagementProps) => {
     return level1Products.find(p => p.id === level2Product.parentProductId);
   };
 
+  const forceRefresh = () => {
+    setRefreshKey(prev => prev + 1);
+  };
+
   // CRUD Operations
   const handleCreateLevel1Product = (productData: Omit<Level1Product, 'id'>) => {
     const newProduct: Level1Product = {
       ...productData,
       id: `level1-${Date.now()}`
     };
-    setLevel1Products(prev => [...prev, newProduct]);
+    productDataService.addLevel1Product(newProduct);
     setDialogOpen(false);
     setEditingProduct(null);
+    forceRefresh();
     toast({
       title: "Success",
       description: "Level 1 product created successfully"
@@ -250,11 +84,10 @@ const ProductManagement = ({ user }: ProductManagementProps) => {
 
   const handleUpdateLevel1Product = (productData: Omit<Level1Product, 'id'>) => {
     if (!editingProduct) return;
-    setLevel1Products(prev => prev.map(p => 
-      p.id === editingProduct.id ? { ...productData, id: editingProduct.id } : p
-    ));
+    productDataService.updateLevel1Product(editingProduct.id, { ...productData, id: editingProduct.id });
     setDialogOpen(false);
     setEditingProduct(null);
+    forceRefresh();
     toast({
       title: "Success",
       description: "Level 1 product updated successfully"
@@ -273,7 +106,8 @@ const ProductManagement = ({ user }: ProductManagementProps) => {
       return;
     }
     
-    setLevel1Products(prev => prev.filter(p => p.id !== productId));
+    productDataService.deleteLevel1Product(productId);
+    forceRefresh();
     toast({
       title: "Success",
       description: "Level 1 product deleted successfully"
@@ -285,9 +119,10 @@ const ProductManagement = ({ user }: ProductManagementProps) => {
       ...productData,
       id: `level2-${Date.now()}`
     };
-    setLevel2Products(prev => [...prev, newProduct]);
+    productDataService.addLevel2Product(newProduct);
     setDialogOpen(false);
     setEditingProduct(null);
+    forceRefresh();
     toast({
       title: "Success",
       description: "Level 2 product created successfully"
@@ -296,11 +131,10 @@ const ProductManagement = ({ user }: ProductManagementProps) => {
 
   const handleUpdateLevel2Product = (productData: Omit<Level2Product, 'id'>) => {
     if (!editingProduct) return;
-    setLevel2Products(prev => prev.map(p => 
-      p.id === editingProduct.id ? { ...productData, id: editingProduct.id } : p
-    ));
+    productDataService.updateLevel2Product(editingProduct.id, { ...productData, id: editingProduct.id });
     setDialogOpen(false);
     setEditingProduct(null);
+    forceRefresh();
     toast({
       title: "Success",
       description: "Level 2 product updated successfully"
@@ -319,7 +153,8 @@ const ProductManagement = ({ user }: ProductManagementProps) => {
       return;
     }
     
-    setLevel2Products(prev => prev.filter(p => p.id !== productId));
+    productDataService.deleteLevel2Product(productId);
+    forceRefresh();
     toast({
       title: "Success",
       description: "Level 2 product deleted successfully"
@@ -331,9 +166,10 @@ const ProductManagement = ({ user }: ProductManagementProps) => {
       ...productData,
       id: `level3-${Date.now()}`
     };
-    setLevel3Products(prev => [...prev, newProduct]);
+    productDataService.addLevel3Product(newProduct);
     setDialogOpen(false);
     setEditingProduct(null);
+    forceRefresh();
     toast({
       title: "Success",
       description: "Level 3 product created successfully"
@@ -342,11 +178,10 @@ const ProductManagement = ({ user }: ProductManagementProps) => {
 
   const handleUpdateLevel3Product = (productData: Omit<Level3Product, 'id'>) => {
     if (!editingProduct) return;
-    setLevel3Products(prev => prev.map(p => 
-      p.id === editingProduct.id ? { ...productData, id: editingProduct.id } : p
-    ));
+    productDataService.updateLevel3Product(editingProduct.id, { ...productData, id: editingProduct.id });
     setDialogOpen(false);
     setEditingProduct(null);
+    forceRefresh();
     toast({
       title: "Success",
       description: "Level 3 product updated successfully"
@@ -354,7 +189,8 @@ const ProductManagement = ({ user }: ProductManagementProps) => {
   };
 
   const handleDeleteLevel3Product = (productId: string) => {
-    setLevel3Products(prev => prev.filter(p => p.id !== productId));
+    productDataService.deleteLevel3Product(productId);
+    forceRefresh();
     toast({
       title: "Success",
       description: "Level 3 product deleted successfully"
@@ -374,7 +210,7 @@ const ProductManagement = ({ user }: ProductManagementProps) => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" key={refreshKey}>
       <div className="flex justify-between items-center">
         <div>
           <h2 className="text-2xl font-bold text-white">Product Catalog Management</h2>
