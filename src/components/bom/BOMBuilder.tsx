@@ -33,6 +33,17 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
     }
   }, [level1Products.length, activeTab]);
 
+  // Update selected product when tab changes
+  useEffect(() => {
+    if (activeTab) {
+      const product = level1Products.find(p => p.id === activeTab);
+      if (product && selectedLevel1Product?.id !== activeTab) {
+        setSelectedLevel1Product(product);
+        setSelectedLevel2Options([]);
+      }
+    }
+  }, [activeTab, level1Products, selectedLevel1Product?.id]);
+
   const handleLevel1ProductSelect = (product: Level1Product) => {
     setSelectedLevel1Product(product);
     setSelectedLevel2Options([]);
@@ -95,12 +106,6 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
   const renderProductContent = (productId: string) => {
     const product = level1Products.find(p => p.id === productId);
     if (!product) return null;
-
-    // Set the selected product when switching tabs
-    if (selectedLevel1Product?.id !== productId) {
-      setSelectedLevel1Product(product);
-      setSelectedLevel2Options([]);
-    }
 
     switch (productId) {
       case 'qtms':
