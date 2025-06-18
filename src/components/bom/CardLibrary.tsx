@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Plus } from "lucide-react";
+import { productDataService } from "@/services/productDataService";
 
 interface CardLibraryProps {
   chassis: Level2Product;
@@ -14,123 +15,30 @@ interface CardLibraryProps {
 }
 
 const CardLibrary = ({ chassis, onCardSelect, canSeePrices }: CardLibraryProps) => {
-  const [selectedSlot, setSelectedSlot] = useState<number>(2); // Default to slot 2 (CPU is always slot 1)
-
-  const cardLibrary: Level3Product[] = [
-    {
-      id: 'relay-8in-2out',
-      name: 'Relay Protection Card',
-      parentProductId: chassis.id,
-      type: 'relay',
-      description: '8 digital inputs + 2 analog outputs for comprehensive protection',
-      price: 2500,
-      cost: 1250,
-      enabled: true,
-      specifications: {
-        slotRequirement: 1,
-        inputs: 8,
-        outputs: 2,
-        protocols: ['DNP3', 'IEC 61850']
-      },
-      partNumber: 'RPC-8I2O-001'
-    },
-    {
-      id: 'analog-8ch',
-      name: 'Analog Input Card',
-      parentProductId: chassis.id,
-      type: 'analog',
-      description: '8-channel analog input with configurable input types',
-      price: 1800,
-      cost: 900,
-      enabled: true,
-      specifications: {
-        slotRequirement: 1,
-        channels: 8,
-        inputTypes: ['4-20mA', 'CT', 'RTD', 'Thermocouple']
-      },
-      partNumber: 'AIC-8CH-001'
-    },
-    {
-      id: 'fiber-4port',
-      name: 'Fiber Optic Card (4-port)',
-      parentProductId: chassis.id,
-      type: 'fiber',
-      description: '4-port fiber optic communication card',
-      price: 3200,
-      cost: 1600,
-      enabled: true,
-      specifications: {
-        slotRequirement: 1,
-        ports: 4,
-        protocols: ['IEC 61850', 'GOOSE']
-      },
-      partNumber: 'FOC-4P-001'
-    },
-    {
-      id: 'fiber-6port',
-      name: 'Fiber Optic Card (6-port)',
-      parentProductId: chassis.id,
-      type: 'fiber',
-      description: '6-port fiber optic communication card',
-      price: 4200,
-      cost: 2100,
-      enabled: true,
-      specifications: {
-        slotRequirement: 1,
-        ports: 6,
-        protocols: ['IEC 61850', 'GOOSE']
-      },
-      partNumber: 'FOC-6P-001'
-    },
-    {
-      id: 'display-oncard',
-      name: 'On-Card Display Module',
-      parentProductId: chassis.id,
-      type: 'display',
-      description: 'Integrated display module for local monitoring',
-      price: 1200,
-      cost: 600,
-      enabled: true,
-      specifications: {
-        slotRequirement: 1,
-        type: 'LCD',
-        size: '3.5"',
-        resolution: '320x240'
-      },
-      partNumber: 'DCM-LCD-001'
-    },
-    {
-      id: 'bushing-monitor',
-      name: 'Bushing Monitoring Module',
-      parentProductId: chassis.id,
-      type: 'bushing',
-      description: 'Dual-slot bushing monitoring for transformer health',
-      price: 5800,
-      cost: 2900,
-      enabled: true,
-      specifications: {
-        slotRequirement: 2,
-        channels: 6,
-        measurements: ['Capacitance', 'Tan Delta', 'Temperature']
-      },
-      partNumber: 'BMM-6CH-001'
-    }
-  ];
+  const [selectedSlot, setSelectedSlot] = useState<number>(2);
 
   const getCompatibleCards = () => {
-    return cardLibrary.filter(card => 
-      card.parentProductId === chassis.id && card.enabled
+    const allLevel3Products = productDataService.getLevel3Products();
+    return allLevel3Products.filter(card => 
+      card.enabled && productDataService.isLevel3AvailableForLevel2(card, chassis)
     );
   };
 
   const groupCardsByType = () => {
     const compatible = getCompatibleCards();
     return {
-      relay: compatible.filter(card => card.type === 'relay'),
-      analog: compatible.filter(card => card.type === 'analog'),
-      fiber: compatible.filter(card => card.type === 'fiber'),
-      display: compatible.filter(card => card.type === 'display'),
-      bushing: compatible.filter(card => card.type === 'bushing')
+      relay: compatible.filter(card => card.name.toLowerCase().includes('relay')),
+      analog: compatible.filter(card => card.name.toLowerCase().includes('analog')),
+      fiber: compatible.filter(card => card.name.toLowerCase().includes('fiber')),
+      display: compatible.filter(card => card.name.toLowerCase().includes('display')),
+      digital: compatible.filter(card => card.name.toLowerCase().includes('digital')),
+      other: compatible.filter(card => 
+        !card.name.toLowerCase().includes('relay') &&
+        !card.name.toLowerCase().includes('analog') &&
+        !card.name.toLowerCase().includes('fiber') &&
+        !card.name.toLowerCase().includes('display') &&
+        !card.name.toLowerCase().includes('digital')
+      )
     };
   };
 
@@ -186,6 +94,19 @@ const CardLibrary = ({ chassis, onCardSelect, canSeePrices }: CardLibraryProps) 
     </div>
   );
 
+  const hasCards = Object.values(cardGroups).some(group => group.length > 0);
+
+  if (!hasCards) {
+    return (
+      <div className="text-center py-8">
+        <p className="text-gray-400">
+          No cards available for {chassis.name}. 
+          Please create Level 3 products for this category in the Admin Panel.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <Card className="bg-gray-900 border-gray-800">
@@ -198,7 +119,7 @@ const CardLibrary = ({ chassis, onCardSelect, canSeePrices }: CardLibraryProps) 
       </Card>
 
       <Tabs defaultValue="relay" className="w-full">
-        <TabsList className="grid w-full grid-cols-5 bg-gray-800">
+        <TabsList className="grid w-full grid-cols-6 bg-gray-800">
           <TabsTrigger value="relay" className="text-white data-[state=active]:bg-red-600">
             Relay ({cardGroups.relay.length})
           </TabsTrigger>
@@ -211,8 +132,11 @@ const CardLibrary = ({ chassis, onCardSelect, canSeePrices }: CardLibraryProps) 
           <TabsTrigger value="display" className="text-white data-[state=active]:bg-red-600">
             Display ({cardGroups.display.length})
           </TabsTrigger>
-          <TabsTrigger value="bushing" className="text-white data-[state=active]:bg-red-600">
-            Bushing ({cardGroups.bushing.length})
+          <TabsTrigger value="digital" className="text-white data-[state=active]:bg-red-600">
+            Digital ({cardGroups.digital.length})
+          </TabsTrigger>
+          <TabsTrigger value="other" className="text-white data-[state=active]:bg-red-600">
+            Other ({cardGroups.other.length})
           </TabsTrigger>
         </TabsList>
         
@@ -232,8 +156,12 @@ const CardLibrary = ({ chassis, onCardSelect, canSeePrices }: CardLibraryProps) 
           {renderCardGrid(cardGroups.display)}
         </TabsContent>
         
-        <TabsContent value="bushing">
-          {renderCardGrid(cardGroups.bushing)}
+        <TabsContent value="digital">
+          {renderCardGrid(cardGroups.digital)}
+        </TabsContent>
+        
+        <TabsContent value="other">
+          {renderCardGrid(cardGroups.other)}
         </TabsContent>
       </Tabs>
     </div>

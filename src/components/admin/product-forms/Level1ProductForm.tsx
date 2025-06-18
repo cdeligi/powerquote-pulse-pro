@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Level1Product } from "@/types/product";
+import { productDataService } from "@/services/productDataService";
 
 interface Level1ProductFormProps {
   onSubmit: (product: Omit<Level1Product, 'id'>) => void;
@@ -26,6 +28,9 @@ const Level1ProductForm = ({ onSubmit, initialData }: Level1ProductFormProps) =>
     image: initialData?.image || ''
   });
 
+  // Get asset types from service
+  const assetTypes = productDataService.getAssetTypes();
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     onSubmit(formData);
@@ -42,10 +47,11 @@ const Level1ProductForm = ({ onSubmit, initialData }: Level1ProductFormProps) =>
             onChange={(e) => setFormData({ ...formData, name: e.target.value })}
             className="bg-gray-800 border-gray-700 text-white"
             required
+            placeholder="e.g., QTMS, DGA, Partial Discharge"
           />
         </div>
         <div>
-          <Label htmlFor="type" className="text-white">Asset Type</Label>
+          <Label htmlFor="type" className="text-white">Asset Type (Level 0)</Label>
           <Select 
             value={formData.type} 
             onValueChange={(value) => setFormData({ ...formData, type: value })}
@@ -54,9 +60,11 @@ const Level1ProductForm = ({ onSubmit, initialData }: Level1ProductFormProps) =>
               <SelectValue placeholder="Select asset type" />
             </SelectTrigger>
             <SelectContent className="bg-gray-800 border-gray-700">
-              <SelectItem value="Power Transformer" className="text-white">Power Transformer</SelectItem>
-              <SelectItem value="Gas Insulated Switchgear" className="text-white">Gas Insulated Switchgear</SelectItem>
-              <SelectItem value="Breakers" className="text-white">Breakers</SelectItem>
+              {assetTypes.filter(type => type.enabled).map((type) => (
+                <SelectItem key={type.id} value={type.name} className="text-white">
+                  {type.name}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
