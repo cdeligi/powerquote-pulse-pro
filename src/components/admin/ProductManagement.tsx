@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -17,6 +16,10 @@ import {
 } from "lucide-react";
 import { User } from "@/types/auth";
 import { Level1Product, Level2Product, Level3Product } from "@/types/product";
+import Level1ProductForm from "./product-forms/Level1ProductForm";
+import Level2OptionForm from "./product-forms/Level2OptionForm";
+import CardForm from "./product-forms/CardForm";
+import { useToast } from "@/hooks/use-toast";
 
 interface ProductManagementProps {
   user: User;
@@ -24,6 +27,10 @@ interface ProductManagementProps {
 
 const ProductManagement = ({ user }: ProductManagementProps) => {
   const [activeTab, setActiveTab] = useState("level1");
+  const [editingProduct, setEditingProduct] = useState<any>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [dialogType, setDialogType] = useState<'level1' | 'level2' | 'level3'>('level1');
+  const { toast } = useToast();
 
   // Mock data reflecting the new 3-level hierarchy
   const [level1Products, setLevel1Products] = useState<Level1Product[]>([
@@ -203,6 +210,7 @@ const ProductManagement = ({ user }: ProductManagementProps) => {
     }
   ]);
 
+  // Helper functions
   const getLevel2ProductsForLevel1 = (level1Id: string) => {
     return level2Products.filter(p => p.parentProductId === level1Id);
   };
@@ -223,6 +231,146 @@ const ProductManagement = ({ user }: ProductManagementProps) => {
 
   const getGrandParentProduct = (level2Product: Level2Product) => {
     return level1Products.find(p => p.id === level2Product.parentProductId);
+  };
+
+  // CRUD Operations
+  const handleCreateLevel1Product = (productData: Omit<Level1Product, 'id'>) => {
+    const newProduct: Level1Product = {
+      ...productData,
+      id: `level1-${Date.now()}`
+    };
+    setLevel1Products(prev => [...prev, newProduct]);
+    setDialogOpen(false);
+    setEditingProduct(null);
+    toast({
+      title: "Success",
+      description: "Level 1 product created successfully"
+    });
+  };
+
+  const handleUpdateLevel1Product = (productData: Omit<Level1Product, 'id'>) => {
+    if (!editingProduct) return;
+    setLevel1Products(prev => prev.map(p => 
+      p.id === editingProduct.id ? { ...productData, id: editingProduct.id } : p
+    ));
+    setDialogOpen(false);
+    setEditingProduct(null);
+    toast({
+      title: "Success",
+      description: "Level 1 product updated successfully"
+    });
+  };
+
+  const handleDeleteLevel1Product = (productId: string) => {
+    // Check for dependencies
+    const dependentLevel2 = level2Products.filter(p => p.parentProductId === productId);
+    if (dependentLevel2.length > 0) {
+      toast({
+        title: "Cannot Delete",
+        description: `This product has ${dependentLevel2.length} dependent Level 2 products. Please remove them first.`,
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    setLevel1Products(prev => prev.filter(p => p.id !== productId));
+    toast({
+      title: "Success",
+      description: "Level 1 product deleted successfully"
+    });
+  };
+
+  const handleCreateLevel2Product = (productData: Omit<Level2Product, 'id'>) => {
+    const newProduct: Level2Product = {
+      ...productData,
+      id: `level2-${Date.now()}`
+    };
+    setLevel2Products(prev => [...prev, newProduct]);
+    setDialogOpen(false);
+    setEditingProduct(null);
+    toast({
+      title: "Success",
+      description: "Level 2 product created successfully"
+    });
+  };
+
+  const handleUpdateLevel2Product = (productData: Omit<Level2Product, 'id'>) => {
+    if (!editingProduct) return;
+    setLevel2Products(prev => prev.map(p => 
+      p.id === editingProduct.id ? { ...productData, id: editingProduct.id } : p
+    ));
+    setDialogOpen(false);
+    setEditingProduct(null);
+    toast({
+      title: "Success",
+      description: "Level 2 product updated successfully"
+    });
+  };
+
+  const handleDeleteLevel2Product = (productId: string) => {
+    // Check for dependencies
+    const dependentLevel3 = level3Products.filter(p => p.parentProductId === productId);
+    if (dependentLevel3.length > 0) {
+      toast({
+        title: "Cannot Delete",
+        description: `This product has ${dependentLevel3.length} dependent Level 3 products. Please remove them first.`,
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    setLevel2Products(prev => prev.filter(p => p.id !== productId));
+    toast({
+      title: "Success",
+      description: "Level 2 product deleted successfully"
+    });
+  };
+
+  const handleCreateLevel3Product = (productData: Omit<Level3Product, 'id'>) => {
+    const newProduct: Level3Product = {
+      ...productData,
+      id: `level3-${Date.now()}`
+    };
+    setLevel3Products(prev => [...prev, newProduct]);
+    setDialogOpen(false);
+    setEditingProduct(null);
+    toast({
+      title: "Success",
+      description: "Level 3 product created successfully"
+    });
+  };
+
+  const handleUpdateLevel3Product = (productData: Omit<Level3Product, 'id'>) => {
+    if (!editingProduct) return;
+    setLevel3Products(prev => prev.map(p => 
+      p.id === editingProduct.id ? { ...productData, id: editingProduct.id } : p
+    ));
+    setDialogOpen(false);
+    setEditingProduct(null);
+    toast({
+      title: "Success",
+      description: "Level 3 product updated successfully"
+    });
+  };
+
+  const handleDeleteLevel3Product = (productId: string) => {
+    setLevel3Products(prev => prev.filter(p => p.id !== productId));
+    toast({
+      title: "Success",
+      description: "Level 3 product deleted successfully"
+    });
+  };
+
+  const openEditDialog = (product: any, type: 'level1' | 'level2' | 'level3') => {
+    setEditingProduct(product);
+    setDialogType(type);
+    setDialogOpen(true);
+  };
+
+  const openCreateDialog = (type: 'level1' | 'level2' | 'level3') => {
+    setEditingProduct(null);
+    setDialogType(type);
+    setDialogOpen(true);
   };
 
   return (
@@ -269,7 +417,10 @@ const ProductManagement = ({ user }: ProductManagementProps) => {
               <h3 className="text-xl font-medium text-white">Level 1: Main Product Categories</h3>
               <p className="text-gray-400">Core product families (QTMS, TM8, QPDM, etc.)</p>
             </div>
-            <Button className="bg-red-600 hover:bg-red-700">
+            <Button 
+              className="bg-red-600 hover:bg-red-700"
+              onClick={() => openCreateDialog('level1')}
+            >
               <Plus className="h-4 w-4 mr-2" />
               Add Level 1 Product
             </Button>
@@ -312,10 +463,20 @@ const ProductManagement = ({ user }: ProductManagementProps) => {
                         </div>
                       </div>
                       <div className="flex space-x-2">
-                        <Button variant="ghost" size="sm" className="text-blue-400 hover:text-blue-300">
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="text-blue-400 hover:text-blue-300"
+                          onClick={() => openEditDialog(product, 'level1')}
+                        >
                           <Edit2 className="h-4 w-4" />
                         </Button>
-                        <Button variant="ghost" size="sm" className="text-red-400 hover:text-red-300">
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="text-red-400 hover:text-red-300"
+                          onClick={() => handleDeleteLevel1Product(product.id)}
+                        >
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
@@ -369,7 +530,10 @@ const ProductManagement = ({ user }: ProductManagementProps) => {
               <h3 className="text-xl font-medium text-white">Level 2: Product Variants</h3>
               <p className="text-gray-400">Chassis types, options, and variants (LTX/MTX/STX, CalGas, etc.)</p>
             </div>
-            <Button className="bg-red-600 hover:bg-red-700">
+            <Button 
+              className="bg-red-600 hover:bg-red-700"
+              onClick={() => openCreateDialog('level2')}
+            >
               <Plus className="h-4 w-4 mr-2" />
               Add Level 2 Product
             </Button>
@@ -412,10 +576,20 @@ const ProductManagement = ({ user }: ProductManagementProps) => {
                         </div>
                       </div>
                       <div className="flex space-x-2">
-                        <Button variant="ghost" size="sm" className="text-blue-400 hover:text-blue-300">
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="text-blue-400 hover:text-blue-300"
+                          onClick={() => openEditDialog(product, 'level2')}
+                        >
                           <Edit2 className="h-4 w-4" />
                         </Button>
-                        <Button variant="ghost" size="sm" className="text-red-400 hover:text-red-300">
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="text-red-400 hover:text-red-300"
+                          onClick={() => handleDeleteLevel2Product(product.id)}
+                        >
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
@@ -468,7 +642,10 @@ const ProductManagement = ({ user }: ProductManagementProps) => {
               <h3 className="text-xl font-medium text-white">Level 3: Components & Cards</h3>
               <p className="text-gray-400">Individual cards, sensors, and components for specific variants</p>
             </div>
-            <Button className="bg-red-600 hover:bg-red-700">
+            <Button 
+              className="bg-red-600 hover:bg-red-700"
+              onClick={() => openCreateDialog('level3')}
+            >
               <Plus className="h-4 w-4 mr-2" />
               Add Level 3 Component
             </Button>
@@ -509,10 +686,20 @@ const ProductManagement = ({ user }: ProductManagementProps) => {
                         </div>
                       </div>
                       <div className="flex space-x-2">
-                        <Button variant="ghost" size="sm" className="text-blue-400 hover:text-blue-300">
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="text-blue-400 hover:text-blue-300"
+                          onClick={() => openEditDialog(product, 'level3')}
+                        >
                           <Edit2 className="h-4 w-4" />
                         </Button>
-                        <Button variant="ghost" size="sm" className="text-red-400 hover:text-red-300">
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="text-red-400 hover:text-red-300"
+                          onClick={() => handleDeleteLevel3Product(product.id)}
+                        >
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
@@ -554,6 +741,44 @@ const ProductManagement = ({ user }: ProductManagementProps) => {
           </div>
         </TabsContent>
       </Tabs>
+
+      {/* Edit/Create Dialog */}
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="bg-gray-900 border-gray-800 max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-white">
+              {editingProduct ? 'Edit' : 'Create'} {
+                dialogType === 'level1' ? 'Level 1 Product' :
+                dialogType === 'level2' ? 'Level 2 Product' :
+                'Level 3 Product'
+              }
+            </DialogTitle>
+          </DialogHeader>
+          
+          {dialogType === 'level1' && (
+            <Level1ProductForm
+              onSubmit={editingProduct ? handleUpdateLevel1Product : handleCreateLevel1Product}
+              initialData={editingProduct}
+            />
+          )}
+          
+          {dialogType === 'level2' && (
+            <Level2OptionForm
+              onSubmit={editingProduct ? handleUpdateLevel2Product : handleCreateLevel2Product}
+              level1Products={level1Products}
+              initialData={editingProduct}
+            />
+          )}
+          
+          {dialogType === 'level3' && (
+            <CardForm
+              onSubmit={editingProduct ? handleUpdateLevel3Product : handleCreateLevel3Product}
+              level2Products={level2Products}
+              initialData={editingProduct}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

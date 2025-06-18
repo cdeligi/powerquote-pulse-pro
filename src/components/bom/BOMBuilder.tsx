@@ -315,15 +315,42 @@ const BOMBuilder = ({ user }: BOMBuilderProps) => {
   };
 
   const updateLevel3Customizations = (bomItemId: string, customizations: Level3Customization[]) => {
+    console.log('Updating Level 3 customizations for BOM item:', bomItemId, customizations);
     setBomItems(prev => prev.map(item =>
       item.id === bomItemId ? { 
         ...item, 
-        level3Customizations: customizations.map(customization => ({
-          ...customization,
-          parentProductId: item.product.id,
-          description: customization.name,
-          type: customization.type as 'sensor_type' | 'fiber_option' | 'channel_config'
-        })) as Level3Product[]
+        level3Customizations: customizations.map(customization => {
+          // Map Level3Customization type to Level3Product type
+          let mappedType: 'relay' | 'analog' | 'fiber' | 'display' | 'bushing' | 'accessory' | 'sensor';
+          switch (customization.type) {
+            case 'sensor_type':
+              mappedType = 'sensor';
+              break;
+            case 'fiber_option':
+              mappedType = 'fiber';
+              break;
+            case 'channel_config':
+              mappedType = 'accessory';
+              break;
+            default:
+              mappedType = 'accessory';
+          }
+          
+          return {
+            id: customization.id,
+            name: customization.name,
+            parentProductId: item.product.id,
+            type: mappedType,
+            description: customization.name,
+            price: customization.price,
+            cost: customization.cost,
+            enabled: customization.enabled,
+            specifications: {
+              options: customization.options
+            },
+            partNumber: `${customization.type.toUpperCase()}-${customization.id}`
+          } as Level3Product;
+        })
       } : item
     ));
   };
