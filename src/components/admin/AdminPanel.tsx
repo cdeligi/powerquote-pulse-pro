@@ -24,6 +24,40 @@ interface AdminPanelProps {
 const AdminPanel = ({ user }: AdminPanelProps) => {
   const [activeTab, setActiveTab] = useState("products");
 
+  // Mock analytics data for the dashboard
+  const mockAnalytics = {
+    monthly: {
+      executed: 25,
+      approved: 15,
+      underAnalysis: 8,
+      rejected: 5,
+      totalQuotedValue: 450000
+    },
+    yearly: {
+      executed: 280,
+      approved: 180,
+      underAnalysis: 95,
+      rejected: 65,
+      totalQuotedValue: 5200000
+    }
+  };
+
+  // Mock BOM items for margin dashboard
+  const mockBomItems = [
+    {
+      id: '1',
+      product: { id: '1', name: 'Sample Product 1', price: 1000, cost: 600 },
+      quantity: 2,
+      enabled: true
+    },
+    {
+      id: '2', 
+      product: { id: '2', name: 'Sample Product 2', price: 500, cost: 300 },
+      quantity: 1,
+      enabled: true
+    }
+  ];
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -92,15 +126,15 @@ const AdminPanel = ({ user }: AdminPanelProps) => {
         </TabsContent>
 
         <TabsContent value="analytics" className="mt-6">
-          <QuoteAnalyticsDashboard user={user} />
+          <QuoteAnalyticsDashboard analytics={mockAnalytics} isAdmin={true} />
         </TabsContent>
 
         <TabsContent value="margins" className="mt-6">
-          <MarginDashboard user={user} />
+          <MarginDashboard bomItems={mockBomItems} user={user} />
         </TabsContent>
 
         <TabsContent value="settings" className="mt-6">
-          <AdminSettings user={user} />
+          <AdminSettings />
         </TabsContent>
       </Tabs>
     </div>
