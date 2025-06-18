@@ -68,11 +68,7 @@ const ProductManagement = ({ user }: ProductManagementProps) => {
 
   // CRUD Operations
   const handleCreateLevel1Product = (productData: Omit<Level1Product, 'id'>) => {
-    const newProduct: Level1Product = {
-      ...productData,
-      id: `level1-${Date.now()}`
-    };
-    productDataService.addLevel1Product(newProduct);
+    const newProduct = productDataService.createLevel1Product(productData);
     setDialogOpen(false);
     setEditingProduct(null);
     forceRefresh();
@@ -84,7 +80,7 @@ const ProductManagement = ({ user }: ProductManagementProps) => {
 
   const handleUpdateLevel1Product = (productData: Omit<Level1Product, 'id'>) => {
     if (!editingProduct) return;
-    productDataService.updateLevel1Product(editingProduct.id, { ...productData, id: editingProduct.id });
+    productDataService.updateLevel1Product(editingProduct.id, productData);
     setDialogOpen(false);
     setEditingProduct(null);
     forceRefresh();
@@ -115,11 +111,7 @@ const ProductManagement = ({ user }: ProductManagementProps) => {
   };
 
   const handleCreateLevel2Product = (productData: Omit<Level2Product, 'id'>) => {
-    const newProduct: Level2Product = {
-      ...productData,
-      id: `level2-${Date.now()}`
-    };
-    productDataService.addLevel2Product(newProduct);
+    const newProduct = productDataService.createLevel2Product(productData);
     setDialogOpen(false);
     setEditingProduct(null);
     forceRefresh();
@@ -131,7 +123,7 @@ const ProductManagement = ({ user }: ProductManagementProps) => {
 
   const handleUpdateLevel2Product = (productData: Omit<Level2Product, 'id'>) => {
     if (!editingProduct) return;
-    productDataService.updateLevel2Product(editingProduct.id, { ...productData, id: editingProduct.id });
+    productDataService.updateLevel2Product(editingProduct.id, productData);
     setDialogOpen(false);
     setEditingProduct(null);
     forceRefresh();
@@ -162,11 +154,7 @@ const ProductManagement = ({ user }: ProductManagementProps) => {
   };
 
   const handleCreateLevel3Product = (productData: Omit<Level3Product, 'id'>) => {
-    const newProduct: Level3Product = {
-      ...productData,
-      id: `level3-${Date.now()}`
-    };
-    productDataService.addLevel3Product(newProduct);
+    const newProduct = productDataService.createLevel3Product(productData);
     setDialogOpen(false);
     setEditingProduct(null);
     forceRefresh();
@@ -178,7 +166,7 @@ const ProductManagement = ({ user }: ProductManagementProps) => {
 
   const handleUpdateLevel3Product = (productData: Omit<Level3Product, 'id'>) => {
     if (!editingProduct) return;
-    productDataService.updateLevel3Product(editingProduct.id, { ...productData, id: editingProduct.id });
+    productDataService.updateLevel3Product(editingProduct.id, productData);
     setDialogOpen(false);
     setEditingProduct(null);
     forceRefresh();

@@ -1,4 +1,11 @@
 
+// Level 0: Asset Types (Power Transformer, GIS, Breaker, etc.)
+export interface AssetType {
+  id: string;
+  name: string;
+  enabled: boolean;
+}
+
 // Level 1: Main Product Categories (QTMS, etc.)
 export interface Level1Product {
   id: string;

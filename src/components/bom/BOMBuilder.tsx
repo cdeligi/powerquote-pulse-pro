@@ -213,8 +213,8 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
 
       {bomItems.length > 0 && (
         <RackVisualizer
-          items={bomItems}
-          onItemsUpdate={(updatedItems) => {
+          bomItems={bomItems}
+          onBOMItemsUpdate={(updatedItems) => {
             setBomItems(updatedItems);
             onBOMUpdate(updatedItems);
           }}
