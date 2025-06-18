@@ -1,5 +1,5 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
@@ -28,11 +28,11 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
   const level1Products = productDataService.getLevel1Products().filter(p => p.enabled);
 
   // Set default active tab when products are loaded
-  useState(() => {
+  useEffect(() => {
     if (level1Products.length > 0 && !activeTab) {
       setActiveTab(level1Products[0].id);
     }
-  });
+  }, [level1Products.length, activeTab]);
 
   const handleLevel1ProductSelect = (product: Level1Product) => {
     setSelectedLevel1Product(product);
@@ -60,6 +60,35 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
     };
     
     const updatedItems = [...bomItems, newItem];
+    setBomItems(updatedItems);
+    onBOMUpdate(updatedItems);
+  };
+
+  const handleDGAProductSelect = (product: Level1Product, configuration?: Record<string, any>, level2Options?: Level2Product[]) => {
+    // Handle DGA product selection
+    const newItem: BOMItem = {
+      id: `${Date.now()}-${Math.random()}`,
+      product: product,
+      quantity: 1,
+      enabled: true,
+      configuration
+    };
+    
+    const updatedItems = [...bomItems, newItem];
+    
+    // Add level 2 options as separate items
+    if (level2Options) {
+      level2Options.forEach(option => {
+        const optionItem: BOMItem = {
+          id: `${Date.now()}-${Math.random()}-${option.id}`,
+          product: option as any,
+          quantity: 1,
+          enabled: true
+        };
+        updatedItems.push(optionItem);
+      });
+    }
+    
     setBomItems(updatedItems);
     onBOMUpdate(updatedItems);
   };
@@ -113,10 +142,7 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
       case 'dga':
         return (
           <DGAProductSelector
-            onProductSelect={handleLevel1ProductSelect}
-            onOptionToggle={handleLevel2OptionToggle}
-            selectedLevel1Product={selectedLevel1Product}
-            selectedLevel2Options={selectedLevel2Options}
+            onProductSelect={handleDGAProductSelect}
             canSeePrices={canSeePrices}
           />
         );
@@ -124,10 +150,7 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
       case 'partial-discharge':
         return (
           <PDProductSelector
-            onProductSelect={handleLevel1ProductSelect}
-            onOptionToggle={handleLevel2OptionToggle}
-            selectedLevel1Product={selectedLevel1Product}
-            selectedLevel2Options={selectedLevel2Options}
+            onProductSelect={handleDGAProductSelect}
             canSeePrices={canSeePrices}
           />
         );
@@ -190,8 +213,8 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
 
       {bomItems.length > 0 && (
         <RackVisualizer
-          bomItems={bomItems}
-          onBOMUpdate={(updatedItems) => {
+          items={bomItems}
+          onItemsUpdate={(updatedItems) => {
             setBomItems(updatedItems);
             onBOMUpdate(updatedItems);
           }}

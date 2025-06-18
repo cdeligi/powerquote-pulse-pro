@@ -6,6 +6,7 @@ import DashboardOverview from "./DashboardOverview";
 import BOMBuilder from "../bom/BOMBuilder";
 import QuoteManager from "../quotes/QuoteManager";
 import AdminPanel from "../admin/AdminPanel";
+import { BOMItem } from "@/types/product";
 
 interface DashboardProps {
   user: User;
@@ -16,13 +17,23 @@ type ActiveView = 'overview' | 'bom' | 'quotes' | 'admin';
 
 const Dashboard = ({ user, onLogout }: DashboardProps) => {
   const [activeView, setActiveView] = useState<ActiveView>('overview');
+  const [bomItems, setBomItems] = useState<BOMItem[]>([]);
+
+  const handleBOMUpdate = (items: BOMItem[]) => {
+    setBomItems(items);
+  };
 
   const renderContent = () => {
     switch (activeView) {
       case 'overview':
         return <DashboardOverview user={user} />;
       case 'bom':
-        return <BOMBuilder user={user} />;
+        return (
+          <BOMBuilder 
+            onBOMUpdate={handleBOMUpdate}
+            canSeePrices={user.role === 'admin' || user.role === 'sales'}
+          />
+        );
       case 'quotes':
         return <QuoteManager user={user} />;
       case 'admin':
