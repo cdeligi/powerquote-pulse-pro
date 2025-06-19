@@ -164,51 +164,39 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
       case 'qtms':
         return (
           <div className="space-y-6">
-            {selectedLevel1Product && (
-              <Level2OptionsSelector
-                level1Product={selectedLevel1Product}
-                selectedOptions={selectedLevel2Options}
-                onOptionToggle={handleLevel2OptionToggle}
-              />
-            )}
+            <ChassisSelector
+              onChassisSelect={handleChassisSelect}
+              selectedChassis={selectedChassis}
+              canSeePrices={canSeePrices}
+            />
             
-            {selectedLevel2Options.length > 0 && (
+            {selectedChassis && (
               <div className="space-y-6">
-                <ChassisSelector
-                  onChassisSelect={handleChassisSelect}
-                  selectedChassis={selectedChassis}
+                <RackVisualizer
+                  chassis={selectedChassis as any}
+                  slotAssignments={slotAssignments as any}
+                  onSlotClick={handleSlotClick}
+                  onSlotClear={handleSlotClear}
+                  selectedSlot={selectedSlot}
+                />
+                
+                <CardLibrary
+                  chassis={selectedChassis}
+                  onCardSelect={handleCardSelect}
                   canSeePrices={canSeePrices}
                 />
                 
-                {selectedChassis && (
-                  <div className="space-y-6">
-                    <RackVisualizer
-                      chassis={selectedChassis as any}
-                      slotAssignments={slotAssignments as any}
-                      onSlotClick={handleSlotClick}
-                      onSlotClear={handleSlotClear}
-                      selectedSlot={selectedSlot}
-                    />
-                    
-                    <CardLibrary
-                      chassis={selectedChassis}
-                      onCardSelect={handleCardSelect}
-                      canSeePrices={canSeePrices}
-                    />
-                    
-                    {Object.keys(slotAssignments).length > 0 && (
-                      <Card className="bg-gray-900 border-gray-800">
-                        <CardContent className="pt-6">
-                          <button
-                            onClick={handleAddChassisAndCardsToBOM}
-                            className="w-full bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded font-medium"
-                          >
-                            Add Chassis & Cards to BOM
-                          </button>
-                        </CardContent>
-                      </Card>
-                    )}
-                  </div>
+                {Object.keys(slotAssignments).length > 0 && (
+                  <Card className="bg-gray-900 border-gray-800">
+                    <CardContent className="pt-6">
+                      <button
+                        onClick={handleAddChassisAndCardsToBOM}
+                        className="w-full bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded font-medium"
+                      >
+                        Add Chassis & Cards to BOM
+                      </button>
+                    </CardContent>
+                  </Card>
                 )}
               </div>
             )}
