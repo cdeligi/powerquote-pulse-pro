@@ -3,7 +3,7 @@ import { Chassis, Card as ProductCard } from "@/types/product";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Cpu, X } from "lucide-react";
+import { Cpu, X, Monitor } from "lucide-react";
 
 interface RackVisualizerProps {
   chassis: Chassis;
@@ -11,9 +11,19 @@ interface RackVisualizerProps {
   onSlotClick: (slot: number) => void;
   onSlotClear: (slot: number) => void;
   selectedSlot?: number | null;
+  hasRemoteDisplay?: boolean;
+  onRemoteDisplayToggle?: (enabled: boolean) => void;
 }
 
-const RackVisualizer = ({ chassis, slotAssignments, onSlotClick, onSlotClear, selectedSlot }: RackVisualizerProps) => {
+const RackVisualizer = ({ 
+  chassis, 
+  slotAssignments, 
+  onSlotClick, 
+  onSlotClear, 
+  selectedSlot,
+  hasRemoteDisplay = false,
+  onRemoteDisplayToggle
+}: RackVisualizerProps) => {
   const getSlotColor = (slot: number) => {
     if (slot === 0) return 'bg-blue-600'; // CPU slot (slot 0)
     if (selectedSlot === slot) return 'bg-yellow-600'; // Selected slot
@@ -124,6 +134,29 @@ const RackVisualizer = ({ chassis, slotAssignments, onSlotClick, onSlotClear, se
           <p className="text-gray-400 text-sm">Click on any slot (except CPU) to add a card. Click the X to clear a slot.</p>
           
           {renderChassisLayout()}
+          
+          {/* Remote Display Option */}
+          {onRemoteDisplayToggle && (
+            <div className="pt-4 border-t border-gray-700">
+              <div className="flex items-center justify-between p-3 bg-gray-800 rounded">
+                <div className="flex items-center space-x-3">
+                  <Monitor className="h-5 w-5 text-blue-400" />
+                  <div>
+                    <span className="text-white font-medium">Remote Display</span>
+                    <p className="text-gray-400 text-sm">Add remote display capability</p>
+                  </div>
+                </div>
+                <Button
+                  variant={hasRemoteDisplay ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => onRemoteDisplayToggle(!hasRemoteDisplay)}
+                  className={hasRemoteDisplay ? "bg-green-600 hover:bg-green-700" : ""}
+                >
+                  {hasRemoteDisplay ? "Added" : "Add"}
+                </Button>
+              </div>
+            </div>
+          )}
           
           {/* Legend */}
           <div className="flex flex-wrap gap-4 pt-4 border-t border-gray-700">

@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -26,6 +25,7 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
   const [selectedSlot, setSelectedSlot] = useState<number | null>(null);
   const [bomItems, setBomItems] = useState<BOMItem[]>([]);
   const [activeTab, setActiveTab] = useState<string>('');
+  const [hasRemoteDisplay, setHasRemoteDisplay] = useState<boolean>(false);
 
   // Get all Level 1 products for dynamic tabs
   const level1Products = productDataService.getLevel1Products().filter(p => p.enabled);
@@ -66,6 +66,7 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
     setSelectedChassis(chassis);
     setSlotAssignments({});
     setSelectedSlot(null);
+    setHasRemoteDisplay(false);
   };
 
   const handleSlotClick = (slot: number) => {
@@ -133,6 +134,10 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
     onBOMUpdate(updatedItems);
   };
 
+  const handleRemoteDisplayToggle = (enabled: boolean) => {
+    setHasRemoteDisplay(enabled);
+  };
+
   const handleAddChassisAndCardsToBOM = () => {
     if (!selectedChassis) return;
 
@@ -151,7 +156,27 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
       enabled: true
     }));
 
-    const updatedItems = [...bomItems, chassisItem, ...cardItems];
+    const items = [chassisItem, ...cardItems];
+
+    // Add remote display if selected
+    if (hasRemoteDisplay) {
+      const remoteDisplayItem: BOMItem = {
+        id: `${Date.now()}-remote-display`,
+        product: {
+          id: 'remote-display',
+          name: 'Remote Display',
+          type: 'accessory',
+          description: 'Remote display for QTMS chassis',
+          price: 850,
+          enabled: true
+        } as any,
+        quantity: 1,
+        enabled: true
+      };
+      items.push(remoteDisplayItem);
+    }
+
+    const updatedItems = [...bomItems, ...items];
     setBomItems(updatedItems);
     onBOMUpdate(updatedItems);
   };
@@ -178,6 +203,8 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
                   onSlotClick={handleSlotClick}
                   onSlotClear={handleSlotClear}
                   selectedSlot={selectedSlot}
+                  hasRemoteDisplay={hasRemoteDisplay}
+                  onRemoteDisplayToggle={handleRemoteDisplayToggle}
                 />
                 
                 <CardLibrary
