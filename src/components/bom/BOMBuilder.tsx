@@ -14,6 +14,7 @@ import BOMDisplay from './BOMDisplay';
 import AnalogCardConfigurator from './AnalogCardConfigurator';
 import BushingCardConfigurator from './BushingCardConfigurator';
 import { productDataService } from '@/services/productDataService';
+import { generateQTMSPartNumber, generateProductPartNumber } from '@/types/product/part-number-utils';
 
 interface BOMBuilderProps {
   onBOMUpdate: (items: BOMItem[]) => void;
@@ -101,10 +102,21 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
 
     if (selectedSlot !== null || slot !== undefined) {
       const targetSlot = slot !== undefined ? slot : selectedSlot!;
-      setSlotAssignments(prev => ({
-        ...prev,
-        [targetSlot]: card
-      }));
+      
+      // Handle bushing card positioning - for all chassis types
+      if (card.type === 'bushing' && card.specifications?.slotRequirement === 2) {
+        // Bushing cards always occupy 2 consecutive slots
+        setSlotAssignments(prev => ({
+          ...prev,
+          [targetSlot]: card,
+          [targetSlot + 1]: card // Occupy the next slot as well
+        }));
+      } else {
+        setSlotAssignments(prev => ({
+          ...prev,
+          [targetSlot]: card
+        }));
+      }
       setSelectedSlot(null);
     } else {
       // Add directly to BOM for non-chassis items
@@ -113,7 +125,8 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
         product: card,
         quantity: 1,
         slot,
-        enabled: true
+        enabled: true,
+        partNumber: generateProductPartNumber(card as any)
       };
       
       const updatedItems = [...bomItems, newItem];
@@ -131,11 +144,20 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
     };
 
     if (configuringCard.slot !== undefined) {
-      // Add to slot assignments for chassis cards
-      setSlotAssignments(prev => ({
-        ...prev,
-        [configuringCard.slot!]: configuringCard.product
-      }));
+      // Handle bushing card positioning during configuration
+      const card = configuringCard.product as Level3Product;
+      if (card.type === 'bushing' && card.specifications?.slotRequirement === 2) {
+        setSlotAssignments(prev => ({
+          ...prev,
+          [configuringCard.slot!]: card,
+          [configuringCard.slot! + 1]: card
+        }));
+      } else {
+        setSlotAssignments(prev => ({
+          ...prev,
+          [configuringCard.slot!]: card
+        }));
+      }
     } else {
       // Add directly to BOM
       const updatedItems = [...bomItems, configuredItem];
@@ -154,7 +176,8 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
       product: product,
       quantity: 1,
       enabled: true,
-      configuration
+      configuration,
+      partNumber: generateProductPartNumber(product, configuration)
     };
     
     const updatedItems = [...bomItems, newItem];
@@ -166,7 +189,8 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
           id: `${Date.now()}-${Math.random()}-${option.id}`,
           product: option as any,
           quantity: 1,
-          enabled: true
+          enabled: true,
+          partNumber: option.partNumber || option.id.toUpperCase()
         };
         updatedItems.push(optionItem);
       });
@@ -183,20 +207,40 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
   const handleAddChassisAndCardsToBOM = () => {
     if (!selectedChassis) return;
 
+    // Generate QTMS part number with slot assignments
+    const chassisPartNumber = generateQTMSPartNumber(
+      selectedChassis as any,
+      Object.values(slotAssignments) as any[],
+      hasRemoteDisplay,
+      slotAssignments as any
+    );
+
     const chassisItem: BOMItem = {
       id: `${Date.now()}-chassis`,
       product: selectedChassis,
       quantity: 1,
-      enabled: true
+      enabled: true,
+      partNumber: chassisPartNumber
     };
 
-    const cardItems: BOMItem[] = Object.entries(slotAssignments).map(([slot, card]) => ({
-      id: `${Date.now()}-card-${slot}`,
-      product: card,
-      quantity: 1,
-      slot: parseInt(slot),
-      enabled: true
-    }));
+    const cardItems: BOMItem[] = Object.entries(slotAssignments)
+      .filter(([slot, card]) => {
+        // For bushing cards that occupy 2 slots, only add the item once for the first slot
+        if (card.type === 'bushing' && card.specifications?.slotRequirement === 2) {
+          const slotNum = parseInt(slot);
+          const prevSlot = slotNum - 1;
+          return !(slotAssignments[prevSlot]?.id === card.id);
+        }
+        return true;
+      })
+      .map(([slot, card]) => ({
+        id: `${Date.now()}-card-${slot}`,
+        product: card,
+        quantity: 1,
+        slot: parseInt(slot),
+        enabled: true,
+        partNumber: card.partNumber || card.id.toUpperCase()
+      }));
 
     const items = [chassisItem, ...cardItems];
 
@@ -213,7 +257,8 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
           enabled: true
         } as any,
         quantity: 1,
-        enabled: true
+        enabled: true,
+        partNumber: 'QTMS-RD-001'
       };
       items.push(remoteDisplayItem);
     }

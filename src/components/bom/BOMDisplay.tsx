@@ -81,11 +81,26 @@ const BOMDisplay = ({ bomItems, onUpdateBOM, canSeePrices }: BOMDisplayProps) =>
                 {item.product.description && (
                   <p className="text-gray-400 text-xs mt-1">{item.product.description}</p>
                 )}
-                {item.slot && (
-                  <Badge variant="outline" className="text-xs mt-1 text-blue-400 border-blue-400">
-                    Slot {item.slot}
-                  </Badge>
+                
+                {/* Part Number Display */}
+                {item.partNumber && (
+                  <div className="text-green-400 text-xs mt-1 font-mono">
+                    P/N: {item.partNumber}
+                  </div>
                 )}
+                
+                <div className="flex gap-1 mt-2 flex-wrap">
+                  {item.slot && (
+                    <Badge variant="outline" className="text-xs text-blue-400 border-blue-400">
+                      Slot {item.slot}
+                    </Badge>
+                  )}
+                  {item.product.type && (
+                    <Badge variant="outline" className="text-xs text-gray-400 border-gray-500">
+                      {item.product.type}
+                    </Badge>
+                  )}
+                </div>
               </div>
               
               <div className="flex items-center space-x-2 ml-2">

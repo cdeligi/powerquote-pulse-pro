@@ -65,7 +65,8 @@ const SlotCardSelector = ({ chassis, slot, onCardSelect, onClose, canSeePrices }
       compatibleChassis: ['LTX', 'MTX', 'STX'],
       specifications: {
         channels: 12,
-        measurement: 'Capacitance & Tan Delta'
+        measurement: 'Capacitance & Tan Delta',
+        slotRequirement: 2
       },
       partNumber: 'BSH-12CH-001'
     }
@@ -165,9 +166,21 @@ const SlotCardSelector = ({ chassis, slot, onCardSelect, onClose, canSeePrices }
 
   const availableCards = getAvailableCards();
 
-  // Filter cards based on chassis compatibility
+  // Filter cards based on chassis compatibility and slot availability for bushing cards
   const compatibleCards = availableCards.filter(card => {
-    return card.compatibleChassis.includes(chassis.type);
+    if (!card.compatibleChassis.includes(chassis.type)) {
+      return false;
+    }
+    
+    // For bushing cards that require 2 slots, check if next slot is available
+    if (card.type === 'bushing' && card.slotRequirement === 2) {
+      const maxSlots = chassis.type === 'LTX' ? 14 : chassis.type === 'MTX' ? 7 : 4;
+      if (slot >= maxSlots) {
+        return false; // Can't fit 2-slot card in last slot
+      }
+    }
+    
+    return true;
   });
 
   const handleCardSelect = (card: any) => {
@@ -207,7 +220,9 @@ const SlotCardSelector = ({ chassis, slot, onCardSelect, onClose, canSeePrices }
                 <CardTitle className="text-white text-lg flex items-center justify-between">
                   {card.name}
                   {needsConfiguration(card) && (
-                    <Settings className="h-4 w-4 text-blue-400" title="Requires Configuration" />
+                    <div title="Requires Configuration">
+                      <Settings className="h-4 w-4 text-blue-400" />
+                    </div>
                   )}
                 </CardTitle>
                 <CardDescription className="text-gray-400">
@@ -233,6 +248,11 @@ const SlotCardSelector = ({ chassis, slot, onCardSelect, onClose, canSeePrices }
                   {needsConfiguration(card) && (
                     <Badge variant="outline" className="text-blue-400 border-blue-400">
                       Config Required
+                    </Badge>
+                  )}
+                  {card.type === 'bushing' && (
+                    <Badge variant="outline" className="text-orange-400 border-orange-400">
+                      Slots {slot}-{slot + 1}
                     </Badge>
                   )}
                 </div>
