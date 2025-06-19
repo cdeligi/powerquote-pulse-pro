@@ -1,11 +1,10 @@
-
 import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { X } from "lucide-react";
+import { X, Settings } from "lucide-react";
 
 interface SlotCardSelectorProps {
   chassis: any;
@@ -180,6 +179,10 @@ const SlotCardSelector = ({ chassis, slot, onCardSelect, onClose, canSeePrices }
     }
   };
 
+  const needsConfiguration = (card: any) => {
+    return card.name.toLowerCase().includes('analog') || card.name.toLowerCase().includes('bushing');
+  };
+
   return (
     <Dialog open={true} onOpenChange={onClose}>
       <DialogContent className="max-w-5xl bg-gray-900 border-gray-800 text-white max-h-[90vh] overflow-y-auto">
@@ -201,7 +204,12 @@ const SlotCardSelector = ({ chassis, slot, onCardSelect, onClose, canSeePrices }
           {compatibleCards.map((card) => (
             <Card key={card.id} className="bg-gray-800 border-gray-700 hover:border-red-600 transition-all cursor-pointer">
               <CardHeader>
-                <CardTitle className="text-white text-lg">{card.name}</CardTitle>
+                <CardTitle className="text-white text-lg flex items-center justify-between">
+                  {card.name}
+                  {needsConfiguration(card) && (
+                    <Settings className="h-4 w-4 text-blue-400" title="Requires Configuration" />
+                  )}
+                </CardTitle>
                 <CardDescription className="text-gray-400">
                   {card.description}
                 </CardDescription>
@@ -220,6 +228,11 @@ const SlotCardSelector = ({ chassis, slot, onCardSelect, onClose, canSeePrices }
                   {card.type === 'display' && chassis.type === 'LTX' && slot !== 8 && (
                     <Badge variant="outline" className="text-yellow-400 border-yellow-400">
                       → Slot 8
+                    </Badge>
+                  )}
+                  {needsConfiguration(card) && (
+                    <Badge variant="outline" className="text-blue-400 border-blue-400">
+                      Config Required
                     </Badge>
                   )}
                 </div>
@@ -245,7 +258,7 @@ const SlotCardSelector = ({ chassis, slot, onCardSelect, onClose, canSeePrices }
                   className="w-full bg-red-600 hover:bg-red-700 text-white"
                   onClick={() => handleCardSelect(card)}
                 >
-                  Select Card
+                  {needsConfiguration(card) ? 'Configure Card' : 'Select Card'}
                 </Button>
               </CardContent>
             </Card>

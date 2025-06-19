@@ -1,9 +1,8 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { BOMItem, Level1Product, Level2Product, Level3Product } from '@/types/product';
+import { BOMItem, Level1Product, Level2Product, Level3Product, Level3Customization } from '@/types/product';
 import Level2OptionsSelector from './Level2OptionsSelector';
 import ChassisSelector from './ChassisSelector';
 import CardLibrary from './CardLibrary';
@@ -12,6 +11,8 @@ import SlotCardSelector from './SlotCardSelector';
 import DGAProductSelector from './DGAProductSelector';
 import PDProductSelector from './PDProductSelector';
 import BOMDisplay from './BOMDisplay';
+import AnalogCardConfigurator from './AnalogCardConfigurator';
+import BushingCardConfigurator from './BushingCardConfigurator';
 import { productDataService } from '@/services/productDataService';
 
 interface BOMBuilderProps {
@@ -28,6 +29,7 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
   const [bomItems, setBomItems] = useState<BOMItem[]>([]);
   const [activeTab, setActiveTab] = useState<string>('');
   const [hasRemoteDisplay, setHasRemoteDisplay] = useState<boolean>(false);
+  const [configuringCard, setConfiguringCard] = useState<BOMItem | null>(null);
 
   // Get all Level 1 products for dynamic tabs
   const level1Products = productDataService.getLevel1Products().filter(p => p.enabled);
@@ -84,6 +86,19 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
   };
 
   const handleCardSelect = (card: Level3Product, slot?: number) => {
+    // Check if card needs configuration
+    if (card.name.toLowerCase().includes('analog') || card.name.toLowerCase().includes('bushing')) {
+      const newItem: BOMItem = {
+        id: `${Date.now()}-${Math.random()}`,
+        product: card,
+        quantity: 1,
+        slot: slot || selectedSlot,
+        enabled: true
+      };
+      setConfiguringCard(newItem);
+      return;
+    }
+
     if (selectedSlot !== null || slot !== undefined) {
       const targetSlot = slot !== undefined ? slot : selectedSlot!;
       setSlotAssignments(prev => ({
@@ -105,6 +120,31 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
       setBomItems(updatedItems);
       onBOMUpdate(updatedItems);
     }
+  };
+
+  const handleCardConfiguration = (customizations: Level3Customization[]) => {
+    if (!configuringCard) return;
+
+    const configuredItem: BOMItem = {
+      ...configuringCard,
+      level3Customizations: customizations
+    };
+
+    if (configuringCard.slot !== undefined) {
+      // Add to slot assignments for chassis cards
+      setSlotAssignments(prev => ({
+        ...prev,
+        [configuringCard.slot!]: configuringCard.product
+      }));
+    } else {
+      // Add directly to BOM
+      const updatedItems = [...bomItems, configuredItem];
+      setBomItems(updatedItems);
+      onBOMUpdate(updatedItems);
+    }
+
+    setConfiguringCard(null);
+    setSelectedSlot(null);
   };
 
   const handleDGAProductSelect = (product: Level1Product, configuration?: Record<string, any>, level2Options?: Level2Product[]) => {
@@ -179,6 +219,11 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
     }
 
     const updatedItems = [...bomItems, ...items];
+    setBomItems(updatedItems);
+    onBOMUpdate(updatedItems);
+  };
+
+  const handleBOMUpdate = (updatedItems: BOMItem[]) => {
     setBomItems(updatedItems);
     onBOMUpdate(updatedItems);
   };
@@ -274,70 +319,80 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
   };
 
   return (
-    <div className="space-y-6">
-      <Card className="bg-gray-900 border-gray-800">
-        <CardHeader>
-          <CardTitle className="text-white">BOM Builder</CardTitle>
-          <CardDescription className="text-gray-400">
-            Build your Bill of Materials by selecting products and configurations
-          </CardDescription>
-        </CardHeader>
-      </Card>
-
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full bg-gray-800" style={{ gridTemplateColumns: `repeat(${level1Products.length}, 1fr)` }}>
-          {level1Products.map((product) => (
-            <TabsTrigger 
-              key={product.id}
-              value={product.id} 
-              className="text-white data-[state=active]:bg-red-600 data-[state=active]:text-white"
-            >
-              {product.name}
-              {product.category && (
-                <Badge variant="outline" className="ml-2 text-xs">
-                  {product.category}
-                </Badge>
-              )}
-            </TabsTrigger>
-          ))}
-        </TabsList>
-        
-        {level1Products.map((product) => (
-          <TabsContent key={product.id} value={product.id} className="mt-6">
-            {renderProductContent(product.id)}
-          </TabsContent>
-        ))}
-      </Tabs>
-
-      {bomItems.length > 0 && (
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full">
+      {/* Left side - Product selection (2/3 width) */}
+      <div className="lg:col-span-2 space-y-6">
         <Card className="bg-gray-900 border-gray-800">
           <CardHeader>
-            <CardTitle className="text-white">Bill of Materials</CardTitle>
+            <CardTitle className="text-white">BOM Builder</CardTitle>
+            <CardDescription className="text-gray-400">
+              Build your Bill of Materials by selecting products and configurations
+            </CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              {bomItems.map((item) => (
-                <div key={item.id} className="flex justify-between items-center p-3 bg-gray-800 rounded">
-                  <div className="flex flex-col">
-                    <span className="text-white font-medium">{item.product.name}</span>
-                    {item.slot && (
-                      <span className="text-gray-400 text-sm">Slot {item.slot}</span>
-                    )}
-                  </div>
-                  <div className="flex items-center space-x-4">
-                    <span className="text-gray-400">Qty: {item.quantity}</span>
-                    {canSeePrices && (
-                      <span className="text-white font-medium">
-                        ${item.product.price?.toLocaleString() || '—'}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
         </Card>
-      )}
+
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="grid w-full bg-gray-800" style={{ gridTemplateColumns: `repeat(${level1Products.length}, 1fr)` }}>
+            {level1Products.map((product) => (
+              <TabsTrigger 
+                key={product.id}
+                value={product.id} 
+                className="text-white data-[state=active]:bg-red-600 data-[state=active]:text-white"
+              >
+                {product.name}
+                {product.category && (
+                  <Badge variant="outline" className="ml-2 text-xs">
+                    {product.category}
+                  </Badge>
+                )}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+          
+          {level1Products.map((product) => (
+            <TabsContent key={product.id} value={product.id} className="mt-6">
+              {renderProductContent(product.id)}
+            </TabsContent>
+          ))}
+        </Tabs>
+
+        {/* Card Configuration Dialogs */}
+        {configuringCard && configuringCard.product.name.toLowerCase().includes('analog') && (
+          <AnalogCardConfigurator
+            bomItem={configuringCard}
+            onSave={handleCardConfiguration}
+            onClose={() => setConfiguringCard(null)}
+          />
+        )}
+
+        {configuringCard && configuringCard.product.name.toLowerCase().includes('bushing') && (
+          <BushingCardConfigurator
+            bomItem={configuringCard}
+            onSave={handleCardConfiguration}
+            onClose={() => setConfiguringCard(null)}
+          />
+        )}
+
+        {/* Slot Card Selector Dialog */}
+        {selectedSlot !== null && selectedChassis && (
+          <SlotCardSelector
+            chassis={selectedChassis as any}
+            slot={selectedSlot}
+            onCardSelect={handleCardSelect}
+            onClose={() => setSelectedSlot(null)}
+            canSeePrices={canSeePrices}
+          />
+        )}
+      </div>
+
+      {/* Right side - BOM Display (1/3 width) */}
+      <div className="lg:col-span-1">
+        <BOMDisplay
+          bomItems={bomItems}
+          onUpdateBOM={handleBOMUpdate}
+          canSeePrices={canSeePrices}
+        />
+      </div>
     </div>
   );
 };
