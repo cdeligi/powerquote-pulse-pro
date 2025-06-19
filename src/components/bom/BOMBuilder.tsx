@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -10,6 +11,7 @@ import RackVisualizer from './RackVisualizer';
 import SlotCardSelector from './SlotCardSelector';
 import DGAProductSelector from './DGAProductSelector';
 import PDProductSelector from './PDProductSelector';
+import BOMDisplay from './BOMDisplay';
 import { productDataService } from '@/services/productDataService';
 
 interface BOMBuilderProps {
