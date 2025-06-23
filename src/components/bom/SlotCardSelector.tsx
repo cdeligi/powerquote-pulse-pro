@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -152,13 +153,13 @@ const SlotCardSelector = ({ chassis, slot, onCardSelect, onClose, canSeePrices }
   const getBushingSlots = (chassisType: string) => {
     switch (chassisType) {
       case 'LTX':
-        return [6, 7]; // Primary slots for LTX
+        return "6-7 (preferred) or 13-14";
       case 'MTX':
-        return [6, 7]; // Fixed slots for MTX
+        return "6-7 (fixed)";
       case 'STX':
-        return [3, 4]; // Fixed slots for STX
+        return "3-4 (fixed)";
       default:
-        return [slot, slot + 1]; // Fallback
+        return `${slot}-${slot + 1}`;
     }
   };
 
@@ -267,7 +268,7 @@ const SlotCardSelector = ({ chassis, slot, onCardSelect, onClose, canSeePrices }
                     )}
                     {card.type === 'bushing' && (
                       <Badge variant="outline" className="text-orange-400 border-orange-400">
-                        → Slots {bushingSlots[0]}-{bushingSlots[1]}
+                        → Slots {bushingSlots}
                       </Badge>
                     )}
                   </div>

@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -86,6 +87,30 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
     });
   };
 
+  const getBushingSlotPlacement = (chassisType: string) => {
+    if (chassisType === 'LTX') {
+      // LTX logic: Try 6-7 first, then 13-14, then clear 6-7
+      const slots6_7Available = !slotAssignments[6] && !slotAssignments[7];
+      const slots13_14Available = !slotAssignments[13] && !slotAssignments[14];
+      
+      if (slots6_7Available) {
+        return [6, 7];
+      } else if (slots13_14Available) {
+        return [13, 14];
+      } else {
+        // Clear 6-7 and use them
+        return [6, 7];
+      }
+    } else if (chassisType === 'MTX') {
+      // MTX: Always 6-7, clear if occupied
+      return [6, 7];
+    } else if (chassisType === 'STX') {
+      // STX: Always 3-4, clear if occupied
+      return [3, 4];
+    }
+    return [6, 7]; // Fallback
+  };
+
   const handleCardSelect = (card: Level3Product, slot?: number) => {
     // Check if card needs configuration
     if (card.name.toLowerCase().includes('analog') || card.name.toLowerCase().includes('bushing')) {
@@ -105,62 +130,29 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
       
       // Handle bushing card positioning with specific logic for each chassis
       if (card.type === 'bushing' && card.specifications?.slotRequirement === 2) {
-        let bushingSlots: [number, number];
+        const bushingSlots = getBushingSlotPlacement(selectedChassis?.type || '');
         
+        // Clear the target slots if they need to be cleared
+        const updatedAssignments = { ...slotAssignments };
         if (selectedChassis?.type === 'LTX') {
-          // LTX: Try slots 6-7 first, then 13-14 if occupied
-          const slots6_7Available = !slotAssignments[6] && !slotAssignments[7];
-          if (slots6_7Available) {
-            bushingSlots = [6, 7];
-          } else {
-            // Clear slots 6-7 and place there
-            const updatedAssignments = { ...slotAssignments };
+          // For LTX, only clear if we're not using the preferred slots
+          if (bushingSlots[0] === 6 && (slotAssignments[6] || slotAssignments[7])) {
             delete updatedAssignments[6];
             delete updatedAssignments[7];
-            setSlotAssignments({
-              ...updatedAssignments,
-              6: card,
-              7: card
-            });
-            setSelectedSlot(null);
-            return;
+          } else if (bushingSlots[0] === 13) {
+            // Using 13-14, no need to clear anything
           }
-        } else if (selectedChassis?.type === 'MTX') {
-          // MTX: Always slots 6-7, clear if occupied
-          bushingSlots = [6, 7];
-          const updatedAssignments = { ...slotAssignments };
-          delete updatedAssignments[6];
-          delete updatedAssignments[7];
-          setSlotAssignments({
-            ...updatedAssignments,
-            6: card,
-            7: card
-          });
-          setSelectedSlot(null);
-          return;
-        } else if (selectedChassis?.type === 'STX') {
-          // STX: Always slots 3-4, clear if occupied
-          bushingSlots = [3, 4];
-          const updatedAssignments = { ...slotAssignments };
-          delete updatedAssignments[3];
-          delete updatedAssignments[4];
-          setSlotAssignments({
-            ...updatedAssignments,
-            3: card,
-            4: card
-          });
-          setSelectedSlot(null);
-          return;
         } else {
-          // Fallback to original logic
-          bushingSlots = [targetSlot, targetSlot + 1];
+          // For MTX and STX, always clear the target slots
+          delete updatedAssignments[bushingSlots[0]];
+          delete updatedAssignments[bushingSlots[1]];
         }
         
-        setSlotAssignments(prev => ({
-          ...prev,
+        setSlotAssignments({
+          ...updatedAssignments,
           [bushingSlots[0]]: card,
           [bushingSlots[1]]: card
-        }));
+        });
       } else {
         setSlotAssignments(prev => ({
           ...prev,
@@ -196,46 +188,26 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
     if (configuringCard.slot !== undefined) {
       const card = configuringCard.product as Level3Product;
       
-      // Handle bushing card positioning during configuration with chassis-specific logic
+      // Handle bushing card positioning during configuration
       if (card.type === 'bushing' && card.specifications?.slotRequirement === 2) {
+        const bushingSlots = getBushingSlotPlacement(selectedChassis?.type || '');
+        
+        const updatedAssignments = { ...slotAssignments };
         if (selectedChassis?.type === 'LTX') {
-          // LTX: Try slots 6-7 first, then clear and place there
-          const updatedAssignments = { ...slotAssignments };
-          delete updatedAssignments[6];
-          delete updatedAssignments[7];
-          setSlotAssignments({
-            ...updatedAssignments,
-            6: card,
-            7: card
-          });
-        } else if (selectedChassis?.type === 'MTX') {
-          // MTX: Always slots 6-7, clear if occupied
-          const updatedAssignments = { ...slotAssignments };
-          delete updatedAssignments[6];
-          delete updatedAssignments[7];
-          setSlotAssignments({
-            ...updatedAssignments,
-            6: card,
-            7: card
-          });
-        } else if (selectedChassis?.type === 'STX') {
-          // STX: Always slots 3-4, clear if occupied
-          const updatedAssignments = { ...slotAssignments };
-          delete updatedAssignments[3];
-          delete updatedAssignments[4];
-          setSlotAssignments({
-            ...updatedAssignments,
-            3: card,
-            4: card
-          });
+          if (bushingSlots[0] === 6 && (slotAssignments[6] || slotAssignments[7])) {
+            delete updatedAssignments[6];
+            delete updatedAssignments[7];
+          }
         } else {
-          // Fallback to original slot
-          setSlotAssignments(prev => ({
-            ...prev,
-            [configuringCard.slot!]: card,
-            [configuringCard.slot! + 1]: card
-          }));
+          delete updatedAssignments[bushingSlots[0]];
+          delete updatedAssignments[bushingSlots[1]];
         }
+        
+        setSlotAssignments({
+          ...updatedAssignments,
+          [bushingSlots[0]]: card,
+          [bushingSlots[1]]: card
+        });
       } else {
         setSlotAssignments(prev => ({
           ...prev,
@@ -291,63 +263,45 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
   const handleAddChassisAndCardsToBOM = () => {
     if (!selectedChassis) return;
 
+    // Calculate total price for QTMS assembly
+    const chassisPrice = selectedChassis.price || 0;
+    const cardsPrice = Object.values(slotAssignments).reduce((total, card) => {
+      // For bushing cards that occupy 2 slots, only count the price once
+      const cardId = card.id;
+      const alreadyCounted = Object.entries(slotAssignments).some(([slot, otherCard]) => 
+        parseInt(slot) < parseInt(Object.keys(slotAssignments).find(s => slotAssignments[parseInt(s)]?.id === cardId) || '0') && 
+        otherCard.id === cardId
+      );
+      
+      return total + (alreadyCounted ? 0 : (card.price || 0));
+    }, 0);
+    
+    const remoteDisplayPrice = hasRemoteDisplay ? 850 : 0;
+    const totalPrice = chassisPrice + cardsPrice + remoteDisplayPrice;
+
     // Generate QTMS part number with slot assignments
-    const chassisPartNumber = generateQTMSPartNumber(
+    const qtmsPartNumber = generateQTMSPartNumber(
       selectedChassis as any,
       Object.values(slotAssignments) as any[],
       hasRemoteDisplay,
       slotAssignments as any
     );
 
-    const chassisItem: BOMItem = {
-      id: `${Date.now()}-chassis`,
-      product: selectedChassis,
+    // Create a single QTMS assembly item
+    const qtmsAssemblyItem: BOMItem = {
+      id: `${Date.now()}-qtms-assembly`,
+      product: {
+        ...selectedChassis,
+        name: `QTMS ${selectedChassis.type} Assembly`,
+        description: `Complete QTMS ${selectedChassis.type} chassis with configured cards${hasRemoteDisplay ? ' and remote display' : ''}`,
+        price: totalPrice
+      },
       quantity: 1,
       enabled: true,
-      partNumber: chassisPartNumber
+      partNumber: qtmsPartNumber
     };
 
-    const cardItems: BOMItem[] = Object.entries(slotAssignments)
-      .filter(([slot, card]) => {
-        // For bushing cards that occupy 2 slots, only add the item once for the first slot
-        if (card.type === 'bushing' && card.specifications?.slotRequirement === 2) {
-          const slotNum = parseInt(slot);
-          const prevSlot = slotNum - 1;
-          return !(slotAssignments[prevSlot]?.id === card.id);
-        }
-        return true;
-      })
-      .map(([slot, card]) => ({
-        id: `${Date.now()}-card-${slot}`,
-        product: card,
-        quantity: 1,
-        slot: parseInt(slot),
-        enabled: true,
-        partNumber: card.partNumber || card.id.toUpperCase()
-      }));
-
-    const items = [chassisItem, ...cardItems];
-
-    // Add remote display if selected
-    if (hasRemoteDisplay) {
-      const remoteDisplayItem: BOMItem = {
-        id: `${Date.now()}-remote-display`,
-        product: {
-          id: 'remote-display',
-          name: 'Remote Display',
-          type: 'accessory',
-          description: 'Remote display for QTMS chassis',
-          price: 850,
-          enabled: true
-        } as any,
-        quantity: 1,
-        enabled: true,
-        partNumber: 'QTMS-RD-001'
-      };
-      items.push(remoteDisplayItem);
-    }
-
-    const updatedItems = [...bomItems, ...items];
+    const updatedItems = [...bomItems, qtmsAssemblyItem];
     setBomItems(updatedItems);
     onBOMUpdate(updatedItems);
   };
@@ -396,7 +350,7 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
                         onClick={handleAddChassisAndCardsToBOM}
                         className="w-full bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded font-medium"
                       >
-                        Add Chassis & Cards to BOM
+                        Add QTMS Assembly to BOM
                       </button>
                     </CardContent>
                   </Card>
