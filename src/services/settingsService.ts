@@ -12,7 +12,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   ordersTeamEmail: 'orders@qualitrolcorp.com',
   ccEmails: ['orders-backup@qualitrolcorp.com'],
   emailSubjectPrefix: '[PowerQuotePro]',
-  marginWarginThreshold: 25,
+  marginWarningThreshold: 25,
   minimumMargin: 25,
   standardMargin: 40
 };
@@ -69,7 +69,7 @@ class SettingsService {
 
   // Apply standard margin pricing to a product
   applyStandardMarginPricing(cost: number): number {
-    return this.calculatePriceForMargin(cost, this.standardMargin);
+    return this.calculatePriceForMargin(cost, this.getStandardMargin());
   }
 }
 
