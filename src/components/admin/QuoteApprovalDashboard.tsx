@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -23,7 +22,9 @@ import {
 } from "lucide-react";
 import { User as UserType } from "@/types/auth";
 import { useToast } from "@/hooks/use-toast";
+import { quoteFieldsService, QuoteField } from '@/services/quoteFieldsService';
 
+// Update the DetailedQuote interface to include BOM items and dynamic fields
 interface DetailedQuote {
   id: string;
   customerName: string;
@@ -59,7 +60,9 @@ interface DetailedQuote {
     totalPrice: number;
     totalCost: number;
     margin: number;
+    description?: string;
   }>;
+  quoteFields?: Record<string, string>; // Dynamic quote fields
 }
 
 interface QuoteApprovalDashboardProps {
@@ -102,7 +105,8 @@ const QuoteApprovalDashboard = ({ user }: QuoteApprovalDashboardProps) => {
           unitCost: 32000,
           totalPrice: 90000,
           totalCost: 64000,
-          margin: 28.9
+          margin: 28.9,
+          description: 'Complete QTMS LTX chassis with configured cards and remote display'
         },
         {
           id: '2',
@@ -113,9 +117,22 @@ const QuoteApprovalDashboard = ({ user }: QuoteApprovalDashboardProps) => {
           unitCost: 10500,
           totalPrice: 35000,
           totalCost: 21000,
-          margin: 40.0
+          margin: 40.0,
+          description: 'Remote display unit for QTMS monitoring'
         }
-      ]
+      ],
+      quoteFields: {
+        customerName: 'Pacific Gas & Electric',
+        oracleCustomerId: 'ORG-789012',
+        sfdcOpportunity: 'SFDC-789456',
+        contactPerson: 'Jane Doe',
+        contactEmail: 'jane.doe@pge.com',
+        projectName: 'Substation Monitoring Upgrade',
+        expectedCloseDate: '2024-03-15',
+        paymentTerms: '30 days',
+        shippingTerms: 'FOB Origin',
+        currency: 'USD'
+      }
     }
   ]);
 
@@ -126,6 +143,9 @@ const QuoteApprovalDashboard = ({ user }: QuoteApprovalDashboardProps) => {
   const [showDetails, setShowDetails] = useState<Record<string, boolean>>({});
   const [activeTab, setActiveTab] = useState('pending');
   const { toast } = useToast();
+
+  // Get enabled quote fields for display
+  const enabledQuoteFields = quoteFieldsService.getEnabledFields();
 
   const getStatusColor = (status: DetailedQuote['status']) => {
     switch (status) {
@@ -338,6 +358,81 @@ const QuoteApprovalDashboard = ({ user }: QuoteApprovalDashboardProps) => {
 
                 {showDetails[quote.id] && (
                   <CardContent className="border-t border-gray-800 pt-6">
+                    {/* Quote Fields Information */}
+                    {quote.quoteFields && (
+                      <div className="mb-6">
+                        <h4 className="text-white font-medium mb-3">Quote Information</h4>
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
+                          {enabledQuoteFields.map((field) => {
+                            const value = quote.quoteFields?.[field.id];
+                            if (!value) return null;
+                            
+                            return (
+                              <div key={field.id} className="bg-gray-800 p-3 rounded">
+                                <div className="text-gray-400 text-sm">{field.label}</div>
+                                <div className="text-white font-medium">{value}</div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* BOM Items */}
+                    <div className="mb-6">
+                      <h4 className="text-white font-medium mb-3">Bill of Materials</h4>
+                      <div className="bg-gray-800 rounded-lg overflow-hidden">
+                        <div className="overflow-x-auto">
+                          <table className="w-full">
+                            <thead className="bg-gray-700">
+                              <tr>
+                                <th className="text-left p-3 text-gray-300 text-sm font-medium">Part Number</th>
+                                <th className="text-left p-3 text-gray-300 text-sm font-medium">Description</th>
+                                <th className="text-right p-3 text-gray-300 text-sm font-medium">Qty</th>
+                                <th className="text-right p-3 text-gray-300 text-sm font-medium">Unit Price</th>
+                                <th className="text-right p-3 text-gray-300 text-sm font-medium">Total Price</th>
+                                <th className="text-right p-3 text-gray-300 text-sm font-medium">Unit Cost</th>
+                                <th className="text-right p-3 text-gray-300 text-sm font-medium">Total Cost</th>
+                                <th className="text-right p-3 text-gray-300 text-sm font-medium">Margin %</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {quote.bomItems.map((item, index) => (
+                                <tr key={item.id} className={index % 2 === 0 ? 'bg-gray-800' : 'bg-gray-750'}>
+                                  <td className="p-3 text-white font-mono text-sm">{item.partNumber}</td>
+                                  <td className="p-3 text-white">
+                                    <div className="font-medium">{item.name}</div>
+                                    {item.description && (
+                                      <div className="text-gray-400 text-sm mt-1">{item.description}</div>
+                                    )}
+                                  </td>
+                                  <td className="p-3 text-white text-right">{item.quantity}</td>
+                                  <td className="p-3 text-white text-right">{quote.currency} {item.unitPrice.toLocaleString()}</td>
+                                  <td className="p-3 text-white text-right font-medium">{quote.currency} {item.totalPrice.toLocaleString()}</td>
+                                  <td className="p-3 text-orange-400 text-right">{quote.currency} {item.unitCost.toLocaleString()}</td>
+                                  <td className="p-3 text-orange-400 text-right">{quote.currency} {item.totalCost.toLocaleString()}</td>
+                                  <td className={`p-3 text-right font-medium ${item.margin >= settingsService.getMarginWarningThreshold() ? 'text-green-400' : 'text-red-400'}`}>
+                                    {item.margin.toFixed(1)}%
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                            <tfoot className="bg-gray-700 border-t border-gray-600">
+                              <tr>
+                                <td colSpan={4} className="p-3 text-white font-medium">Totals:</td>
+                                <td className="p-3 text-white text-right font-bold">{quote.currency} {quote.originalQuoteValue.toLocaleString()}</td>
+                                <td className="p-3 text-orange-400 text-right font-bold">{quote.currency} {quote.totalCost.toLocaleString()}</td>
+                                <td className="p-3 text-green-400 text-right font-bold">{quote.currency} {quote.grossProfit.toLocaleString()}</td>
+                                <td className={`p-3 text-right font-bold ${quote.originalMargin >= settingsService.getMarginWarningThreshold() ? 'text-green-400' : 'text-red-400'}`}>
+                                  {quote.originalMargin.toFixed(1)}%
+                                </td>
+                              </tr>
+                            </tfoot>
+                          </table>
+                        </div>
+                      </div>
+                    </div>
+
                     {/* Financial Metrics */}
                     <div className="grid grid-cols-4 gap-4 mb-6">
                       <div className="bg-gray-800 p-4 rounded text-center">
@@ -392,11 +487,11 @@ const QuoteApprovalDashboard = ({ user }: QuoteApprovalDashboardProps) => {
                     )}
 
                     {/* Margin Warning */}
-                    {quote.discountedMargin < 25 && (
+                    {quote.discountedMargin < settingsService.getMarginWarningThreshold() && (
                       <div className="mb-6 p-3 bg-red-900/20 border border-red-600/20 rounded flex items-center space-x-2">
                         <AlertTriangle className="h-4 w-4 text-red-400" />
                         <p className="text-red-400 text-sm">
-                          Warning: Requested discount will reduce margin to {quote.discountedMargin.toFixed(1)}% (below 25% threshold)
+                          Warning: Requested discount will reduce margin to {quote.discountedMargin.toFixed(1)}% (below {settingsService.getMarginWarningThreshold()}% threshold)
                         </p>
                       </div>
                     )}

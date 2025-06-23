@@ -24,6 +24,8 @@ import { calculateTotalMargin, calculateDiscountedMargin, shouldShowMarginWarnin
 import { settingsService } from '@/services/settingsService';
 import { useToast } from '@/hooks/use-toast';
 import { Send, AlertTriangle } from 'lucide-react';
+import { quoteFieldsService } from '@/services/quoteFieldsService';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface BOMBuilderProps {
   onBOMUpdate: (items: BOMItem[]) => void;
@@ -41,13 +43,11 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
   const [hasRemoteDisplay, setHasRemoteDisplay] = useState<boolean>(false);
   const [configuringCard, setConfiguringCard] = useState<BOMItem | null>(null);
 
-  // Quote submission state
+  // Quote submission state with dynamic fields
   const [showQuoteDialog, setShowQuoteDialog] = useState(false);
   const [requestedDiscount, setRequestedDiscount] = useState<number>(0);
   const [quoteJustification, setQuoteJustification] = useState('');
-  const [customerName, setCustomerName] = useState('');
-  const [oracleCustomerId, setOracleCustomerId] = useState('');
-  const [sfdcOpportunity, setSfdcOpportunity] = useState('');
+  const [quoteFieldValues, setQuoteFieldValues] = useState<Record<string, string>>({});
   
   const { toast } = useToast();
 
@@ -335,11 +335,21 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
   const currentMargin = calculateTotalMargin(bomItems);
   const discountedMargin = requestedDiscount > 0 ? calculateDiscountedMargin(bomItems, requestedDiscount) : null;
 
+  const handleQuoteFieldChange = (fieldId: string, value: string) => {
+    setQuoteFieldValues(prev => ({
+      ...prev,
+      [fieldId]: value
+    }));
+  };
+
   const handleSubmitQuote = () => {
-    if (!customerName || !oracleCustomerId || !sfdcOpportunity) {
+    const requiredFields = quoteFieldsService.getRequiredFields();
+    const missingFields = requiredFields.filter(field => !quoteFieldValues[field.id]?.trim());
+
+    if (missingFields.length > 0) {
       toast({
         title: "Missing Information",
-        description: "Please fill in all required fields.",
+        description: `Please fill in all required fields: ${missingFields.map(f => f.label).join(', ')}`,
         variant: "destructive"
       });
       return;
@@ -357,9 +367,6 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
     // Submit quote for approval
     const quoteData = {
       id: `QR-${Date.now()}`,
-      customerName,
-      oracleCustomerId,
-      sfdcOpportunity,
       bomItems,
       requestedDiscount,
       justification: quoteJustification,
@@ -367,7 +374,8 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
       discountedMargin: discountedMargin?.discountedMargin || currentMargin.marginPercentage,
       totalValue: currentMargin.totalRevenue,
       totalCost: currentMargin.totalCost,
-      grossProfit: discountedMargin?.discountedRevenue ? (discountedMargin.discountedRevenue - currentMargin.totalCost) : currentMargin.grossProfit
+      grossProfit: discountedMargin?.discountedRevenue ? (discountedMargin.discountedRevenue - currentMargin.totalCost) : currentMargin.grossProfit,
+      quoteFields: quoteFieldValues
     };
 
     console.log('Submitting quote for approval:', quoteData);
@@ -381,9 +389,7 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
     setShowQuoteDialog(false);
     setRequestedDiscount(0);
     setQuoteJustification('');
-    setCustomerName('');
-    setOracleCustomerId('');
-    setSfdcOpportunity('');
+    setQuoteFieldValues({});
   };
 
   const renderProductContent = (productId: string) => {
@@ -566,44 +572,82 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
                     Submit for Quote
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="bg-gray-900 border-gray-800 max-w-2xl">
+                <DialogContent className="bg-gray-900 border-gray-800 max-w-4xl max-h-[90vh] overflow-y-auto">
                   <DialogHeader>
                     <DialogTitle className="text-white">Submit Quote for Approval</DialogTitle>
                   </DialogHeader>
                   
                   <div className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <Label htmlFor="customer-name" className="text-white">Customer Name *</Label>
-                        <Input
-                          id="customer-name"
-                          value={customerName}
-                          onChange={(e) => setCustomerName(e.target.value)}
-                          className="bg-gray-800 border-gray-700 text-white"
-                          placeholder="Pacific Gas & Electric"
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="oracle-id" className="text-white">Oracle Customer ID *</Label>
-                        <Input
-                          id="oracle-id"
-                          value={oracleCustomerId}
-                          onChange={(e) => setOracleCustomerId(e.target.value)}
-                          className="bg-gray-800 border-gray-700 text-white"
-                          placeholder="ORG-123456"
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <Label htmlFor="sfdc-opportunity" className="text-white">SFDC Opportunity *</Label>
-                      <Input
-                        id="sfdc-opportunity"
-                        value={sfdcOpportunity}
-                        onChange={(e) => setSfdcOpportunity(e.target.value)}
-                        className="bg-gray-800 border-gray-700 text-white"
-                        placeholder="SFDC-789456"
-                      />
+                    {/* Dynamic Quote Fields */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {enabledQuoteFields.map((field) => (
+                        <div key={field.id} className={field.type === 'textarea' ? 'col-span-full' : ''}>
+                          <Label htmlFor={field.id} className="text-white">
+                            {field.label} {field.required && '*'}
+                          </Label>
+                          
+                          {field.type === 'text' && (
+                            <Input
+                              id={field.id}
+                              value={quoteFieldValues[field.id] || ''}
+                              onChange={(e) => handleQuoteFieldChange(field.id, e.target.value)}
+                              className="bg-gray-800 border-gray-700 text-white"
+                              placeholder={field.label}
+                              required={field.required}
+                            />
+                          )}
+                          
+                          {field.type === 'number' && (
+                            <Input
+                              id={field.id}
+                              type="number"
+                              value={quoteFieldValues[field.id] || ''}
+                              onChange={(e) => handleQuoteFieldChange(field.id, e.target.value)}
+                              className="bg-gray-800 border-gray-700 text-white"
+                              placeholder={field.label}
+                              required={field.required}
+                            />
+                          )}
+                          
+                          {field.type === 'date' && (
+                            <Input
+                              id={field.id}
+                              type="date"
+                              value={quoteFieldValues[field.id] || ''}
+                              onChange={(e) => handleQuoteFieldChange(field.id, e.target.value)}
+                              className="bg-gray-800 border-gray-700 text-white"
+                              required={field.required}
+                            />
+                          )}
+                          
+                          {field.type === 'select' && field.options && (
+                            <Select value={quoteFieldValues[field.id] || ''} onValueChange={(value) => handleQuoteFieldChange(field.id, value)}>
+                              <SelectTrigger className="bg-gray-800 border-gray-700 text-white">
+                                <SelectValue placeholder={`Select ${field.label}`} />
+                              </SelectTrigger>
+                              <SelectContent className="bg-gray-800 border-gray-700">
+                                {field.options.map((option) => (
+                                  <SelectItem key={option} value={option} className="text-white hover:bg-gray-700">
+                                    {option}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          )}
+                          
+                          {field.type === 'textarea' && (
+                            <Textarea
+                              id={field.id}
+                              value={quoteFieldValues[field.id] || ''}
+                              onChange={(e) => handleQuoteFieldChange(field.id, e.target.value)}
+                              className="bg-gray-800 border-gray-700 text-white"
+                              placeholder={field.label}
+                              rows={3}
+                              required={field.required}
+                            />
+                          )}
+                        </div>
+                      ))}
                     </div>
 
                     <div>
