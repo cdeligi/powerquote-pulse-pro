@@ -547,47 +547,17 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
           canSeePrices={canSeePrices}
         />
 
-        {/* Quote Submission Section */}
+        {/* Quote Submission Section - Only show total price, hide margin/profit */}
         {bomItems.length > 0 && canSeePrices && (
           <Card className="bg-gray-900 border-gray-800">
             <CardHeader>
-              <CardTitle className="text-white flex items-center justify-between">
-                Quote Summary
-                <Badge className={`${getMarginColor(currentMargin.marginPercentage)} border-none`}>
-                  {currentMargin.marginPercentage.toFixed(1)}% Margin
-                </Badge>
-              </CardTitle>
+              <CardTitle className="text-white">Quote Summary</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <div className="text-gray-400">Total Revenue</div>
-                  <div className="text-white font-bold">${currentMargin.totalRevenue.toLocaleString()}</div>
-                </div>
-                <div>
-                  <div className="text-gray-400">Total Cost</div>
-                  <div className="text-white font-bold">${currentMargin.totalCost.toLocaleString()}</div>
-                </div>
-                <div>
-                  <div className="text-gray-400">Gross Profit</div>
-                  <div className="text-green-400 font-bold">${currentMargin.grossProfit.toLocaleString()}</div>
-                </div>
-                <div>
-                  <div className="text-gray-400">Margin %</div>
-                  <div className={`font-bold ${getMarginColor(currentMargin.marginPercentage)}`}>
-                    {currentMargin.marginPercentage.toFixed(1)}%
-                  </div>
-                </div>
+              <div className="text-center">
+                <div className="text-gray-400">Total Price</div>
+                <div className="text-white font-bold text-2xl">${currentMargin.totalRevenue.toLocaleString()}</div>
               </div>
-
-              {shouldShowMarginWarning(currentMargin.marginPercentage) && (
-                <div className="p-3 bg-yellow-900/20 border border-yellow-600/20 rounded flex items-center space-x-2">
-                  <AlertTriangle className="h-4 w-4 text-yellow-400" />
-                  <p className="text-yellow-400 text-sm">
-                    Current margin is below {settingsService.getMarginWarningThreshold()}% threshold
-                  </p>
-                </div>
-              )}
 
               <Dialog open={showQuoteDialog} onOpenChange={setShowQuoteDialog}>
                 <DialogTrigger asChild>
@@ -655,21 +625,19 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
                     {requestedDiscount > 0 && discountedMargin && (
                       <div className="p-3 bg-gray-800 rounded space-y-2">
                         <div className="text-white font-medium">Discount Impact:</div>
-                        <div className="grid grid-cols-3 gap-4 text-sm">
+                        <div className="grid grid-cols-2 gap-4 text-sm">
                           <div>
-                            <div className="text-gray-400">New Value</div>
-                            <div className="text-white font-bold">${discountedMargin.discountedRevenue.toLocaleString()}</div>
+                            <div className="text-gray-400">Original Price</div>
+                            <div className="text-white font-bold">${currentMargin.totalRevenue.toLocaleString()}</div>
                           </div>
                           <div>
-                            <div className="text-gray-400">New Margin</div>
-                            <div className={`font-bold ${getMarginColor(discountedMargin.discountedMargin)}`}>
-                              {discountedMargin.discountedMargin.toFixed(1)}%
-                            </div>
+                            <div className="text-gray-400">Discounted Price</div>
+                            <div className="text-green-400 font-bold">${discountedMargin.discountedRevenue.toLocaleString()}</div>
                           </div>
-                          <div>
-                            <div className="text-gray-400">Discount Amount</div>
-                            <div className="text-red-400 font-bold">-${discountedMargin.discountAmount.toLocaleString()}</div>
-                          </div>
+                        </div>
+                        <div className="text-center">
+                          <div className="text-gray-400">Discount Amount</div>
+                          <div className="text-red-400 font-bold">-${discountedMargin.discountAmount.toLocaleString()}</div>
                         </div>
                         
                         {shouldShowMarginWarning(discountedMargin.discountedMargin) && (
