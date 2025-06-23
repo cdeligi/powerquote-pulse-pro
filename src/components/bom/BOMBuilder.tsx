@@ -23,7 +23,7 @@ import { generateQTMSPartNumber, generateProductPartNumber } from '@/types/produ
 import { calculateTotalMargin, calculateDiscountedMargin, shouldShowMarginWarning, getMarginColor } from '@/utils/marginCalculations';
 import { settingsService } from '@/services/settingsService';
 import { useToast } from '@/hooks/use-toast';
-import { Send, AlertTriangle } from 'lucide-react';
+import { Send, AlertTriangle, Percent } from 'lucide-react';
 import { quoteFieldsService } from '@/services/quoteFieldsService';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
@@ -105,7 +105,6 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
       const updated = { ...prev };
       const cardAtSlot = updated[slot];
       
-      // If it's a bushing card, clear all slots with the same bushing card
       if (cardAtSlot?.type === 'bushing') {
         Object.keys(updated).forEach(slotKey => {
           const slotNum = parseInt(slotKey);
@@ -123,7 +122,6 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
 
   const getBushingSlotPlacement = (chassisType: string) => {
     if (chassisType === 'LTX') {
-      // Priority order: 6-7 first, then 13-14, then clear 6-7
       const slots6_7Available = !slotAssignments[6] && !slotAssignments[7];
       const slots13_14Available = !slotAssignments[13] && !slotAssignments[14];
       
@@ -132,17 +130,14 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
       } else if (slots13_14Available) {
         return [13, 14];
       } else {
-        // Clear 6-7 and use them
         return [6, 7];
       }
     } else if (chassisType === 'MTX') {
-      // Always 6-7, clear if occupied
       return [6, 7];
     } else if (chassisType === 'STX') {
-      // Always 3-4, clear if occupied
       return [3, 4];
     }
-    return [6, 7]; // Fallback
+    return [6, 7];
   };
 
   const handleCardSelect = (card: Level3Product, slot?: number) => {
@@ -166,16 +161,12 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
         
         const updatedAssignments = { ...slotAssignments };
         
-        // Clear target slots based on chassis type
         if (selectedChassis?.type === 'LTX') {
           if (bushingSlots[0] === 6) {
-            // Using 6-7, clear them
             delete updatedAssignments[6];
             delete updatedAssignments[7];
           }
-          // If using 13-14, no need to clear anything extra
         } else {
-          // For MTX and STX, always clear the target slots
           delete updatedAssignments[bushingSlots[0]];
           delete updatedAssignments[bushingSlots[1]];
         }
@@ -337,6 +328,7 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
   // Calculate current margin for quote submission
   const currentMargin = calculateTotalMargin(bomItems);
   const discountedMargin = requestedDiscount > 0 ? calculateDiscountedMargin(bomItems, requestedDiscount) : null;
+  const finalTotalPrice = discountedMargin ? discountedMargin.discountedRevenue : currentMargin.totalRevenue;
 
   const handleQuoteFieldChange = (fieldId: string, value: string) => {
     setQuoteFieldValues(prev => ({
@@ -367,7 +359,6 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
       return;
     }
 
-    // Submit quote for approval
     const quoteData = {
       id: `QR-${Date.now()}`,
       bomItems,
@@ -388,7 +379,6 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
       description: `Quote ${quoteData.id} has been submitted for approval.`,
     });
 
-    // Reset form
     setShowQuoteDialog(false);
     setRequestedDiscount(0);
     setQuoteJustification('');
@@ -497,6 +487,90 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
           </CardHeader>
         </Card>
 
+        {/* Quote Fields Section */}
+        {enabledQuoteFields.length > 0 && (
+          <Card className="bg-gray-900 border-gray-800">
+            <CardHeader>
+              <CardTitle className="text-white">Quote Information</CardTitle>
+              <CardDescription className="text-gray-400">
+                Please provide the following information for your quote
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {enabledQuoteFields.map((field) => (
+                  <div key={field.id} className={field.type === 'textarea' ? 'col-span-full' : ''}>
+                    <Label htmlFor={field.id} className="text-white">
+                      {field.label} {field.required && <span className="text-red-400">*</span>}
+                    </Label>
+                    
+                    {field.type === 'text' && (
+                      <Input
+                        id={field.id}
+                        value={quoteFieldValues[field.id] || ''}
+                        onChange={(e) => handleQuoteFieldChange(field.id, e.target.value)}
+                        className="bg-gray-800 border-gray-700 text-white"
+                        placeholder={field.label}
+                        required={field.required}
+                      />
+                    )}
+                    
+                    {field.type === 'number' && (
+                      <Input
+                        id={field.id}
+                        type="number"
+                        value={quoteFieldValues[field.id] || ''}
+                        onChange={(e) => handleQuoteFieldChange(field.id, e.target.value)}
+                        className="bg-gray-800 border-gray-700 text-white"
+                        placeholder={field.label}
+                        required={field.required}
+                      />
+                    )}
+                    
+                    {field.type === 'date' && (
+                      <Input
+                        id={field.id}
+                        type="date"
+                        value={quoteFieldValues[field.id] || ''}
+                        onChange={(e) => handleQuoteFieldChange(field.id, e.target.value)}
+                        className="bg-gray-800 border-gray-700 text-white"
+                        required={field.required}
+                      />
+                    )}
+                    
+                    {field.type === 'select' && field.options && (
+                      <Select value={quoteFieldValues[field.id] || ''} onValueChange={(value) => handleQuoteFieldChange(field.id, value)}>
+                        <SelectTrigger className="bg-gray-800 border-gray-700 text-white">
+                          <SelectValue placeholder={`Select ${field.label}`} />
+                        </SelectTrigger>
+                        <SelectContent className="bg-gray-800 border-gray-700">
+                          {field.options.map((option) => (
+                            <SelectItem key={option} value={option} className="text-white hover:bg-gray-700">
+                              {option}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                    
+                    {field.type === 'textarea' && (
+                      <Textarea
+                        id={field.id}
+                        value={quoteFieldValues[field.id] || ''}
+                        onChange={(e) => handleQuoteFieldChange(field.id, e.target.value)}
+                        className="bg-gray-800 border-gray-700 text-white"
+                        placeholder={field.label}
+                        rows={3}
+                        required={field.required}
+                      />
+                    )}
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full bg-gray-800" style={{ gridTemplateColumns: `repeat(${level1Products.length}, 1fr)` }}>
             {level1Products.map((product) => (
@@ -522,6 +596,7 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
           ))}
         </Tabs>
 
+        {/* ... keep existing configurator components */}
         {configuringCard && configuringCard.product.name.toLowerCase().includes('analog') && (
           <AnalogCardConfigurator
             bomItem={configuringCard}
@@ -556,7 +631,7 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
           canSeePrices={canSeePrices}
         />
 
-        {/* Quote Submission Section - Only show total price, hide margin/profit */}
+        {/* Quote Summary Section with Discount Request */}
         {bomItems.length > 0 && canSeePrices && (
           <Card className="bg-gray-900 border-gray-800">
             <CardHeader>
@@ -564,8 +639,51 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="text-center">
-                <div className="text-gray-400">Total Price</div>
+                <div className="text-gray-400">List Price</div>
                 <div className="text-white font-bold text-2xl">${currentMargin.totalRevenue.toLocaleString()}</div>
+              </div>
+
+              {/* Request Discount Section */}
+              <div className="space-y-3 p-3 bg-gray-800 rounded">
+                <div className="flex items-center space-x-2">
+                  <Percent className="h-4 w-4 text-orange-400" />
+                  <Label className="text-white font-medium">Request Discount</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Input
+                    type="number"
+                    min="0"
+                    max="50"
+                    value={requestedDiscount || ''}
+                    onChange={(e) => setRequestedDiscount(Number(e.target.value))}
+                    className="bg-gray-700 border-gray-600 text-white w-20"
+                    placeholder="0"
+                  />
+                  <span className="text-white">%</span>
+                </div>
+                
+                {requestedDiscount > 0 && discountedMargin && (
+                  <div className="space-y-2">
+                    <div className="text-center border-t border-gray-700 pt-3">
+                      <div className="text-gray-400">Quote Total with Discount</div>
+                      <div className="text-green-400 font-bold text-2xl">
+                        ${discountedMargin.discountedRevenue.toLocaleString()}
+                      </div>
+                      <div className="text-red-400 text-sm">
+                        Save ${discountedMargin.discountAmount.toLocaleString()} ({requestedDiscount}% off)
+                      </div>
+                    </div>
+                    
+                    {shouldShowMarginWarning(discountedMargin.discountedMargin) && (
+                      <div className="p-2 bg-yellow-900/20 border border-yellow-600/20 rounded flex items-center space-x-2">
+                        <AlertTriangle className="h-4 w-4 text-yellow-400" />
+                        <p className="text-yellow-400 text-xs">
+                          Large discount request - requires approval
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               <Dialog open={showQuoteDialog} onOpenChange={setShowQuoteDialog}>
@@ -575,140 +693,45 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
                     Submit for Quote
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="bg-gray-900 border-gray-800 max-w-4xl max-h-[90vh] overflow-y-auto">
+                <DialogContent className="bg-gray-900 border-gray-800 max-w-2xl max-h-[90vh] overflow-y-auto">
                   <DialogHeader>
                     <DialogTitle className="text-white">Submit Quote for Approval</DialogTitle>
                   </DialogHeader>
                   
                   <div className="space-y-4">
-                    {/* Dynamic Quote Fields */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {enabledQuoteFields.map((field) => (
-                        <div key={field.id} className={field.type === 'textarea' ? 'col-span-full' : ''}>
-                          <Label htmlFor={field.id} className="text-white">
-                            {field.label} {field.required && '*'}
-                          </Label>
-                          
-                          {field.type === 'text' && (
-                            <Input
-                              id={field.id}
-                              value={quoteFieldValues[field.id] || ''}
-                              onChange={(e) => handleQuoteFieldChange(field.id, e.target.value)}
-                              className="bg-gray-800 border-gray-700 text-white"
-                              placeholder={field.label}
-                              required={field.required}
-                            />
-                          )}
-                          
-                          {field.type === 'number' && (
-                            <Input
-                              id={field.id}
-                              type="number"
-                              value={quoteFieldValues[field.id] || ''}
-                              onChange={(e) => handleQuoteFieldChange(field.id, e.target.value)}
-                              className="bg-gray-800 border-gray-700 text-white"
-                              placeholder={field.label}
-                              required={field.required}
-                            />
-                          )}
-                          
-                          {field.type === 'date' && (
-                            <Input
-                              id={field.id}
-                              type="date"
-                              value={quoteFieldValues[field.id] || ''}
-                              onChange={(e) => handleQuoteFieldChange(field.id, e.target.value)}
-                              className="bg-gray-800 border-gray-700 text-white"
-                              required={field.required}
-                            />
-                          )}
-                          
-                          {field.type === 'select' && field.options && (
-                            <Select value={quoteFieldValues[field.id] || ''} onValueChange={(value) => handleQuoteFieldChange(field.id, value)}>
-                              <SelectTrigger className="bg-gray-800 border-gray-700 text-white">
-                                <SelectValue placeholder={`Select ${field.label}`} />
-                              </SelectTrigger>
-                              <SelectContent className="bg-gray-800 border-gray-700">
-                                {field.options.map((option) => (
-                                  <SelectItem key={option} value={option} className="text-white hover:bg-gray-700">
-                                    {option}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          )}
-                          
-                          {field.type === 'textarea' && (
-                            <Textarea
-                              id={field.id}
-                              value={quoteFieldValues[field.id] || ''}
-                              onChange={(e) => handleQuoteFieldChange(field.id, e.target.value)}
-                              className="bg-gray-800 border-gray-700 text-white"
-                              placeholder={field.label}
-                              rows={3}
-                              required={field.required}
-                            />
-                          )}
+                    <div className="p-3 bg-gray-800 rounded">
+                      <div className="text-white font-medium mb-2">Quote Summary</div>
+                      <div className="grid grid-cols-2 gap-4 text-sm">
+                        <div>
+                          <div className="text-gray-400">List Price</div>
+                          <div className="text-white font-bold">${currentMargin.totalRevenue.toLocaleString()}</div>
                         </div>
-                      ))}
-                    </div>
-
-                    <div>
-                      <Label htmlFor="discount-request" className="text-white">
-                        Requested Discount (%) - Optional
-                      </Label>
-                      <Input
-                        id="discount-request"
-                        type="number"
-                        min="0"
-                        max="50"
-                        value={requestedDiscount || ''}
-                        onChange={(e) => setRequestedDiscount(Number(e.target.value))}
-                        className="bg-gray-800 border-gray-700 text-white"
-                        placeholder="0"
-                      />
-                    </div>
-
-                    {requestedDiscount > 0 && discountedMargin && (
-                      <div className="p-3 bg-gray-800 rounded space-y-2">
-                        <div className="text-white font-medium">Discount Impact:</div>
-                        <div className="grid grid-cols-2 gap-4 text-sm">
-                          <div>
-                            <div className="text-gray-400">Original Price</div>
-                            <div className="text-white font-bold">${currentMargin.totalRevenue.toLocaleString()}</div>
-                          </div>
-                          <div>
-                            <div className="text-gray-400">Discounted Price</div>
-                            <div className="text-green-400 font-bold">${discountedMargin.discountedRevenue.toLocaleString()}</div>
-                          </div>
+                        <div>
+                          <div className="text-gray-400">Final Price</div>
+                          <div className="text-green-400 font-bold">${finalTotalPrice.toLocaleString()}</div>
                         </div>
-                        <div className="text-center">
-                          <div className="text-gray-400">Discount Amount</div>
-                          <div className="text-red-400 font-bold">-${discountedMargin.discountAmount.toLocaleString()}</div>
-                        </div>
-                        
-                        {shouldShowMarginWarning(discountedMargin.discountedMargin) && (
-                          <div className="p-2 bg-yellow-900/20 border border-yellow-600/20 rounded flex items-center space-x-2">
-                            <AlertTriangle className="h-4 w-4 text-yellow-400" />
-                            <p className="text-yellow-400 text-xs">
-                              Warning: Requested discount will reduce margin to {discountedMargin.discountedMargin.toFixed(1)}% (below {settingsService.getMarginWarningThreshold()}% threshold)
-                            </p>
-                          </div>
-                        )}
                       </div>
-                    )}
+                      {requestedDiscount > 0 && (
+                        <div className="text-center mt-2 pt-2 border-t border-gray-700">
+                          <div className="text-red-400 font-medium">
+                            {requestedDiscount}% Discount Requested
+                          </div>
+                        </div>
+                      )}
+                    </div>
 
                     <div>
                       <Label htmlFor="justification" className="text-white">
-                        Discount Justification {requestedDiscount > 0 ? '*' : '(Optional)'}
+                        {requestedDiscount > 0 ? 'Discount Justification *' : 'Additional Notes (Optional)'}
                       </Label>
                       <Textarea
                         id="justification"
                         value={quoteJustification}
                         onChange={(e) => setQuoteJustification(e.target.value)}
                         className="bg-gray-800 border-gray-700 text-white"
-                        placeholder="Provide justification for the requested discount..."
+                        placeholder={requestedDiscount > 0 ? "Please provide justification for the requested discount..." : "Any additional notes or special requirements..."}
                         rows={3}
+                        required={requestedDiscount > 0}
                       />
                     </div>
 
