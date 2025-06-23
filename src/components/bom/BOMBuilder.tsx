@@ -103,13 +103,63 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
     if (selectedSlot !== null || slot !== undefined) {
       const targetSlot = slot !== undefined ? slot : selectedSlot!;
       
-      // Handle bushing card positioning - for all chassis types
+      // Handle bushing card positioning with specific logic for each chassis
       if (card.type === 'bushing' && card.specifications?.slotRequirement === 2) {
-        // Bushing cards always occupy 2 consecutive slots
+        let bushingSlots: [number, number];
+        
+        if (selectedChassis?.type === 'LTX') {
+          // LTX: Try slots 6-7 first, then 13-14 if occupied
+          const slots6_7Available = !slotAssignments[6] && !slotAssignments[7];
+          if (slots6_7Available) {
+            bushingSlots = [6, 7];
+          } else {
+            // Clear slots 6-7 and place there
+            const updatedAssignments = { ...slotAssignments };
+            delete updatedAssignments[6];
+            delete updatedAssignments[7];
+            setSlotAssignments({
+              ...updatedAssignments,
+              6: card,
+              7: card
+            });
+            setSelectedSlot(null);
+            return;
+          }
+        } else if (selectedChassis?.type === 'MTX') {
+          // MTX: Always slots 6-7, clear if occupied
+          bushingSlots = [6, 7];
+          const updatedAssignments = { ...slotAssignments };
+          delete updatedAssignments[6];
+          delete updatedAssignments[7];
+          setSlotAssignments({
+            ...updatedAssignments,
+            6: card,
+            7: card
+          });
+          setSelectedSlot(null);
+          return;
+        } else if (selectedChassis?.type === 'STX') {
+          // STX: Always slots 3-4, clear if occupied
+          bushingSlots = [3, 4];
+          const updatedAssignments = { ...slotAssignments };
+          delete updatedAssignments[3];
+          delete updatedAssignments[4];
+          setSlotAssignments({
+            ...updatedAssignments,
+            3: card,
+            4: card
+          });
+          setSelectedSlot(null);
+          return;
+        } else {
+          // Fallback to original logic
+          bushingSlots = [targetSlot, targetSlot + 1];
+        }
+        
         setSlotAssignments(prev => ({
           ...prev,
-          [targetSlot]: card,
-          [targetSlot + 1]: card // Occupy the next slot as well
+          [bushingSlots[0]]: card,
+          [bushingSlots[1]]: card
         }));
       } else {
         setSlotAssignments(prev => ({
@@ -144,14 +194,48 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
     };
 
     if (configuringCard.slot !== undefined) {
-      // Handle bushing card positioning during configuration
       const card = configuringCard.product as Level3Product;
+      
+      // Handle bushing card positioning during configuration with chassis-specific logic
       if (card.type === 'bushing' && card.specifications?.slotRequirement === 2) {
-        setSlotAssignments(prev => ({
-          ...prev,
-          [configuringCard.slot!]: card,
-          [configuringCard.slot! + 1]: card
-        }));
+        if (selectedChassis?.type === 'LTX') {
+          // LTX: Try slots 6-7 first, then clear and place there
+          const updatedAssignments = { ...slotAssignments };
+          delete updatedAssignments[6];
+          delete updatedAssignments[7];
+          setSlotAssignments({
+            ...updatedAssignments,
+            6: card,
+            7: card
+          });
+        } else if (selectedChassis?.type === 'MTX') {
+          // MTX: Always slots 6-7, clear if occupied
+          const updatedAssignments = { ...slotAssignments };
+          delete updatedAssignments[6];
+          delete updatedAssignments[7];
+          setSlotAssignments({
+            ...updatedAssignments,
+            6: card,
+            7: card
+          });
+        } else if (selectedChassis?.type === 'STX') {
+          // STX: Always slots 3-4, clear if occupied
+          const updatedAssignments = { ...slotAssignments };
+          delete updatedAssignments[3];
+          delete updatedAssignments[4];
+          setSlotAssignments({
+            ...updatedAssignments,
+            3: card,
+            4: card
+          });
+        } else {
+          // Fallback to original slot
+          setSlotAssignments(prev => ({
+            ...prev,
+            [configuringCard.slot!]: card,
+            [configuringCard.slot! + 1]: card
+          }));
+        }
       } else {
         setSlotAssignments(prev => ({
           ...prev,
