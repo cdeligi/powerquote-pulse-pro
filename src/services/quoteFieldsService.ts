@@ -25,6 +25,7 @@ const DEFAULT_QUOTE_FIELDS: QuoteField[] = [
 class QuoteFieldsService {
   private static instance: QuoteFieldsService;
   private fields: QuoteField[];
+  private listeners: Array<() => void> = [];
 
   private constructor() {
     this.loadFields();
@@ -46,20 +47,38 @@ class QuoteFieldsService {
     }
   }
 
+  // Add listener for field changes
+  addListener(callback: () => void): void {
+    this.listeners.push(callback);
+  }
+
+  removeListener(callback: () => void): void {
+    this.listeners = this.listeners.filter(listener => listener !== callback);
+  }
+
+  private notifyListeners(): void {
+    this.listeners.forEach(listener => listener());
+  }
+
   getEnabledFields(): QuoteField[] {
+    // Always reload from localStorage to get latest fields
+    this.loadFields();
     return this.fields.filter(field => field.enabled);
   }
 
   getAllFields(): QuoteField[] {
+    this.loadFields();
     return [...this.fields];
   }
 
   updateFields(fields: QuoteField[]): void {
     this.fields = fields;
     localStorage.setItem('quoteFields', JSON.stringify(fields));
+    this.notifyListeners();
   }
 
   getRequiredFields(): QuoteField[] {
+    this.loadFields();
     return this.fields.filter(field => field.enabled && field.required);
   }
 }
