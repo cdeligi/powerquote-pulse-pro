@@ -2,6 +2,11 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { BOMItem, Level1Product, Level2Product, Level3Product, Level3Customization } from '@/types/product';
 import Level2OptionsSelector from './Level2OptionsSelector';
 import ChassisSelector from './ChassisSelector';
@@ -15,6 +20,10 @@ import AnalogCardConfigurator from './AnalogCardConfigurator';
 import BushingCardConfigurator from './BushingCardConfigurator';
 import { productDataService } from '@/services/productDataService';
 import { generateQTMSPartNumber, generateProductPartNumber } from '@/types/product/part-number-utils';
+import { calculateTotalMargin, calculateDiscountedMargin, shouldShowMarginWarning, getMarginColor } from '@/utils/marginCalculations';
+import { settingsService } from '@/services/settingsService';
+import { useToast } from '@/hooks/use-toast';
+import { Send, AlertTriangle } from 'lucide-react';
 
 interface BOMBuilderProps {
   onBOMUpdate: (items: BOMItem[]) => void;
@@ -31,6 +40,16 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
   const [activeTab, setActiveTab] = useState<string>('');
   const [hasRemoteDisplay, setHasRemoteDisplay] = useState<boolean>(false);
   const [configuringCard, setConfiguringCard] = useState<BOMItem | null>(null);
+
+  // Quote submission state
+  const [showQuoteDialog, setShowQuoteDialog] = useState(false);
+  const [requestedDiscount, setRequestedDiscount] = useState<number>(0);
+  const [quoteJustification, setQuoteJustification] = useState('');
+  const [customerName, setCustomerName] = useState('');
+  const [oracleCustomerId, setOracleCustomerId] = useState('');
+  const [sfdcOpportunity, setSfdcOpportunity] = useState('');
+  
+  const { toast } = useToast();
 
   // Get all Level 1 products for dynamic tabs
   const level1Products = productDataService.getLevel1Products().filter(p => p.enabled);
@@ -312,6 +331,61 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
     onBOMUpdate(updatedItems);
   };
 
+  // Calculate current margin for quote submission
+  const currentMargin = calculateTotalMargin(bomItems);
+  const discountedMargin = requestedDiscount > 0 ? calculateDiscountedMargin(bomItems, requestedDiscount) : null;
+
+  const handleSubmitQuote = () => {
+    if (!customerName || !oracleCustomerId || !sfdcOpportunity) {
+      toast({
+        title: "Missing Information",
+        description: "Please fill in all required fields.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (bomItems.length === 0) {
+      toast({
+        title: "Empty BOM",
+        description: "Please add items to your BOM before submitting.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Submit quote for approval
+    const quoteData = {
+      id: `QR-${Date.now()}`,
+      customerName,
+      oracleCustomerId,
+      sfdcOpportunity,
+      bomItems,
+      requestedDiscount,
+      justification: quoteJustification,
+      originalMargin: currentMargin.marginPercentage,
+      discountedMargin: discountedMargin?.discountedMargin || currentMargin.marginPercentage,
+      totalValue: currentMargin.totalRevenue,
+      totalCost: currentMargin.totalCost,
+      grossProfit: discountedMargin?.discountedRevenue ? (discountedMargin.discountedRevenue - currentMargin.totalCost) : currentMargin.grossProfit
+    };
+
+    console.log('Submitting quote for approval:', quoteData);
+
+    toast({
+      title: "Quote Submitted",
+      description: `Quote ${quoteData.id} has been submitted for approval.`,
+    });
+
+    // Reset form
+    setShowQuoteDialog(false);
+    setRequestedDiscount(0);
+    setQuoteJustification('');
+    setCustomerName('');
+    setOracleCustomerId('');
+    setSfdcOpportunity('');
+  };
+
   const renderProductContent = (productId: string) => {
     const product = level1Products.find(p => p.id === productId);
     if (!product) return null;
@@ -466,12 +540,185 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
         )}
       </div>
 
-      <div className="lg:col-span-1">
+      <div className="lg:col-span-1 space-y-6">
         <BOMDisplay
           bomItems={bomItems}
           onUpdateBOM={handleBOMUpdate}
           canSeePrices={canSeePrices}
         />
+
+        {/* Quote Submission Section */}
+        {bomItems.length > 0 && canSeePrices && (
+          <Card className="bg-gray-900 border-gray-800">
+            <CardHeader>
+              <CardTitle className="text-white flex items-center justify-between">
+                Quote Summary
+                <Badge className={`${getMarginColor(currentMargin.marginPercentage)} border-none`}>
+                  {currentMargin.marginPercentage.toFixed(1)}% Margin
+                </Badge>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <div className="text-gray-400">Total Revenue</div>
+                  <div className="text-white font-bold">${currentMargin.totalRevenue.toLocaleString()}</div>
+                </div>
+                <div>
+                  <div className="text-gray-400">Total Cost</div>
+                  <div className="text-white font-bold">${currentMargin.totalCost.toLocaleString()}</div>
+                </div>
+                <div>
+                  <div className="text-gray-400">Gross Profit</div>
+                  <div className="text-green-400 font-bold">${currentMargin.grossProfit.toLocaleString()}</div>
+                </div>
+                <div>
+                  <div className="text-gray-400">Margin %</div>
+                  <div className={`font-bold ${getMarginColor(currentMargin.marginPercentage)}`}>
+                    {currentMargin.marginPercentage.toFixed(1)}%
+                  </div>
+                </div>
+              </div>
+
+              {shouldShowMarginWarning(currentMargin.marginPercentage) && (
+                <div className="p-3 bg-yellow-900/20 border border-yellow-600/20 rounded flex items-center space-x-2">
+                  <AlertTriangle className="h-4 w-4 text-yellow-400" />
+                  <p className="text-yellow-400 text-sm">
+                    Current margin is below {settingsService.getMarginWarningThreshold()}% threshold
+                  </p>
+                </div>
+              )}
+
+              <Dialog open={showQuoteDialog} onOpenChange={setShowQuoteDialog}>
+                <DialogTrigger asChild>
+                  <Button className="w-full bg-red-600 hover:bg-red-700 text-white">
+                    <Send className="mr-2 h-4 w-4" />
+                    Submit for Quote
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="bg-gray-900 border-gray-800 max-w-2xl">
+                  <DialogHeader>
+                    <DialogTitle className="text-white">Submit Quote for Approval</DialogTitle>
+                  </DialogHeader>
+                  
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor="customer-name" className="text-white">Customer Name *</Label>
+                        <Input
+                          id="customer-name"
+                          value={customerName}
+                          onChange={(e) => setCustomerName(e.target.value)}
+                          className="bg-gray-800 border-gray-700 text-white"
+                          placeholder="Pacific Gas & Electric"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="oracle-id" className="text-white">Oracle Customer ID *</Label>
+                        <Input
+                          id="oracle-id"
+                          value={oracleCustomerId}
+                          onChange={(e) => setOracleCustomerId(e.target.value)}
+                          className="bg-gray-800 border-gray-700 text-white"
+                          placeholder="ORG-123456"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <Label htmlFor="sfdc-opportunity" className="text-white">SFDC Opportunity *</Label>
+                      <Input
+                        id="sfdc-opportunity"
+                        value={sfdcOpportunity}
+                        onChange={(e) => setSfdcOpportunity(e.target.value)}
+                        className="bg-gray-800 border-gray-700 text-white"
+                        placeholder="SFDC-789456"
+                      />
+                    </div>
+
+                    <div>
+                      <Label htmlFor="discount-request" className="text-white">
+                        Requested Discount (%) - Optional
+                      </Label>
+                      <Input
+                        id="discount-request"
+                        type="number"
+                        min="0"
+                        max="50"
+                        value={requestedDiscount || ''}
+                        onChange={(e) => setRequestedDiscount(Number(e.target.value))}
+                        className="bg-gray-800 border-gray-700 text-white"
+                        placeholder="0"
+                      />
+                    </div>
+
+                    {requestedDiscount > 0 && discountedMargin && (
+                      <div className="p-3 bg-gray-800 rounded space-y-2">
+                        <div className="text-white font-medium">Discount Impact:</div>
+                        <div className="grid grid-cols-3 gap-4 text-sm">
+                          <div>
+                            <div className="text-gray-400">New Value</div>
+                            <div className="text-white font-bold">${discountedMargin.discountedRevenue.toLocaleString()}</div>
+                          </div>
+                          <div>
+                            <div className="text-gray-400">New Margin</div>
+                            <div className={`font-bold ${getMarginColor(discountedMargin.discountedMargin)}`}>
+                              {discountedMargin.discountedMargin.toFixed(1)}%
+                            </div>
+                          </div>
+                          <div>
+                            <div className="text-gray-400">Discount Amount</div>
+                            <div className="text-red-400 font-bold">-${discountedMargin.discountAmount.toLocaleString()}</div>
+                          </div>
+                        </div>
+                        
+                        {shouldShowMarginWarning(discountedMargin.discountedMargin) && (
+                          <div className="p-2 bg-yellow-900/20 border border-yellow-600/20 rounded flex items-center space-x-2">
+                            <AlertTriangle className="h-4 w-4 text-yellow-400" />
+                            <p className="text-yellow-400 text-xs">
+                              Warning: Requested discount will reduce margin to {discountedMargin.discountedMargin.toFixed(1)}% (below {settingsService.getMarginWarningThreshold()}% threshold)
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    <div>
+                      <Label htmlFor="justification" className="text-white">
+                        Discount Justification {requestedDiscount > 0 ? '*' : '(Optional)'}
+                      </Label>
+                      <Textarea
+                        id="justification"
+                        value={quoteJustification}
+                        onChange={(e) => setQuoteJustification(e.target.value)}
+                        className="bg-gray-800 border-gray-700 text-white"
+                        placeholder="Provide justification for the requested discount..."
+                        rows={3}
+                      />
+                    </div>
+
+                    <div className="flex justify-end space-x-3">
+                      <Button
+                        variant="outline"
+                        onClick={() => setShowQuoteDialog(false)}
+                        className="border-gray-600 text-gray-300"
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        onClick={handleSubmitQuote}
+                        className="bg-red-600 hover:bg-red-700"
+                      >
+                        <Send className="mr-2 h-4 w-4" />
+                        Submit Quote
+                      </Button>
+                    </div>
+                  </div>
+                </DialogContent>
+              </Dialog>
+            </CardContent>
+          </Card>
+        )}
       </div>
     </div>
   );
