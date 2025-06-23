@@ -1,56 +1,48 @@
-
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Settings, Save, Mail, AlertTriangle } from "lucide-react";
+import { Settings, Save, Mail, AlertTriangle, Percent, TrendingUp } from "lucide-react";
+import { settingsService, AppSettings } from "@/services/settingsService";
 
 interface AdminSettingsProps {
-  onSettingsSave?: (settings: AdminSettings) => void;
-}
-
-interface AdminSettings {
-  ordersTeamEmail: string;
-  ccEmails: string[];
-  emailSubjectPrefix: string;
-  marginWarningThreshold: number;
+  onSettingsSave?: (settings: AppSettings) => void;
 }
 
 const AdminSettings = ({ onSettingsSave }: AdminSettingsProps) => {
-  const [ordersTeamEmail, setOrdersTeamEmail] = useState('orders@qualitrolcorp.com');
-  const [ccEmails, setCcEmails] = useState<string[]>(['orders-backup@qualitrolcorp.com']);
+  const [settings, setSettings] = useState<AppSettings>(settingsService.getSettings());
   const [newCcEmail, setNewCcEmail] = useState('');
-  const [emailSubjectPrefix, setEmailSubjectPrefix] = useState('[PowerQuotePro]');
-  const [marginWarningThreshold, setMarginWarningThreshold] = useState(25);
+
+  useEffect(() => {
+    setSettings(settingsService.getSettings());
+  }, []);
 
   const handleAddCcEmail = () => {
-    if (newCcEmail && !ccEmails.includes(newCcEmail)) {
-      setCcEmails([...ccEmails, newCcEmail]);
+    if (newCcEmail && !settings.ccEmails.includes(newCcEmail)) {
+      setSettings(prev => ({
+        ...prev,
+        ccEmails: [...prev.ccEmails, newCcEmail]
+      }));
       setNewCcEmail('');
     }
   };
 
   const handleRemoveCcEmail = (email: string) => {
-    setCcEmails(ccEmails.filter(e => e !== email));
+    setSettings(prev => ({
+      ...prev,
+      ccEmails: prev.ccEmails.filter(e => e !== email)
+    }));
   };
 
   const handleSave = () => {
-    const settings: AdminSettings = {
-      ordersTeamEmail,
-      ccEmails,
-      emailSubjectPrefix,
-      marginWarningThreshold
-    };
-    
-    // Save to localStorage or send to backend
-    localStorage.setItem('adminSettings', JSON.stringify(settings));
+    settingsService.updateSettings(settings);
     
     if (onSettingsSave) {
       onSettingsSave(settings);
     }
     
-    alert('Settings saved successfully!');
+    alert('Settings saved successfully! Margin changes will apply to new quotes and BOM pricing.');
   };
 
   return (
@@ -60,40 +52,120 @@ const AdminSettings = ({ onSettingsSave }: AdminSettingsProps) => {
           System Settings
         </h2>
         <p className="text-gray-400">
-          Configure system-wide settings and email notifications
+          Configure system-wide settings including margin thresholds and pricing
         </p>
       </div>
 
-      {/* Margin Warning Threshold Settings */}
+      {/* Margin & Pricing Configuration */}
       <Card className="bg-gray-900 border-gray-800">
         <CardHeader>
           <CardTitle className="text-white flex items-center">
-            <AlertTriangle className="mr-2 h-5 w-5" />
-            Margin Warning Configuration
+            <TrendingUp className="mr-2 h-5 w-5" />
+            Margin & Pricing Configuration
           </CardTitle>
           <CardDescription className="text-gray-400">
-            Configure when discount warnings should appear in the quote approval process
+            Configure margin thresholds and automatic pricing rules for the system
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          <div>
-            <Label htmlFor="margin-threshold" className="text-white font-medium mb-2 block">
-              Margin Warning Threshold (%) *
-            </Label>
-            <Input
-              id="margin-threshold"
-              type="number"
-              min="0"
-              max="100"
-              value={marginWarningThreshold}
-              onChange={(e) => setMarginWarningThreshold(Number(e.target.value))}
-              className="bg-gray-800 border-gray-600 text-white placeholder:text-gray-400 focus:border-red-500 focus:ring-red-500"
-              placeholder="25"
-            />
-            <p className="text-gray-400 text-sm mt-1">
-              Warning will appear when requested discount reduces margin below this percentage. 
-              Current setting: {marginWarningThreshold}%
-            </p>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div>
+              <Label htmlFor="margin-threshold" className="text-white font-medium mb-2 block">
+                Margin Warning Threshold (%) *
+              </Label>
+              <Input
+                id="margin-threshold"
+                type="number"
+                min="0"
+                max="100"
+                value={settings.marginWarningThreshold}
+                onChange={(e) => setSettings(prev => ({ ...prev, marginWarningThreshold: Number(e.target.value) }))}
+                className="bg-gray-800 border-gray-600 text-white placeholder:text-gray-400 focus:border-red-500 focus:ring-red-500"
+                placeholder="25"
+              />
+              <p className="text-gray-400 text-xs mt-1">
+                Show warnings when discounts reduce margin below this %
+              </p>
+            </div>
+
+            <div>
+              <Label htmlFor="minimum-margin" className="text-white font-medium mb-2 block">
+                Minimum Margin (%) *
+              </Label>
+              <Input
+                id="minimum-margin"
+                type="number"
+                min="0"
+                max="100"
+                value={settings.minimumMargin}
+                onChange={(e) => setSettings(prev => ({ ...prev, minimumMargin: Number(e.target.value) }))}
+                className="bg-gray-800 border-gray-600 text-white placeholder:text-gray-400 focus:border-red-500 focus:ring-red-500"
+                placeholder="25"
+              />
+              <p className="text-gray-400 text-xs mt-1">
+                Absolute minimum margin for all products
+              </p>
+            </div>
+
+            <div>
+              <Label htmlFor="standard-margin" className="text-white font-medium mb-2 block">
+                Standard Margin (%) *
+              </Label>
+              <Input
+                id="standard-margin"
+                type="number"
+                min="0"
+                max="100"
+                value={settings.standardMargin}
+                onChange={(e) => setSettings(prev => ({ ...prev, standardMargin: Number(e.target.value) }))}
+                className="bg-gray-800 border-gray-600 text-white placeholder:text-gray-400 focus:border-red-500 focus:ring-red-500"
+                placeholder="40"
+              />
+              <p className="text-gray-400 text-xs mt-1">
+                Default margin applied to BOM pricing
+              </p>
+            </div>
+          </div>
+
+          {/* Margin Preview */}
+          <div className="bg-gray-800 p-4 rounded border border-blue-600">
+            <div className="flex items-center space-x-2 mb-3">
+              <Percent className="h-4 w-4 text-blue-500" />
+              <span className="text-blue-500 font-medium">Margin Configuration Preview:</span>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+              <div>
+                <p className="text-gray-400">Warning appears at:</p>
+                <p className="text-yellow-400 font-medium">{settings.marginWarningThreshold}% margin</p>
+              </div>
+              <div>
+                <p className="text-gray-400">Minimum allowed:</p>
+                <p className="text-red-400 font-medium">{settings.minimumMargin}% margin</p>
+              </div>
+              <div>
+                <p className="text-gray-400">BOM auto-pricing uses:</p>
+                <p className="text-green-400 font-medium">{settings.standardMargin}% margin</p>
+              </div>
+            </div>
+            
+            {/* Example calculation */}
+            <div className="mt-4 p-3 bg-gray-700 rounded">
+              <p className="text-gray-300 text-sm mb-2">Example: Product with $1,000 cost</p>
+              <div className="text-xs space-y-1">
+                <p className="text-gray-400">
+                  • Standard price: ${settingsService.calculatePriceForMargin(1000, settings.standardMargin).toLocaleString()} 
+                  ({settings.standardMargin}% margin)
+                </p>
+                <p className="text-yellow-400">
+                  • Warning triggers at: ${settingsService.calculatePriceForMargin(1000, settings.marginWarningThreshold).toLocaleString()} 
+                  ({settings.marginWarningThreshold}% margin)
+                </p>
+                <p className="text-red-400">
+                  • Minimum allowed: ${settingsService.calculatePriceForMargin(1000, settings.minimumMargin).toLocaleString()} 
+                  ({settings.minimumMargin}% margin)
+                </p>
+              </div>
+            </div>
           </div>
 
           {/* Preview warning message */}
@@ -103,12 +175,13 @@ const AdminSettings = ({ onSettingsSave }: AdminSettingsProps) => {
               <span className="text-yellow-500 font-medium">Preview Warning Message:</span>
             </div>
             <p className="text-yellow-400 mt-2 text-sm">
-              "Warning: Requested discount will reduce margin to X.X% (below {marginWarningThreshold}% threshold)"
+              "Warning: Requested discount will reduce margin to X.X% (below {settings.marginWarningThreshold}% threshold)"
             </p>
           </div>
         </CardContent>
       </Card>
 
+      {/* Email Configuration */}
       <Card className="bg-gray-900 border-gray-800">
         <CardHeader>
           <CardTitle className="text-white flex items-center">
@@ -128,8 +201,8 @@ const AdminSettings = ({ onSettingsSave }: AdminSettingsProps) => {
             <Input
               id="orders-email"
               type="email"
-              value={ordersTeamEmail}
-              onChange={(e) => setOrdersTeamEmail(e.target.value)}
+              value={settings.ordersTeamEmail}
+              onChange={(e) => setSettings(prev => ({ ...prev, ordersTeamEmail: e.target.value }))}
               className="bg-gray-800 border-gray-600 text-white placeholder:text-gray-400 focus:border-red-500 focus:ring-red-500"
               placeholder="orders@company.com"
             />
@@ -145,7 +218,7 @@ const AdminSettings = ({ onSettingsSave }: AdminSettingsProps) => {
             </Label>
             <div className="space-y-3">
               {/* Existing CC emails */}
-              {ccEmails.map((email, index) => (
+              {settings.ccEmails.map((email, index) => (
                 <div key={index} className="flex items-center space-x-2">
                   <Input
                     value={email}
@@ -193,8 +266,8 @@ const AdminSettings = ({ onSettingsSave }: AdminSettingsProps) => {
             </Label>
             <Input
               id="subject-prefix"
-              value={emailSubjectPrefix}
-              onChange={(e) => setEmailSubjectPrefix(e.target.value)}
+              value={settings.emailSubjectPrefix}
+              onChange={(e) => setSettings(prev => ({ ...prev, emailSubjectPrefix: e.target.value }))}
               className="bg-gray-800 border-gray-600 text-white placeholder:text-gray-400 focus:border-red-500 focus:ring-red-500"
               placeholder="[PowerQuotePro]"
             />
@@ -202,19 +275,19 @@ const AdminSettings = ({ onSettingsSave }: AdminSettingsProps) => {
               Prefix that will be added to all order notification email subjects
             </p>
           </div>
-
-          {/* Save Button */}
-          <div className="pt-4 border-t border-gray-700">
-            <Button
-              onClick={handleSave}
-              className="bg-red-600 hover:bg-red-700 text-white"
-            >
-              <Save className="mr-2 h-4 w-4" />
-              Save Settings
-            </Button>
-          </div>
         </CardContent>
       </Card>
+
+      {/* Save Button */}
+      <div className="pt-4">
+        <Button
+          onClick={handleSave}
+          className="bg-red-600 hover:bg-red-700 text-white"
+        >
+          <Save className="mr-2 h-4 w-4" />
+          Save All Settings
+        </Button>
+      </div>
 
       {/* Email Template Preview */}
       <Card className="bg-gray-900 border-gray-800">
@@ -227,11 +300,11 @@ const AdminSettings = ({ onSettingsSave }: AdminSettingsProps) => {
         <CardContent>
           <div className="bg-gray-800 p-4 rounded font-mono text-sm text-gray-300">
             <div className="space-y-2">
-              <div><strong>To:</strong> {ordersTeamEmail}</div>
-              {ccEmails.length > 0 && (
-                <div><strong>CC:</strong> {ccEmails.join(', ')}</div>
+              <div><strong>To:</strong> {settings.ordersTeamEmail}</div>
+              {settings.ccEmails.length > 0 && (
+                <div><strong>CC:</strong> {settings.ccEmails.join(', ')}</div>
               )}
-              <div><strong>Subject:</strong> {emailSubjectPrefix} New PO Submission - [Customer Name] - [Quote ID]</div>
+              <div><strong>Subject:</strong> {settings.emailSubjectPrefix} New PO Submission - [Customer Name] - [Quote ID]</div>
               <div className="border-t border-gray-600 pt-2 mt-3">
                 <div><strong>Body:</strong></div>
                 <div className="mt-2 text-gray-400">
