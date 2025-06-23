@@ -23,6 +23,7 @@ import {
 import { User as UserType } from "@/types/auth";
 import { useToast } from "@/hooks/use-toast";
 import { quoteFieldsService, QuoteField } from '@/services/quoteFieldsService';
+import { settingsService } from '@/services/settingsService';
 
 // Update the DetailedQuote interface to include BOM items and dynamic fields
 interface DetailedQuote {

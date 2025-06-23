@@ -51,6 +51,9 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
   
   const { toast } = useToast();
 
+  // Get enabled quote fields
+  const enabledQuoteFields = quoteFieldsService.getEnabledFields();
+
   // Get all Level 1 products for dynamic tabs
   const level1Products = productDataService.getLevel1Products().filter(p => p.enabled);
 
