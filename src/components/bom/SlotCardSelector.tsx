@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -183,7 +184,7 @@ const SlotCardSelector = ({
 
       // Special validation for bushing cards
       if (isBushingCard(card as any)) {
-        const validation = validateBushingCardPlacement(slot, chassis, currentSlotAssignments);
+        const validation = validateBushingCardPlacement(chassis, currentSlotAssignments);
         return validation.isValid;
       }
 
@@ -196,7 +197,7 @@ const SlotCardSelector = ({
   // Get validation result for bushing cards to show error messages
   const getBushingValidation = (card: any) => {
     if (isBushingCard(card)) {
-      return validateBushingCardPlacement(slot, chassis, currentSlotAssignments);
+      return validateBushingCardPlacement(chassis, currentSlotAssignments);
     }
     return null;
   };
@@ -217,7 +218,7 @@ const SlotCardSelector = ({
   // Show error message for bushing cards that can't be placed
   const bushingErrorCards = availableCards.filter(card => {
     if (!isBushingCard(card as any)) return false;
-    const validation = validateBushingCardPlacement(slot, chassis, currentSlotAssignments);
+    const validation = validateBushingCardPlacement(chassis, currentSlotAssignments);
     return !validation.isValid;
   });
 
