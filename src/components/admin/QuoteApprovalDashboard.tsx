@@ -66,11 +66,7 @@ interface DetailedQuote {
   quoteFields?: Record<string, string>; // Dynamic quote fields
 }
 
-interface QuoteApprovalDashboardProps {
-  user: UserType;
-}
-
-const QuoteApprovalDashboard = ({ user }: QuoteApprovalDashboardProps) => {
+const QuoteApprovalDashboard = () => {
   const [quotes] = useState<DetailedQuote[]>([
     {
       id: 'QR-2024-001',
