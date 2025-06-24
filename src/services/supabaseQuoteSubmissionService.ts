@@ -88,7 +88,7 @@ class SupabaseQuoteSubmissionService {
         total_cost: quoteData.totalCost,
         original_margin: quoteData.originalMargin,
         discounted_margin: quoteData.discountedMargin,
-        gross_profit: quoteData.grossProfi,
+        gross_profit: quoteData.grossProfit,
         is_rep_involved: quoteData.quoteFields.isRepInvolved === 'Yes',
         discount_justification: quoteData.justification,
         quote_fields: quoteData.quoteFields
@@ -153,7 +153,8 @@ class SupabaseQuoteSubmissionService {
 
       return data.map(quote => ({
         ...quote,
-        status: quote.status as SubmittedQuote['status'], // Type assertion for status
+        status: quote.status as SubmittedQuote['status'],
+        priority: quote.priority as SubmittedQuote['priority'], // Type assertion for priority
         bomItems: quote.bom_items?.map((item: any) => ({
           id: item.id,
           name: item.name,
