@@ -134,7 +134,7 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
       // Add to slot assignments for chassis cards
       setSlotAssignments(prev => ({
         ...prev,
-        [configuringCard.slot!]: configuringCard.product
+        [configuringCard.slot!]: configuringCard.product as Level3Product
       }));
     } else {
       // Add directly to BOM

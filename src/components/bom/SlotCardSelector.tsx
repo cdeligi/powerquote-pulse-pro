@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -207,7 +208,7 @@ const SlotCardSelector = ({ chassis, slot, onCardSelect, onClose, canSeePrices }
                 <CardTitle className="text-white text-lg flex items-center justify-between">
                   {card.name}
                   {needsConfiguration(card) && (
-                    <Settings className="h-4 w-4 text-blue-400" title="Requires Configuration" />
+                    <Settings className="h-4 w-4 text-blue-400" />
                   )}
                 </CardTitle>
                 <CardDescription className="text-gray-400">
