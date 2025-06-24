@@ -7,60 +7,48 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { User, LoginCredentials } from "@/types/auth";
 import { Shield, Zap } from "lucide-react";
 import UserRegistrationForm from "./UserRegistrationForm";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { AlertCircle } from "lucide-react";
 
 interface LoginFormProps {
   onLogin: (user: User) => void;
+  signIn: (email: string, password: string) => Promise<{ error: any }>;
 }
 
-const LoginForm = ({ onLogin }: LoginFormProps) => {
+const LoginForm = ({ onLogin, signIn }: LoginFormProps) => {
   const [credentials, setCredentials] = useState<LoginCredentials>({
     email: '',
     password: ''
   });
   const [isLoading, setIsLoading] = useState(false);
   const [showRegistration, setShowRegistration] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
+    setError(null);
     
-    // Simulate authentication
-    setTimeout(() => {
-      // Demo users for different roles
-      const demoUsers: Record<string, User> = {
-        'sales1@qualitrol.com': {
-          id: '1',
-          name: 'Sarah Johnson',
-          email: 'sales1@qualitrol.com',
-          role: 'level1',
-          department: 'Sales'
-        },
-        'sales2@qualitrol.com': {
-          id: '2',
-          name: 'Mike Chen',
-          email: 'sales2@qualitrol.com',
-          role: 'level2',
-          department: 'Sales'
-        },
-        'admin@qualitrol.com': {
-          id: '3',
-          name: 'Jennifer Martinez',
-          email: 'admin@qualitrol.com',
-          role: 'admin',
-          department: 'Operations'
+    try {
+      const { error } = await signIn(credentials.email, credentials.password);
+      
+      if (error) {
+        console.error('Login error:', error);
+        if (error.message?.includes('Invalid login credentials')) {
+          setError('Invalid email or password. Please check your credentials and try again.');
+        } else if (error.message?.includes('Email not confirmed')) {
+          setError('Please check your email and click the confirmation link before signing in.');
+        } else {
+          setError(error.message || 'An error occurred during sign in. Please try again.');
         }
-      };
-
-      const user = demoUsers[credentials.email] || {
-        id: '1',
-        name: 'Demo User',
-        email: credentials.email,
-        role: 'level1' as const
-      };
-
-      onLogin(user);
+      }
+      // Success will be handled by the auth hook in the parent component
+    } catch (error) {
+      console.error('Unexpected error:', error);
+      setError('An unexpected error occurred. Please try again.');
+    } finally {
       setIsLoading(false);
-    }, 1000);
+    }
   };
 
   const handleRegistrationSubmit = (request: any) => {
@@ -102,6 +90,15 @@ const LoginForm = ({ onLogin }: LoginFormProps) => {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
+            {error && (
+              <Alert className="bg-red-900/20 border-red-600">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription className="text-red-400">
+                  {error}
+                </AlertDescription>
+              </Alert>
+            )}
+            
             <div>
               <Label htmlFor="email" className="text-white">Email</Label>
               <Input
@@ -146,11 +143,10 @@ const LoginForm = ({ onLogin }: LoginFormProps) => {
           </div>
           
           <div className="mt-6 text-sm text-gray-400">
-            <p className="mb-2">Demo Accounts:</p>
+            <p className="mb-2">Admin Account:</p>
             <div className="space-y-1 text-xs">
-              <p>Level 1: sales1@qualitrol.com</p>
-              <p>Level 2: sales2@qualitrol.com</p>
-              <p>Admin: admin@qualitrol.com</p>
+              <p>Email: cdeligi@qualitrolcorp.com</p>
+              <p className="text-gray-500">Use your assigned password</p>
             </div>
           </div>
         </CardContent>

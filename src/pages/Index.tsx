@@ -1,28 +1,34 @@
 
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
 import LoginForm from "@/components/auth/LoginForm";
 import Dashboard from "@/components/dashboard/Dashboard";
-import { User } from "@/types/auth";
+import { useAuth } from "@/hooks/useAuth";
+import { Loader2 } from "lucide-react";
 
 const Index = () => {
-  const [user, setUser] = useState<User | null>(null);
-  const navigate = useNavigate();
+  const { user, loading, signIn, signOut } = useAuth();
 
-  const handleLogin = (userData: User) => {
-    setUser(userData);
-    console.log("User logged in:", userData);
+  const handleLogout = async () => {
+    const { error } = await signOut();
+    if (error) {
+      console.error('Logout error:', error);
+    }
   };
 
-  const handleLogout = () => {
-    setUser(null);
-    console.log("User logged out");
-  };
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-black flex items-center justify-center">
+        <div className="flex items-center space-x-2 text-white">
+          <Loader2 className="h-6 w-6 animate-spin" />
+          <span>Loading...</span>
+        </div>
+      </div>
+    );
+  }
 
   if (!user) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center">
-        <LoginForm onLogin={handleLogin} />
+        <LoginForm onLogin={() => {}} signIn={signIn} />
       </div>
     );
   }
