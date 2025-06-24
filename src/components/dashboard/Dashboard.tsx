@@ -1,43 +1,51 @@
 
 import { useState } from "react";
-import { User } from "@/types/auth";
 import Sidebar from "./Sidebar";
 import DashboardOverview from "./DashboardOverview";
-import BOMBuilder from "../bom/BOMBuilder";
-import QuoteManager from "../quotes/QuoteManager";
-import AdminPanel from "../admin/AdminPanel";
-import { BOMItem } from "@/types/product";
+import BOMBuilder from "@/components/bom/BOMBuilder";
+import QuoteManager from "@/components/quotes/QuoteManager";
+import QuoteAnalyticsDashboard from "./QuoteAnalyticsDashboard";
+import AdminPanel from "@/components/admin/AdminPanel";
+import { useAuth } from "@/hooks/useAuth";
+
+interface User {
+  id: string;
+  name: string;
+  email: string;
+  role: 'level1' | 'level2' | 'admin';
+  department?: string;
+}
 
 interface DashboardProps {
   user: User;
   onLogout: () => void;
 }
 
-type ActiveView = 'overview' | 'bom' | 'quotes' | 'admin';
-
 const Dashboard = ({ user, onLogout }: DashboardProps) => {
-  const [activeView, setActiveView] = useState<ActiveView>('overview');
-  const [bomItems, setBomItems] = useState<BOMItem[]>([]);
+  const [activeView, setActiveView] = useState('overview');
+  const { signOut } = useAuth();
 
-  const handleBOMUpdate = (items: BOMItem[]) => {
-    setBomItems(items);
+  const handleLogout = async () => {
+    await signOut();
+    onLogout();
   };
 
-  const renderContent = () => {
+  const renderActiveView = () => {
     switch (activeView) {
       case 'overview':
         return <DashboardOverview user={user} />;
-      case 'bom':
-        return (
-          <BOMBuilder 
-            onBOMUpdate={handleBOMUpdate}
-            canSeePrices={user.role === 'admin'}
-          />
-        );
-      case 'quotes':
+      case 'bom-builder':
+        return <BOMBuilder user={user} />;
+      case 'quote-manager':
         return <QuoteManager user={user} />;
+      case 'analytics':
+        return user.role === 'level2' || user.role === 'admin' ? 
+          <QuoteAnalyticsDashboard user={user} /> : 
+          <div className="p-6 text-white">Access denied. Level 2 or Admin access required.</div>;
       case 'admin':
-        return user.role === 'admin' ? <AdminPanel user={user} /> : <div className="text-white">Access Denied</div>;
+        return user.role === 'admin' ? 
+          <AdminPanel user={user} /> : 
+          <div className="p-6 text-white">Access denied. Admin access required.</div>;
       default:
         return <DashboardOverview user={user} />;
     }
@@ -46,13 +54,13 @@ const Dashboard = ({ user, onLogout }: DashboardProps) => {
   return (
     <div className="min-h-screen bg-black flex">
       <Sidebar 
-        user={user}
-        activeView={activeView}
+        user={user} 
+        activeView={activeView} 
         onViewChange={setActiveView}
-        onLogout={onLogout}
+        onLogout={handleLogout}
       />
-      <main className="flex-1 ml-64 p-8">
-        {renderContent()}
+      <main className="flex-1 overflow-auto">
+        {renderActiveView()}
       </main>
     </div>
   );

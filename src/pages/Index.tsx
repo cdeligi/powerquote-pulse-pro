@@ -1,30 +1,34 @@
 
-import { useState } from "react";
+import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import LoginForm from "@/components/auth/LoginForm";
+import { useAuth } from "@/hooks/useAuth";
 import Dashboard from "@/components/dashboard/Dashboard";
-import { User } from "@/types/auth";
 
 const Index = () => {
-  const [user, setUser] = useState<User | null>(null);
+  const { user, loading } = useAuth();
   const navigate = useNavigate();
 
-  const handleLogin = (userData: User) => {
-    setUser(userData);
-    console.log("User logged in:", userData);
-  };
+  useEffect(() => {
+    if (!loading && !user) {
+      navigate('/auth');
+    }
+  }, [user, loading, navigate]);
 
   const handleLogout = () => {
-    setUser(null);
-    console.log("User logged out");
+    // Logout is handled by the useAuth hook
+    navigate('/auth');
   };
 
-  if (!user) {
+  if (loading) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center">
-        <LoginForm onLogin={handleLogin} />
+        <div className="text-white">Loading...</div>
       </div>
     );
+  }
+
+  if (!user) {
+    return null; // Will redirect to auth page
   }
 
   return <Dashboard user={user} onLogout={handleLogout} />;
