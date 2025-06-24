@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { 
   Plus, 
   Edit2, 
@@ -16,7 +16,8 @@ import {
   Eye,
   EyeOff,
   AlertCircle,
-  Loader2
+  Loader2,
+  Shield
 } from "lucide-react";
 import { User } from "@/types/auth";
 import { useToast } from "@/hooks/use-toast";
@@ -41,12 +42,39 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
   const [loading, setLoading] = useState(true);
   const [editingField, setEditingField] = useState<QuoteField | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [activeSection, setActiveSection] = useState<string>('all');
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [authLoading, setAuthLoading] = useState(true);
   const { toast } = useToast();
 
   useEffect(() => {
+    checkAuthAndRole();
     fetchQuoteFields();
   }, []);
+
+  const checkAuthAndRole = async () => {
+    try {
+      setAuthLoading(true);
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (session?.user) {
+        setIsAuthenticated(true);
+        
+        // Check if user is admin
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', session.user.id)
+          .single();
+        
+        setIsAdmin(profile?.role === 'admin');
+      }
+    } catch (error) {
+      console.error('Error checking auth:', error);
+    } finally {
+      setAuthLoading(false);
+    }
+  };
 
   const fetchQuoteFields = async () => {
     try {
@@ -106,7 +134,7 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
       console.error('Error creating quote field:', error);
       toast({
         title: "Error",
-        description: "Failed to create quote field",
+        description: error.message || "Failed to create quote field",
         variant: "destructive"
       });
     }
@@ -137,7 +165,7 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
       console.error('Error updating quote field:', error);
       toast({
         title: "Error",
-        description: "Failed to update quote field",
+        description: error.message || "Failed to update quote field",
         variant: "destructive"
       });
     }
@@ -161,7 +189,7 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
       console.error('Error deleting quote field:', error);
       toast({
         title: "Error",
-        description: "Failed to delete quote field",
+        description: error.message || "Failed to delete quote field",
         variant: "destructive"
       });
     }
@@ -184,7 +212,7 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
       console.error('Error toggling field:', error);
       toast({
         title: "Error",
-        description: "Failed to toggle field status",
+        description: error.message || "Failed to toggle field status",
         variant: "destructive"
       });
     }
@@ -217,11 +245,76 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
     setDialogOpen(true);
   };
 
-  if (loading) {
+  if (authLoading || loading) {
     return (
       <div className="flex items-center justify-center h-64">
         <Loader2 className="h-8 w-8 animate-spin text-white" />
-        <span className="ml-2 text-white">Loading quote fields...</span>
+        <span className="ml-2 text-white">Loading...</span>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <div className="space-y-6">
+        <Alert className="bg-red-900/20 border-red-600">
+          <Shield className="h-4 w-4" />
+          <AlertDescription className="text-red-400">
+            You must be logged in to manage quote fields. Please sign in to continue.
+          </AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
+
+  if (!isAdmin) {
+    return (
+      <div className="space-y-6">
+        <Alert className="bg-orange-900/20 border-orange-600">
+          <Shield className="h-4 w-4" />
+          <AlertDescription className="text-orange-400">
+            You need administrator privileges to manage quote fields. Contact your system administrator for access.
+          </AlertDescription>
+        </Alert>
+        
+        {/* Show read-only view for non-admins */}
+        <Card className="bg-gray-900 border-gray-800">
+          <CardHeader>
+            <CardTitle className="text-white">Current Quote Fields (Read-Only)</CardTitle>
+            <CardDescription className="text-gray-400">
+              These are the fields currently configured for quote requests
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {quoteFields.map((field) => (
+                <div key={field.id} className="flex justify-between items-center p-2 bg-gray-800 rounded">
+                  <div>
+                    <span className="text-white">{field.label}</span>
+                    <span className="text-gray-400 ml-2 text-sm">({field.type})</span>
+                  </div>
+                  <div className="flex space-x-2">
+                    {field.required && (
+                      <Badge variant="outline" className="text-xs border-red-500 text-red-400">
+                        Required
+                      </Badge>
+                    )}
+                    <Badge 
+                      variant="outline" 
+                      className={`text-xs ${
+                        field.enabled 
+                          ? "border-green-500 text-green-400" 
+                          : "border-gray-500 text-gray-400"
+                      }`}
+                    >
+                      {field.enabled ? "Enabled" : "Disabled"}
+                    </Badge>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
       </div>
     );
   }

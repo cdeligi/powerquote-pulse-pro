@@ -6,6 +6,8 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { AlertCircle, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 
 interface QuoteField {
@@ -35,7 +37,11 @@ const QuoteFieldsSection = ({ onFieldsChange, initialValues = {} }: QuoteFieldsS
 
   const fetchQuoteFields = async () => {
     try {
-      console.log('Fetching quote fields...');
+      console.log('Fetching enabled quote fields...');
+      setLoading(true);
+      setError(null);
+      
+      // This query will use the "Anyone can view enabled quote fields" policy
       const { data, error } = await supabase
         .from('quote_fields')
         .select('*')
@@ -50,7 +56,7 @@ const QuoteFieldsSection = ({ onFieldsChange, initialValues = {} }: QuoteFieldsS
       console.log('Raw quote fields data:', data);
 
       if (!data || data.length === 0) {
-        console.log('No quote fields found in database');
+        console.log('No enabled quote fields found in database');
         setQuoteFields([]);
         return;
       }
@@ -58,7 +64,7 @@ const QuoteFieldsSection = ({ onFieldsChange, initialValues = {} }: QuoteFieldsS
       const fields = data.map(field => {
         console.log('Processing field:', field);
         
-        // Fix options parsing - handle different data formats
+        // Handle options parsing
         let parsedOptions: string[] | undefined = undefined;
         if (field.options) {
           if (Array.isArray(field.options)) {
@@ -70,13 +76,6 @@ const QuoteFieldsSection = ({ onFieldsChange, initialValues = {} }: QuoteFieldsS
             } catch (parseError) {
               console.error(`Error parsing options for field ${field.id}:`, parseError);
               parsedOptions = undefined;
-            }
-          } else if (typeof field.options === 'object' && field.options !== null) {
-            // Handle case where it's an object - extract values or convert to array
-            if (field.options.hasOwnProperty('options') && Array.isArray(field.options.options)) {
-              parsedOptions = field.options.options;
-            } else {
-              parsedOptions = Object.values(field.options).filter(val => typeof val === 'string') as string[];
             }
           }
         }
@@ -94,10 +93,9 @@ const QuoteFieldsSection = ({ onFieldsChange, initialValues = {} }: QuoteFieldsS
 
       console.log('Processed quote fields:', fields);
       setQuoteFields(fields);
-      setError(null);
     } catch (error) {
       console.error('Error fetching quote fields:', error);
-      setError('Failed to load quote fields');
+      setError('Unable to load quote fields. Please try again later.');
     } finally {
       setLoading(false);
     }
@@ -204,8 +202,11 @@ const QuoteFieldsSection = ({ onFieldsChange, initialValues = {} }: QuoteFieldsS
   if (loading) {
     return (
       <Card className="bg-gray-900 border-gray-800">
-        <CardContent className="py-4">
-          <div className="text-center text-gray-400 text-sm">Loading quote fields...</div>
+        <CardContent className="py-8">
+          <div className="flex items-center justify-center">
+            <Loader2 className="h-6 w-6 animate-spin text-white mr-2" />
+            <span className="text-gray-400 text-sm">Loading quote fields...</span>
+          </div>
         </CardContent>
       </Card>
     );
@@ -215,15 +216,18 @@ const QuoteFieldsSection = ({ onFieldsChange, initialValues = {} }: QuoteFieldsS
     return (
       <Card className="bg-gray-900 border-gray-800">
         <CardContent className="py-4">
-          <div className="text-center text-red-400 text-sm">
-            Error: {error}
-            <button 
-              onClick={fetchQuoteFields}
-              className="ml-2 text-blue-400 hover:text-blue-300 underline"
-            >
-              Retry
-            </button>
-          </div>
+          <Alert className="bg-red-900/20 border-red-600">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription className="text-red-400">
+              {error}
+              <button 
+                onClick={fetchQuoteFields}
+                className="ml-2 text-blue-400 hover:text-blue-300 underline"
+              >
+                Retry
+              </button>
+            </AlertDescription>
+          </Alert>
         </CardContent>
       </Card>
     );
@@ -235,7 +239,7 @@ const QuoteFieldsSection = ({ onFieldsChange, initialValues = {} }: QuoteFieldsS
         <CardHeader className="pb-3">
           <CardTitle className="text-white text-lg">Quote Information</CardTitle>
           <CardDescription className="text-gray-400 text-sm">
-            No quote fields configured. Configure fields in the admin panel.
+            No quote fields are currently enabled. Please contact your administrator to configure quote fields.
           </CardDescription>
         </CardHeader>
       </Card>
