@@ -7,63 +7,120 @@ export interface BushingSlotValidation {
   occupiedSlots: number[];
 }
 
+export interface BushingPlacement {
+  primarySlot: number;
+  secondarySlot: number;
+  shouldClearExisting: boolean;
+  existingSlotsTolear: number[];
+}
+
+export const getBushingSlotConfiguration = (chassisType: string): { allowedPlacements: number[][] } => {
+  switch (chassisType) {
+    case 'LTX':
+      return { allowedPlacements: [[6, 7], [13, 14]] }; // Priority: 6-7, fallback: 13-14
+    case 'MTX':
+      return { allowedPlacements: [[6, 7]] }; // Fixed slots 6-7 only
+    case 'STX':
+      return { allowedPlacements: [[3, 4]] }; // Fixed slots 3-4 only
+    default:
+      return { allowedPlacements: [] };
+  }
+};
+
+export const findOptimalBushingPlacement = (
+  chassis: Level2Product,
+  currentSlotAssignments: Record<number, Level3Product>
+): BushingPlacement | null => {
+  const config = getBushingSlotConfiguration(chassis.type);
+  
+  if (config.allowedPlacements.length === 0) {
+    return null;
+  }
+
+  // Remove any existing bushing cards first
+  const existingBushingSlots = findExistingBushingSlots(currentSlotAssignments);
+  
+  for (const [primarySlot, secondarySlot] of config.allowedPlacements) {
+    const isPrimaryOccupied = currentSlotAssignments[primarySlot] && !isBushingCard(currentSlotAssignments[primarySlot]);
+    const isSecondaryOccupied = currentSlotAssignments[secondarySlot] && !isBushingCard(currentSlotAssignments[secondarySlot]);
+    
+    // If both slots are free (ignoring existing bushing cards), use this placement
+    if (!isPrimaryOccupied && !isSecondaryOccupied) {
+      return {
+        primarySlot,
+        secondarySlot,
+        shouldClearExisting: existingBushingSlots.length > 0,
+        existingSlotsTolear: existingBushingSlots
+      };
+    }
+  }
+
+  // For LTX, if primary placement (6-7) is occupied by non-bushing cards, 
+  // but fallback (13-14) is available, use fallback
+  if (chassis.type === 'LTX' && config.allowedPlacements.length === 2) {
+    const [fallbackPrimary, fallbackSecondary] = config.allowedPlacements[1];
+    const isFallbackPrimaryOccupied = currentSlotAssignments[fallbackPrimary] && !isBushingCard(currentSlotAssignments[fallbackPrimary]);
+    const isFallbackSecondaryOccupied = currentSlotAssignments[fallbackSecondary] && !isBushingCard(currentSlotAssignments[fallbackSecondary]);
+    
+    if (!isFallbackPrimaryOccupied && !isFallbackSecondaryOccupied) {
+      return {
+        primarySlot: fallbackPrimary,
+        secondarySlot: fallbackSecondary,
+        shouldClearExisting: existingBushingSlots.length > 0,
+        existingSlotsTolear: existingBushingSlots
+      };
+    }
+    
+    // If both placements are occupied, clear primary placement (6-7) and use it
+    const [primaryPrimary, primarySecondary] = config.allowedPlacements[0];
+    return {
+      primarySlot: primaryPrimary,
+      secondarySlot: primarySecondary,
+      shouldClearExisting: true,
+      existingSlotsTolear: [...existingBushingSlots, primaryPrimary, primarySecondary]
+    };
+  }
+
+  return null;
+};
+
 export const validateBushingCardPlacement = (
-  slot: number,
   chassis: Level2Product,
   currentSlotAssignments: Record<number, Level3Product>
 ): BushingSlotValidation => {
-  const maxSlots = getMaxSlotsForChassis(chassis.type);
-  const nextSlot = slot + 1;
-
-  // Check if slot is within valid range
-  if (slot < 1 || slot > maxSlots) {
+  const placement = findOptimalBushingPlacement(chassis, currentSlotAssignments);
+  
+  if (!placement) {
     return {
       isValid: false,
-      errorMessage: `Slot ${slot} is not valid for ${chassis.type} chassis`,
-      occupiedSlots: []
-    };
-  }
-
-  // Check if it's the last slot (can't place 2-slot card)
-  if (slot === maxSlots) {
-    return {
-      isValid: false,
-      errorMessage: `Cannot place 2-slot bushing card at slot ${slot} (last slot)`,
-      occupiedSlots: []
-    };
-  }
-
-  // Check chassis-specific positioning rules
-  if (!isBushingSlotAllowedForChassis(slot, chassis.type)) {
-    return {
-      isValid: false,
-      errorMessage: `Slot ${slot} is not allowed for bushing cards in ${chassis.type} chassis`,
-      occupiedSlots: []
-    };
-  }
-
-  // Check if current slot is occupied
-  if (currentSlotAssignments[slot]) {
-    return {
-      isValid: false,
-      errorMessage: `Slot ${slot} is already occupied`,
-      occupiedSlots: []
-    };
-  }
-
-  // Check if next slot is occupied
-  if (currentSlotAssignments[nextSlot]) {
-    return {
-      isValid: false,
-      errorMessage: `Slot ${nextSlot} is already occupied (required for 2-slot bushing card)`,
+      errorMessage: `Bushing cards are not supported for ${chassis.type} chassis`,
       occupiedSlots: []
     };
   }
 
   return {
     isValid: true,
-    occupiedSlots: [slot, nextSlot]
+    occupiedSlots: [placement.primarySlot, placement.secondarySlot]
   };
+};
+
+export const findExistingBushingSlots = (
+  slotAssignments: Record<number, Level3Product>
+): number[] => {
+  const bushingSlots: number[] = [];
+  
+  Object.entries(slotAssignments).forEach(([slotStr, card]) => {
+    const slot = parseInt(slotStr);
+    if (isBushingCard(card)) {
+      bushingSlots.push(slot);
+    }
+  });
+  
+  return bushingSlots;
+};
+
+export const isBushingCard = (card: Level3Product): boolean => {
+  return card.name.toLowerCase().includes('bushing') || card.type === 'bushing';
 };
 
 export const getMaxSlotsForChassis = (chassisType: string): number => {
@@ -75,41 +132,32 @@ export const getMaxSlotsForChassis = (chassisType: string): number => {
   }
 };
 
-export const isBushingSlotAllowedForChassis = (slot: number, chassisType: string): boolean => {
-  switch (chassisType) {
-    case 'LTX':
-      // Slots 1-6, 8-13 (avoiding slot 7 which conflicts with 8, and slot 14 which has no next slot)
-      return (slot >= 1 && slot <= 6) || (slot >= 8 && slot <= 13);
-    case 'MTX':
-      // Slots 1-6 (avoiding slot 7 which has no next slot)
-      return slot >= 1 && slot <= 6;
-    case 'STX':
-      // Slots 1-3 (avoiding slot 4 which has no next slot)
-      return slot >= 1 && slot <= 3;
-    default:
-      return false;
-  }
-};
-
 export const getBushingOccupiedSlots = (
   slotAssignments: Record<number, Level3Product>
 ): Record<number, number[]> => {
   const bushingSlots: Record<number, number[]> = {};
+  const processedSlots = new Set<number>();
   
   Object.entries(slotAssignments).forEach(([slotStr, card]) => {
     const slot = parseInt(slotStr);
-    if (card.name.toLowerCase().includes('bushing')) {
-      // Check if this is the first slot of a bushing card
-      const prevSlot = slot - 1;
-      if (!slotAssignments[prevSlot] || !slotAssignments[prevSlot].name.toLowerCase().includes('bushing')) {
-        bushingSlots[slot] = [slot, slot + 1];
+    if (isBushingCard(card) && !processedSlots.has(slot)) {
+      // Check if this is the primary slot of a bushing card
+      const nextSlot = slot + 1;
+      if (slotAssignments[nextSlot] && isBushingCard(slotAssignments[nextSlot])) {
+        bushingSlots[slot] = [slot, nextSlot];
+        processedSlots.add(slot);
+        processedSlots.add(nextSlot);
+      } else {
+        // Check if this is the secondary slot
+        const prevSlot = slot - 1;
+        if (slotAssignments[prevSlot] && isBushingCard(slotAssignments[prevSlot]) && !processedSlots.has(prevSlot)) {
+          bushingSlots[prevSlot] = [prevSlot, slot];
+          processedSlots.add(prevSlot);
+          processedSlots.add(slot);
+        }
       }
     }
   });
   
   return bushingSlots;
-};
-
-export const isBushingCard = (card: Level3Product): boolean => {
-  return card.name.toLowerCase().includes('bushing') || card.type === 'bushing';
 };

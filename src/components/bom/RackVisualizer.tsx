@@ -32,13 +32,6 @@ const RackVisualizer = ({
     if (slot === 0) return 'bg-blue-600'; // CPU slot (slot 0)
     if (selectedSlot === slot) return 'bg-yellow-600'; // Selected slot
     if (slotAssignments[slot]) return 'bg-green-600'; // Occupied
-    
-    // Check if this slot is the second slot of a bushing card
-    const prevSlot = slot - 1;
-    if (slotAssignments[prevSlot] && isBushingCard(slotAssignments[prevSlot])) {
-      return 'bg-green-600'; // Second slot of bushing card
-    }
-    
     return 'bg-gray-700'; // Empty
   };
 
@@ -46,52 +39,49 @@ const RackVisualizer = ({
     if (slot === 0) return 'CPU';
     if (slotAssignments[slot]) {
       const card = slotAssignments[slot];
+      if (isBushingCard(card)) {
+        // Check if this is the primary slot of the bushing card
+        const isSecondarySlot = Object.values(bushingSlots).some(slots => 
+          slots.includes(slot) && slots[0] !== slot
+        );
+        return isSecondarySlot ? 'B+' : 'B';
+      }
       return card.type.charAt(0).toUpperCase() + card.type.slice(1);
     }
-    
-    // Check if this is the second slot of a bushing card
-    const prevSlot = slot - 1;
-    if (slotAssignments[prevSlot] && isBushingCard(slotAssignments[prevSlot])) {
-      return 'B+'; // Indicates extension of bushing card
-    }
-    
     return `${slot}`;
   };
 
   const getSlotTitle = (slot: number) => {
     if (slot === 0) return 'CPU (Fixed)';
-    if (slotAssignments[slot]) return slotAssignments[slot].name;
-    
-    // Check if this is the second slot of a bushing card
-    const prevSlot = slot - 1;
-    if (slotAssignments[prevSlot] && isBushingCard(slotAssignments[prevSlot])) {
-      return `${slotAssignments[prevSlot].name} (Extension Slot)`;
+    if (slotAssignments[slot]) {
+      const card = slotAssignments[slot];
+      if (isBushingCard(card)) {
+        const isSecondarySlot = Object.values(bushingSlots).some(slots => 
+          slots.includes(slot) && slots[0] !== slot
+        );
+        return isSecondarySlot ? `${card.name} (Extension Slot)` : card.name;
+      }
+      return card.name;
     }
-    
     return `Slot ${slot} - Click to add card`;
   };
 
   const isSlotClickable = (slot: number) => {
     if (slot === 0) return false; // CPU slot not clickable
     
-    // Check if this is the second slot of a bushing card
-    const prevSlot = slot - 1;
-    if (slotAssignments[prevSlot] && isBushingCard(slotAssignments[prevSlot])) {
-      return false; // Second slot of bushing card not clickable
-    }
+    // Check if this is the secondary slot of a bushing card
+    const isSecondaryBushingSlot = Object.values(bushingSlots).some(slots => 
+      slots.includes(slot) && slots[0] !== slot
+    );
     
-    return true;
+    return !isSecondaryBushingSlot;
   };
 
   const handleSlotClear = (slot: number) => {
     const card = slotAssignments[slot];
     if (card && isBushingCard(card)) {
-      // Clear both slots for bushing cards
+      // Clear all bushing cards when any bushing slot is cleared
       onSlotClear(slot);
-      const nextSlot = slot + 1;
-      if (slotAssignments[nextSlot]) {
-        // The onSlotClear in parent should handle clearing both slots
-      }
     } else {
       onSlotClear(slot);
     }
@@ -99,7 +89,12 @@ const RackVisualizer = ({
 
   const renderSlot = (slot: number) => {
     const clickable = isSlotClickable(slot);
-    const isSecondBushingSlot = slot > 0 && slotAssignments[slot - 1] && isBushingCard(slotAssignments[slot - 1]);
+    const isSecondaryBushingSlot = Object.values(bushingSlots).some(slots => 
+      slots.includes(slot) && slots[0] !== slot
+    );
+    const isPrimaryBushingSlot = Object.values(bushingSlots).some(slots => 
+      slots.includes(slot) && slots[0] === slot
+    );
     
     return (
       <div
@@ -110,7 +105,8 @@ const RackVisualizer = ({
           ${getSlotColor(slot)}
           ${clickable ? 'cursor-pointer hover:border-red-600 hover:bg-opacity-80' : 'cursor-not-allowed'}
           ${selectedSlot === slot ? 'ring-2 ring-yellow-400' : ''}
-          ${isSecondBushingSlot ? 'border-l-0 rounded-l-none' : ''}
+          ${isSecondaryBushingSlot ? 'border-l-0 rounded-l-none border-orange-500' : ''}
+          ${isPrimaryBushingSlot ? 'border-r-0 rounded-r-none border-orange-500' : ''}
         `}
         onClick={() => clickable && onSlotClick(slot)}
         title={getSlotTitle(slot)}
@@ -119,7 +115,7 @@ const RackVisualizer = ({
         {getSlotLabel(slot)}
         
         {/* Clear button for occupied slots (only show on primary slot for bushing cards) */}
-        {slot !== 0 && slotAssignments[slot] && !isSecondBushingSlot && (
+        {slot !== 0 && slotAssignments[slot] && !isSecondaryBushingSlot && (
           <Button
             size="sm"
             variant="ghost"
@@ -128,7 +124,7 @@ const RackVisualizer = ({
               e.stopPropagation();
               handleSlotClear(slot);
             }}
-            title="Clear slot"
+            title={isPrimaryBushingSlot ? "Clear all bushing cards" : "Clear slot"}
           >
             <X className="h-3 w-3" />
           </Button>
@@ -192,11 +188,15 @@ const RackVisualizer = ({
           {/* Bushing Card Information */}
           {Object.keys(bushingSlots).length > 0 && (
             <div className="bg-orange-900/20 border border-orange-600 rounded p-3">
-              <h4 className="text-orange-400 font-medium mb-2">Bushing Card Placements:</h4>
+              <h4 className="text-orange-400 font-medium mb-2">Bushing Card Placement:</h4>
               <div className="space-y-1 text-sm">
                 {Object.entries(bushingSlots).map(([slot, occupiedSlots]) => (
                   <div key={slot} className="text-orange-300">
                     Slots {occupiedSlots.join(', ')}: {slotAssignments[parseInt(slot)]?.name}
+                    <br />
+                    <span className="text-xs text-orange-200">
+                      (Only one bushing card allowed per chassis - clearing any slot removes all)
+                    </span>
                   </div>
                 ))}
               </div>
@@ -241,6 +241,10 @@ const RackVisualizer = ({
               <span className="text-sm text-gray-400">Occupied</span>
             </div>
             <div className="flex items-center space-x-2">
+              <div className="w-4 h-4 bg-orange-600 rounded"></div>
+              <span className="text-sm text-gray-400">Bushing Card</span>
+            </div>
+            <div className="flex items-center space-x-2">
               <div className="w-4 h-4 bg-gray-700 rounded"></div>
               <span className="text-sm text-gray-400">Available</span>
             </div>
@@ -251,20 +255,20 @@ const RackVisualizer = ({
             <div className="pt-4 border-t border-gray-700">
               <h4 className="text-white font-medium mb-2">Assigned Cards:</h4>
               <div className="space-y-1">
+                {Object.entries(bushingSlots).map(([slot, slots]) => (
+                  <div key={`bushing-${slot}`} className="flex justify-between text-sm">
+                    <span className="text-gray-400">Slots {slots.join('-')}:</span>
+                    <span className="text-white">{slotAssignments[parseInt(slot)]?.name}</span>
+                  </div>
+                ))}
                 {Object.entries(slotAssignments)
-                  .filter(([slot]) => parseInt(slot) !== 0) // Exclude CPU slot
-                  .map(([slot, card]) => {
-                    const slotNum = parseInt(slot);
-                    const isBushing = isBushingCard(card);
-                    const displaySlots = isBushing ? `${slotNum}-${slotNum + 1}` : slot;
-                    
-                    return (
-                      <div key={slot} className="flex justify-between text-sm">
-                        <span className="text-gray-400">Slot{isBushing ? 's' : ''} {displaySlots}:</span>
-                        <span className="text-white">{card.name}</span>
-                      </div>
-                    );
-                  })}
+                  .filter(([slot, card]) => parseInt(slot) !== 0 && !isBushingCard(card))
+                  .map(([slot, card]) => (
+                    <div key={slot} className="flex justify-between text-sm">
+                      <span className="text-gray-400">Slot {slot}:</span>
+                      <span className="text-white">{card.name}</span>
+                    </div>
+                  ))}
               </div>
             </div>
           )}

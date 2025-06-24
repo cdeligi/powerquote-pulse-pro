@@ -20,6 +20,7 @@ import DiscountSection from './DiscountSection';
 import QuoteSubmissionDialog from './QuoteSubmissionDialog';
 import QTMSConfigurationEditor from './QTMSConfigurationEditor';
 import { consolidateQTMSConfiguration, createQTMSBOMItem, ConsolidatedQTMS } from '@/utils/qtmsConsolidation';
+import { findOptimalBushingPlacement, findExistingBushingSlots, isBushingCard } from '@/utils/bushingValidation';
 
 interface BOMBuilderProps {
   onBOMUpdate: (items: BOMItem[]) => void;
@@ -93,20 +94,69 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
       const updated = { ...prev };
       const card = updated[slot];
       
-      // If it's a bushing card, also clear the next slot
-      if (card && (card.name.toLowerCase().includes('bushing') || card.type === 'bushing')) {
-        const nextSlot = slot + 1;
-        delete updated[nextSlot];
+      // If it's a bushing card, clear ALL bushing cards from the chassis
+      if (card && isBushingCard(card)) {
+        // Find all bushing slots and clear them
+        const bushingSlots = findExistingBushingSlots(updated);
+        bushingSlots.forEach(bushingSlot => {
+          delete updated[bushingSlot];
+        });
+      } else {
+        delete updated[slot];
       }
       
-      delete updated[slot];
       return updated;
     });
   };
 
   const handleCardSelect = (card: Level3Product, slot?: number) => {
+    // Special handling for bushing cards
+    if (isBushingCard(card)) {
+      if (!selectedChassis) return;
+      
+      const placement = findOptimalBushingPlacement(selectedChassis, slotAssignments);
+      if (!placement) {
+        console.error('Cannot place bushing card - no valid placement found');
+        return;
+      }
+
+      // Clear existing cards if needed
+      setSlotAssignments(prev => {
+        const updated = { ...prev };
+        
+        // Clear existing bushing cards
+        if (placement.shouldClearExisting) {
+          placement.existingSlotsTolear.forEach(slotToClear => {
+            delete updated[slotToClear];
+          });
+        }
+        
+        // Place the bushing card in both slots
+        updated[placement.primarySlot] = card;
+        updated[placement.secondarySlot] = card;
+        
+        return updated;
+      });
+
+      // Check if card needs configuration
+      if (card.name.toLowerCase().includes('bushing')) {
+        const newItem: BOMItem = {
+          id: `${Date.now()}-${Math.random()}`,
+          product: card,
+          quantity: 1,
+          slot: placement.primarySlot,
+          enabled: true
+        };
+        setConfiguringCard(newItem);
+        return;
+      }
+
+      setSelectedSlot(null);
+      return;
+    }
+
     // Check if card needs configuration
-    if (card.name.toLowerCase().includes('analog') || card.name.toLowerCase().includes('bushing')) {
+    if (card.name.toLowerCase().includes('analog')) {
       const newItem: BOMItem = {
         id: `${Date.now()}-${Math.random()}`,
         product: card,
