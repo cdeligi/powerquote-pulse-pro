@@ -1,10 +1,9 @@
 
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Level2Product, Level3Product, BOMItem } from '@/types/product';
-import { Plus, X } from 'lucide-react';
+import { Level2Product, BOMItem } from '@/types/product';
+import { Plus, X, AlertTriangle } from 'lucide-react';
 import { productDataService } from '@/services/productDataService';
 
 interface RackVisualizerProps {
@@ -19,7 +18,7 @@ const RackVisualizer = ({ chassis, bomItems, onAddCard, onRemoveCard }: RackVisu
 
   const getSlotConfiguration = () => {
     const config = productDataService.getChassisSlotConfiguration(chassis.id);
-    return config || { totalSlots: 0, usableSlots: 0, layout: 'Unknown', slotNumbers: [] };
+    return config || { totalSlots: 0, usableSlots: 0, layout: 'Unknown', slotNumbers: [], bushingSlots: [] };
   };
 
   const slotConfig = getSlotConfiguration();
@@ -29,11 +28,25 @@ const RackVisualizer = ({ chassis, bomItems, onAddCard, onRemoveCard }: RackVisu
   };
 
   const isSlotUsable = (slotNumber: number) => {
-    // Slot 0 is typically reserved for controller in QTMS systems
+    // Slot 0 is reserved for controller in QTMS systems
     if (slotNumber === 0) return false;
     
     // Check if slot is within usable range
     return slotNumber <= slotConfig.usableSlots;
+  };
+
+  const isSlotAvailableForCard = (slotNumber: number, cardType?: string) => {
+    if (!isSlotUsable(slotNumber)) return false;
+    
+    const occupant = getSlotOccupant(slotNumber);
+    if (occupant) return false;
+    
+    // Check bushing card slot restrictions
+    if (cardType === 'Bushing') {
+      return slotConfig.bushingSlots?.includes(slotNumber) || false;
+    }
+    
+    return true;
   };
 
   const getSlotTypeInfo = (slot: number) => {
@@ -42,7 +55,8 @@ const RackVisualizer = ({ chassis, bomItems, onAddCard, onRemoveCard }: RackVisu
         type: 'Controller',
         color: 'bg-purple-600',
         textColor: 'text-white',
-        description: 'System Controller (Reserved)'
+        description: 'System Controller (Reserved)',
+        isRestricted: true
       };
     }
     
@@ -65,21 +79,26 @@ const RackVisualizer = ({ chassis, bomItems, onAddCard, onRemoveCard }: RackVisu
         type: occupant.product.type,
         color: typeInfo.color,
         textColor: typeInfo.textColor,
-        description: occupant.product.name
+        description: occupant.product.name,
+        isRestricted: false
       };
     }
     
+    // Check if this is a bushing-only slot
+    const isBushingSlot = slotConfig.bushingSlots?.includes(slot);
+    
     return {
       type: 'Empty',
-      color: 'bg-gray-800',
+      color: isBushingSlot ? 'bg-orange-900/30' : 'bg-gray-800',
       textColor: 'text-gray-400',
-      description: 'Empty Slot'
+      description: isBushingSlot ? 'Bushing Slot (Empty)' : 'Empty Slot',
+      isRestricted: isBushingSlot
     };
   };
 
   const renderSlotGrid = () => {
     if (chassis.type === 'LTX') {
-      // LTX: 2-row layout (8-14 top row, 0-7 bottom row)
+      // LTX: 2-row layout (8-14 top row, 0-7 bottom row) - 14 usable cards
       return (
         <div className="space-y-2">
           {/* Top Row (8-14) */}
@@ -92,12 +111,18 @@ const RackVisualizer = ({ chassis, bomItems, onAddCard, onRemoveCard }: RackVisu
           </div>
         </div>
       );
-    } else {
-      // MTX and STX: Single row
-      const maxSlot = chassis.type === 'MTX' ? 7 : 4;
+    } else if (chassis.type === 'MTX') {
+      // MTX: Single row (0-7) - 7 usable cards
       return (
         <div className="flex gap-1 justify-center flex-wrap">
-          {Array.from({ length: maxSlot + 1 }, (_, i) => i).map(slot => renderSlot(slot))}
+          {[0, 1, 2, 3, 4, 5, 6, 7].map(slot => renderSlot(slot))}
+        </div>
+      );
+    } else {
+      // STX: Single row (0-4) - 4 usable cards
+      return (
+        <div className="flex gap-1 justify-center flex-wrap">
+          {[0, 1, 2, 3, 4].map(slot => renderSlot(slot))}
         </div>
       );
     }
@@ -108,6 +133,7 @@ const RackVisualizer = ({ chassis, bomItems, onAddCard, onRemoveCard }: RackVisu
     const isUsable = isSlotUsable(slotNumber);
     const occupant = getSlotOccupant(slotNumber);
     const isSelected = selectedSlot === slotNumber;
+    const isBushingSlot = slotConfig.bushingSlots?.includes(slotNumber);
 
     return (
       <div
@@ -117,6 +143,7 @@ const RackVisualizer = ({ chassis, bomItems, onAddCard, onRemoveCard }: RackVisu
           ${isSelected ? 'border-red-500 shadow-lg shadow-red-500/20' : 'border-gray-600'}
           ${slotInfo.color} ${slotInfo.textColor}
           ${!isUsable ? 'opacity-60' : 'hover:shadow-md'}
+          ${isBushingSlot && !occupant ? 'border-orange-400 border-dashed' : ''}
         `}
         onClick={() => {
           if (isUsable && !occupant) {
@@ -124,16 +151,24 @@ const RackVisualizer = ({ chassis, bomItems, onAddCard, onRemoveCard }: RackVisu
             onAddCard(slotNumber);
           }
         }}
+        title={slotInfo.description}
       >
         {/* Slot Number */}
         <div className="absolute top-1 left-1 text-xs font-bold bg-black/20 px-1 rounded">
           {slotNumber}
         </div>
 
+        {/* Bushing Slot Indicator */}
+        {isBushingSlot && !occupant && (
+          <div className="absolute top-1 right-1">
+            <AlertTriangle className="w-3 h-3 text-orange-400" />
+          </div>
+        )}
+
         {/* Remove Button */}
         {occupant && (
           <button
-            className="absolute top-1 right-1 w-4 h-4 bg-red-500 hover:bg-red-600 rounded-full flex items-center justify-center text-white text-xs"
+            className="absolute top-1 right-1 w-4 h-4 bg-red-500 hover:bg-red-600 rounded-full flex items-center justify-center text-white text-xs z-10"
             onClick={(e) => {
               e.stopPropagation();
               onRemoveCard(occupant.id);
@@ -155,7 +190,12 @@ const RackVisualizer = ({ chassis, bomItems, onAddCard, onRemoveCard }: RackVisu
               </div>
             </>
           ) : isUsable ? (
-            <Plus className="w-6 h-6 opacity-60" />
+            <div className="flex flex-col items-center">
+              <Plus className="w-4 h-4 opacity-60" />
+              {isBushingSlot && (
+                <div className="text-xs mt-1">BUSH</div>
+              )}
+            </div>
           ) : (
             <div className="text-xs">
               {slotNumber === 0 ? 'CTRL' : 'N/A'}
@@ -163,7 +203,7 @@ const RackVisualizer = ({ chassis, bomItems, onAddCard, onRemoveCard }: RackVisu
           )}
         </div>
 
-        {/* Slot requirement indicator for double-wide cards */}
+        {/* Double-wide card indicator */}
         {occupant && 'specifications' in occupant.product && occupant.product.specifications?.slotRequirement === 2 && (
           <div className="absolute -right-4 top-0 w-4 h-full bg-gray-700 rounded-r-lg border-l-2 border-gray-600">
             <div className="flex items-center justify-center h-full text-xs text-gray-400 transform rotate-90">
@@ -187,7 +227,7 @@ const RackVisualizer = ({ chassis, bomItems, onAddCard, onRemoveCard }: RackVisu
               </Badge>
             </CardTitle>
             <p className="text-gray-400 text-sm mt-1">
-              {slotConfig.layout} • {slotConfig.usableSlots} usable slots
+              {slotConfig.layout} • {slotConfig.usableSlots} usable card slots
             </p>
           </div>
         </div>
@@ -199,59 +239,73 @@ const RackVisualizer = ({ chassis, bomItems, onAddCard, onRemoveCard }: RackVisu
           {renderSlotGrid()}
         </div>
 
-        {/* Legend */}
-        <div className="space-y-3">
-          <h4 className="text-white font-medium">Card Types</h4>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
-            <div className="flex items-center space-x-2">
-              <div className="w-3 h-3 bg-red-500 rounded"></div>
-              <span className="text-gray-300">Relay</span>
-            </div>
-            <div className="flex items-center space-x-2">
-              <div className="w-3 h-3 bg-blue-500 rounded"></div>
-              <span className="text-gray-300">Analog</span>
-            </div>
-            <div className="flex items-center space-x-2">
-              <div className="w-3 h-3 bg-green-500 rounded"></div>
-              <span className="text-gray-300">Fiber</span>
-            </div>
-            <div className="flex items-center space-x-2">
-              <div className="w-3 h-3 bg-yellow-500 rounded"></div>
-              <span className="text-gray-300">Display</span>
-            </div>
-            <div className="flex items-center space-x-2">
-              <div className="w-3 h-3 bg-indigo-500 rounded"></div>
-              <span className="text-gray-300">Digital</span>
-            </div>
-            <div className="flex items-center space-x-2">
-              <div className="w-3 h-3 bg-pink-500 rounded"></div>
-              <span className="text-gray-300">Comm</span>
-            </div>
-            <div className="flex items-center space-x-2">
-              <div className="w-3 h-3 bg-orange-500 rounded"></div>
-              <span className="text-gray-300">Bushing</span>
-            </div>
-            <div className="flex items-center space-x-2">
-              <div className="w-3 h-3 bg-purple-600 rounded"></div>
-              <span className="text-gray-300">Controller</span>
+        {/* Legend and Information */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Card Type Legend */}
+          <div className="space-y-3">
+            <h4 className="text-white font-medium">Card Types</h4>
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <div className="flex items-center space-x-2">
+                <div className="w-3 h-3 bg-red-500 rounded"></div>
+                <span className="text-gray-300">Relay</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <div className="w-3 h-3 bg-blue-500 rounded"></div>
+                <span className="text-gray-300">Analog</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <div className="w-3 h-3 bg-green-500 rounded"></div>
+                <span className="text-gray-300">Fiber</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <div className="w-3 h-3 bg-yellow-500 rounded"></div>
+                <span className="text-gray-300">Display</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <div className="w-3 h-3 bg-indigo-500 rounded"></div>
+                <span className="text-gray-300">Digital</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <div className="w-3 h-3 bg-pink-500 rounded"></div>
+                <span className="text-gray-300">Comm</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <div className="w-3 h-3 bg-orange-500 rounded"></div>
+                <span className="text-gray-300">Bushing</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <div className="w-3 h-3 bg-purple-600 rounded"></div>
+                <span className="text-gray-300">Controller</span>
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* Configuration Summary */}
-        <div className="bg-gray-800/30 p-4 rounded-lg">
-          <div className="grid grid-cols-2 gap-4 text-sm">
-            <div>
-              <span className="text-gray-400">Occupied Slots:</span>
-              <span className="text-white font-medium ml-2">
-                {bomItems.filter(item => item.slot).length} / {slotConfig.usableSlots}
-              </span>
-            </div>
-            <div>
-              <span className="text-gray-400">Available Slots:</span>
-              <span className="text-white font-medium ml-2">
-                {slotConfig.usableSlots - bomItems.filter(item => item.slot).length}
-              </span>
+          {/* Slot Information */}
+          <div className="space-y-3">
+            <h4 className="text-white font-medium">Slot Information</h4>
+            <div className="space-y-2 text-sm">
+              <div className="flex items-center space-x-2">
+                <div className="w-3 h-3 border border-orange-400 border-dashed rounded bg-orange-900/30"></div>
+                <span className="text-gray-300">Bushing Card Slots</span>
+              </div>
+              <div>
+                <span className="text-gray-400">Bushing Slots:</span>
+                <span className="text-white font-medium ml-2">
+                  {slotConfig.bushingSlots?.join(', ') || 'None'}
+                </span>
+              </div>
+              <div>
+                <span className="text-gray-400">Occupied:</span>
+                <span className="text-white font-medium ml-2">
+                  {bomItems.filter(item => item.slot).length} / {slotConfig.usableSlots}
+                </span>
+              </div>
+              <div>
+                <span className="text-gray-400">Available:</span>
+                <span className="text-white font-medium ml-2">
+                  {slotConfig.usableSlots - bomItems.filter(item => item.slot).length}
+                </span>
+              </div>
             </div>
           </div>
         </div>

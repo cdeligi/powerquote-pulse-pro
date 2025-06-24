@@ -49,7 +49,7 @@ const DEFAULT_LEVEL1_PRODUCTS: Level1Product[] = [
   {
     id: 'qpdm',
     name: 'QPDM',
-    type: 'Monitoring Systems',
+    type: 'PD Couplers',
     category: 'PD Couplers',
     description: 'Qualitrol Partial Discharge Monitoring couplers for continuous online monitoring of partial discharge activity.',
     price: 5000,
@@ -98,7 +98,7 @@ const DEFAULT_LEVEL1_PRODUCTS: Level1Product[] = [
 ];
 
 const DEFAULT_LEVEL2_PRODUCTS: Level2Product[] = [
-  // QTMS Chassis Variants
+  // QTMS Chassis Variants - Fixed slot counts
   {
     id: 'qtms-ltx-chassis',
     name: 'QTMS LTX Chassis',
@@ -260,6 +260,75 @@ const DEFAULT_LEVEL2_PRODUCTS: Level2Product[] = [
     cost: 840,
     enabled: true,
     partNumber: 'QPDM-HV-001'
+  },
+  // TM8 Temperature Monitoring Options
+  {
+    id: 'tm8-basic-kit',
+    name: 'TM8 Basic Sensor Kit',
+    parentProductId: 'tm8',
+    type: 'Sensor Kit',
+    description: 'Basic 8-channel temperature sensor kit with standard RTDs',
+    price: 1200,
+    cost: 800,
+    enabled: true,
+    partNumber: 'TM8-BASIC-KIT'
+  },
+  {
+    id: 'tm8-premium-kit',
+    name: 'TM8 Premium Sensor Kit',
+    parentProductId: 'tm8',
+    type: 'Sensor Kit',
+    description: 'Premium 8-channel temperature sensor kit with high precision RTDs',
+    price: 1800,
+    cost: 1200,
+    enabled: true,
+    partNumber: 'TM8-PREMIUM-KIT'
+  },
+  // TM3 Temperature Monitoring Options
+  {
+    id: 'tm3-basic-kit',
+    name: 'TM3 Basic Sensor Kit',
+    parentProductId: 'tm3',
+    type: 'Sensor Kit',
+    description: 'Basic 3-channel temperature sensor kit',
+    price: 600,
+    cost: 400,
+    enabled: true,
+    partNumber: 'TM3-BASIC-KIT'
+  },
+  {
+    id: 'tm3-advanced-kit',
+    name: 'TM3 Advanced Sensor Kit',
+    parentProductId: 'tm3',
+    type: 'Sensor Kit',
+    description: 'Advanced 3-channel temperature sensor kit with wireless options',
+    price: 900,
+    cost: 600,
+    enabled: true,
+    partNumber: 'TM3-ADV-KIT'
+  },
+  // TM1 Temperature Monitoring Options
+  {
+    id: 'tm1-standard',
+    name: 'TM1 Standard Configuration',
+    parentProductId: 'tm1',
+    type: 'Standard',
+    description: 'Single channel oil temperature monitoring with basic RTD',
+    price: 400,
+    cost: 280,
+    enabled: true,
+    partNumber: 'TM1-STD-001'
+  },
+  {
+    id: 'tm1-wireless',
+    name: 'TM1 Wireless Configuration',
+    parentProductId: 'tm1',
+    type: 'Wireless',
+    description: 'Single channel wireless oil temperature monitoring',
+    price: 650,
+    cost: 450,
+    enabled: true,
+    partNumber: 'TM1-WIRELESS-001'
   }
 ];
 
@@ -301,7 +370,7 @@ const DEFAULT_LEVEL3_PRODUCTS: Level3Product[] = [
       compatibleChassis: ['LTX', 'MTX']
     }
   },
-  // Analog Input Cards
+  // Analog Input Cards with configuration options
   {
     id: 'analog-input-4ch',
     name: '4-Channel Analog Input Card',
@@ -317,6 +386,7 @@ const DEFAULT_LEVEL3_PRODUCTS: Level3Product[] = [
       inputRange: '0-10V / 4-20mA',
       resolution: '16-bit',
       sensorTypes: ['Temperature', 'Pressure', 'Flow', 'Level'],
+      inputConfigurations: ['4x Voltage', '4x Current', '2x Voltage + 2x Current', 'Mixed'],
       slotRequirement: 1,
       compatibleChassis: ['LTX', 'MTX', 'STX']
     }
@@ -336,108 +406,147 @@ const DEFAULT_LEVEL3_PRODUCTS: Level3Product[] = [
       inputRange: '0-10V / 4-20mA',
       resolution: '16-bit',
       sensorTypes: ['Temperature', 'Pressure', 'Flow', 'Level'],
+      inputConfigurations: ['8x Voltage', '8x Current', '4x Voltage + 4x Current', 'Mixed'],
       slotRequirement: 1,
       compatibleChassis: ['LTX', 'MTX', 'STX']
     }
   },
-  // Fiber Optic Cards
+  // Hot Spot Fiber Cards with input options
   {
-    id: 'fiber-optic-single',
-    name: 'Single-Mode Fiber Optic Card',
+    id: 'hotspot-fiber-4ch',
+    name: 'Hot Spot Fiber 4-Channel',
     parentProductId: 'qtms-ltx-chassis',
     type: 'Fiber',
-    description: 'Single-mode fiber optic communication card for long-distance connectivity',
-    price: 1200,
-    cost: 900,
+    description: '4-channel fiber optic hot spot temperature monitoring',
+    price: 2200,
+    cost: 1600,
     enabled: true,
-    partNumber: 'QTMS-FIBER-SM',
+    partNumber: 'QTMS-HOTSPOT-4CH',
     specifications: {
-      mode: 'Single-mode',
-      wavelength: '1310/1550 nm',
-      distance: '40 km',
-      connectorType: 'LC',
-      ports: 2,
+      channels: 4,
+      sensorType: 'Fiber Optic',
+      temperature: '-40°C to +200°C',
+      accuracy: '±1°C',
       slotRequirement: 1,
       compatibleChassis: ['LTX', 'MTX', 'STX']
     }
   },
   {
-    id: 'fiber-optic-multi',
-    name: 'Multi-Mode Fiber Optic Card',
+    id: 'hotspot-fiber-6ch',
+    name: 'Hot Spot Fiber 6-Channel',
     parentProductId: 'qtms-ltx-chassis',
     type: 'Fiber',
-    description: 'Multi-mode fiber optic communication card for short-distance connectivity',
-    price: 900,
-    cost: 650,
+    description: '6-channel fiber optic hot spot temperature monitoring',
+    price: 2800,
+    cost: 2000,
     enabled: true,
-    partNumber: 'QTMS-FIBER-MM',
+    partNumber: 'QTMS-HOTSPOT-6CH',
     specifications: {
-      mode: 'Multi-mode',
-      wavelength: '850/1300 nm',
-      distance: '2 km',
-      connectorType: 'SC',
-      ports: 2,
+      channels: 6,
+      sensorType: 'Fiber Optic',
+      temperature: '-40°C to +200°C',
+      accuracy: '±1°C',
       slotRequirement: 1,
       compatibleChassis: ['LTX', 'MTX', 'STX']
     }
   },
-  // Display Cards
   {
-    id: 'display-touchscreen-7inch',
-    name: '7-inch Touchscreen Display',
+    id: 'hotspot-fiber-8ch',
+    name: 'Hot Spot Fiber 8-Channel',
+    parentProductId: 'qtms-ltx-chassis',
+    type: 'Fiber',
+    description: '8-channel fiber optic hot spot temperature monitoring',
+    price: 3200,
+    cost: 2300,
+    enabled: true,
+    partNumber: 'QTMS-HOTSPOT-8CH',
+    specifications: {
+      channels: 8,
+      sensorType: 'Fiber Optic',
+      temperature: '-40°C to +200°C',
+      accuracy: '±1°C',
+      slotRequirement: 2,
+      compatibleChassis: ['LTX', 'MTX']
+    }
+  },
+  // Display Cards - Local and Remote
+  {
+    id: 'display-local-7inch',
+    name: '7-inch Local Display Card',
     parentProductId: 'qtms-ltx-chassis',
     type: 'Display',
     description: '7-inch color touchscreen display for local system interface',
     price: 1500,
     cost: 1100,
     enabled: true,
-    partNumber: 'QTMS-DISPLAY-7T',
+    partNumber: 'QTMS-DISPLAY-LOCAL-7',
     specifications: {
       size: '7 inch',
       resolution: '1024x600',
       touchType: 'Capacitive',
       colors: '16.7M',
+      mounting: 'Card Slot',
       slotRequirement: 2,
       compatibleChassis: ['LTX', 'MTX']
     }
   },
   {
-    id: 'display-lcd-4inch',
-    name: '4-inch LCD Display',
+    id: 'display-remote-interface',
+    name: 'Remote Display Interface Card',
     parentProductId: 'qtms-ltx-chassis',
     type: 'Display',
-    description: '4-inch LCD display with button interface for basic local access',
-    price: 800,
-    cost: 600,
+    description: 'Interface card for remote display connection',
+    price: 600,
+    cost: 400,
     enabled: true,
-    partNumber: 'QTMS-DISPLAY-4L',
+    partNumber: 'QTMS-DISPLAY-REMOTE',
     specifications: {
-      size: '4 inch',
-      resolution: '480x320',
-      touchType: 'Button Interface',
-      colors: 'Monochrome',
+      connection: 'Ethernet/RS485',
+      distance: 'Up to 1000m',
+      displays: 'Up to 4 remote displays',
       slotRequirement: 1,
       compatibleChassis: ['LTX', 'MTX', 'STX']
     }
   },
-  // Digital Input Cards
+  // Bushing Monitoring Cards - Specific slot restrictions
   {
-    id: 'digital-input-16ch',
-    name: '16-Channel Digital Input Card',
+    id: 'bushing-monitor-3ch',
+    name: '3-Channel Bushing Monitor Card',
     parentProductId: 'qtms-ltx-chassis',
-    type: 'Digital',
-    description: '16-channel digital input card for dry contact monitoring',
-    price: 600,
-    cost: 400,
+    type: 'Bushing',
+    description: '3-channel bushing monitoring card for power factor and capacitance measurement',
+    price: 1800,
+    cost: 1300,
     enabled: true,
-    partNumber: 'QTMS-DIGITAL-16CH',
+    partNumber: 'QTMS-BUSHING-3CH',
     specifications: {
-      channels: 16,
-      voltage: '24V DC',
-      inputType: 'Dry Contact / Wet Contact',
-      isolation: 'Optically Isolated',
+      channels: 3,
+      measurements: ['Power Factor', 'Capacitance', 'Temperature'],
+      frequency: '50/60 Hz',
+      accuracy: '±0.1%',
       slotRequirement: 1,
+      restrictedSlots: [1, 2, 3], // Can only go in specific slots
       compatibleChassis: ['LTX', 'MTX', 'STX']
+    }
+  },
+  {
+    id: 'bushing-monitor-6ch',
+    name: '6-Channel Bushing Monitor Card',
+    parentProductId: 'qtms-ltx-chassis',
+    type: 'Bushing',
+    description: '6-channel bushing monitoring card for power factor and capacitance measurement',
+    price: 2200,
+    cost: 1600,
+    enabled: true,
+    partNumber: 'QTMS-BUSHING-6CH',
+    specifications: {
+      channels: 6,
+      measurements: ['Power Factor', 'Capacitance', 'Temperature'],
+      frequency: '50/60 Hz',
+      accuracy: '±0.1%',
+      slotRequirement: 2,
+      restrictedSlots: [1, 2, 3, 4], // Can only go in specific slots
+      compatibleChassis: ['LTX', 'MTX']
     }
   },
   // Communication Cards
@@ -479,25 +588,73 @@ const DEFAULT_LEVEL3_PRODUCTS: Level3Product[] = [
       compatibleChassis: ['LTX', 'MTX', 'STX']
     }
   },
-  // Bushing Monitoring Cards
+  // QPDM Level 3 Accessories
   {
-    id: 'bushing-monitor-6ch',
-    name: '6-Channel Bushing Monitor Card',
-    parentProductId: 'qtms-ltx-chassis',
-    type: 'Bushing',
-    description: '6-channel bushing monitoring card for power factor and capacitance measurement',
-    price: 2200,
-    cost: 1600,
+    id: 'qpdm-ic43',
+    name: 'IC43 Interface Cable',
+    parentProductId: 'qpdm-standard',
+    type: 'Accessory',
+    description: '43-meter interface cable for QPDM coupler connection',
+    price: 150,
+    cost: 100,
     enabled: true,
-    partNumber: 'QTMS-BUSHING-6CH',
-    specifications: {
-      channels: 6,
-      measurements: ['Power Factor', 'Capacitance', 'Temperature'],
-      frequency: '50/60 Hz',
-      accuracy: '±0.1%',
-      slotRequirement: 2,
-      compatibleChassis: ['LTX', 'MTX']
-    }
+    partNumber: 'QPDM-IC43'
+  },
+  {
+    id: 'qpdm-ic44',
+    name: 'IC44 Interface Cable',
+    parentProductId: 'qpdm-standard',
+    type: 'Accessory',
+    description: '44-meter interface cable for QPDM coupler connection',
+    price: 160,
+    cost: 110,
+    enabled: true,
+    partNumber: 'QPDM-IC44'
+  },
+  {
+    id: 'qpdm-drain-dn25',
+    name: 'Drain Coupler DN25',
+    parentProductId: 'qpdm-standard',
+    type: 'Accessory',
+    description: 'DN25 drain type coupler for transformer valve connection',
+    price: 200,
+    cost: 140,
+    enabled: true,
+    partNumber: 'QPDM-DRAIN-DN25'
+  },
+  {
+    id: 'qpdm-drain-dn50',
+    name: 'Drain Coupler DN50',
+    parentProductId: 'qpdm-standard',
+    type: 'Accessory',
+    description: 'DN50 drain type coupler for large transformer valve connection',
+    price: 250,
+    cost: 175,
+    enabled: true,
+    partNumber: 'QPDM-DRAIN-DN50'
+  },
+  // TM8 Level 3 Options
+  {
+    id: 'tm8-calibration-kit',
+    name: 'TM8 Calibration Kit',
+    parentProductId: 'tm8-basic-kit',
+    type: 'Calibration',
+    description: 'Calibration kit for TM8 temperature monitoring system',
+    price: 300,
+    cost: 200,
+    enabled: true,
+    partNumber: 'TM8-CAL-KIT'
+  },
+  {
+    id: 'tm8-wireless-module',
+    name: 'TM8 Wireless Communication Module',
+    parentProductId: 'tm8-basic-kit',
+    type: 'Communication',
+    description: 'Wireless communication module for TM8 system',
+    price: 450,
+    cost: 300,
+    enabled: true,
+    partNumber: 'TM8-WIRELESS'
   }
 ];
 
@@ -678,7 +835,7 @@ class ProductDataService {
     return false;
   }
 
-  // Helper method to get chassis slot configuration
+  // Helper method to get chassis slot configuration - FIXED
   getChassisSlotConfiguration(chassisId: string) {
     const chassis = this.level2Products.find(p => p.id === chassisId);
     if (!chassis || chassis.parentProductId !== 'qtms') {
@@ -688,25 +845,49 @@ class ProductDataService {
     const config = {
       'LTX': { 
         totalSlots: 15, 
-        usableSlots: 14, 
+        usableSlots: 14, // Fixed: 14 cards not 15
         layout: 'Two-row: Bottom (0-7), Top (8-14)',
-        slotNumbers: Array.from({length: 15}, (_, i) => i)
+        slotNumbers: Array.from({length: 15}, (_, i) => i),
+        bushingSlots: [1, 2, 3, 4] // Specific slots for bushing cards
       },
       'MTX': { 
         totalSlots: 8, 
-        usableSlots: 7, 
+        usableSlots: 7, // Fixed: 7 cards not 8
         layout: 'Single-row: (0-7)',
-        slotNumbers: Array.from({length: 8}, (_, i) => i)
+        slotNumbers: Array.from({length: 8}, (_, i) => i),
+        bushingSlots: [1, 2, 3] // Specific slots for bushing cards
       },
       'STX': { 
         totalSlots: 5, 
-        usableSlots: 4, 
+        usableSlots: 4, // Fixed: 4 cards not 5
         layout: 'Single-row: (0-4)',
-        slotNumbers: Array.from({length: 5}, (_, i) => i)
+        slotNumbers: Array.from({length: 5}, (_, i) => i),
+        bushingSlots: [1, 2] // Specific slots for bushing cards
       }
     };
 
     return config[chassis.type as keyof typeof config] || null;
+  }
+
+  // Check if card can go in specific slot (for bushing cards)
+  canCardGoInSlot(cardId: string, chassisId: string, slotNumber: number): boolean {
+    const card = this.level3Products.find(p => p.id === cardId);
+    const chassisConfig = this.getChassisSlotConfiguration(chassisId);
+    
+    if (!card || !chassisConfig) return false;
+    
+    // Slot 0 is always reserved for controller
+    if (slotNumber === 0) return false;
+    
+    // Check if slot is within usable range
+    if (slotNumber > chassisConfig.usableSlots) return false;
+    
+    // Check bushing card restrictions
+    if (card.type === 'Bushing' && card.specifications?.restrictedSlots) {
+      return card.specifications.restrictedSlots.includes(slotNumber);
+    }
+    
+    return true;
   }
 
   private initializeDefaultData() {

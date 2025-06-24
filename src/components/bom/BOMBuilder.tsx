@@ -8,12 +8,12 @@ import Level2OptionsSelector from './Level2OptionsSelector';
 import ChassisSelector from './ChassisSelector';
 import CardLibrary from './CardLibrary';
 import RackVisualizer from './RackVisualizer';
-import BOMQuoteBuilder from './BOMQuoteBuilder';
+import BOMQuoteBuilder from './B'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Package, FileText, ArrowLeft, Plus } from 'lucide-react';
+import { Package, ArrowLeft } from 'lucide-react';
 
 interface BOMBuilderProps {
   onBOMUpdate: (items: BOMItem[]) => void;
@@ -31,6 +31,9 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
     setSelectedLevel1Product(product);
     setSelectedLevel2Options([]);
     setSelectedChassis(null);
+    
+    // Reset BOM when changing Level 1 product
+    setBomItems([]);
     
     // For QTMS, go to chassis selection; for others, go to Level 2 options
     if (product.id === 'qtms') {
@@ -63,9 +66,14 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
 
   const handleChassisSelect = (chassis: Level2Product) => {
     setSelectedChassis(chassis);
-    // Add chassis to BOM if not already added
-    const exists = bomItems.some(item => item.product.id === chassis.id);
-    if (!exists) {
+    
+    // Remove any existing chassis from BOM and add new one
+    setBomItems(prev => {
+      const nonChassisItems = prev.filter(item => 
+        !('parentProductId' in item.product) || 
+        item.product.parentProductId !== 'qtms'
+      );
+      
       const newBOMItem: BOMItem = {
         id: uuidv4(),
         product: chassis,
@@ -73,8 +81,10 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
         partNumber: chassis.partNumber || '',
         enabled: true
       };
-      setBomItems(prev => [...prev, newBOMItem]);
-    }
+      
+      return [...nonChassisItems, newBOMItem];
+    });
+    
     setCurrentStep('cards');
   };
 
@@ -112,6 +122,7 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
     setSelectedLevel1Product(null);
     setSelectedLevel2Options([]);
     setSelectedChassis(null);
+    setBomItems([]);
     setCurrentStep('level1');
   };
 
@@ -125,9 +136,9 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
-      <div className="container mx-auto px-6 py-8 space-y-8">
+      <div className="container mx-auto px-6 py-8">
         {/* Header Section */}
-        <div className="text-center space-y-4">
+        <div className="text-center space-y-4 mb-8">
           <div className="flex items-center justify-center space-x-3">
             <Package className="h-10 w-10 text-red-500" />
             <h1 className="text-4xl font-bold bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent">
@@ -161,12 +172,12 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
           </div>
         </div>
 
-        <Separator className="bg-gray-700" />
+        <Separator className="bg-gray-700 mb-8" />
 
-        {/* Main Configuration Section */}
-        <div className="grid grid-cols-1 xl:grid-cols-4 gap-8">
-          {/* Left Column - Product Configuration */}
-          <div className="xl:col-span-3 space-y-8">
+        {/* Main Layout - Fixed layout with proper right sidebar */}
+        <div className="grid grid-cols-12 gap-8">
+          {/* Left Column - Product Configuration (8 columns) */}
+          <div className="col-span-12 lg:col-span-8 space-y-8">
             {/* Step 1: Level 1 Product Selection */}
             {currentStep === 'level1' && (
               <Card className="bg-gray-900/50 border-gray-800 backdrop-blur-sm">
@@ -189,7 +200,7 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
             {currentStep === 'level2' && selectedLevel1Product && (
               <Card className="bg-gray-900/50 border-gray-800 backdrop-blur-sm">
                 <CardHeader>
-                  <CardTitle className="text-white">Configure Options</CardTitle>
+                  <CardTitle className="text-white">Configure {selectedLevel1Product.name} Options</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <Level2OptionsSelector
@@ -242,8 +253,9 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
             )}
           </div>
 
-          {/* Right Column - BOM Display and Quote Builder */}
-          <div className="space-y-6">
+          {/* Right Sidebar - BOM Display and Quote Builder (4 columns) */}
+          <div className="col-span-12 lg:col-span-4 space-y-6">
+            {/* Configuration Summary */}
             <Card className="bg-gray-900/50 border-gray-800 backdrop-blur-sm">
               <CardHeader>
                 <CardTitle className="text-white text-lg">Configuration Summary</CardTitle>
@@ -268,12 +280,14 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
               </CardContent>
             </Card>
 
+            {/* BOM Display - Fixed to right sidebar */}
             <BOMDisplay 
               bomItems={bomItems} 
               onUpdateBOM={handleBOMUpdate}
               canSeePrices={canSeePrices}
             />
             
+            {/* Quote Builder - Only one instance, moved to right sidebar */}
             {bomItems.length > 0 && (
               <BOMQuoteBuilder 
                 bomItems={bomItems}
