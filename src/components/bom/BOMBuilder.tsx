@@ -16,6 +16,9 @@ import BushingCardConfigurator from './BushingCardConfigurator';
 import { productDataService } from '@/services/productDataService';
 import QuoteFieldsSection from './QuoteFieldsSection';
 import DiscountSection from './DiscountSection';
+import QuoteSubmissionDialog from './QuoteSubmissionDialog';
+import QTMSConfigurationEditor from './QTMSConfigurationEditor';
+import { consolidateQTMSConfiguration, createQTMSBOMItem, ConsolidatedQTMS } from '@/utils/qtmsConsolidation';
 
 interface BOMBuilderProps {
   onBOMUpdate: (items: BOMItem[]) => void;
@@ -35,6 +38,8 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
   const [quoteFields, setQuoteFields] = useState<Record<string, any>>({});
   const [discountPercentage, setDiscountPercentage] = useState<number>(0);
   const [discountJustification, setDiscountJustification] = useState<string>('');
+  const [showQuoteSubmission, setShowQuoteSubmission] = useState(false);
+  const [editingQTMS, setEditingQTMS] = useState<ConsolidatedQTMS | null>(null);
 
   // Get all Level 1 products for dynamic tabs
   const level1Products = productDataService.getLevel1Products().filter(p => p.enabled);
@@ -188,44 +193,43 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
   const handleAddChassisAndCardsToBOM = () => {
     if (!selectedChassis) return;
 
-    const chassisItem: BOMItem = {
-      id: `${Date.now()}-chassis`,
-      product: selectedChassis,
-      quantity: 1,
-      enabled: true
-    };
+    // Consolidate QTMS configuration
+    const consolidatedQTMS = consolidateQTMSConfiguration(
+      selectedChassis,
+      slotAssignments,
+      hasRemoteDisplay,
+      {}, // analogConfigurations - will be implemented separately
+      {} // bushingConfigurations - will be implemented separately
+    );
 
-    const cardItems: BOMItem[] = Object.entries(slotAssignments).map(([slot, card]) => ({
-      id: `${Date.now()}-card-${slot}`,
-      product: card,
-      quantity: 1,
-      slot: parseInt(slot),
-      enabled: true
-    }));
+    // Show editor to allow user to review/edit before adding
+    setEditingQTMS(consolidatedQTMS);
+  };
 
-    const items = [chassisItem, ...cardItems];
-
-    // Add remote display if selected
-    if (hasRemoteDisplay) {
-      const remoteDisplayItem: BOMItem = {
-        id: `${Date.now()}-remote-display`,
-        product: {
-          id: 'remote-display',
-          name: 'Remote Display',
-          type: 'accessory',
-          description: 'Remote display for QTMS chassis',
-          price: 850,
-          enabled: true
-        } as any,
-        quantity: 1,
-        enabled: true
-      };
-      items.push(remoteDisplayItem);
-    }
-
-    const updatedItems = [...bomItems, ...items];
+  const handleQTMSConfigurationSave = (updatedQTMS: ConsolidatedQTMS) => {
+    // Create consolidated BOM item
+    const qtmsBOMItem = createQTMSBOMItem(updatedQTMS);
+    
+    const updatedItems = [...bomItems, qtmsBOMItem];
     setBomItems(updatedItems);
     onBOMUpdate(updatedItems);
+    
+    // Clear chassis configuration
+    setSelectedChassis(null);
+    setSlotAssignments({});
+    setHasRemoteDisplay(false);
+    setEditingQTMS(null);
+  };
+
+  const handleSubmitQuote = (quoteId: string) => {
+    console.log('Quote submitted with ID:', quoteId);
+    setShowQuoteSubmission(false);
+    // Reset BOM after successful submission
+    setBomItems([]);
+    setQuoteFields({});
+    setDiscountPercentage(0);
+    setDiscountJustification('');
+    onBOMUpdate([]);
   };
 
   const handleBOMUpdate = (updatedItems: BOMItem[]) => {
@@ -394,6 +398,21 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
             />
           )}
 
+          {/* Submit Quote Button */}
+          {bomItems.length > 0 && (
+            <Card className="bg-gray-900 border-gray-800">
+              <CardContent className="pt-6">
+                <Button
+                  onClick={() => setShowQuoteSubmission(true)}
+                  className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3"
+                  size="lg"
+                >
+                  Submit Quote Request ({bomItems.length} items)
+                </Button>
+              </CardContent>
+            </Card>
+          )}
+
           {/* Slot Card Selector Dialog */}
           {selectedSlot !== null && selectedChassis && (
             <SlotCardSelector
@@ -424,6 +443,29 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
           />
         </div>
       </div>
+
+      {/* QTMS Configuration Editor */}
+      {editingQTMS && (
+        <QTMSConfigurationEditor
+          consolidatedQTMS={editingQTMS}
+          onSave={handleQTMSConfigurationSave}
+          onClose={() => setEditingQTMS(null)}
+          canSeePrices={canSeePrices}
+        />
+      )}
+
+      {/* Quote Submission Dialog */}
+      {showQuoteSubmission && (
+        <QuoteSubmissionDialog
+          bomItems={bomItems}
+          quoteFields={quoteFields}
+          discountPercentage={discountPercentage}
+          discountJustification={discountJustification}
+          onSubmit={handleSubmitQuote}
+          onClose={() => setShowQuoteSubmission(false)}
+          canSeePrices={canSeePrices}
+        />
+      )}
     </div>
   );
 };

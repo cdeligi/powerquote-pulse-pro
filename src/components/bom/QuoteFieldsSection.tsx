@@ -58,21 +58,26 @@ const QuoteFieldsSection = ({ onFieldsChange, initialValues = {} }: QuoteFieldsS
       const fields = data.map(field => {
         console.log('Processing field:', field);
         
-        // Handle options parsing - check if it's already an array or needs parsing
+        // Fix options parsing - handle different data formats
         let parsedOptions: string[] | undefined = undefined;
         if (field.options) {
           if (Array.isArray(field.options)) {
             parsedOptions = field.options;
           } else if (typeof field.options === 'string') {
             try {
-              parsedOptions = JSON.parse(field.options);
+              const parsed = JSON.parse(field.options);
+              parsedOptions = Array.isArray(parsed) ? parsed : undefined;
             } catch (parseError) {
               console.error(`Error parsing options for field ${field.id}:`, parseError);
               parsedOptions = undefined;
             }
-          } else if (typeof field.options === 'object') {
-            // Handle case where it's already a parsed object/array
-            parsedOptions = Array.isArray(field.options) ? field.options : Object.values(field.options);
+          } else if (typeof field.options === 'object' && field.options !== null) {
+            // Handle case where it's an object - extract values or convert to array
+            if (field.options.hasOwnProperty('options') && Array.isArray(field.options.options)) {
+              parsedOptions = field.options.options;
+            } else {
+              parsedOptions = Object.values(field.options).filter(val => typeof val === 'string') as string[];
+            }
           }
         }
 
