@@ -27,6 +27,7 @@ const QuoteFieldsSection = ({ onFieldsChange, initialValues = {} }: QuoteFieldsS
   const [quoteFields, setQuoteFields] = useState<QuoteField[]>([]);
   const [fieldValues, setFieldValues] = useState<Record<string, any>>(initialValues);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchQuoteFields();
@@ -34,34 +35,71 @@ const QuoteFieldsSection = ({ onFieldsChange, initialValues = {} }: QuoteFieldsS
 
   const fetchQuoteFields = async () => {
     try {
+      console.log('Fetching quote fields...');
       const { data, error } = await supabase
         .from('quote_fields')
         .select('*')
         .eq('enabled', true)
         .order('display_order');
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase error:', error);
+        throw error;
+      }
       
-      const fields = data?.map(field => ({
-        id: field.id,
-        label: field.label,
-        type: field.type as QuoteField['type'],
-        required: field.required,
-        enabled: field.enabled,
-        options: field.options ? JSON.parse(field.options) : undefined,
-        display_order: field.display_order
-      })) || [];
+      console.log('Raw quote fields data:', data);
 
+      if (!data || data.length === 0) {
+        console.log('No quote fields found in database');
+        setQuoteFields([]);
+        return;
+      }
+
+      const fields = data.map(field => {
+        console.log('Processing field:', field);
+        
+        // Handle options parsing - check if it's already an array or needs parsing
+        let parsedOptions: string[] | undefined = undefined;
+        if (field.options) {
+          if (Array.isArray(field.options)) {
+            parsedOptions = field.options;
+          } else if (typeof field.options === 'string') {
+            try {
+              parsedOptions = JSON.parse(field.options);
+            } catch (parseError) {
+              console.error(`Error parsing options for field ${field.id}:`, parseError);
+              parsedOptions = undefined;
+            }
+          } else if (typeof field.options === 'object') {
+            // Handle case where it's already a parsed object/array
+            parsedOptions = Array.isArray(field.options) ? field.options : Object.values(field.options);
+          }
+        }
+
+        return {
+          id: field.id,
+          label: field.label,
+          type: field.type as QuoteField['type'],
+          required: field.required || false,
+          enabled: field.enabled || true,
+          options: parsedOptions,
+          display_order: field.display_order || 0
+        };
+      });
+
+      console.log('Processed quote fields:', fields);
       setQuoteFields(fields);
-      console.log('Fetched quote fields:', fields);
+      setError(null);
     } catch (error) {
       console.error('Error fetching quote fields:', error);
+      setError('Failed to load quote fields');
     } finally {
       setLoading(false);
     }
   };
 
   const handleFieldChange = (fieldId: string, value: any) => {
+    console.log('Field change:', fieldId, value);
     const updatedValues = { ...fieldValues, [fieldId]: value };
     setFieldValues(updatedValues);
     onFieldsChange(updatedValues);
@@ -163,6 +201,24 @@ const QuoteFieldsSection = ({ onFieldsChange, initialValues = {} }: QuoteFieldsS
       <Card className="bg-gray-900 border-gray-800">
         <CardContent className="py-4">
           <div className="text-center text-gray-400 text-sm">Loading quote fields...</div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (error) {
+    return (
+      <Card className="bg-gray-900 border-gray-800">
+        <CardContent className="py-4">
+          <div className="text-center text-red-400 text-sm">
+            Error: {error}
+            <button 
+              onClick={fetchQuoteFields}
+              className="ml-2 text-blue-400 hover:text-blue-300 underline"
+            >
+              Retry
+            </button>
+          </div>
         </CardContent>
       </Card>
     );
