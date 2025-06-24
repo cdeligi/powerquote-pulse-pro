@@ -195,18 +195,20 @@ const CardLibrary = ({ chassis, onCardSelect, canSeePrices, occupiedSlots = [] }
               <span className="text-gray-400">Available Slots:</span>
               <span className="text-white font-medium ml-2">{availableSlots.length}</span>
             </div>
-            <div>
-              <span className="text-gray-400">Target Slot:</span>
-              <select 
-                value={selectedSlot} 
-                onChange={(e) => setSelectedSlot(Number(e.target.value))}
-                className="ml-2 bg-gray-800 border border-gray-600 rounded px-2 py-1 text-white text-sm"
-              >
-                {availableSlots.map(slot => (
-                  <option key={slot} value={slot}>Slot {slot}</option>
-                ))}
-              </select>
-            </div>
+            {availableSlots.length > 0 && (
+              <div>
+                <span className="text-gray-400">Target Slot:</span>
+                <select 
+                  value={selectedSlot} 
+                  onChange={(e) => setSelectedSlot(Number(e.target.value))}
+                  className="ml-2 bg-gray-800 border border-gray-600 rounded px-2 py-1 text-white text-sm"
+                >
+                  {availableSlots.map(slot => (
+                    <option key={slot} value={slot}>Slot {slot}</option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>

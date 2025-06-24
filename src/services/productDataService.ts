@@ -1,4 +1,3 @@
-
 import { Level1Product, Level2Product, Level3Product, AssetType } from "@/types/product";
 
 const DEFAULT_ASSET_TYPES = [
@@ -46,6 +45,55 @@ const DEFAULT_LEVEL1_PRODUCTS: Level1Product[] = [
     enabled: true,
     partNumber: 'PD-1000',
     image: 'https://qualitrolcorp.com/wp-content/uploads/2024/01/Partial_Discharge_Monitor.png'
+  },
+  {
+    id: 'qpdm',
+    name: 'QPDM',
+    type: 'Monitoring Systems',
+    category: 'PD Couplers',
+    description: 'Qualitrol Partial Discharge Monitoring couplers for continuous online monitoring of partial discharge activity.',
+    price: 5000,
+    cost: 3500,
+    productInfoUrl: 'https://qualitrolcorp.com/products/qpdm/',
+    enabled: true,
+    partNumber: 'QPDM-1000',
+    hasQuantitySelection: true
+  },
+  {
+    id: 'tm8',
+    name: 'TM8',
+    type: 'Temperature Monitoring',
+    category: 'Temperature Monitors',
+    description: 'Eight channel temperature monitoring system for transformer winding and oil temperature monitoring.',
+    price: 6000,
+    cost: 4200,
+    productInfoUrl: 'https://qualitrolcorp.com/products/tm8/',
+    enabled: true,
+    partNumber: 'TM8-1000'
+  },
+  {
+    id: 'tm3',
+    name: 'TM3',
+    type: 'Temperature Monitoring',
+    category: 'Temperature Monitors',
+    description: 'Three channel temperature monitoring system for basic transformer temperature monitoring.',
+    price: 3500,
+    cost: 2450,
+    productInfoUrl: 'https://qualitrolcorp.com/products/tm3/',
+    enabled: true,
+    partNumber: 'TM3-1000'
+  },
+  {
+    id: 'tm1',
+    name: 'TM1',
+    type: 'Temperature Monitoring',
+    category: 'Temperature Monitors',
+    description: 'Single channel temperature monitoring system for basic oil temperature monitoring.',
+    price: 2000,
+    cost: 1400,
+    productInfoUrl: 'https://qualitrolcorp.com/products/tm1/',
+    enabled: true,
+    partNumber: 'TM1-1000'
   }
 ];
 
@@ -113,7 +161,7 @@ const DEFAULT_LEVEL2_PRODUCTS: Level2Product[] = [
     id: 'dga-9-plus',
     name: 'DGA 9 Plus',
     parentProductId: 'dga',
-    type: 'Monitor',
+    type: 'Standard',
     description: '9-gas online DGA monitor with advanced features',
     price: 15000,
     cost: 11000,
@@ -129,7 +177,7 @@ const DEFAULT_LEVEL2_PRODUCTS: Level2Product[] = [
     id: 'dga-5-pro',
     name: 'DGA 5 Pro',
     parentProductId: 'dga',
-    type: 'Monitor',
+    type: 'Standard',
     description: '5-gas online DGA monitor for essential monitoring',
     price: 12000,
     cost: 9000,
@@ -141,12 +189,28 @@ const DEFAULT_LEVEL2_PRODUCTS: Level2Product[] = [
       communication: ['Ethernet']
     }
   },
+  {
+    id: 'dga-moisture',
+    name: 'DGA with Moisture',
+    parentProductId: 'dga',
+    type: 'Moisture',
+    description: 'DGA monitor with integrated moisture analysis',
+    price: 18000,
+    cost: 13500,
+    enabled: true,
+    partNumber: 'DGA-MOIST-001',
+    specifications: {
+      gases: ['H2', 'CO', 'CO2', 'CH4', 'C2H2', 'Moisture'],
+      oilType: 'Mineral/Synthetic',
+      communication: ['Ethernet', 'Modbus']
+    }
+  },
   // PD Products
   {
     id: 'pd-guard-pro',
     name: 'PD-Guard Pro',
     parentProductId: 'partial-discharge',
-    type: 'Monitor',
+    type: 'Standard',
     description: 'Advanced online partial discharge monitoring system',
     price: 18000,
     cost: 14000,
@@ -162,7 +226,7 @@ const DEFAULT_LEVEL2_PRODUCTS: Level2Product[] = [
     id: 'pd-sense-basic',
     name: 'PD-Sense Basic',
     parentProductId: 'partial-discharge',
-    type: 'Monitor',
+    type: 'Standard',
     description: 'Basic online partial discharge detection system',
     price: 15000,
     cost: 11000,
@@ -173,6 +237,29 @@ const DEFAULT_LEVEL2_PRODUCTS: Level2Product[] = [
       frequencyRange: '500 kHz - 2 MHz',
       communication: ['Ethernet']
     }
+  },
+  // QPDM Couplers
+  {
+    id: 'qpdm-standard',
+    name: 'QPDM Standard Coupler',
+    parentProductId: 'qpdm',
+    type: 'Standard',
+    description: 'Standard partial discharge coupler for transformer monitoring',
+    price: 800,
+    cost: 560,
+    enabled: true,
+    partNumber: 'QPDM-STD-001'
+  },
+  {
+    id: 'qpdm-high-voltage',
+    name: 'QPDM High Voltage Coupler',
+    parentProductId: 'qpdm',
+    type: 'Standard',
+    description: 'High voltage partial discharge coupler for large transformers',
+    price: 1200,
+    cost: 840,
+    enabled: true,
+    partNumber: 'QPDM-HV-001'
   }
 ];
 
