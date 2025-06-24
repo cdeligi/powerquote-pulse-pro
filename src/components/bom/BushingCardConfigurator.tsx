@@ -6,7 +6,8 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { BOMItem, Level3Customization } from "@/types/product";
-import { Settings } from "lucide-react";
+import { Settings, Info } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface BushingCardConfiguratorProps {
   bomItem: BOMItem;
@@ -72,6 +73,16 @@ const BushingCardConfigurator = ({ bomItem, onSave, onClose }: BushingCardConfig
     onSave(customizations);
   };
 
+  // Get slot information if available
+  const getSlotInfo = () => {
+    if (bomItem.slot) {
+      const primarySlot = bomItem.slot;
+      const secondarySlot = primarySlot + 1;
+      return `Slots ${primarySlot}-${secondarySlot}`;
+    }
+    return 'Slots will be assigned when placed';
+  };
+
   return (
     <Dialog open={true} onOpenChange={onClose}>
       <DialogContent className="bg-gray-900 border-gray-800 text-white max-w-2xl">
@@ -83,6 +94,16 @@ const BushingCardConfigurator = ({ bomItem, onSave, onClose }: BushingCardConfig
         </DialogHeader>
         
         <div className="space-y-6">
+          {/* Slot Information */}
+          <Alert className="bg-blue-900/20 border-blue-600">
+            <Info className="h-4 w-4" />
+            <AlertDescription className="text-blue-400">
+              <strong>2-Slot Card:</strong> This bushing monitoring card requires 2 consecutive slots.
+              <br />
+              <strong>Position:</strong> {getSlotInfo()}
+            </AlertDescription>
+          </Alert>
+
           {/* Number of Bushings */}
           <div className="space-y-2">
             <Label className="text-white font-medium">Number of Bushings</Label>
@@ -144,6 +165,10 @@ const BushingCardConfigurator = ({ bomItem, onSave, onClose }: BushingCardConfig
           <div className="bg-gray-800 p-4 rounded border border-gray-700">
             <h4 className="text-white font-medium mb-2">Configuration Summary</h4>
             <div className="space-y-1 text-sm">
+              <div className="flex justify-between">
+                <span className="text-gray-400">Card Position:</span>
+                <span className="text-white">{getSlotInfo()}</span>
+              </div>
               <div className="flex justify-between">
                 <span className="text-gray-400">Total Bushings:</span>
                 <span className="text-white">{numberOfBushings}</span>

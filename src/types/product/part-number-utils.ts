@@ -1,4 +1,3 @@
-
 import { Chassis, Card, Level1Product } from './interfaces';
 
 export const generateQTMSPartNumber = (
@@ -28,7 +27,15 @@ export const generateQTMSPartNumber = (
   const maxSlots = chassis.type === 'LTX' ? 14 : chassis.type === 'MTX' ? 7 : 4;
   let slotConfig = '';
   
+  // Keep track of slots that are occupied by multi-slot cards
+  const occupiedSlots = new Set<number>();
+  
   for (let i = 1; i <= maxSlots; i++) {
+    // Skip if this slot is already marked as occupied by a multi-slot card
+    if (occupiedSlots.has(i)) {
+      continue;
+    }
+    
     const card = slotAssignments[i];
     if (card) {
       let slotCode = '';
@@ -60,10 +67,8 @@ export const generateQTMSPartNumber = (
           } else {
             slotCode = 'B';
           }
-          // Check if this is the second slot of a bushing card
-          if (i > 1 && slotAssignments[i-1]?.type === 'bushing' && slotAssignments[i-1]?.id === card.id) {
-            continue; // Skip second slot of bushing card
-          }
+          // Mark the next slot as occupied since bushing cards use 2 slots
+          occupiedSlots.add(i + 1);
           break;
         default: 
           slotCode = 'X';

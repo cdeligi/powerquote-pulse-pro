@@ -1,11 +1,12 @@
-
 import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { X, Settings } from "lucide-react";
+import { X, Settings, AlertTriangle } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { validateBushingCardPlacement, isBushingCard } from "@/utils/bushingValidation";
 
 interface SlotCardSelectorProps {
   chassis: any;
@@ -13,9 +14,17 @@ interface SlotCardSelectorProps {
   onCardSelect: (card: any, slot: number) => void;
   onClose: () => void;
   canSeePrices: boolean;
+  currentSlotAssignments?: Record<number, any>;
 }
 
-const SlotCardSelector = ({ chassis, slot, onCardSelect, onClose, canSeePrices }: SlotCardSelectorProps) => {
+const SlotCardSelector = ({ 
+  chassis, 
+  slot, 
+  onCardSelect, 
+  onClose, 
+  canSeePrices,
+  currentSlotAssignments = {}
+}: SlotCardSelectorProps) => {
   const [selectedFiberInputs, setSelectedFiberInputs] = useState<number>(4);
 
   const getBasicCards = () => [
@@ -149,7 +158,6 @@ const SlotCardSelector = ({ chassis, slot, onCardSelect, onClose, canSeePrices }
     }
   ];
 
-  // Show display cards only for LTX chassis
   const getAvailableCards = () => {
     let cards = [];
     
@@ -166,10 +174,32 @@ const SlotCardSelector = ({ chassis, slot, onCardSelect, onClose, canSeePrices }
 
   const availableCards = getAvailableCards();
 
-  // Filter cards based on chassis compatibility
-  const compatibleCards = availableCards.filter(card => {
-    return card.compatibleChassis.includes(chassis.type);
-  });
+  // Filter cards based on chassis compatibility and bushing validation
+  const getCompatibleCards = () => {
+    return availableCards.filter(card => {
+      if (!card.compatibleChassis.includes(chassis.type)) {
+        return false;
+      }
+
+      // Special validation for bushing cards
+      if (isBushingCard(card as any)) {
+        const validation = validateBushingCardPlacement(slot, chassis, currentSlotAssignments);
+        return validation.isValid;
+      }
+
+      return true;
+    });
+  };
+
+  const compatibleCards = getCompatibleCards();
+
+  // Get validation result for bushing cards to show error messages
+  const getBushingValidation = (card: any) => {
+    if (isBushingCard(card)) {
+      return validateBushingCardPlacement(slot, chassis, currentSlotAssignments);
+    }
+    return null;
+  };
 
   const handleCardSelect = (card: any) => {
     // For display cards, automatically route to slot 8 in LTX chassis
@@ -183,6 +213,13 @@ const SlotCardSelector = ({ chassis, slot, onCardSelect, onClose, canSeePrices }
   const needsConfiguration = (card: any) => {
     return card.name.toLowerCase().includes('analog') || card.name.toLowerCase().includes('bushing');
   };
+
+  // Show error message for bushing cards that can't be placed
+  const bushingErrorCards = availableCards.filter(card => {
+    if (!isBushingCard(card as any)) return false;
+    const validation = validateBushingCardPlacement(slot, chassis, currentSlotAssignments);
+    return !validation.isValid;
+  });
 
   return (
     <Dialog open={true} onOpenChange={onClose}>
@@ -200,6 +237,24 @@ const SlotCardSelector = ({ chassis, slot, onCardSelect, onClose, canSeePrices }
             </Button>
           </DialogTitle>
         </DialogHeader>
+
+        {/* Show bushing placement errors */}
+        {bushingErrorCards.length > 0 && (
+          <Alert className="bg-red-900/20 border-red-600">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription className="text-red-400">
+              <strong>Bushing Card Placement Restrictions:</strong>
+              <ul className="mt-2 space-y-1">
+                {bushingErrorCards.map(card => {
+                  const validation = getBushingValidation(card);
+                  return (
+                    <li key={card.id}>• {validation?.errorMessage}</li>
+                  );
+                })}
+              </ul>
+            </AlertDescription>
+          </Alert>
+        )}
         
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
           {compatibleCards.map((card) => (
@@ -236,6 +291,11 @@ const SlotCardSelector = ({ chassis, slot, onCardSelect, onClose, canSeePrices }
                       Config Required
                     </Badge>
                   )}
+                  {isBushingCard(card as any) && (
+                    <Badge variant="outline" className="text-orange-400 border-orange-400">
+                      2-Slot Card
+                    </Badge>
+                  )}
                 </div>
               </CardHeader>
               <CardContent>
@@ -246,6 +306,12 @@ const SlotCardSelector = ({ chassis, slot, onCardSelect, onClose, canSeePrices }
                       <span className="text-white">{String(value)}</span>
                     </div>
                   ))}
+                  {isBushingCard(card as any) && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-400">Occupies Slots:</span>
+                      <span className="text-orange-400">{slot}, {slot + 1}</span>
+                    </div>
+                  )}
                 </div>
                 
                 <div className="flex justify-between items-center mb-4">
@@ -269,6 +335,11 @@ const SlotCardSelector = ({ chassis, slot, onCardSelect, onClose, canSeePrices }
         {compatibleCards.length === 0 && (
           <div className="text-center py-8 text-gray-400">
             No compatible cards available for this slot
+            {bushingErrorCards.length > 0 && (
+              <p className="mt-2 text-sm">
+                Some cards are restricted due to positioning requirements
+              </p>
+            )}
           </div>
         )}
       </DialogContent>

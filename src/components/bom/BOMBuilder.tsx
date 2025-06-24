@@ -91,6 +91,14 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
   const handleSlotClear = (slot: number) => {
     setSlotAssignments(prev => {
       const updated = { ...prev };
+      const card = updated[slot];
+      
+      // If it's a bushing card, also clear the next slot
+      if (card && (card.name.toLowerCase().includes('bushing') || card.type === 'bushing')) {
+        const nextSlot = slot + 1;
+        delete updated[nextSlot];
+      }
+      
       delete updated[slot];
       return updated;
     });
@@ -301,6 +309,7 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
                 onCardSelect={handleCardSelect}
                 onClose={() => setSelectedSlot(null)}
                 canSeePrices={canSeePrices}
+                currentSlotAssignments={slotAssignments}
               />
             )}
           </div>
@@ -422,6 +431,7 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
               onCardSelect={handleCardSelect}
               onClose={() => setSelectedSlot(null)}
               canSeePrices={canSeePrices}
+              currentSlotAssignments={slotAssignments}
             />
           )}
         </div>
