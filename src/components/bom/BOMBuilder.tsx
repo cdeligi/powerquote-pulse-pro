@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import BOMDisplay from './BOMDisplay';
 import { BOMItem, Level1Product, Level2Product, Level3Product } from '@/types/product';
@@ -8,7 +7,7 @@ import Level2OptionsSelector from './Level2OptionsSelector';
 import ChassisSelector from './ChassisSelector';
 import CardLibrary from './CardLibrary';
 import RackVisualizer from './RackVisualizer';
-import BOMQuoteBuilder from './B'
+import BOMQuoteBuilder from './BOMQuoteBuilder';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
