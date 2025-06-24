@@ -53,6 +53,7 @@ const QuoteFieldsSection = ({ onFieldsChange, initialValues = {} }: QuoteFieldsS
       })) || [];
 
       setQuoteFields(fields);
+      console.log('Fetched quote fields:', fields);
     } catch (error) {
       console.error('Error fetching quote fields:', error);
     } finally {
@@ -75,8 +76,9 @@ const QuoteFieldsSection = ({ onFieldsChange, initialValues = {} }: QuoteFieldsS
           <Textarea
             value={value}
             onChange={(e) => handleFieldChange(field.id, e.target.value)}
-            className="bg-gray-800 border-gray-700 text-white"
+            className="bg-gray-800 border-gray-700 text-white text-sm"
             required={field.required}
+            rows={2}
           />
         );
 
@@ -86,12 +88,12 @@ const QuoteFieldsSection = ({ onFieldsChange, initialValues = {} }: QuoteFieldsS
             value={value}
             onValueChange={(val) => handleFieldChange(field.id, val)}
           >
-            <SelectTrigger className="bg-gray-800 border-gray-700 text-white">
+            <SelectTrigger className="bg-gray-800 border-gray-700 text-white text-sm h-9">
               <SelectValue placeholder={`Select ${field.label.toLowerCase()}`} />
             </SelectTrigger>
             <SelectContent className="bg-gray-800 border-gray-700">
               {field.options?.map((option) => (
-                <SelectItem key={option} value={option} className="text-white">
+                <SelectItem key={option} value={option} className="text-white text-sm">
                   {option}
                 </SelectItem>
               ))}
@@ -105,7 +107,7 @@ const QuoteFieldsSection = ({ onFieldsChange, initialValues = {} }: QuoteFieldsS
             type="number"
             value={value}
             onChange={(e) => handleFieldChange(field.id, e.target.value)}
-            className="bg-gray-800 border-gray-700 text-white"
+            className="bg-gray-800 border-gray-700 text-white text-sm h-9"
             required={field.required}
           />
         );
@@ -116,7 +118,7 @@ const QuoteFieldsSection = ({ onFieldsChange, initialValues = {} }: QuoteFieldsS
             type="email"
             value={value}
             onChange={(e) => handleFieldChange(field.id, e.target.value)}
-            className="bg-gray-800 border-gray-700 text-white"
+            className="bg-gray-800 border-gray-700 text-white text-sm h-9"
             required={field.required}
           />
         );
@@ -127,7 +129,7 @@ const QuoteFieldsSection = ({ onFieldsChange, initialValues = {} }: QuoteFieldsS
             type="tel"
             value={value}
             onChange={(e) => handleFieldChange(field.id, e.target.value)}
-            className="bg-gray-800 border-gray-700 text-white"
+            className="bg-gray-800 border-gray-700 text-white text-sm h-9"
             required={field.required}
           />
         );
@@ -138,7 +140,7 @@ const QuoteFieldsSection = ({ onFieldsChange, initialValues = {} }: QuoteFieldsS
             type="date"
             value={value}
             onChange={(e) => handleFieldChange(field.id, e.target.value)}
-            className="bg-gray-800 border-gray-700 text-white"
+            className="bg-gray-800 border-gray-700 text-white text-sm h-9"
             required={field.required}
           />
         );
@@ -149,7 +151,7 @@ const QuoteFieldsSection = ({ onFieldsChange, initialValues = {} }: QuoteFieldsS
             type="text"
             value={value}
             onChange={(e) => handleFieldChange(field.id, e.target.value)}
-            className="bg-gray-800 border-gray-700 text-white"
+            className="bg-gray-800 border-gray-700 text-white text-sm h-9"
             required={field.required}
           />
         );
@@ -159,8 +161,8 @@ const QuoteFieldsSection = ({ onFieldsChange, initialValues = {} }: QuoteFieldsS
   if (loading) {
     return (
       <Card className="bg-gray-900 border-gray-800">
-        <CardContent className="pt-6">
-          <div className="text-center text-gray-400">Loading quote fields...</div>
+        <CardContent className="py-4">
+          <div className="text-center text-gray-400 text-sm">Loading quote fields...</div>
         </CardContent>
       </Card>
     );
@@ -169,9 +171,9 @@ const QuoteFieldsSection = ({ onFieldsChange, initialValues = {} }: QuoteFieldsS
   if (quoteFields.length === 0) {
     return (
       <Card className="bg-gray-900 border-gray-800">
-        <CardHeader>
-          <CardTitle className="text-white">Quote Information</CardTitle>
-          <CardDescription className="text-gray-400">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-white text-lg">Quote Information</CardTitle>
+          <CardDescription className="text-gray-400 text-sm">
             No quote fields configured. Configure fields in the admin panel.
           </CardDescription>
         </CardHeader>
@@ -181,21 +183,26 @@ const QuoteFieldsSection = ({ onFieldsChange, initialValues = {} }: QuoteFieldsS
 
   return (
     <Card className="bg-gray-900 border-gray-800">
-      <CardHeader>
-        <CardTitle className="text-white">Quote Information</CardTitle>
-        <CardDescription className="text-gray-400">
+      <CardHeader className="pb-3">
+        <CardTitle className="text-white text-lg flex items-center justify-between">
+          Quote Information
+          <Badge variant="outline" className="text-xs text-gray-300 border-gray-600">
+            {quoteFields.length} fields
+          </Badge>
+        </CardTitle>
+        <CardDescription className="text-gray-400 text-sm">
           Complete the required fields for your quote request
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <CardContent className="pt-0">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6 gap-3">
           {quoteFields.map((field) => (
-            <div key={field.id} className="space-y-2">
-              <Label htmlFor={field.id} className="text-white flex items-center gap-2">
+            <div key={field.id} className="space-y-1.5">
+              <Label htmlFor={field.id} className="text-white text-xs flex items-center gap-1.5">
                 {field.label}
                 {field.required && (
-                  <Badge variant="outline" className="text-xs border-red-500 text-red-400">
-                    Required
+                  <Badge variant="outline" className="text-xs px-1 py-0 h-4 border-red-500 text-red-400">
+                    *
                   </Badge>
                 )}
               </Label>
