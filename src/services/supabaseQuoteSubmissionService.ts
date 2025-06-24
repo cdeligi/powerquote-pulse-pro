@@ -154,7 +154,8 @@ class SupabaseQuoteSubmissionService {
       return data.map(quote => ({
         ...quote,
         status: quote.status as SubmittedQuote['status'],
-        priority: quote.priority as SubmittedQuote['priority'], // Type assertion for priority
+        priority: quote.priority as SubmittedQuote['priority'],
+        quote_fields: (quote.quote_fields as Record<string, string>) || {},
         bomItems: quote.bom_items?.map((item: any) => ({
           id: item.id,
           name: item.name,

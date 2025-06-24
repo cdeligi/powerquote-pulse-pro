@@ -128,7 +128,7 @@ const AdminPanel = ({ user }: AdminPanelProps) => {
         </TabsContent>
 
         <TabsContent value="quote-approval" className="mt-6">
-          <QuoteApprovalDashboard />
+          <QuoteApprovalDashboard user={user} />
         </TabsContent>
 
         <TabsContent value="users" className="mt-6">
