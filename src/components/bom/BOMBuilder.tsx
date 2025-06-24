@@ -14,6 +14,8 @@ import BOMDisplay from './BOMDisplay';
 import AnalogCardConfigurator from './AnalogCardConfigurator';
 import BushingCardConfigurator from './BushingCardConfigurator';
 import { productDataService } from '@/services/productDataService';
+import QuoteFieldsSection from './QuoteFieldsSection';
+import DiscountSection from './DiscountSection';
 
 interface BOMBuilderProps {
   onBOMUpdate: (items: BOMItem[]) => void;
@@ -30,6 +32,9 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
   const [activeTab, setActiveTab] = useState<string>('');
   const [hasRemoteDisplay, setHasRemoteDisplay] = useState<boolean>(false);
   const [configuringCard, setConfiguringCard] = useState<BOMItem | null>(null);
+  const [quoteFields, setQuoteFields] = useState<Record<string, any>>({});
+  const [discountPercentage, setDiscountPercentage] = useState<number>(0);
+  const [discountJustification, setDiscountJustification] = useState<string>('');
 
   // Get all Level 1 products for dynamic tabs
   const level1Products = productDataService.getLevel1Products().filter(p => p.enabled);
@@ -228,6 +233,15 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
     onBOMUpdate(updatedItems);
   };
 
+  const handleQuoteFieldsChange = (fields: Record<string, any>) => {
+    setQuoteFields(fields);
+  };
+
+  const handleDiscountChange = (discount: number, justification: string) => {
+    setDiscountPercentage(discount);
+    setDiscountJustification(justification);
+  };
+
   const renderProductContent = (productId: string) => {
     const product = level1Products.find(p => p.id === productId);
     if (!product) return null;
@@ -319,79 +333,96 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
   };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full">
-      {/* Left side - Product selection (2/3 width) */}
-      <div className="lg:col-span-2 space-y-6">
-        <Card className="bg-gray-900 border-gray-800">
-          <CardHeader>
-            <CardTitle className="text-white">BOM Builder</CardTitle>
-            <CardDescription className="text-gray-400">
-              Build your Bill of Materials by selecting products and configurations
-            </CardDescription>
-          </CardHeader>
-        </Card>
+    <div className="space-y-6">
+      {/* Quote Fields Section - Always at the top */}
+      <QuoteFieldsSection 
+        onFieldsChange={handleQuoteFieldsChange}
+        initialValues={quoteFields}
+      />
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full bg-gray-800" style={{ gridTemplateColumns: `repeat(${level1Products.length}, 1fr)` }}>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full">
+        {/* Left side - Product selection (2/3 width) */}
+        <div className="lg:col-span-2 space-y-6">
+          <Card className="bg-gray-900 border-gray-800">
+            <CardHeader>
+              <CardTitle className="text-white">BOM Builder</CardTitle>
+              <CardDescription className="text-gray-400">
+                Build your Bill of Materials by selecting products and configurations
+              </CardDescription>
+            </CardHeader>
+          </Card>
+
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <TabsList className="grid w-full bg-gray-800" style={{ gridTemplateColumns: `repeat(${level1Products.length}, 1fr)` }}>
+              {level1Products.map((product) => (
+                <TabsTrigger 
+                  key={product.id}
+                  value={product.id} 
+                  className="text-white data-[state=active]:bg-red-600 data-[state=active]:text-white"
+                >
+                  {product.name}
+                  {product.category && (
+                    <Badge variant="outline" className="ml-2 text-xs">
+                      {product.category}
+                    </Badge>
+                  )}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+            
             {level1Products.map((product) => (
-              <TabsTrigger 
-                key={product.id}
-                value={product.id} 
-                className="text-white data-[state=active]:bg-red-600 data-[state=active]:text-white"
-              >
-                {product.name}
-                {product.category && (
-                  <Badge variant="outline" className="ml-2 text-xs">
-                    {product.category}
-                  </Badge>
-                )}
-              </TabsTrigger>
+              <TabsContent key={product.id} value={product.id} className="mt-6">
+                {renderProductContent(product.id)}
+              </TabsContent>
             ))}
-          </TabsList>
-          
-          {level1Products.map((product) => (
-            <TabsContent key={product.id} value={product.id} className="mt-6">
-              {renderProductContent(product.id)}
-            </TabsContent>
-          ))}
-        </Tabs>
+          </Tabs>
 
-        {/* Card Configuration Dialogs */}
-        {configuringCard && configuringCard.product.name.toLowerCase().includes('analog') && (
-          <AnalogCardConfigurator
-            bomItem={configuringCard}
-            onSave={handleCardConfiguration}
-            onClose={() => setConfiguringCard(null)}
-          />
-        )}
+          {/* Card Configuration Dialogs */}
+          {configuringCard && configuringCard.product.name.toLowerCase().includes('analog') && (
+            <AnalogCardConfigurator
+              bomItem={configuringCard}
+              onSave={handleCardConfiguration}
+              onClose={() => setConfiguringCard(null)}
+            />
+          )}
 
-        {configuringCard && configuringCard.product.name.toLowerCase().includes('bushing') && (
-          <BushingCardConfigurator
-            bomItem={configuringCard}
-            onSave={handleCardConfiguration}
-            onClose={() => setConfiguringCard(null)}
-          />
-        )}
+          {configuringCard && configuringCard.product.name.toLowerCase().includes('bushing') && (
+            <BushingCardConfigurator
+              bomItem={configuringCard}
+              onSave={handleCardConfiguration}
+              onClose={() => setConfiguringCard(null)}
+            />
+          )}
 
-        {/* Slot Card Selector Dialog */}
-        {selectedSlot !== null && selectedChassis && (
-          <SlotCardSelector
-            chassis={selectedChassis as any}
-            slot={selectedSlot}
-            onCardSelect={handleCardSelect}
-            onClose={() => setSelectedSlot(null)}
+          {/* Slot Card Selector Dialog */}
+          {selectedSlot !== null && selectedChassis && (
+            <SlotCardSelector
+              chassis={selectedChassis as any}
+              slot={selectedSlot}
+              onCardSelect={handleCardSelect}
+              onClose={() => setSelectedSlot(null)}
+              canSeePrices={canSeePrices}
+            />
+          )}
+        </div>
+
+        {/* Right side - BOM Display and Discount (1/3 width) */}
+        <div className="lg:col-span-1 space-y-6">
+          <BOMDisplay
+            bomItems={bomItems}
+            onUpdateBOM={handleBOMUpdate}
             canSeePrices={canSeePrices}
           />
-        )}
-      </div>
-
-      {/* Right side - BOM Display (1/3 width) */}
-      <div className="lg:col-span-1">
-        <BOMDisplay
-          bomItems={bomItems}
-          onUpdateBOM={handleBOMUpdate}
-          canSeePrices={canSeePrices}
-        />
+          
+          {/* Discount Section - Shows after products are selected */}
+          <DiscountSection
+            bomItems={bomItems}
+            onDiscountChange={handleDiscountChange}
+            canSeePrices={canSeePrices}
+            initialDiscount={discountPercentage}
+            initialJustification={discountJustification}
+          />
+        </div>
       </div>
     </div>
   );
