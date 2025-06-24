@@ -164,7 +164,7 @@ const RackVisualizer = ({ chassis, bomItems, onAddCard, onRemoveCard }: RackVisu
         </div>
 
         {/* Slot requirement indicator for double-wide cards */}
-        {occupant && occupant.product.specifications?.slotRequirement === 2 && (
+        {occupant && 'specifications' in occupant.product && occupant.product.specifications?.slotRequirement === 2 && (
           <div className="absolute -right-4 top-0 w-4 h-full bg-gray-700 rounded-r-lg border-l-2 border-gray-600">
             <div className="flex items-center justify-center h-full text-xs text-gray-400 transform rotate-90">
               2W
