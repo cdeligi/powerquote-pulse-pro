@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Level2Product, Chassis } from '@/types/product';
+import { Level2Product } from '@/types/product';
 import { productDataService } from '@/services/productDataService';
 import { Search, Cpu, Zap, Shield, Check } from 'lucide-react';
 
@@ -20,12 +20,17 @@ const ChassisSelector = ({ onChassisSelect, selectedChassis, canSeePrices }: Cha
   const [selectedType, setSelectedType] = useState<'all' | 'LTX' | 'MTX' | 'STX'>('all');
 
   useEffect(() => {
-    const level1Products = productDataService.getLevel1Products();
-    const chassisProduct = level1Products.find(p => p.name.toLowerCase().includes('chassis'));
+    // Get all Level 2 products that are chassis type
+    const level2Products = productDataService.getLevel2Products();
+    const chassisProducts = level2Products.filter(product => 
+      product.type.toLowerCase().includes('chassis') || 
+      product.name.toLowerCase().includes('chassis') ||
+      product.name.includes('LTX') || 
+      product.name.includes('MTX') || 
+      product.name.includes('STX')
+    );
     
-    if (chassisProduct?.level2Options) {
-      setChassisOptions(chassisProduct.level2Options);
-    }
+    setChassisOptions(chassisProducts);
   }, []);
 
   const filteredChassis = chassisOptions.filter(chassis => {
@@ -221,6 +226,52 @@ const ChassisSelector = ({ onChassisSelect, selectedChassis, canSeePrices }: Cha
       )}
     </div>
   );
+
+  function getChassisTypeInfo(chassisName: string) {
+    if (chassisName.includes('LTX')) {
+      return {
+        type: 'LTX',
+        icon: Zap,
+        color: 'text-yellow-400',
+        bgColor: 'bg-yellow-400/10',
+        borderColor: 'border-yellow-400/20',
+        description: 'High-density 15-slot chassis',
+        slots: 15,
+        layout: '2-row configuration'
+      };
+    } else if (chassisName.includes('MTX')) {
+      return {
+        type: 'MTX',
+        icon: Cpu,
+        color: 'text-blue-400',
+        bgColor: 'bg-blue-400/10',
+        borderColor: 'border-blue-400/20',
+        description: 'Mid-range 8-slot chassis',
+        slots: 8,
+        layout: 'Single-row configuration'
+      };
+    } else {
+      return {
+        type: 'STX',
+        icon: Shield,
+        color: 'text-green-400',
+        bgColor: 'bg-green-400/10',
+        borderColor: 'border-green-400/20',
+        description: 'Compact 5-slot chassis',
+        slots: 5,
+        layout: 'Single-row configuration'
+      };
+    }
+  }
+
+  function formatPrice(price: number) {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(price);
+  }
 };
 
 export default ChassisSelector;
