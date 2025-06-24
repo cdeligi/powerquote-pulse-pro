@@ -226,52 +226,6 @@ const ChassisSelector = ({ onChassisSelect, selectedChassis, canSeePrices }: Cha
       )}
     </div>
   );
-
-  function getChassisTypeInfo(chassisName: string) {
-    if (chassisName.includes('LTX')) {
-      return {
-        type: 'LTX',
-        icon: Zap,
-        color: 'text-yellow-400',
-        bgColor: 'bg-yellow-400/10',
-        borderColor: 'border-yellow-400/20',
-        description: 'High-density 15-slot chassis',
-        slots: 15,
-        layout: '2-row configuration'
-      };
-    } else if (chassisName.includes('MTX')) {
-      return {
-        type: 'MTX',
-        icon: Cpu,
-        color: 'text-blue-400',
-        bgColor: 'bg-blue-400/10',
-        borderColor: 'border-blue-400/20',
-        description: 'Mid-range 8-slot chassis',
-        slots: 8,
-        layout: 'Single-row configuration'
-      };
-    } else {
-      return {
-        type: 'STX',
-        icon: Shield,
-        color: 'text-green-400',
-        bgColor: 'bg-green-400/10',
-        borderColor: 'border-green-400/20',
-        description: 'Compact 5-slot chassis',
-        slots: 5,
-        layout: 'Single-row configuration'
-      };
-    }
-  }
-
-  function formatPrice(price: number) {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(price);
-  }
 };
 
 export default ChassisSelector;
