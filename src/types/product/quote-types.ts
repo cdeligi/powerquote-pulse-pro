@@ -32,38 +32,13 @@ export interface Quote {
   updatedAt: string;
   notes?: string;
   rejectionReason?: string;
-  oracleCustomerId: string; // Required field
-  customerName: string; // Required field
+  oracleCustomerId?: string;
+  customerName?: string;
   sfdcOpportunity: string; // Mandatory SFDC Opportunity ID
   priority: 'High' | 'Medium' | 'Low' | 'Urgent';
   termsAndConditions?: string;
-  isRepInvolved: boolean; // Required field
-  shippingTerms: ShippingTerms; // Required field
-  paymentTerms: PaymentTerms; // Required field
-  quoteCurrency: 'USD' | 'EURO' | 'GBP' | 'CAD'; // Required field
-  
-  // Additional approval information
-  submittedBy?: string;
-  approvedBy?: string;
-  approvedDiscount?: number;
-  marginAnalysis?: {
-    originalMargin: number;
-    discountedMargin: number;
-    totalCost: number;
-    totalRevenue: number;
-    grossProfit: number;
-  };
-  
-  // Item-level details for approval
-  itemDetails?: Array<{
-    itemId: string;
-    name: string;
-    partNumber?: string;
-    quantity: number;
-    unitPrice: number;
-    unitCost: number;
-    totalPrice: number;
-    totalCost: number;
-    margin: number;
-  }>;
+  isRepInvolved?: boolean;
+  shippingTerms?: ShippingTerms;
+  paymentTerms?: PaymentTerms;
+  quoteCurrency?: 'USD' | 'EURO' | 'GBP' | 'CAD';
 }

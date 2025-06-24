@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -66,8 +65,7 @@ const SlotCardSelector = ({ chassis, slot, onCardSelect, onClose, canSeePrices }
       compatibleChassis: ['LTX', 'MTX', 'STX'],
       specifications: {
         channels: 12,
-        measurement: 'Capacitance & Tan Delta',
-        slotRequirement: 2
+        measurement: 'Capacitance & Tan Delta'
       },
       partNumber: 'BSH-12CH-001'
     }
@@ -150,19 +148,7 @@ const SlotCardSelector = ({ chassis, slot, onCardSelect, onClose, canSeePrices }
     }
   ];
 
-  const getBushingSlots = (chassisType: string) => {
-    switch (chassisType) {
-      case 'LTX':
-        return "6-7 (preferred) or 13-14";
-      case 'MTX':
-        return "6-7 (fixed)";
-      case 'STX':
-        return "3-4 (fixed)";
-      default:
-        return `${slot}-${slot + 1}`;
-    }
-  };
-
+  // Show display cards only for LTX chassis
   const getAvailableCards = () => {
     let cards = [];
     
@@ -179,21 +165,9 @@ const SlotCardSelector = ({ chassis, slot, onCardSelect, onClose, canSeePrices }
 
   const availableCards = getAvailableCards();
 
-  // Filter cards based on chassis compatibility and slot availability for bushing cards
+  // Filter cards based on chassis compatibility
   const compatibleCards = availableCards.filter(card => {
-    if (!card.compatibleChassis.includes(chassis.type)) {
-      return false;
-    }
-    
-    // For bushing cards that require 2 slots, check if next slot is available
-    if (card.type === 'bushing' && card.slotRequirement === 2) {
-      const maxSlots = chassis.type === 'LTX' ? 14 : chassis.type === 'MTX' ? 7 : 4;
-      if (slot >= maxSlots) {
-        return false; // Can't fit 2-slot card in last slot
-      }
-    }
-    
-    return true;
+    return card.compatibleChassis.includes(chassis.type);
   });
 
   const handleCardSelect = (card: any) => {
@@ -227,79 +201,68 @@ const SlotCardSelector = ({ chassis, slot, onCardSelect, onClose, canSeePrices }
         </DialogHeader>
         
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
-          {compatibleCards.map((card) => {
-            const bushingSlots = getBushingSlots(chassis.type);
-            
-            return (
-              <Card key={card.id} className="bg-gray-800 border-gray-700 hover:border-red-600 transition-all cursor-pointer">
-                <CardHeader>
-                  <CardTitle className="text-white text-lg flex items-center justify-between">
-                    {card.name}
-                    {needsConfiguration(card) && (
-                      <div title="Requires Configuration">
-                        <Settings className="h-4 w-4 text-blue-400" />
-                      </div>
-                    )}
-                  </CardTitle>
-                  <CardDescription className="text-gray-400">
-                    {card.description}
-                  </CardDescription>
-                  <div className="flex gap-2 flex-wrap">
+          {compatibleCards.map((card) => (
+            <Card key={card.id} className="bg-gray-800 border-gray-700 hover:border-red-600 transition-all cursor-pointer">
+              <CardHeader>
+                <CardTitle className="text-white text-lg flex items-center justify-between">
+                  {card.name}
+                  {needsConfiguration(card) && (
+                    <Settings className="h-4 w-4 text-blue-400" title="Requires Configuration" />
+                  )}
+                </CardTitle>
+                <CardDescription className="text-gray-400">
+                  {card.description}
+                </CardDescription>
+                <div className="flex gap-2 flex-wrap">
+                  <Badge variant="outline" className="text-white border-gray-500">
+                    {card.slotRequirement} slot{card.slotRequirement > 1 ? 's' : ''}
+                  </Badge>
+                  <Badge variant="outline" className="text-white border-gray-500">
+                    {card.type}
+                  </Badge>
+                  {card.specifications?.inputs && (
                     <Badge variant="outline" className="text-white border-gray-500">
-                      {card.slotRequirement} slot{card.slotRequirement > 1 ? 's' : ''}
+                      {card.specifications.inputs} inputs
                     </Badge>
-                    <Badge variant="outline" className="text-white border-gray-500">
-                      {card.type}
+                  )}
+                  {card.type === 'display' && chassis.type === 'LTX' && slot !== 8 && (
+                    <Badge variant="outline" className="text-yellow-400 border-yellow-400">
+                      → Slot 8
                     </Badge>
-                    {card.specifications?.inputs && (
-                      <Badge variant="outline" className="text-white border-gray-500">
-                        {card.specifications.inputs} inputs
-                      </Badge>
-                    )}
-                    {card.type === 'display' && chassis.type === 'LTX' && slot !== 8 && (
-                      <Badge variant="outline" className="text-yellow-400 border-yellow-400">
-                        → Slot 8
-                      </Badge>
-                    )}
-                    {needsConfiguration(card) && (
-                      <Badge variant="outline" className="text-blue-400 border-blue-400">
-                        Config Required
-                      </Badge>
-                    )}
-                    {card.type === 'bushing' && (
-                      <Badge variant="outline" className="text-orange-400 border-orange-400">
-                        → Slots {bushingSlots}
-                      </Badge>
-                    )}
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2 mb-4">
-                    {Object.entries(card.specifications || {}).map(([key, value]) => (
-                      <div key={key} className="flex justify-between text-sm">
-                        <span className="text-gray-400 capitalize">{key}:</span>
-                        <span className="text-white">{String(value)}</span>
-                      </div>
-                    ))}
-                  </div>
-                  
-                  <div className="flex justify-between items-center mb-4">
-                    <span className="text-white font-bold">
-                      {canSeePrices ? `$${card.price.toLocaleString()}` : '—'}
-                    </span>
-                    <span className="text-gray-400 text-xs">{card.partNumber}</span>
-                  </div>
-                  
-                  <Button 
-                    className="w-full bg-red-600 hover:bg-red-700 text-white"
-                    onClick={() => handleCardSelect(card)}
-                  >
-                    {needsConfiguration(card) ? 'Configure Card' : 'Select Card'}
-                  </Button>
-                </CardContent>
-              </Card>
-            );
-          })}
+                  )}
+                  {needsConfiguration(card) && (
+                    <Badge variant="outline" className="text-blue-400 border-blue-400">
+                      Config Required
+                    </Badge>
+                  )}
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2 mb-4">
+                  {Object.entries(card.specifications || {}).map(([key, value]) => (
+                    <div key={key} className="flex justify-between text-sm">
+                      <span className="text-gray-400 capitalize">{key}:</span>
+                      <span className="text-white">{String(value)}</span>
+                    </div>
+                  ))}
+                </div>
+                
+                <div className="flex justify-between items-center mb-4">
+                  <span className="text-white font-bold">
+                    {canSeePrices ? `$${card.price.toLocaleString()}` : '—'}
+                  </span>
+                  <span className="text-gray-400 text-xs">{card.partNumber}</span>
+                </div>
+                
+                <Button 
+                  className="w-full bg-red-600 hover:bg-red-700 text-white"
+                  onClick={() => handleCardSelect(card)}
+                >
+                  {needsConfiguration(card) ? 'Configure Card' : 'Select Card'}
+                </Button>
+              </CardContent>
+            </Card>
+          ))}
         </div>
         
         {compatibleCards.length === 0 && (

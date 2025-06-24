@@ -1,6 +1,5 @@
 
 import { BOMItem, Level2Option, Level3Customization } from '@/types/product';
-import { settingsService } from '@/services/settingsService';
 
 export const calculateItemCost = (item: BOMItem): number => {
   let totalCost = (item.product.cost || 0) * item.quantity;
@@ -95,29 +94,4 @@ export const calculateDiscountedMargin = (
     discountedMargin,
     discountAmount
   };
-};
-
-// New function to apply standard margin pricing
-export const applyStandardMarginPricing = (cost: number): number => {
-  return settingsService.applyStandardMarginPricing(cost);
-};
-
-// New function to check if margin meets minimum requirements
-export const isMarginAcceptable = (margin: number): boolean => {
-  return margin >= settingsService.getMinimumMargin();
-};
-
-// New function to check if margin warning should be shown
-export const shouldShowMarginWarning = (margin: number): boolean => {
-  return margin < settingsService.getMarginWarningThreshold();
-};
-
-// Get margin warning color based on configurable thresholds
-export const getMarginColor = (margin: number): string => {
-  const warningThreshold = settingsService.getMarginWarningThreshold();
-  const minimumMargin = settingsService.getMinimumMargin();
-  
-  if (margin >= warningThreshold) return 'text-green-400';
-  if (margin >= minimumMargin) return 'text-yellow-400';
-  return 'text-red-400';
 };
