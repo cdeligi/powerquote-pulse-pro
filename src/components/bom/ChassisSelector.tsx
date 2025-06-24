@@ -20,62 +20,74 @@ const ChassisSelector = ({ onChassisSelect, selectedChassis, canSeePrices }: Cha
   const [selectedType, setSelectedType] = useState<'all' | 'LTX' | 'MTX' | 'STX'>('all');
 
   useEffect(() => {
-    // Get all Level 2 products that are chassis type
-    const level2Products = productDataService.getLevel2Products();
-    const chassisProducts = level2Products.filter(product => 
-      product.type.toLowerCase().includes('chassis') || 
-      product.name.toLowerCase().includes('chassis') ||
-      product.name.includes('LTX') || 
-      product.name.includes('MTX') || 
-      product.name.includes('STX')
-    );
+    // Get QTMS chassis variants (Level 2 products under QTMS)
+    const qtmsChassisVariants = productDataService.getLevel2ProductsForLevel1('qtms');
+    const enabledChassis = qtmsChassisVariants.filter(chassis => chassis.enabled);
     
-    setChassisOptions(chassisProducts);
+    setChassisOptions(enabledChassis);
   }, []);
 
   const filteredChassis = chassisOptions.filter(chassis => {
     const matchesSearch = chassis.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          chassis.partNumber?.toLowerCase().includes(searchTerm.toLowerCase());
     
-    const matchesType = selectedType === 'all' || chassis.name.includes(selectedType);
+    const matchesType = selectedType === 'all' || chassis.type === selectedType;
     
     return matchesSearch && matchesType;
   });
 
-  const getChassisTypeInfo = (chassisName: string) => {
-    if (chassisName.includes('LTX')) {
-      return {
-        type: 'LTX',
-        icon: Zap,
-        color: 'text-yellow-400',
-        bgColor: 'bg-yellow-400/10',
-        borderColor: 'border-yellow-400/20',
-        description: 'High-density 15-slot chassis',
-        slots: 15,
-        layout: '2-row configuration'
-      };
-    } else if (chassisName.includes('MTX')) {
-      return {
-        type: 'MTX',
-        icon: Cpu,
-        color: 'text-blue-400',
-        bgColor: 'bg-blue-400/10',
-        borderColor: 'border-blue-400/20',
-        description: 'Mid-range 8-slot chassis',
-        slots: 8,
-        layout: 'Single-row configuration'
-      };
-    } else {
-      return {
-        type: 'STX',
-        icon: Shield,
-        color: 'text-green-400',
-        bgColor: 'bg-green-400/10',
-        borderColor: 'border-green-400/20',
-        description: 'Compact 5-slot chassis',
-        slots: 5,
-        layout: 'Single-row configuration'
-      };
+  const getChassisTypeInfo = (chassis: Level2Product) => {
+    const chassisType = chassis.type;
+    
+    switch (chassisType) {
+      case 'LTX':
+        return {
+          type: 'LTX',
+          icon: Zap,
+          color: 'text-yellow-400',
+          bgColor: 'bg-yellow-400/10',
+          borderColor: 'border-yellow-400/20',
+          description: 'High-density 15-slot chassis (14 usable)',
+          slots: chassis.specifications?.slots || 15,
+          maxCards: chassis.specifications?.maxCards || 14,
+          layout: chassis.specifications?.layout || '2-row configuration'
+        };
+      case 'MTX':
+        return {
+          type: 'MTX',
+          icon: Cpu,
+          color: 'text-blue-400',
+          bgColor: 'bg-blue-400/10',
+          borderColor: 'border-blue-400/20',
+          description: 'Mid-range 8-slot chassis (7 usable)',
+          slots: chassis.specifications?.slots || 8,
+          maxCards: chassis.specifications?.maxCards || 7,
+          layout: chassis.specifications?.layout || 'Single-row configuration'
+        };
+      case 'STX':
+        return {
+          type: 'STX',
+          icon: Shield,
+          color: 'text-green-400',
+          bgColor: 'bg-green-400/10',
+          borderColor: 'border-green-400/20',
+          description: 'Compact 5-slot chassis (4 usable)',
+          slots: chassis.specifications?.slots || 5,
+          maxCards: chassis.specifications?.maxCards || 4,
+          layout: chassis.specifications?.layout || 'Single-row configuration'
+        };
+      default:
+        return {
+          type: 'Unknown',
+          icon: Shield,
+          color: 'text-gray-400',
+          bgColor: 'bg-gray-400/10',
+          borderColor: 'border-gray-400/20',
+          description: 'Unknown chassis type',
+          slots: 0,
+          maxCards: 0,
+          layout: 'Unknown'
+        };
     }
   };
 
@@ -95,22 +107,22 @@ const ChassisSelector = ({ onChassisSelect, selectedChassis, canSeePrices }: Cha
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
           <Input
-            placeholder="Search chassis by name or part number..."
+            placeholder="Search QTMS chassis by name or part number..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="pl-10 bg-gray-800 border-gray-700 text-white"
           />
         </div>
         <div className="flex space-x-2">
-          {['all', 'LTX', 'MTX', 'STX'].map((type) => (
+          {(['all', 'LTX', 'MTX', 'STX'] as const).map((type) => (
             <Button
               key={type}
               variant={selectedType === type ? "default" : "outline"}
               size="sm"
-              onClick={() => setSelectedType(type as typeof selectedType)}
+              onClick={() => setSelectedType(type)}
               className={selectedType === type ? "bg-red-600 hover:bg-red-700" : ""}
             >
-              {type.toUpperCase()}
+              {type === 'all' ? 'ALL' : type}
             </Button>
           ))}
         </div>
@@ -119,7 +131,7 @@ const ChassisSelector = ({ onChassisSelect, selectedChassis, canSeePrices }: Cha
       {/* Chassis Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredChassis.map((chassis) => {
-          const typeInfo = getChassisTypeInfo(chassis.name);
+          const typeInfo = getChassisTypeInfo(chassis);
           const IconComponent = typeInfo.icon;
           const isSelected = selectedChassis?.id === chassis.id;
 
@@ -165,14 +177,26 @@ const ChassisSelector = ({ onChassisSelect, selectedChassis, canSeePrices }: Cha
                 
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div>
-                    <span className="text-gray-400">Slots:</span>
+                    <span className="text-gray-400">Total Slots:</span>
                     <p className="text-white font-medium">{typeInfo.slots}</p>
                   </div>
                   <div>
-                    <span className="text-gray-400">Layout:</span>
-                    <p className="text-white font-medium">{typeInfo.layout}</p>
+                    <span className="text-gray-400">Card Slots:</span>
+                    <p className="text-white font-medium">{typeInfo.maxCards}</p>
                   </div>
                 </div>
+
+                <div className="text-sm">
+                  <span className="text-gray-400">Layout:</span>
+                  <p className="text-white font-medium">{typeInfo.layout}</p>
+                </div>
+
+                {chassis.specifications?.height && (
+                  <div className="text-sm">
+                    <span className="text-gray-400">Height:</span>
+                    <p className="text-white font-medium">{chassis.specifications.height}</p>
+                  </div>
+                )}
 
                 {chassis.partNumber && (
                   <div className="text-sm">
@@ -218,7 +242,7 @@ const ChassisSelector = ({ onChassisSelect, selectedChassis, canSeePrices }: Cha
           <CardContent className="text-center py-12">
             <div className="text-gray-400 space-y-2">
               <Search className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <p className="text-lg">No chassis found</p>
+              <p className="text-lg">No QTMS chassis found</p>
               <p className="text-sm">Try adjusting your search terms or filters</p>
             </div>
           </CardContent>
