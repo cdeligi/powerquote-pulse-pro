@@ -1,9 +1,8 @@
+
 import { useState } from 'react';
-import ProductSelector from './ProductSelector';
 import BOMDisplay from './BOMDisplay';
-import { Product, BOMItem } from '@/types/product';
+import { BOMItem, Level1Product, Level2Product } from '@/types/product';
 import { v4 as uuidv4 } from 'uuid';
-import { initialProducts } from '@/data/products';
 import ChassisSelector from './ChassisSelector';
 import BOMQuoteBuilder from './BOMQuoteBuilder';
 
@@ -14,28 +13,16 @@ interface BOMBuilderProps {
 
 const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
   const [bomItems, setBomItems] = useState<BOMItem[]>([]);
-  const [selectedChassis, setSelectedChassis] = useState<Product | null>(null);
+  const [selectedChassis, setSelectedChassis] = useState<Level2Product | null>(null);
 
-  const handleProductSelect = (product: Product, slot?: string) => {
-    const newBOMItem: BOMItem = {
-      id: uuidv4(),
-      product: product,
-      quantity: 1,
-      slot: slot,
-      partNumber: '',
-      enabled: true
-    };
-    setBomItems([...bomItems, newBOMItem]);
-  };
-
-  const handleChassisSelect = (product: Product) => {
+  const handleChassisSelect = (product: Level2Product) => {
     setSelectedChassis(product);
     // Automatically add chassis to BOM
     const newBOMItem: BOMItem = {
       id: uuidv4(),
       product: product,
       quantity: 1,
-      partNumber: '',
+      partNumber: product.partNumber || '',
       enabled: true
     };
     setBomItems([...bomItems, newBOMItem]);
@@ -56,20 +43,13 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left Column - Product Selectors */}
+        {/* Left Column - Chassis Selector */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Chassis Selector */}
-          <ChassisSelector onSelect={handleChassisSelect} />
-
-          {/* Product Selectors */}
-          {initialProducts.map((category) => (
-            <ProductSelector
-              key={category.name}
-              category={category}
-              onSelect={handleProductSelect}
-              selectedChassis={selectedChassis}
-            />
-          ))}
+          <ChassisSelector 
+            onChassisSelect={handleChassisSelect}
+            selectedChassis={selectedChassis}
+            canSeePrices={canSeePrices}
+          />
         </div>
 
         {/* Right Column - BOM Display and Quote Builder */}
@@ -80,7 +60,6 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
             canSeePrices={canSeePrices}
           />
           
-          {/* Add Quote Builder */}
           <BOMQuoteBuilder 
             bomItems={bomItems}
             canSeePrices={canSeePrices}
