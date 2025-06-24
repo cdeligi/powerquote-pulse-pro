@@ -1,4 +1,5 @@
-import { useState } from "react";
+
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -6,39 +7,29 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { 
   Plus, 
   Edit2, 
   Trash2, 
-  Settings,
   Eye,
   EyeOff,
   AlertCircle,
-  CheckCircle
+  Loader2
 } from "lucide-react";
 import { User } from "@/types/auth";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 interface QuoteField {
   id: string;
-  name: string;
   label: string;
   type: 'text' | 'textarea' | 'number' | 'select' | 'date' | 'email' | 'tel';
   required: boolean;
   enabled: boolean;
-  placeholder?: string;
-  helpText?: string;
-  options?: string[]; // For select fields
-  validation?: {
-    min?: number;
-    max?: number;
-    pattern?: string;
-    message?: string;
-  };
-  section: 'customer' | 'project' | 'technical' | 'commercial' | 'delivery';
-  order: number;
+  options?: string[];
+  display_order: number;
 }
 
 interface QuoteFieldConfigurationProps {
@@ -46,155 +37,174 @@ interface QuoteFieldConfigurationProps {
 }
 
 const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
-  const [quoteFields, setQuoteFields] = useState<QuoteField[]>([
-    {
-      id: 'customer-name',
-      name: 'customerName',
-      label: 'Customer Name',
-      type: 'text',
-      required: true,
-      enabled: true,
-      placeholder: 'Enter customer name',
-      section: 'customer',
-      order: 1
-    },
-    {
-      id: 'oracle-customer-id',
-      name: 'oracleCustomerId',
-      label: 'Oracle Customer ID',
-      type: 'text',
-      required: true,
-      enabled: true,
-      placeholder: 'Enter Oracle Customer ID',
-      section: 'customer',
-      order: 2
-    },
-    {
-      id: 'sfdc-opportunity',
-      name: 'sfdcOpportunity',
-      label: 'SFDC Opportunity ID',
-      type: 'text',
-      required: true,
-      enabled: true,
-      placeholder: 'Enter SFDC Opportunity ID',
-      helpText: 'Mandatory field for all quotes',
-      section: 'customer',
-      order: 3
-    },
-    {
-      id: 'priority',
-      name: 'priority',
-      label: 'Priority',
-      type: 'select',
-      required: true,
-      enabled: true,
-      options: ['High', 'Medium', 'Low', 'Urgent'],
-      section: 'commercial',
-      order: 4
-    },
-    {
-      id: 'shipping-terms',
-      name: 'shippingTerms',
-      label: 'Shipping Terms',
-      type: 'text',
-      required: false,
-      enabled: true,
-      placeholder: 'Enter shipping terms',
-      section: 'delivery',
-      order: 5
-    },
-    {
-      id: 'payment-terms',
-      name: 'paymentTerms',
-      label: 'Payment Terms',
-      type: 'text',
-      required: false,
-      enabled: true,
-      placeholder: 'Enter payment terms',
-      section: 'commercial',
-      order: 6
-    },
-    {
-      id: 'quote-currency',
-      name: 'quoteCurrency',
-      label: 'Quote Currency',
-      type: 'select',
-      required: true,
-      enabled: true,
-      options: ['USD', 'EURO', 'GBP', 'CAD'],
-      section: 'commercial',
-      order: 7
-    },
-    {
-      id: 'is-rep-involved',
-      name: 'isRepInvolved',
-      label: 'Rep Involved',
-      type: 'select',
-      required: false,
-      enabled: true,
-      options: ['Yes', 'No'],
-      section: 'commercial',
-      order: 8
-    }
-  ]);
-
+  const [quoteFields, setQuoteFields] = useState<QuoteField[]>([]);
+  const [loading, setLoading] = useState(true);
   const [editingField, setEditingField] = useState<QuoteField | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [activeSection, setActiveSection] = useState<string>('all');
   const { toast } = useToast();
 
-  const sections = [
-    { id: 'customer', label: 'Customer Info', color: 'bg-blue-600' },
-    { id: 'project', label: 'Project Details', color: 'bg-green-600' },
-    { id: 'technical', label: 'Technical Specs', color: 'bg-purple-600' },
-    { id: 'commercial', label: 'Commercial', color: 'bg-orange-600' },
-    { id: 'delivery', label: 'Delivery', color: 'bg-teal-600' }
-  ];
+  useEffect(() => {
+    fetchQuoteFields();
+  }, []);
 
-  const getFilteredFields = () => {
-    if (activeSection === 'all') return quoteFields;
-    return quoteFields.filter(field => field.section === activeSection);
+  const fetchQuoteFields = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('quote_fields')
+        .select('*')
+        .order('display_order');
+
+      if (error) throw error;
+
+      const fields = data.map(field => ({
+        id: field.id,
+        label: field.label,
+        type: field.type as QuoteField['type'],
+        required: field.required || false,
+        enabled: field.enabled || true,
+        options: field.options ? (Array.isArray(field.options) ? field.options : JSON.parse(field.options)) : undefined,
+        display_order: field.display_order || 0
+      }));
+
+      setQuoteFields(fields);
+    } catch (error) {
+      console.error('Error fetching quote fields:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load quote fields",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleCreateField = (fieldData: Omit<QuoteField, 'id'>) => {
-    const newField: QuoteField = {
-      ...fieldData,
-      id: `field-${Date.now()}`
-    };
-    setQuoteFields(prev => [...prev, newField].sort((a, b) => a.order - b.order));
+  const createQuoteField = async (fieldData: Omit<QuoteField, 'id'>) => {
+    try {
+      const { error } = await supabase
+        .from('quote_fields')
+        .insert({
+          id: `field-${Date.now()}`,
+          label: fieldData.label,
+          type: fieldData.type,
+          required: fieldData.required,
+          enabled: fieldData.enabled,
+          options: fieldData.options ? JSON.stringify(fieldData.options) : null,
+          display_order: fieldData.display_order
+        });
+
+      if (error) throw error;
+
+      await fetchQuoteFields();
+      toast({
+        title: "Success",
+        description: "Quote field created successfully"
+      });
+    } catch (error) {
+      console.error('Error creating quote field:', error);
+      toast({
+        title: "Error",
+        description: "Failed to create quote field",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const updateQuoteField = async (fieldId: string, fieldData: Omit<QuoteField, 'id'>) => {
+    try {
+      const { error } = await supabase
+        .from('quote_fields')
+        .update({
+          label: fieldData.label,
+          type: fieldData.type,
+          required: fieldData.required,
+          enabled: fieldData.enabled,
+          options: fieldData.options ? JSON.stringify(fieldData.options) : null,
+          display_order: fieldData.display_order
+        })
+        .eq('id', fieldId);
+
+      if (error) throw error;
+
+      await fetchQuoteFields();
+      toast({
+        title: "Success",
+        description: "Quote field updated successfully"
+      });
+    } catch (error) {
+      console.error('Error updating quote field:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update quote field",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const deleteQuoteField = async (fieldId: string) => {
+    try {
+      const { error } = await supabase
+        .from('quote_fields')
+        .delete()
+        .eq('id', fieldId);
+
+      if (error) throw error;
+
+      await fetchQuoteFields();
+      toast({
+        title: "Success",
+        description: "Quote field deleted successfully"
+      });
+    } catch (error) {
+      console.error('Error deleting quote field:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete quote field",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const toggleFieldEnabled = async (fieldId: string) => {
+    const field = quoteFields.find(f => f.id === fieldId);
+    if (!field) return;
+
+    try {
+      const { error } = await supabase
+        .from('quote_fields')
+        .update({ enabled: !field.enabled })
+        .eq('id', fieldId);
+
+      if (error) throw error;
+
+      await fetchQuoteFields();
+    } catch (error) {
+      console.error('Error toggling field:', error);
+      toast({
+        title: "Error",
+        description: "Failed to toggle field status",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleCreateField = async (fieldData: Omit<QuoteField, 'id'>) => {
+    await createQuoteField(fieldData);
     setDialogOpen(false);
     setEditingField(null);
-    toast({
-      title: "Success",
-      description: "Quote field created successfully"
-    });
   };
 
-  const handleUpdateField = (fieldData: Omit<QuoteField, 'id'>) => {
+  const handleUpdateField = async (fieldData: Omit<QuoteField, 'id'>) => {
     if (!editingField) return;
-    setQuoteFields(prev => prev.map(f => 
-      f.id === editingField.id ? { ...fieldData, id: editingField.id } : f
-    ).sort((a, b) => a.order - b.order));
+    await updateQuoteField(editingField.id, fieldData);
     setDialogOpen(false);
     setEditingField(null);
-    toast({
-      title: "Success",
-      description: "Quote field updated successfully"
-    });
   };
 
-  const handleDeleteField = (fieldId: string) => {
-    setQuoteFields(prev => prev.filter(f => f.id !== fieldId));
-    toast({
-      title: "Success",
-      description: "Quote field deleted successfully"
-    });
-  };
-
-  const toggleFieldEnabled = (fieldId: string) => {
-    setQuoteFields(prev => prev.map(f => 
-      f.id === fieldId ? { ...f, enabled: !f.enabled } : f
-    ));
+  const handleDeleteField = async (fieldId: string) => {
+    await deleteQuoteField(fieldId);
   };
 
   const openEditDialog = (field: QuoteField) => {
@@ -206,6 +216,15 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
     setEditingField(null);
     setDialogOpen(true);
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin text-white" />
+        <span className="ml-2 text-white">Loading quote fields...</span>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -223,41 +242,15 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
         </Button>
       </div>
 
-      {/* Section Filter */}
-      <div className="flex flex-wrap gap-2">
-        {sections.map((section) => (
-          <Button
-            key={section.id}
-            variant={activeSection === section.id ? "default" : "outline"}
-            size="sm"
-            onClick={() => setActiveSection(section.id)}
-            className={activeSection === section.id ? `${section.color} hover:opacity-80` : "border-gray-600 text-gray-300 hover:bg-gray-800"}
-          >
-            {section.label}
-            <Badge variant="secondary" className="ml-2 text-xs">
-              {quoteFields.filter(f => f.section === section.id).length}
-            </Badge>
-          </Button>
-        ))}
-      </div>
-
       {/* Fields Grid */}
       <div className="grid gap-4">
-        {getFilteredFields().map((field) => (
+        {quoteFields.map((field) => (
           <Card key={field.id} className="bg-gray-900 border-gray-800">
             <CardHeader>
               <div className="flex justify-between items-start">
                 <div className="flex-1">
                   <div className="flex items-center space-x-3">
                     <CardTitle className="text-white">{field.label}</CardTitle>
-                    <Badge 
-                      variant="outline" 
-                      className={`text-xs capitalize ${
-                        sections.find(s => s.id === field.section)?.color || 'bg-gray-600'
-                      } border-none text-white`}
-                    >
-                      {field.section}
-                    </Badge>
                     <Badge variant="outline" className="text-xs capitalize">
                       {field.type}
                     </Badge>
@@ -289,10 +282,7 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
                     </Badge>
                   </div>
                   <CardDescription className="text-gray-400 mt-2">
-                    Field Name: <code className="text-xs bg-gray-800 px-1 rounded">{field.name}</code>
-                    {field.helpText && (
-                      <span className="block mt-1">{field.helpText}</span>
-                    )}
+                    Field ID: <code className="text-xs bg-gray-800 px-1 rounded">{field.id}</code>
                   </CardDescription>
                 </div>
                 <div className="flex space-x-2">
@@ -327,14 +317,10 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                 <div>
                   <p className="text-gray-400">Order</p>
-                  <p className="text-white font-medium">{field.order}</p>
-                </div>
-                <div>
-                  <p className="text-gray-400">Placeholder</p>
-                  <p className="text-white font-medium">{field.placeholder || 'None'}</p>
+                  <p className="text-white font-medium">{field.display_order}</p>
                 </div>
                 {field.options && (
-                  <div className="col-span-2">
+                  <div className="col-span-3">
                     <p className="text-gray-400">Options</p>
                     <div className="flex flex-wrap gap-1 mt-1">
                       {field.options.map((option, index) => (
@@ -379,16 +365,12 @@ interface QuoteFieldFormProps {
 
 const QuoteFieldForm = ({ onSubmit, initialData, onCancel }: QuoteFieldFormProps) => {
   const [formData, setFormData] = useState<Omit<QuoteField, 'id'>>({
-    name: initialData?.name || '',
     label: initialData?.label || '',
     type: initialData?.type || 'text',
     required: initialData?.required ?? false,
     enabled: initialData?.enabled ?? true,
-    placeholder: initialData?.placeholder || '',
-    helpText: initialData?.helpText || '',
     options: initialData?.options || [],
-    section: initialData?.section || 'customer',
-    order: initialData?.order || 1
+    display_order: initialData?.display_order || 1
   });
 
   const [optionsText, setOptionsText] = useState(
@@ -418,20 +400,6 @@ const QuoteFieldForm = ({ onSubmit, initialData, onCancel }: QuoteFieldFormProps
           />
         </div>
         <div>
-          <Label htmlFor="name" className="text-white">Field Name (Code)</Label>
-          <Input
-            id="name"
-            value={formData.name}
-            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-            className="bg-gray-800 border-gray-700 text-white"
-            placeholder="camelCase field name"
-            required
-          />
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <div>
           <Label htmlFor="type" className="text-white">Field Type</Label>
           <Select
             value={formData.type}
@@ -451,57 +419,17 @@ const QuoteFieldForm = ({ onSubmit, initialData, onCancel }: QuoteFieldFormProps
             </SelectContent>
           </Select>
         </div>
-        <div>
-          <Label htmlFor="section" className="text-white">Section</Label>
-          <Select
-            value={formData.section}
-            onValueChange={(value: QuoteField['section']) => setFormData({ ...formData, section: value })}
-          >
-            <SelectTrigger className="bg-gray-800 border-gray-700 text-white">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent className="bg-gray-800 border-gray-700">
-              <SelectItem value="customer" className="text-white">Customer Info</SelectItem>
-              <SelectItem value="project" className="text-white">Project Details</SelectItem>
-              <SelectItem value="technical" className="text-white">Technical Specs</SelectItem>
-              <SelectItem value="commercial" className="text-white">Commercial</SelectItem>
-              <SelectItem value="delivery" className="text-white">Delivery</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <Label htmlFor="placeholder" className="text-white">Placeholder Text</Label>
-          <Input
-            id="placeholder"
-            value={formData.placeholder}
-            onChange={(e) => setFormData({ ...formData, placeholder: e.target.value })}
-            className="bg-gray-800 border-gray-700 text-white"
-          />
-        </div>
-        <div>
-          <Label htmlFor="order" className="text-white">Display Order</Label>
-          <Input
-            id="order"
-            type="number"
-            value={formData.order}
-            onChange={(e) => setFormData({ ...formData, order: parseInt(e.target.value) })}
-            className="bg-gray-800 border-gray-700 text-white"
-            min="1"
-          />
-        </div>
       </div>
 
       <div>
-        <Label htmlFor="helpText" className="text-white">Help Text</Label>
-        <Textarea
-          id="helpText"
-          value={formData.helpText}
-          onChange={(e) => setFormData({ ...formData, helpText: e.target.value })}
+        <Label htmlFor="order" className="text-white">Display Order</Label>
+        <Input
+          id="order"
+          type="number"
+          value={formData.display_order}
+          onChange={(e) => setFormData({ ...formData, display_order: parseInt(e.target.value) })}
           className="bg-gray-800 border-gray-700 text-white"
-          rows={2}
+          min="1"
         />
       </div>
 
