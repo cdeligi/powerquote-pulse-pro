@@ -1,3 +1,6 @@
+/**
+ * © 2025 Qualitrol Corp. All rights reserved.
+ */
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -7,6 +10,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { useState, useEffect } from "react";
 import { BOMItem } from "@/types/product";
 import { User } from "@/types/auth";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "@/components/ui/use-toast";
 
 interface QuoteSubmissionDialogProps {
   open: boolean;
@@ -40,6 +45,8 @@ const QuoteSubmissionDialog = ({
     notes: ''
   });
 
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   // Initialize form data from quoteFields when dialog opens
   useEffect(() => {
     if (open && quoteFields) {
@@ -52,11 +59,124 @@ const QuoteSubmissionDialog = ({
     }
   }, [open, quoteFields]);
 
-  const handleSubmit = () => {
-    // Generate a quote ID and submit
-    const quoteId = `Q-${Date.now()}`;
-    onSubmit(quoteId);
-    onOpenChange(false);
+  const handleSubmit = async () => {
+    if (isSubmitting) return;
+    
+    setIsSubmitting(true);
+    
+    try {
+      // Generate a quote ID
+      const quoteId = `Q-${Date.now()}`;
+      
+      // Calculate totals
+      const originalQuoteValue = bomItems.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
+      const discountedValue = originalQuoteValue * (1 - discountPercentage / 100);
+      const totalCost = bomItems.reduce((sum, item) => sum + ((item.product.cost || 0) * item.quantity), 0);
+      const grossProfit = discountedValue - totalCost;
+      const discountedMargin = discountedValue > 0 ? (grossProfit / discountedValue) * 100 : 0;
+
+      // Create quote in database with pending_approval status
+      const { error: quoteError } = await supabase
+        .from('quotes')
+        .insert({
+          id: quoteId,
+          customer_name: formData.customerName,
+          oracle_customer_id: formData.oracleCustomerId,
+          sfdc_opportunity: formData.sfdcOpportunity,
+          status: 'pending_approval',
+          user_id: user.id,
+          submitted_by_name: user.name,
+          submitted_by_email: user.email,
+          original_quote_value: originalQuoteValue,
+          requested_discount: discountPercentage,
+          discount_justification: discountJustification,
+          discounted_value: discountedValue,
+          total_cost: totalCost,
+          gross_profit: grossProfit,
+          original_margin: originalQuoteValue > 0 ? ((originalQuoteValue - totalCost) / originalQuoteValue) * 100 : 0,
+          discounted_margin: discountedMargin,
+          quote_fields: {
+            ...quoteFields,
+            customerName: formData.customerName,
+            oracleCustomerId: formData.oracleCustomerId,
+            sfdcOpportunity: formData.sfdcOpportunity,
+            notes: formData.notes
+          },
+          priority: 'Medium',
+          currency: 'USD',
+          payment_terms: 'Net 30',
+          shipping_terms: 'FOB Origin'
+        });
+
+      if (quoteError) throw quoteError;
+
+      // Create BOM items
+      for (const item of bomItems) {
+        const { error: bomError } = await supabase
+          .from('bom_items')
+          .insert({
+            quote_id: quoteId,
+            product_id: item.product.id,
+            name: item.product.name,
+            description: item.product.description || '',
+            part_number: item.product.partNumber || item.partNumber || '',
+            quantity: item.quantity,
+            unit_price: item.product.price,
+            unit_cost: item.product.cost || 0,
+            total_price: item.product.price * item.quantity,
+            total_cost: (item.product.cost || 0) * item.quantity,
+            margin: item.product.price > 0 ? (((item.product.price - (item.product.cost || 0)) / item.product.price) * 100) : 0,
+            original_unit_price: item.product.price,
+            approved_unit_price: item.product.price,
+            configuration_data: item.configuration || {},
+            product_type: item.product.type || 'standard'
+          });
+
+        if (bomError) throw bomError;
+      }
+
+      // Send notification to admins
+      try {
+        const { data: adminIds } = await supabase.rpc('get_admin_user_ids');
+        
+        if (adminIds && adminIds.length > 0) {
+          await supabase
+            .from('admin_notifications')
+            .insert({
+              quote_id: quoteId,
+              notification_type: 'quote_pending_approval',
+              sent_to: adminIds,
+              message_content: {
+                customer_name: formData.customerName,
+                submitted_by: user.name,
+                quote_value: discountedValue,
+                discount_percentage: discountPercentage
+              }
+            });
+        }
+      } catch (notificationError) {
+        console.error('Failed to send admin notifications:', notificationError);
+        // Don't fail the quote submission if notifications fail
+      }
+
+      toast({
+        title: "Quote Submitted Successfully",
+        description: `Quote ${quoteId} has been submitted for approval.`,
+      });
+
+      onSubmit(quoteId);
+      onOpenChange(false);
+
+    } catch (error) {
+      console.error('Error submitting quote:', error);
+      toast({
+        title: "Submission Failed",
+        description: "Failed to submit quote. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const isFormValid = formData.customerName && formData.oracleCustomerId && formData.sfdcOpportunity;
@@ -129,14 +249,15 @@ const QuoteSubmissionDialog = ({
             <Button 
               onClick={handleSubmit} 
               className="flex-1"
-              disabled={!isFormValid}
+              disabled={!isFormValid || isSubmitting}
             >
-              Submit Quote
+              {isSubmitting ? 'Submitting...' : 'Submit Quote'}
             </Button>
             <Button 
               variant="outline" 
               onClick={onClose}
               className="flex-1 border-gray-600 text-gray-300"
+              disabled={isSubmitting}
             >
               Cancel
             </Button>

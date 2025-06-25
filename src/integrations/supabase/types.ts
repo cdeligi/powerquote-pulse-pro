@@ -9,6 +9,33 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      admin_notifications: {
+        Row: {
+          created_at: string | null
+          id: string
+          message_content: Json | null
+          notification_type: string
+          quote_id: string
+          sent_to: string[]
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          message_content?: Json | null
+          notification_type?: string
+          quote_id: string
+          sent_to?: string[]
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          message_content?: Json | null
+          notification_type?: string
+          quote_id?: string
+          sent_to?: string[]
+        }
+        Relationships: []
+      }
       app_settings: {
         Row: {
           created_at: string
@@ -249,6 +276,7 @@ export type Database = {
           last_name: string | null
           role: string
           updated_at: string
+          user_status: string | null
         }
         Insert: {
           created_at?: string
@@ -259,6 +287,7 @@ export type Database = {
           last_name?: string | null
           role?: string
           updated_at?: string
+          user_status?: string | null
         }
         Update: {
           created_at?: string
@@ -269,6 +298,7 @@ export type Database = {
           last_name?: string | null
           role?: string
           updated_at?: string
+          user_status?: string | null
         }
         Relationships: []
       }
@@ -513,6 +543,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      deactivate_user: {
+        Args: { target_user_id: string }
+        Returns: boolean
+      }
+      get_admin_user_ids: {
+        Args: Record<PropertyKey, never>
+        Returns: string[]
+      }
       get_user_role: {
         Args: { user_id: string }
         Returns: string

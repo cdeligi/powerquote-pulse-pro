@@ -1,4 +1,8 @@
 
+/**
+ * © 2025 Qualitrol Corp. All rights reserved.
+ */
+
 // Re-export all types and interfaces
 export * from './interfaces';
 export * from './quote-types';

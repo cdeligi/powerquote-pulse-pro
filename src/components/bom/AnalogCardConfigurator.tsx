@@ -1,4 +1,8 @@
 
+/**
+ * © 2025 Qualitrol Corp. All rights reserved.
+ */
+
 import { useState } from "react";
 import { BOMItem, Level3Customization, ANALOG_SENSOR_TYPES, AnalogSensorType, ANALOG_SENSOR_DESCRIPTIONS } from "@/types/product/interfaces";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";

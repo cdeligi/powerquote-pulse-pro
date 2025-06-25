@@ -1,4 +1,8 @@
 
+/**
+ * © 2025 Qualitrol Corp. All rights reserved.
+ */
+
 // Level 0: Asset Types (Power Transformer, GIS, Breaker, etc.)
 export interface AssetType {
   id: string;
@@ -143,9 +147,9 @@ export interface Level2Option extends Level3Product {
 
 export interface Level3Customization {
   id: string;
-  name: string;
   parentOptionId: string;
   type: string;
+  name: string;
   description?: string;
   options: string[];
   price: number;

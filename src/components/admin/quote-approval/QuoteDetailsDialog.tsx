@@ -1,4 +1,8 @@
 
+/**
+ * © 2025 Qualitrol Corp. All rights reserved.
+ */
+
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { FileText } from "lucide-react";
 import { Quote, BOMItemWithDetails } from "@/hooks/useQuotes";
