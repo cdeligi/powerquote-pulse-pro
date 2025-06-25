@@ -437,8 +437,8 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
   return (
     <div className="space-y-6">
       {/* Quote Fields Section - Always at the top */}
-      <QuoteFieldsSection 
-        onFieldsChange={handleQuoteFieldsChange}
+      <QuoteFieldsSection
+        onFieldChange={setQuoteFields}
         initialValues={quoteFields}
       />
 
