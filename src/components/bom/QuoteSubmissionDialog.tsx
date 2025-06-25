@@ -1,145 +1,122 @@
 
 import { useState } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Checkbox } from '@/components/ui/checkbox';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { FileText, Send } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { CheckCircle, AlertCircle, FileText } from 'lucide-react';
 import { BOMItem } from '@/types/product';
-import { ShippingTerms, PaymentTerms } from '@/types/product/quote-types';
 import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
-import { calculateTotalMargin } from '@/utils/marginCalculations';
 
 interface QuoteSubmissionDialogProps {
   bomItems: BOMItem[];
+  quoteFields: Record<string, any>;
+  discountPercentage: number;
+  discountJustification: string;
+  onSubmit: (quoteId: string) => void;
+  onClose: () => void;
   canSeePrices: boolean;
-  userId?: string;
 }
 
-const QuoteSubmissionDialog = ({ bomItems, canSeePrices, userId }: QuoteSubmissionDialogProps) => {
-  const [isOpen, setIsOpen] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const { toast } = useToast();
+const QuoteSubmissionDialog = ({
+  bomItems,
+  quoteFields,
+  discountPercentage,
+  discountJustification,
+  onSubmit,
+  onClose,
+  canSeePrices
+}: QuoteSubmissionDialogProps) => {
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  // Form state
-  const [customerName, setCustomerName] = useState('');
-  const [oracleCustomerId, setOracleCustomerId] = useState('');
-  const [sfdcOpportunity, setSfdcOpportunity] = useState('');
-  const [priority, setPriority] = useState<'High' | 'Medium' | 'Low' | 'Urgent'>('Medium');
-  const [isRepInvolved, setIsRepInvolved] = useState(false);
-  const [shippingTerms, setShippingTerms] = useState<ShippingTerms>('Ex-Works');
-  const [paymentTerms, setPaymentTerms] = useState<PaymentTerms>('30');
-  const [quoteCurrency, setQuoteCurrency] = useState<'USD' | 'EURO' | 'GBP' | 'CAD'>('USD');
-  const [requestedDiscount, setRequestedDiscount] = useState(0);
-  const [discountJustification, setDiscountJustification] = useState('');
+  const calculateTotals = () => {
+    const originalValue = bomItems.reduce((total, item) => {
+      return total + ((item.product.price || 0) * item.quantity);
+    }, 0);
+    
+    const discountAmount = originalValue * (discountPercentage / 100);
+    const discountedValue = originalValue - discountAmount;
+    
+    return {
+      originalValue,
+      discountAmount,
+      discountedValue
+    };
+  };
 
-  const { totalRevenue, totalCost, marginPercentage, grossProfit } = calculateTotalMargin(bomItems);
-  const discountedValue = totalRevenue * (1 - requestedDiscount / 100);
-  const discountedGrossProfit = discountedValue - totalCost;
-  const discountedMargin = totalCost > 0 ? ((discountedValue - totalCost) / discountedValue) * 100 : 0;
-
-  const resetForm = () => {
-    setCustomerName('');
-    setOracleCustomerId('');
-    setSfdcOpportunity('');
-    setPriority('Medium');
-    setIsRepInvolved(false);
-    setShippingTerms('Ex-Works');
-    setPaymentTerms('30');
-    setQuoteCurrency('USD');
-    setRequestedDiscount(0);
-    setDiscountJustification('');
+  const validateRequiredFields = () => {
+    // Check for required quote fields that are empty
+    const requiredFields = Object.keys(quoteFields).filter(key => 
+      quoteFields[key] === '' || quoteFields[key] === null || quoteFields[key] === undefined
+    );
+    
+    return requiredFields.length === 0;
   };
 
   const handleSubmit = async () => {
-    if (!customerName.trim() || !oracleCustomerId.trim() || !sfdcOpportunity.trim()) {
-      toast({
-        title: "Missing Information",
-        description: "Please fill in all required fields.",
-        variant: "destructive"
-      });
+    if (!validateRequiredFields()) {
+      setError('Please fill in all required fields');
       return;
     }
 
-    if (bomItems.length === 0) {
-      toast({
-        title: "No Items",
-        description: "Please add items to your BOM before submitting.",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    if (requestedDiscount > 0 && !discountJustification.trim()) {
-      toast({
-        title: "Discount Justification Required",
-        description: "Please provide justification for the requested discount.",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    setIsSubmitting(true);
+    setSubmitting(true);
+    setError(null);
 
     try {
-      // Generate quote ID
-      const quoteId = `Q-${new Date().getFullYear()}-${Date.now().toString().slice(-6)}`;
-      
-      // Get current user info
-      const { data: { user } } = await supabase.auth.getUser();
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('first_name, last_name, email')
-        .eq('id', user?.id)
-        .single();
+      const { originalValue, discountedValue } = calculateTotals();
+      const quoteId = `QUOTE-${Date.now()}`;
 
-      // Insert quote
+      // Calculate costs and margins (simplified for demo)
+      const totalCost = bomItems.reduce((total, item) => {
+        return total + ((item.product.cost || item.product.price * 0.6) * item.quantity);
+      }, 0);
+
+      const originalMargin = ((originalValue - totalCost) / originalValue) * 100;
+      const discountedMargin = ((discountedValue - totalCost) / discountedValue) * 100;
+
+      // Submit quote to database
       const { error: quoteError } = await supabase
         .from('quotes')
         .insert({
           id: quoteId,
-          user_id: userId || user?.id,
-          customer_name: customerName,
-          oracle_customer_id: oracleCustomerId,
-          sfdc_opportunity: sfdcOpportunity,
-          priority,
-          is_rep_involved: isRepInvolved,
-          shipping_terms: shippingTerms,
-          payment_terms: paymentTerms,
-          currency: quoteCurrency,
-          original_quote_value: totalRevenue,
-          requested_discount: requestedDiscount,
+          user_id: 'temp-user-id', // Replace with actual user ID when auth is implemented
+          customer_name: quoteFields.customerName || 'Unknown Customer',
+          oracle_customer_id: quoteFields.oracleCustomerId || '',
+          sfdc_opportunity: quoteFields.sfdcOpportunity || `OPP-${Date.now()}`,
+          priority: quoteFields.priority || 'Medium',
+          shipping_terms: quoteFields.shippingTerms || 'Ex-Works',
+          payment_terms: quoteFields.paymentTerms || '30',
+          currency: quoteFields.currency || 'USD',
+          original_quote_value: originalValue,
           discounted_value: discountedValue,
-          original_margin: marginPercentage,
+          requested_discount: discountPercentage,
+          discount_justification: discountJustification,
+          original_margin: originalMargin,
           discounted_margin: discountedMargin,
-          gross_profit: discountedGrossProfit,
           total_cost: totalCost,
-          status: 'pending',
-          discount_justification: discountJustification || null,
-          submitted_by_name: profile ? `${profile.first_name} ${profile.last_name}` : null,
-          submitted_by_email: profile?.email || null
+          gross_profit: discountedValue - totalCost,
+          is_rep_involved: quoteFields.isRepInvolved || false,
+          quote_fields: quoteFields,
+          status: 'pending'
         });
 
       if (quoteError) throw quoteError;
 
-      // Insert BOM items
+      // Submit BOM items
       const bomItemsData = bomItems.map(item => ({
         quote_id: quoteId,
         product_id: item.product.id,
         name: item.product.name,
-        description: item.product.description,
-        part_number: item.partNumber,
+        description: item.product.description || '',
+        part_number: item.product.partNumber || item.product.id,
         quantity: item.quantity,
-        unit_price: item.product.price,
-        unit_cost: item.product.cost || 0,
-        total_price: item.product.price * item.quantity,
-        total_cost: (item.product.cost || 0) * item.quantity,
-        margin: item.product.cost > 0 ? ((item.product.price - (item.product.cost || 0)) / item.product.price) * 100 : 0
+        unit_price: item.product.price || 0,
+        unit_cost: item.product.cost || (item.product.price || 0) * 0.6,
+        total_price: (item.product.price || 0) * item.quantity,
+        total_cost: (item.product.cost || (item.product.price || 0) * 0.6) * item.quantity,
+        margin: item.product.price ? ((item.product.price - (item.product.cost || item.product.price * 0.6)) / item.product.price) * 100 : 0
       }));
 
       const { error: bomError } = await supabase
@@ -148,274 +125,144 @@ const QuoteSubmissionDialog = ({ bomItems, canSeePrices, userId }: QuoteSubmissi
 
       if (bomError) throw bomError;
 
-      toast({
-        title: "Quote Submitted Successfully",
-        description: `Quote ${quoteId} has been submitted for approval.`
-      });
-
-      setIsOpen(false);
-      resetForm();
+      onSubmit(quoteId);
     } catch (error) {
       console.error('Error submitting quote:', error);
-      toast({
-        title: "Submission Failed",
-        description: "There was an error submitting your quote. Please try again.",
-        variant: "destructive"
-      });
+      setError('Failed to submit quote. Please try again.');
     } finally {
-      setIsSubmitting(false);
+      setSubmitting(false);
     }
   };
 
+  const { originalValue, discountAmount, discountedValue } = calculateTotals();
+  const isValid = validateRequiredFields();
+
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogTrigger asChild>
-        <Button 
-          className="bg-red-600 hover:bg-red-700 text-white px-8 py-3 text-lg"
-          disabled={bomItems.length === 0}
-        >
-          <Send className="mr-2 h-5 w-5" />
-          Submit Quote Request
-        </Button>
-      </DialogTrigger>
-      <DialogContent className="bg-gray-900 border-gray-800 max-w-4xl max-h-[90vh] overflow-y-auto">
+    <Dialog open={true} onOpenChange={onClose}>
+      <DialogContent className="bg-gray-900 border-gray-800 text-white max-w-4xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-white text-xl">Submit Quote Request</DialogTitle>
+          <DialogTitle className="text-white flex items-center">
+            <FileText className="mr-2 h-5 w-5" />
+            Submit Quote Request
+          </DialogTitle>
         </DialogHeader>
         
         <div className="space-y-6">
-          {/* Quote Summary */}
-          <div className="bg-gray-800 p-4 rounded">
-            <h3 className="text-white font-medium mb-3">Quote Summary</h3>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div>
-                <p className="text-gray-400 text-sm">Items</p>
-                <p className="text-white font-bold">{bomItems.length}</p>
-              </div>
-              {canSeePrices && (
-                <>
-                  <div>
-                    <p className="text-gray-400 text-sm">Total Value</p>
-                    <p className="text-white font-bold">${totalRevenue.toLocaleString()}</p>
-                  </div>
-                  <div>
-                    <p className="text-gray-400 text-sm">Total Cost</p>
-                    <p className="text-orange-400 font-bold">${totalCost.toLocaleString()}</p>
-                  </div>
-                  <div>
-                    <p className="text-gray-400 text-sm">Margin</p>
-                    <p className="text-green-400 font-bold">{marginPercentage.toFixed(1)}%</p>
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Customer Information */}
-            <div className="space-y-4">
-              <h3 className="text-white font-medium">Customer Information</h3>
-              
-              <div>
-                <Label htmlFor="customerName" className="text-white">Customer Name *</Label>
-                <Input
-                  id="customerName"
-                  value={customerName}
-                  onChange={(e) => setCustomerName(e.target.value)}
-                  className="bg-gray-800 border-gray-700 text-white mt-1"
-                  placeholder="Enter customer name"
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="oracleCustomerId" className="text-white">Oracle Customer ID *</Label>
-                <Input
-                  id="oracleCustomerId"
-                  value={oracleCustomerId}
-                  onChange={(e) => setOracleCustomerId(e.target.value)}
-                  className="bg-gray-800 border-gray-700 text-white mt-1"
-                  placeholder="Enter Oracle customer ID"
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="sfdcOpportunity" className="text-white">SFDC Opportunity *</Label>
-                <Input
-                  id="sfdcOpportunity"
-                  value={sfdcOpportunity}
-                  onChange={(e) => setSfdcOpportunity(e.target.value)}
-                  className="bg-gray-800 border-gray-700 text-white mt-1"
-                  placeholder="Enter SFDC opportunity ID"
-                />
-              </div>
-            </div>
-
-            {/* Quote Details */}
-            <div className="space-y-4">
-              <h3 className="text-white font-medium">Quote Details</h3>
-              
-              <div>
-                <Label className="text-white">Priority</Label>
-                <Select value={priority} onValueChange={(value: any) => setPriority(value)}>
-                  <SelectTrigger className="bg-gray-800 border-gray-700 text-white mt-1">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="bg-gray-800 border-gray-700">
-                    <SelectItem value="Low">Low</SelectItem>
-                    <SelectItem value="Medium">Medium</SelectItem>
-                    <SelectItem value="High">High</SelectItem>
-                    <SelectItem value="Urgent">Urgent</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
-                <Label className="text-white">Currency</Label>
-                <Select value={quoteCurrency} onValueChange={(value: any) => setQuoteCurrency(value)}>
-                  <SelectTrigger className="bg-gray-800 border-gray-700 text-white mt-1">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="bg-gray-800 border-gray-700">
-                    <SelectItem value="USD">USD</SelectItem>
-                    <SelectItem value="EURO">EURO</SelectItem>
-                    <SelectItem value="GBP">GBP</SelectItem>
-                    <SelectItem value="CAD">CAD</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="isRepInvolved"
-                  checked={isRepInvolved}
-                  onCheckedChange={(checked) => setIsRepInvolved(checked as boolean)}
-                />
-                <Label htmlFor="isRepInvolved" className="text-white">Rep Involved</Label>
-              </div>
-            </div>
-          </div>
-
-          {/* Terms */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <Label className="text-white">Shipping Terms</Label>
-              <Select value={shippingTerms} onValueChange={(value: any) => setShippingTerms(value)}>
-                <SelectTrigger className="bg-gray-800 border-gray-700 text-white mt-1">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className="bg-gray-800 border-gray-700">
-                  <SelectItem value="Ex-Works">Ex-Works</SelectItem>
-                  <SelectItem value="CFR">CFR</SelectItem>
-                  <SelectItem value="CIF">CIF</SelectItem>
-                  <SelectItem value="CIP">CIP</SelectItem>
-                  <SelectItem value="CPT">CPT</SelectItem>
-                  <SelectItem value="DDP">DDP</SelectItem>
-                  <SelectItem value="DAP">DAP</SelectItem>
-                  <SelectItem value="FCA">FCA</SelectItem>
-                  <SelectItem value="Prepaid">Prepaid</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div>
-              <Label className="text-white">Payment Terms</Label>
-              <Select value={paymentTerms} onValueChange={(value: any) => setPaymentTerms(value)}>
-                <SelectTrigger className="bg-gray-800 border-gray-700 text-white mt-1">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className="bg-gray-800 border-gray-700">
-                  <SelectItem value="Prepaid">Prepaid</SelectItem>
-                  <SelectItem value="15">15 days</SelectItem>
-                  <SelectItem value="30">30 days</SelectItem>
-                  <SelectItem value="60">60 days</SelectItem>
-                  <SelectItem value="90">90 days</SelectItem>
-                  <SelectItem value="120">120 days</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          {/* Discount Section */}
-          {canSeePrices && (
-            <div className="space-y-4">
-              <h3 className="text-white font-medium">Discount Request</h3>
-              
-              <div>
-                <Label htmlFor="requestedDiscount" className="text-white">Requested Discount (%)</Label>
-                <Input
-                  id="requestedDiscount"
-                  type="number"
-                  value={requestedDiscount}
-                  onChange={(e) => setRequestedDiscount(Number(e.target.value))}
-                  className="bg-gray-800 border-gray-700 text-white mt-1"
-                  placeholder="0"
-                  min="0"
-                  max="50"
-                />
-              </div>
-
-              {requestedDiscount > 0 && (
-                <>
-                  <div className="bg-gray-800 p-3 rounded">
-                    <div className="grid grid-cols-3 gap-4 text-sm">
-                      <div>
-                        <p className="text-gray-400">Discounted Value</p>
-                        <p className="text-white font-bold">${discountedValue.toLocaleString()}</p>
-                      </div>
-                      <div>
-                        <p className="text-gray-400">New Margin</p>
-                        <p className={`font-bold ${discountedMargin > 20 ? 'text-green-400' : discountedMargin > 10 ? 'text-yellow-400' : 'text-red-400'}`}>
-                          {discountedMargin.toFixed(1)}%
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-gray-400">New Profit</p>
-                        <p className="text-green-400 font-bold">${discountedGrossProfit.toLocaleString()}</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div>
-                    <Label htmlFor="discountJustification" className="text-white">Discount Justification *</Label>
-                    <Textarea
-                      id="discountJustification"
-                      value={discountJustification}
-                      onChange={(e) => setDiscountJustification(e.target.value)}
-                      className="bg-gray-800 border-gray-700 text-white mt-1"
-                      placeholder="Please provide justification for the requested discount..."
-                      rows={3}
-                    />
-                  </div>
-                </>
-              )}
-            </div>
+          {/* Validation Status */}
+          {!isValid && (
+            <Alert className="bg-red-900/20 border-red-600">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription className="text-red-400">
+                Please fill in all required fields before submitting the quote.
+              </AlertDescription>
+            </Alert>
           )}
 
-          {/* Submit Button */}
-          <div className="flex justify-end space-x-3 pt-4">
-            <Button
-              variant="outline"
-              onClick={() => setIsOpen(false)}
-              className="border-gray-600 text-gray-300"
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={handleSubmit}
-              disabled={isSubmitting}
-              className="bg-red-600 hover:bg-red-700"
-            >
-              {isSubmitting ? (
-                <>Submitting...</>
-              ) : (
-                <>
-                  <Send className="mr-2 h-4 w-4" />
-                  Submit Quote
-                </>
-              )}
-            </Button>
-          </div>
+          {/* Quote Summary */}
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-white">Quote Summary</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="flex justify-between">
+                  <span className="text-gray-300">Total Items:</span>
+                  <span className="text-white">{bomItems.length}</span>
+                </div>
+                
+                {canSeePrices && (
+                  <>
+                    <div className="flex justify-between">
+                      <span className="text-gray-300">Original Value:</span>
+                      <span className="text-white">${originalValue.toLocaleString()}</span>
+                    </div>
+                    
+                    {discountPercentage > 0 && (
+                      <>
+                        <div className="flex justify-between">
+                          <span className="text-gray-300">Discount ({discountPercentage}%):</span>
+                          <span className="text-red-400">-${discountAmount.toLocaleString()}</span>
+                        </div>
+                        <div className="flex justify-between font-bold border-t border-gray-600 pt-2">
+                          <span className="text-white">Final Value:</span>
+                          <span className="text-green-400">${discountedValue.toLocaleString()}</span>
+                        </div>
+                      </>
+                    )}
+                  </>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* BOM Items Preview */}
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-white">Bill of Materials</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2 max-h-40 overflow-y-auto">
+                {bomItems.map((item, index) => (
+                  <div key={index} className="flex justify-between items-center text-sm">
+                    <div>
+                      <span className="text-white">{item.product.name}</span>
+                      <span className="text-gray-400 ml-2">x{item.quantity}</span>
+                    </div>
+                    {canSeePrices && (
+                      <span className="text-gray-300">
+                        ${((item.product.price || 0) * item.quantity).toLocaleString()}
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Quote Fields Preview */}
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-white">Quote Information</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                {Object.entries(quoteFields).map(([key, value]) => (
+                  <div key={key} className="flex justify-between">
+                    <span className="text-gray-400 capitalize">{key.replace(/([A-Z])/g, ' $1').trim()}:</span>
+                    <span className="text-white">{value || '—'}</span>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
+          {error && (
+            <Alert className="bg-red-900/20 border-red-600">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription className="text-red-400">
+                {error}
+              </AlertDescription>
+            </Alert>
+          )}
         </div>
+
+        <DialogFooter className="flex space-x-2">
+          <Button
+            variant="outline"
+            onClick={onClose}
+            className="border-gray-600 text-white hover:bg-gray-800"
+            disabled={submitting}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={handleSubmit}
+            className="bg-green-600 hover:bg-green-700 text-white"
+            disabled={submitting || !isValid}
+          >
+            {submitting ? 'Submitting...' : 'Submit Quote'}
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
