@@ -28,7 +28,7 @@ interface BOMBuilderProps {
 }
 
 const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
-  // Add authentication
+  // ALL HOOKS MUST BE AT THE TOP - NO CONDITIONAL RETURNS BEFORE HOOKS
   const { user, loading } = useAuth();
 
   const [selectedLevel1Product, setSelectedLevel1Product] = useState<Level1Product | null>(null);
@@ -49,27 +49,6 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
 
   // Get all Level 1 products for dynamic tabs
   const level1Products = productDataService.getLevel1Products().filter(p => p.enabled);
-
-  // Show loading state if authentication is still loading
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-white">Loading...</div>
-      </div>
-    );
-  }
-
-  // Show authentication required message if user is not logged in
-  if (!user) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-white text-center">
-          <p className="mb-4">Please log in to use the BOM Builder</p>
-          <p className="text-gray-400">Authentication is required to submit quotes</p>
-        </div>
-      </div>
-    );
-  }
 
   // Set default active tab when products are loaded
   useEffect(() => {
@@ -434,6 +413,26 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
         );
     }
   };
+
+  // CONDITIONAL RENDERING IN JSX - NO EARLY RETURNS
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-white">Loading...</div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-white text-center">
+          <p className="mb-4">Please log in to use the BOM Builder</p>
+          <p className="text-gray-400">Authentication is required to submit quotes</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
