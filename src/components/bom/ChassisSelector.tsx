@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ExternalLink } from "lucide-react";
+import { productDataService } from "@/services/productDataService";
 
 interface ChassisSelectorProps {
   onChassisSelect: (chassis: Level2Product) => void;
@@ -13,53 +14,10 @@ interface ChassisSelectorProps {
 }
 
 const ChassisSelector = ({ onChassisSelect, selectedChassis, canSeePrices }: ChassisSelectorProps) => {
-  const chassisOptions: Level2Product[] = [
-    {
-      id: 'ltx-chassis',
-      name: 'LTX Chassis',
-      parentProductId: 'qtms-main',
-      type: 'LTX',
-      description: 'Large capacity transformer monitoring system',
-      price: 4200,
-      enabled: true,
-      specifications: {
-        height: '6U',
-        slots: 14
-      },
-      partNumber: 'LTX-6U-14S',
-      productInfoUrl: 'https://www.qualitrolcorp.com/products/ltx-chassis'
-    },
-    {
-      id: 'mtx-chassis',
-      name: 'MTX Chassis',
-      parentProductId: 'qtms-main',
-      type: 'MTX',
-      description: 'Medium capacity transformer monitoring system',
-      price: 2800,
-      enabled: true,
-      specifications: {
-        height: '3U',
-        slots: 7
-      },
-      partNumber: 'MTX-3U-7S',
-      productInfoUrl: 'https://www.qualitrolcorp.com/products/mtx-chassis'
-    },
-    {
-      id: 'stx-chassis',
-      name: 'STX Chassis',
-      parentProductId: 'qtms-main',
-      type: 'STX',
-      description: 'Compact transformer monitoring system',
-      price: 1900,
-      enabled: true,
-      specifications: {
-        height: '1.5U',
-        slots: 4
-      },
-      partNumber: 'STX-1.5U-4S',
-      productInfoUrl: 'https://www.qualitrolcorp.com/products/stx-chassis'
-    }
-  ];
+  // Get chassis options from productDataService
+  const chassisOptions: Level2Product[] = productDataService
+    .getLevel2ProductsForLevel1('qtms')
+    .filter(chassis => ['LTX', 'MTX', 'STX'].includes(chassis.type) && chassis.enabled);
 
   return (
     <div className="space-y-4">

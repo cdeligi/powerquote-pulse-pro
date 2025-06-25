@@ -135,20 +135,26 @@ const QTMSConfigurationEditor = ({
       return;
     }
 
+    // LTX Slot 8 restriction - only display cards allowed
+    const targetSlot = slot !== undefined ? slot : selectedSlot!;
+    if (consolidatedQTMS.configuration.chassis.type === 'LTX' && targetSlot === 8 && card.type !== 'display') {
+      console.error('Only display cards can be placed in slot 8 of LTX chassis');
+      return;
+    }
+
     // Check if card needs configuration
     if (card.name.toLowerCase().includes('analog')) {
       const newItem: BOMItem = {
         id: `${Date.now()}-${Math.random()}`,
         product: card,
         quantity: 1,
-        slot: slot || selectedSlot,
+        slot: targetSlot,
         enabled: true
       };
       setConfiguringCard(newItem);
       return;
     }
 
-    const targetSlot = slot !== undefined ? slot : selectedSlot!;
     setEditedSlotAssignments(prev => ({
       ...prev,
       [targetSlot]: card
@@ -277,6 +283,11 @@ const QTMSConfigurationEditor = ({
                     <h4 className="text-white font-medium mb-2">Chassis</h4>
                     <div className="text-gray-300">{consolidatedQTMS.configuration.chassis.name}</div>
                     <div className="text-gray-400 text-sm">{consolidatedQTMS.configuration.chassis.description}</div>
+                    {consolidatedQTMS.configuration.chassis.type === 'LTX' && (
+                      <div className="text-purple-300 text-xs mt-1">
+                        Slot 8 reserved for Display Cards only
+                      </div>
+                    )}
                   </div>
                   
                   <div>
@@ -334,6 +345,11 @@ const QTMSConfigurationEditor = ({
                                   {hasConfiguration && (
                                     <Badge variant="outline" className="text-purple-400 border-purple-400">
                                       Configured
+                                    </Badge>
+                                  )}
+                                  {consolidatedQTMS.configuration.chassis.type === 'LTX' && parseInt(slot) === 8 && (
+                                    <Badge variant="outline" className="text-purple-400 border-purple-400">
+                                      Display Slot
                                     </Badge>
                                   )}
                                 </div>

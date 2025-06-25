@@ -49,6 +49,56 @@ const DEFAULT_LEVEL1_PRODUCTS: Level1Product[] = [
 ];
 
 const DEFAULT_LEVEL2_PRODUCTS: Level2Product[] = [
+  // QTMS Chassis
+  {
+    id: 'ltx-chassis',
+    name: 'LTX Chassis',
+    parentProductId: 'qtms',
+    type: 'LTX',
+    description: 'Large capacity transformer monitoring system',
+    price: 4200,
+    cost: 3000,
+    enabled: true,
+    specifications: {
+      height: '6U',
+      slots: 14
+    },
+    partNumber: 'LTX-6U-14S',
+    productInfoUrl: 'https://www.qualitrolcorp.com/products/ltx-chassis'
+  },
+  {
+    id: 'mtx-chassis',
+    name: 'MTX Chassis',
+    parentProductId: 'qtms',
+    type: 'MTX',
+    description: 'Medium capacity transformer monitoring system',
+    price: 2800,
+    cost: 2000,
+    enabled: true,
+    specifications: {
+      height: '3U',
+      slots: 7
+    },
+    partNumber: 'MTX-3U-7S',
+    productInfoUrl: 'https://www.qualitrolcorp.com/products/mtx-chassis'
+  },
+  {
+    id: 'stx-chassis',
+    name: 'STX Chassis',
+    parentProductId: 'qtms',
+    type: 'STX',
+    description: 'Compact transformer monitoring system',
+    price: 1900,
+    cost: 1400,
+    enabled: true,
+    specifications: {
+      height: '1.5U',
+      slots: 4
+    },
+    partNumber: 'STX-1.5U-4S',
+    productInfoUrl: 'https://www.qualitrolcorp.com/products/stx-chassis'
+  },
+  // Other existing Level 2 products
   {
     id: 'chassis-6-slot',
     name: '6-Slot Chassis',
@@ -164,6 +214,288 @@ const DEFAULT_LEVEL2_PRODUCTS: Level2Product[] = [
 ];
 
 const DEFAULT_LEVEL3_PRODUCTS: Level3Product[] = [
+  // Basic Cards for all chassis types
+  {
+    id: 'relay-card-basic',
+    name: 'Basic Relay Card',
+    parentProductId: 'ltx-chassis',
+    type: 'relay',
+    description: '8-channel relay output card',
+    price: 850,
+    cost: 600,
+    enabled: true,
+    partNumber: 'RLY-8CH-001',
+    specifications: {
+      channels: 8,
+      voltage: '24VDC',
+      current: '2A per channel',
+      slotRequirement: 1,
+      compatibleChassis: ['LTX', 'MTX', 'STX']
+    }
+  },
+  {
+    id: 'relay-card-basic-mtx',
+    name: 'Basic Relay Card',
+    parentProductId: 'mtx-chassis',
+    type: 'relay',
+    description: '8-channel relay output card',
+    price: 850,
+    cost: 600,
+    enabled: true,
+    partNumber: 'RLY-8CH-001',
+    specifications: {
+      channels: 8,
+      voltage: '24VDC',
+      current: '2A per channel',
+      slotRequirement: 1,
+      compatibleChassis: ['LTX', 'MTX', 'STX']
+    }
+  },
+  {
+    id: 'relay-card-basic-stx',
+    name: 'Basic Relay Card',
+    parentProductId: 'stx-chassis',
+    type: 'relay',
+    description: '8-channel relay output card',
+    price: 850,
+    cost: 600,
+    enabled: true,
+    partNumber: 'RLY-8CH-001',
+    specifications: {
+      channels: 8,
+      voltage: '24VDC',
+      current: '2A per channel',
+      slotRequirement: 1,
+      compatibleChassis: ['LTX', 'MTX', 'STX']
+    }
+  },
+  // Analog Cards
+  {
+    id: 'analog-card-multi-ltx',
+    name: 'Multi-Input Analog Card',
+    parentProductId: 'ltx-chassis',
+    type: 'analog',
+    description: 'High-precision analog input card',
+    price: 1250,
+    cost: 900,
+    enabled: true,
+    partNumber: 'ANA-16CH-001',
+    specifications: {
+      channels: 16,
+      resolution: '16-bit',
+      inputRange: '±10V, 4-20mA',
+      inputs: 16,
+      slotRequirement: 1,
+      compatibleChassis: ['LTX', 'MTX', 'STX']
+    }
+  },
+  {
+    id: 'analog-card-multi-mtx',
+    name: 'Multi-Input Analog Card',
+    parentProductId: 'mtx-chassis',
+    type: 'analog',
+    description: 'High-precision analog input card',
+    price: 1250,
+    cost: 900,
+    enabled: true,
+    partNumber: 'ANA-16CH-001',
+    specifications: {
+      channels: 16,
+      resolution: '16-bit',
+      inputRange: '±10V, 4-20mA',
+      inputs: 16,
+      slotRequirement: 1,
+      compatibleChassis: ['LTX', 'MTX', 'STX']
+    }
+  },
+  {
+    id: 'analog-card-multi-stx',
+    name: 'Multi-Input Analog Card',
+    parentProductId: 'stx-chassis',
+    type: 'analog',
+    description: 'High-precision analog input card',
+    price: 1250,
+    cost: 900,
+    enabled: true,
+    partNumber: 'ANA-16CH-001',
+    specifications: {
+      channels: 16,
+      resolution: '16-bit',
+      inputRange: '±10V, 4-20mA',
+      inputs: 16,
+      slotRequirement: 1,
+      compatibleChassis: ['LTX', 'MTX', 'STX']
+    }
+  },
+  // Bushing Cards
+  {
+    id: 'bushing-card-ltx',
+    name: 'Bushing Monitoring Card',
+    parentProductId: 'ltx-chassis',
+    type: 'bushing',
+    description: 'Transformer bushing monitoring interface',
+    price: 2250,
+    cost: 1600,
+    enabled: true,
+    partNumber: 'BSH-12CH-001',
+    specifications: {
+      channels: 12,
+      measurement: 'Capacitance & Tan Delta',
+      slotRequirement: 2,
+      compatibleChassis: ['LTX', 'MTX', 'STX']
+    }
+  },
+  {
+    id: 'bushing-card-mtx',
+    name: 'Bushing Monitoring Card',
+    parentProductId: 'mtx-chassis',
+    type: 'bushing',
+    description: 'Transformer bushing monitoring interface',
+    price: 2250,
+    cost: 1600,
+    enabled: true,
+    partNumber: 'BSH-12CH-001',
+    specifications: {
+      channels: 12,
+      measurement: 'Capacitance & Tan Delta',
+      slotRequirement: 2,
+      compatibleChassis: ['LTX', 'MTX', 'STX']
+    }
+  },
+  {
+    id: 'bushing-card-stx',
+    name: 'Bushing Monitoring Card',
+    parentProductId: 'stx-chassis',
+    type: 'bushing',
+    description: 'Transformer bushing monitoring interface',
+    price: 2250,
+    cost: 1600,
+    enabled: true,
+    partNumber: 'BSH-12CH-001',
+    specifications: {
+      channels: 12,
+      measurement: 'Capacitance & Tan Delta',
+      slotRequirement: 2,
+      compatibleChassis: ['LTX', 'MTX', 'STX']
+    }
+  },
+  // Display Cards (LTX only)
+  {
+    id: 'display-card-ltx',
+    name: 'Local Display Interface',
+    parentProductId: 'ltx-chassis',
+    type: 'display',
+    description: 'Local HMI display interface card',
+    price: 950,
+    cost: 700,
+    enabled: true,
+    partNumber: 'DIS-LCD-001',
+    specifications: {
+      display: 'LCD',
+      resolution: '320x240',
+      backlight: 'LED',
+      slotRequirement: 1,
+      compatibleChassis: ['LTX']
+    }
+  },
+  // Fiber Cards
+  {
+    id: 'fiber-card-4-input-ltx',
+    name: 'Fiber Optic Communication Card (4 Inputs)',
+    parentProductId: 'ltx-chassis',
+    type: 'fiber',
+    description: 'High-speed fiber optic interface with 4 inputs',
+    price: 1850,
+    cost: 1300,
+    enabled: true,
+    partNumber: 'FIB-4I-001',
+    specifications: {
+      ports: 2,
+      inputs: 4,
+      speed: '1Gbps',
+      connector: 'LC',
+      slotRequirement: 1,
+      compatibleChassis: ['LTX', 'MTX', 'STX']
+    }
+  },
+  {
+    id: 'fiber-card-6-input-ltx',
+    name: 'Fiber Optic Communication Card (6 Inputs)',
+    parentProductId: 'ltx-chassis',
+    type: 'fiber',
+    description: 'High-speed fiber optic interface with 6 inputs',
+    price: 2150,
+    cost: 1500,
+    enabled: true,
+    partNumber: 'FIB-6I-001',
+    specifications: {
+      ports: 2,
+      inputs: 6,
+      speed: '1Gbps',
+      connector: 'LC',
+      slotRequirement: 1,
+      compatibleChassis: ['LTX', 'MTX', 'STX']
+    }
+  },
+  {
+    id: 'fiber-card-8-input-ltx',
+    name: 'Fiber Optic Communication Card (8 Inputs)',
+    parentProductId: 'ltx-chassis',
+    type: 'fiber',
+    description: 'High-speed fiber optic interface with 8 inputs',
+    price: 2450,
+    cost: 1700,
+    enabled: true,
+    partNumber: 'FIB-8I-001',
+    specifications: {
+      ports: 2,
+      inputs: 8,
+      speed: '1Gbps',
+      connector: 'LC',
+      slotRequirement: 1,
+      compatibleChassis: ['LTX', 'MTX', 'STX']
+    }
+  },
+  // Duplicate fiber cards for MTX and STX
+  {
+    id: 'fiber-card-4-input-mtx',
+    name: 'Fiber Optic Communication Card (4 Inputs)',
+    parentProductId: 'mtx-chassis',
+    type: 'fiber',
+    description: 'High-speed fiber optic interface with 4 inputs',
+    price: 1850,
+    cost: 1300,
+    enabled: true,
+    partNumber: 'FIB-4I-001',
+    specifications: {
+      ports: 2,
+      inputs: 4,
+      speed: '1Gbps',
+      connector: 'LC',
+      slotRequirement: 1,
+      compatibleChassis: ['LTX', 'MTX', 'STX']
+    }
+  },
+  {
+    id: 'fiber-card-4-input-stx',
+    name: 'Fiber Optic Communication Card (4 Inputs)',
+    parentProductId: 'stx-chassis',
+    type: 'fiber',
+    description: 'High-speed fiber optic interface with 4 inputs',
+    price: 1850,
+    cost: 1300,
+    enabled: true,
+    partNumber: 'FIB-4I-001',
+    specifications: {
+      ports: 2,
+      inputs: 4,
+      speed: '1Gbps',
+      connector: 'LC',
+      slotRequirement: 1,
+      compatibleChassis: ['LTX', 'MTX', 'STX']
+    }
+  },
+  // Original Level 3 products
   {
     id: 'relay-card-8',
     name: '8-Channel Relay Card',
@@ -232,7 +564,7 @@ const DEFAULT_LEVEL3_PRODUCTS: Level3Product[] = [
       slotRequirement: 2
     }
   },
-    {
+  {
     id: 'digital-input-card-16',
     name: '16-Channel Digital Input Card',
     parentProductId: 'chassis-6-slot',
@@ -366,7 +698,7 @@ class ProductDataService {
     return this.level2Products;
   }
 
-   getLevel2ProductsForLevel1(level1ProductId: string): Level2Product[] {
+  getLevel2ProductsForLevel1(level1ProductId: string): Level2Product[] {
     return this.level2Products.filter(product => product.parentProductId === level1ProductId);
   }
 
@@ -398,6 +730,10 @@ class ProductDataService {
   // Level 3 Products methods
   getLevel3Products(): Level3Product[] {
     return this.level3Products;
+  }
+
+  getLevel3ProductsForLevel2(level2ProductId: string): Level3Product[] {
+    return this.level3Products.filter(product => product.parentProductId === level2ProductId);
   }
 
   createLevel3Product(product: Omit<Level3Product, 'id'>): Level3Product {

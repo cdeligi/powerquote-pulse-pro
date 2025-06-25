@@ -1,4 +1,3 @@
-
 import { Chassis, Card as ProductCard } from "@/types/product";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -32,11 +31,16 @@ const RackVisualizer = ({
     if (slot === 0) return 'bg-blue-600'; // CPU slot (slot 0)
     if (selectedSlot === slot) return 'bg-yellow-600'; // Selected slot
     if (slotAssignments[slot]) return 'bg-green-600'; // Occupied
+    
+    // Special color for LTX slot 8 (display only)
+    if (chassis.type === 'LTX' && slot === 8) return 'bg-purple-700'; // Display slot
+    
     return 'bg-gray-700'; // Empty
   };
 
   const getSlotLabel = (slot: number) => {
     if (slot === 0) return 'CPU';
+    if (chassis.type === 'LTX' && slot === 8 && !slotAssignments[slot]) return 'DISP';
     if (slotAssignments[slot]) {
       const card = slotAssignments[slot];
       if (isBushingCard(card)) {
@@ -53,6 +57,9 @@ const RackVisualizer = ({
 
   const getSlotTitle = (slot: number) => {
     if (slot === 0) return 'CPU (Fixed)';
+    if (chassis.type === 'LTX' && slot === 8 && !slotAssignments[slot]) {
+      return 'Slot 8 - Display Cards Only';
+    }
     if (slotAssignments[slot]) {
       const card = slotAssignments[slot];
       if (isBushingCard(card)) {
@@ -95,6 +102,7 @@ const RackVisualizer = ({
     const isPrimaryBushingSlot = Object.values(bushingSlots).some(slots => 
       slots.includes(slot) && slots[0] === slot
     );
+    const isLTXDisplaySlot = chassis.type === 'LTX' && slot === 8;
     
     return (
       <div
@@ -107,6 +115,7 @@ const RackVisualizer = ({
           ${selectedSlot === slot ? 'ring-2 ring-yellow-400' : ''}
           ${isSecondaryBushingSlot ? 'border-l-0 rounded-l-none border-orange-500' : ''}
           ${isPrimaryBushingSlot ? 'border-r-0 rounded-r-none border-orange-500' : ''}
+          ${isLTXDisplaySlot ? 'border-purple-500' : ''}
         `}
         onClick={() => clickable && onSlotClick(slot)}
         title={getSlotTitle(slot)}
@@ -181,7 +190,14 @@ const RackVisualizer = ({
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
-          <p className="text-gray-400 text-sm">Click on any slot (except CPU) to add a card. Click the X to clear a slot.</p>
+          <p className="text-gray-400 text-sm">
+            Click on any slot (except CPU) to add a card. Click the X to clear a slot.
+            {chassis.type === 'LTX' && (
+              <span className="block text-purple-300 mt-1">
+                Slot 8 is reserved for Display Cards only.
+              </span>
+            )}
+          </p>
           
           {renderChassisLayout()}
           
@@ -195,7 +211,7 @@ const RackVisualizer = ({
                     Slots {occupiedSlots.join(', ')}: {slotAssignments[parseInt(slot)]?.name}
                     <br />
                     <span className="text-xs text-orange-200">
-                      (Only one bushing card allowed per chassis - clearing any slot removes all)
+                      (Only one bushing card allowed per chassis)
                     </span>
                   </div>
                 ))}
@@ -244,6 +260,12 @@ const RackVisualizer = ({
               <div className="w-4 h-4 bg-orange-600 rounded"></div>
               <span className="text-sm text-gray-400">Bushing Card</span>
             </div>
+            {chassis.type === 'LTX' && (
+              <div className="flex items-center space-x-2">
+                <div className="w-4 h-4 bg-purple-700 rounded"></div>
+                <span className="text-sm text-gray-400">Display Only</span>
+              </div>
+            )}
             <div className="flex items-center space-x-2">
               <div className="w-4 h-4 bg-gray-700 rounded"></div>
               <span className="text-sm text-gray-400">Available</span>
