@@ -59,6 +59,39 @@ const QuoteSubmissionDialog = ({
     return requiredFields.length === 0;
   };
 
+  const validateProductsExist = async () => {
+    console.log('Validating products exist in database...');
+    
+    // Get all unique product IDs from BOM items
+    const productIds = bomItems.map(item => item.product.id);
+    console.log('Product IDs to validate:', productIds);
+    
+    // Check if products exist in database
+    const { data: products, error: productsError } = await supabase
+      .from('products')
+      .select('id')
+      .in('id', productIds);
+    
+    if (productsError) {
+      console.error('Error checking products:', productsError);
+      throw new Error(`Failed to validate products: ${productsError.message}`);
+    }
+    
+    console.log('Products found in database:', products);
+    
+    // Check if all products exist
+    const existingProductIds = new Set(products?.map(p => p.id) || []);
+    const missingProducts = productIds.filter(id => !existingProductIds.has(id));
+    
+    if (missingProducts.length > 0) {
+      console.error('Missing products in database:', missingProducts);
+      throw new Error(`Products not found in database: ${missingProducts.join(', ')}`);
+    }
+    
+    console.log('All products validated successfully');
+    return true;
+  };
+
   const handleSubmit = async () => {
     console.log('Starting quote submission for user:', user);
     
@@ -76,6 +109,9 @@ const QuoteSubmissionDialog = ({
     setError(null);
 
     try {
+      // Validate products exist in database
+      await validateProductsExist();
+      
       const { originalValue, discountedValue } = calculateTotals();
       const quoteId = `QUOTE-${Date.now()}`;
 
@@ -154,6 +190,8 @@ const QuoteSubmissionDialog = ({
           margin: itemMargin
         };
       });
+
+      console.log('BOM items data to insert:', bomItemsData);
 
       const { error: bomError } = await supabase
         .from('bom_items')
