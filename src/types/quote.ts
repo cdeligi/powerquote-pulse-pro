@@ -3,7 +3,7 @@ import { BOMItem } from "./product";
 
 export type QuotePriority = 'High' | 'Medium' | 'Low' | 'Urgent';
 export type Currency = 'USD' | 'EURO' | 'GBP' | 'CAD';
-export type QuoteStatus = 'draft' | 'pending_approval' | 'approved' | 'rejected';
+export type QuoteStatus = 'draft' | 'pending' | 'approved' | 'rejected' | 'under-review';
 
 export interface Quote {
   id: string;
