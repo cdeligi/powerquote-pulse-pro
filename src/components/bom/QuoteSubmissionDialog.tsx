@@ -130,7 +130,6 @@ const QuoteSubmissionDialog = ({
 
     const baseData = {
       quote_id: quoteId,
-      product_id: item.product.id,
       name: item.product.name,
       description: item.product.description || '',
       part_number: item.partNumber || item.product.partNumber || item.product.id,
@@ -142,17 +141,28 @@ const QuoteSubmissionDialog = ({
       margin: itemMargin
     };
 
-    // Add configuration data for dynamic products
+    // Use placeholder product IDs for dynamic configurations to avoid foreign key issues
     if (isDynamicProduct(item)) {
-      return {
-        ...baseData,
-        product_type: isQTMSConfiguration(item) ? 'qtms_configuration' : 'dynamic_configuration',
-        configuration_data: item.configuration || null
-      };
+      if (isQTMSConfiguration(item)) {
+        return {
+          ...baseData,
+          product_id: 'QTMS_CONFIGURATION',
+          product_type: 'qtms_configuration',
+          configuration_data: item.configuration || null
+        };
+      } else {
+        return {
+          ...baseData,
+          product_id: 'DGA_CONFIGURATION',
+          product_type: 'dga_configuration',
+          configuration_data: item.configuration || null
+        };
+      }
     }
 
     return {
       ...baseData,
+      product_id: item.product.id,
       product_type: 'standard'
     };
   };
@@ -365,11 +375,6 @@ const QuoteSubmissionDialog = ({
                         <Badge variant="outline" className="ml-2 text-xs text-blue-400 border-blue-400">
                           Configured
                         </Badge>
-                      )}
-                      {canSeePrices && (
-                        <span className="text-gray-400 ml-2">
-                          (Margin: {calculateItemMargin(item).toFixed(1)}%)
-                        </span>
                       )}
                     </div>
                     {canSeePrices && (
