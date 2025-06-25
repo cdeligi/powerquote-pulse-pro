@@ -141,7 +141,8 @@ const BOMBuilder = ({ canSeePrices, onBOMUpdate, onDiscountUpdate, userId }: BOM
   };
 
   const handleSaveQTMSConfiguration = (consolidatedQTMS: any) => {
-    const newBOMItem = createQTMSBOMItem(consolidatedQTMS);
+    const correctedQTMS = consolidateQTMSConfiguration(consolidatedQTMS);
+    const newBOMItem = createQTMSBOMItem(correctedQTMS);
     setBomItems([...bomItems, newBOMItem]);
     setEditingQTMS(null);
   };
@@ -373,7 +374,7 @@ const BOMBuilder = ({ canSeePrices, onBOMUpdate, onDiscountUpdate, userId }: BOM
       {/* QTMS Configuration Editor Dialog */}
       {editingQTMS && (
         <QTMSConfigurationEditor
-          qtmsConfiguration={editingQTMS}
+          configuration={editingQTMS}
           onSave={handleSaveQTMSConfiguration}
           onCancel={() => setEditingQTMS(null)}
           canSeePrices={canSeePrices}

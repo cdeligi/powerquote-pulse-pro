@@ -21,54 +21,13 @@ export interface ConsolidatedQTMS {
 }
 
 export const consolidateQTMSConfiguration = (
-  level1ProductId: string,
-  level2ProductId: string,
-  level3ProductId: string,
-  customizations: Level3Customization[]
+  consolidatedConfig: ConsolidatedQTMS
 ): ConsolidatedQTMS => {
-  // Create a mock consolidated QTMS configuration
-  // This would normally fetch actual products from the service
-  const chassis = {
-    id: level2ProductId,
-    name: 'QTMS Chassis',
-    parentProductId: level1ProductId,
-    type: 'LTX',
-    description: 'QTMS Chassis Configuration',
-    price: 5000,
-    enabled: true
-  } as Level2Product;
-
-  const components: BOMItem[] = [{
-    id: `${Date.now()}-chassis`,
-    product: chassis,
-    quantity: 1,
-    enabled: true,
-    partNumber: chassis.partNumber
-  }];
-
-  const totalPrice = components.reduce((sum, item) => sum + (item.product.price || 0), 0);
-
-  const configuration: QTMSConfiguration = {
-    chassis,
-    slotAssignments: {},
-    hasRemoteDisplay: false
-  };
-
-  return {
-    id: `qtms-${Date.now()}`,
-    name: `QTMS Configuration`,
-    description: 'QTMS Configuration',
-    partNumber: `QTMS-${Date.now()}`,
-    price: totalPrice,
-    configuration,
-    components
-  };
+  // Return the same configuration - this function is for consistency
+  return consolidatedConfig;
 };
 
 export const createQTMSBOMItem = (
-  level1Product: Level1Product,
-  level2Product: Level2Product,
-  level3Product: Level3Product,
   consolidatedConfig: ConsolidatedQTMS
 ): BOMItem => {
   return {
@@ -97,10 +56,14 @@ export const updateQTMSConfiguration = (
   analogConfigurations?: Record<string, any>,
   bushingConfigurations?: Record<string, any>
 ): ConsolidatedQTMS => {
-  return consolidateQTMSConfiguration(
-    'level1',
-    existingQTMS.configuration.chassis.id,
-    'level3',
-    []
-  );
+  return {
+    ...existingQTMS,
+    configuration: {
+      ...existingQTMS.configuration,
+      slotAssignments: newSlotAssignments,
+      hasRemoteDisplay: newHasRemoteDisplay,
+      analogConfigurations,
+      bushingConfigurations
+    }
+  };
 };
