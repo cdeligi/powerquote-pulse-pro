@@ -11,4 +11,4 @@ export * from './sensor-config';
 export * from './part-number-utils';
 
 // Explicit re-exports to avoid ambiguity
-export { ANALOG_SENSOR_TYPES, ANALOG_SENSOR_DESCRIPTIONS, AnalogSensorType } from './interfaces';
+export type { ANALOG_SENSOR_TYPES, ANALOG_SENSOR_DESCRIPTIONS, AnalogSensorType } from './interfaces';

@@ -5,7 +5,7 @@
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { FileText } from "lucide-react";
-import type { Quote } from "@/types/quote";
+import type { Quote } from "@/hooks/useQuotes";
 import { BOMItemWithDetails } from "@/hooks/useQuotes";
 import { QuoteInformation } from "./QuoteInformation";
 import BOMAnalysis from "./BOMAnalysis";
