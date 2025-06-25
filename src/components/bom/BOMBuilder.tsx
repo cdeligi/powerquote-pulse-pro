@@ -7,7 +7,6 @@ import { Button } from '@/components/ui/button';
 import { BOMItem, Level1Product, Level2Product, Level3Product, Level3Customization } from '@/types/product';
 import Level2OptionsSelector from './Level2OptionsSelector';
 import ChassisSelector from './ChassisSelector';
-import CardLibrary from './CardLibrary';
 import RackVisualizer from './RackVisualizer';
 import SlotCardSelector from './SlotCardSelector';
 import DGAProductSelector from './DGAProductSelector';
@@ -263,8 +262,19 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
       {} // bushingConfigurations - will be implemented separately
     );
 
-    // Show editor to allow user to review/edit before adding
-    setEditingQTMS(consolidatedQTMS);
+    // Create the BOM item directly
+    const bomItem = createQTMSBOMItem(consolidatedQTMS);
+    
+    // Add directly to BOM without showing popup
+    const updatedItems = [...bomItems, bomItem];
+    setBomItems(updatedItems);
+    onBOMUpdate(updatedItems);
+
+    // Reset chassis selection after adding to BOM
+    setSelectedChassis(null);
+    setSlotAssignments({});
+    setSelectedSlot(null);
+    setHasRemoteDisplay(false);
   };
 
   const handleBOMConfigurationEdit = (item: BOMItem) => {
@@ -363,12 +373,6 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
                   selectedSlot={selectedSlot}
                   hasRemoteDisplay={hasRemoteDisplay}
                   onRemoteDisplayToggle={handleRemoteDisplayToggle}
-                />
-                
-                <CardLibrary
-                  chassis={selectedChassis}
-                  onCardSelect={handleCardSelect}
-                  canSeePrices={canSeePrices}
                 />
                 
                 {Object.keys(slotAssignments).length > 0 && (

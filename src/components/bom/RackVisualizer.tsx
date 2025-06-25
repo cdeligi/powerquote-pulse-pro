@@ -45,19 +45,17 @@ const RackVisualizer = ({
     if (slot === 0) return 'bg-blue-600'; // CPU slot (slot 0)
     if (selectedSlot === slot) return 'bg-yellow-600'; // Selected slot
     
+    // Only apply card-type colors if slot has a card assigned
     if (slotAssignments[slot]) {
       return getCardTypeColor(slotAssignments[slot].type);
     }
     
-    // Special color for LTX slot 8 (display only)
-    if (chassis.type === 'LTX' && slot === 8) return 'bg-purple-700'; // Display slot
-    
-    return 'bg-gray-700'; // Empty
+    // Empty slots - use neutral colors
+    return 'bg-gray-700'; // Empty slot
   };
 
   const getSlotLabel = (slot: number) => {
     if (slot === 0) return 'CPU';
-    if (chassis.type === 'LTX' && slot === 8 && !slotAssignments[slot]) return 'DISP';
     if (slotAssignments[slot]) {
       const card = slotAssignments[slot];
       if (isBushingCard(card)) {
@@ -69,14 +67,12 @@ const RackVisualizer = ({
       }
       return card.type.charAt(0).toUpperCase() + card.type.slice(1);
     }
+    // For empty slots, just show the slot number
     return `${slot}`;
   };
 
   const getSlotTitle = (slot: number) => {
     if (slot === 0) return 'CPU (Fixed)';
-    if (chassis.type === 'LTX' && slot === 8 && !slotAssignments[slot]) {
-      return 'Slot 8 - Display Cards Only';
-    }
     if (slotAssignments[slot]) {
       const card = slotAssignments[slot];
       if (isBushingCard(card)) {
@@ -86,6 +82,10 @@ const RackVisualizer = ({
         return isSecondarySlot ? `${card.name} (Extension Slot)` : card.name;
       }
       return card.name;
+    }
+    // For empty slots, show appropriate title
+    if (chassis.type === 'LTX' && slot === 8) {
+      return 'Slot 8 - Click to add Display Card';
     }
     return `Slot ${slot} - Click to add card`;
   };
@@ -132,7 +132,7 @@ const RackVisualizer = ({
           ${selectedSlot === slot ? 'ring-2 ring-yellow-400' : ''}
           ${isSecondaryBushingSlot ? 'border-l-0 rounded-l-none border-orange-500' : ''}
           ${isPrimaryBushingSlot ? 'border-r-0 rounded-r-none border-orange-500' : ''}
-          ${isLTXDisplaySlot ? 'border-purple-500' : ''}
+          ${isLTXDisplaySlot && !slotAssignments[slot] ? 'border-gray-500' : ''}
         `}
         onClick={() => clickable && onSlotClick(slot)}
         title={getSlotTitle(slot)}
@@ -140,7 +140,7 @@ const RackVisualizer = ({
         {slot === 0 && <Cpu className="h-4 w-4 mr-1" />}
         {getSlotLabel(slot)}
         
-        {/* Clear button for occupied slots (including display cards in slot 8) */}
+        {/* Clear button for occupied slots */}
         {slot !== 0 && slotAssignments[slot] && !isSecondaryBushingSlot && (
           <Button
             size="sm"
