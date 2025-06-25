@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { BOMItem, Level3Customization } from "@/types/product";
+import { BOMItem, Level3Customization } from "@/types/product/interfaces";
 import { Settings, Info } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
@@ -62,8 +62,7 @@ const BushingCardConfigurator = ({ bomItem, onSave, onClose }: BushingCardConfig
       customizations.push({
         id: `bushing-${i}`,
         name: `Bushing ${i}: ${bushingConfigurations[i]}`,
-        parentOptionId: bomItem.id,
-        type: 'sensor_type',
+        description: `Bushing ${i} tap model configuration`,
         options: [bushingConfigurations[i]],
         price: 150, // Base price per bushing configuration
         enabled: true

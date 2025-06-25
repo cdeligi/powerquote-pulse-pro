@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useState } from "react";
-import { BOMItem } from "@/hooks/useQuotes";
+import { BOMItem } from "@/types/product";
 import { User } from "@/types/auth";
 
 interface QuoteSubmissionDialogProps {

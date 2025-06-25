@@ -3,6 +3,7 @@ import { BOMItem } from "./product";
 
 export type QuotePriority = 'High' | 'Medium' | 'Low' | 'Urgent';
 export type Currency = 'USD' | 'EURO' | 'GBP' | 'CAD';
+export type QuoteStatus = 'draft' | 'pending_approval' | 'approved' | 'rejected';
 
 export interface Quote {
   id: string;
@@ -10,7 +11,7 @@ export interface Quote {
   subtotal: number;
   discount: number;
   total: number;
-  status: 'draft' | 'pending_approval' | 'approved' | 'rejected';
+  status: QuoteStatus;
   customerName: string;
   oracleCustomerId: string;
   sfdcOpportunity: string; // Mandatory SFDC Opportunity ID

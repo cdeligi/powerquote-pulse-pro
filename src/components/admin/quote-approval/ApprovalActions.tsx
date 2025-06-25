@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { CheckCircle, XCircle, MessageSquare } from 'lucide-react';
-import { Quote } from '@/hooks/useQuotes';
+import { Quote } from '@/types/quote';
 
 interface ApprovalActionsProps {
   quote: Quote;

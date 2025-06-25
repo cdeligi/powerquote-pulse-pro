@@ -1,6 +1,6 @@
 
 import { useState } from "react";
-import { BOMItem, Level3Customization, ANALOG_SENSOR_TYPES, AnalogSensorType, ANALOG_SENSOR_DESCRIPTIONS } from "@/types/product";
+import { BOMItem, Level3Customization, ANALOG_SENSOR_TYPES, AnalogSensorType, ANALOG_SENSOR_DESCRIPTIONS } from "@/types/product/interfaces";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -53,8 +53,7 @@ const AnalogCardConfigurator = ({ bomItem, onSave, onClose }: AnalogCardConfigur
       customizations.push({
         id: `analog-ch${channel}-${bomItem.id}`,
         name: sensorType,
-        parentOptionId: bomItem.id,
-        type: 'sensor_type',
+        description: `Channel ${channel} sensor configuration`,
         options: [sensorType],
         price: 0, // No additional cost for sensor type selection
         enabled: true
