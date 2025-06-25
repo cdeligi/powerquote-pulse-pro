@@ -374,9 +374,21 @@ const BOMBuilder = ({ canSeePrices, onBOMUpdate, onDiscountUpdate, userId }: BOM
       {/* QTMS Configuration Editor Dialog */}
       {editingQTMS && (
         <QTMSConfigurationEditor
-          configuration={editingQTMS}
+          consolidatedQTMS={{
+            id: `qtms-${Date.now()}`,
+            name: `${selectedLevel1?.name} - ${selectedLevel2?.name} - ${selectedLevel3?.name}`,
+            description: `Custom QTMS configuration`,
+            partNumber: `QTMS-${Date.now()}`,
+            price: 0,
+            configuration: {
+              chassis: selectedLevel2 as any,
+              slotAssignments: {},
+              hasRemoteDisplay: false
+            },
+            components: []
+          }}
           onSave={handleSaveQTMSConfiguration}
-          onCancel={() => setEditingQTMS(null)}
+          onClose={() => setEditingQTMS(null)}
           canSeePrices={canSeePrices}
         />
       )}
