@@ -183,12 +183,17 @@ class ProductDataService {
         price: product.price || 0,
         cost: product.cost || 0,
         category: 'level1',
-        subcategory: product.subcategory || ''
+        subcategory: product.subcategory || '',
+        enabled: true
       })) || [];
     } catch (error) {
       console.error('Error fetching Level 1 products:', error);
       return [];
     }
+  }
+
+  async getLevel1Products(): Promise<Level1Product[]> {
+    return this.getAllLevel1Products();
   }
 
   async getAllLevel2Products(): Promise<Level2Product[]> {
@@ -208,12 +213,17 @@ class ProductDataService {
         price: product.price || 0,
         cost: product.cost || 0,
         category: 'level2',
-        subcategory: product.subcategory || ''
+        subcategory: product.subcategory || '',
+        enabled: true
       })) || [];
     } catch (error) {
       console.error('Error fetching Level 2 products:', error);
       return [];
     }
+  }
+
+  async getLevel2Products(): Promise<Level2Product[]> {
+    return this.getAllLevel2Products();
   }
 
   async getAllLevel3Products(): Promise<Level3Product[]> {
@@ -233,12 +243,92 @@ class ProductDataService {
         price: product.price || 0,
         cost: product.cost || 0,
         category: 'level3',
-        subcategory: product.subcategory || ''
+        subcategory: product.subcategory || '',
+        enabled: true
       })) || [];
     } catch (error) {
       console.error('Error fetching Level 3 products:', error);
       return [];
     }
+  }
+
+  async getLevel3Products(): Promise<Level3Product[]> {
+    return this.getAllLevel3Products();
+  }
+
+  async getProductsByCategory(category: string): Promise<Level1Product[]> {
+    try {
+      const { data, error } = await supabase
+        .from('products')
+        .select('*')
+        .eq('category', category)
+        .eq('is_active', true);
+
+      if (error) throw error;
+
+      return data?.map(product => ({
+        id: product.id,
+        name: product.name,
+        description: product.description || '',
+        price: product.price || 0,
+        cost: product.cost || 0,
+        category: category as any,
+        subcategory: product.subcategory || '',
+        enabled: true
+      })) || [];
+    } catch (error) {
+      console.error(`Error fetching ${category} products:`, error);
+      return [];
+    }
+  }
+
+  async getChassisOptions(): Promise<Chassis[]> {
+    // Mock data - replace with actual database query when needed
+    return [
+      { id: 'chassis1', name: 'LTX Chassis', type: 'LTX', height: '4U', slots: 14 },
+      { id: 'chassis2', name: 'MTX Chassis', type: 'MTX', height: '2U', slots: 8 },
+      { id: 'chassis3', name: 'STX Chassis', type: 'STX', height: '1U', slots: 5 }
+    ];
+  }
+
+  async getAssetTypes(): Promise<string[]> {
+    return ['Hardware', 'Software', 'Service', 'Accessory'];
+  }
+
+  async createLevel1Product(product: Omit<Level1Product, 'id'>): Promise<Level1Product | null> {
+    return this.createProduct(product);
+  }
+
+  async createLevel2Product(product: Omit<Level2Product, 'id'>): Promise<Level2Product | null> {
+    return this.createProduct(product);
+  }
+
+  async createLevel3Product(product: Omit<Level3Product, 'id'>): Promise<Level3Product | null> {
+    return this.createProduct(product);
+  }
+
+  async updateLevel1Product(id: string, updates: Partial<Level1Product>): Promise<Level1Product | null> {
+    return this.updateProduct(id, updates);
+  }
+
+  async updateLevel2Product(id: string, updates: Partial<Level2Product>): Promise<Level2Product | null> {
+    return this.updateProduct(id, updates);
+  }
+
+  async updateLevel3Product(id: string, updates: Partial<Level3Product>): Promise<Level3Product | null> {
+    return this.updateProduct(id, updates);
+  }
+
+  async deleteLevel1Product(id: string): Promise<boolean> {
+    return this.deleteProduct(id);
+  }
+
+  async deleteLevel2Product(id: string): Promise<boolean> {
+    return this.deleteProduct(id);
+  }
+
+  async deleteLevel3Product(id: string): Promise<boolean> {
+    return this.deleteProduct(id);
   }
 
   async getLevel3Customizations(level3ProductId: string): Promise<Level3Customization[]> {
@@ -307,7 +397,8 @@ class ProductDataService {
         price: product.price || 0,
         cost: product.cost || 0,
         category: 'level2',
-        subcategory: product.subcategory || ''
+        subcategory: product.subcategory || '',
+        enabled: true
       })) || [];
     } catch (error) {
       console.error('Error fetching Level 2 products:', error);
@@ -347,7 +438,8 @@ class ProductDataService {
         price: product.price || 0,
         cost: product.cost || 0,
         category: 'level3',
-        subcategory: product.subcategory || ''
+        subcategory: product.subcategory || '',
+        enabled: true
       })) || [];
     } catch (error) {
       console.error('Error fetching Level 3 products:', error);
@@ -428,7 +520,8 @@ class ProductDataService {
         price: product.price || 0,
         cost: product.cost || 0,
         category: 'level1',
-        subcategory: product.subcategory || ''
+        subcategory: product.subcategory || '',
+        enabled: true
       })) || [];
     } catch (error) {
       console.error('Error fetching Level 1 products for Level 2:', error);
@@ -466,7 +559,8 @@ class ProductDataService {
         price: product.price || 0,
         cost: product.cost || 0,
         category: 'level2',
-        subcategory: product.subcategory || ''
+        subcategory: product.subcategory || '',
+        enabled: true
       })) || [];
     } catch (error) {
       console.error('Error fetching Level 2 products for Level 3:', error);

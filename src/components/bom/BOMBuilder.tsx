@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -57,7 +58,7 @@ const BOMBuilder = ({ canSeePrices, onBOMUpdate, onDiscountUpdate, userId }: BOM
 
   useEffect(() => {
     const fetchInitialData = async () => {
-      const level1 = await productDataService.getLevel1Products();
+      const level1 = await productDataService.getAllLevel1Products();
       setLevel1Products(level1);
 
       const chassis = await productDataService.getChassisOptions();
@@ -154,12 +155,13 @@ const BOMBuilder = ({ canSeePrices, onBOMUpdate, onDiscountUpdate, userId }: BOM
   };
 
   const handleBOMConfigurationEdit = (item: BOMItem) => {
-    if (item.type === 'qtms') {
+    // For QTMS items, open the configuration editor
+    if (item.product && selectedLevel1 && selectedLevel2 && selectedLevel3) {
       setEditingQTMS({
-        level1ProductId: item.level1ProductId!,
-        level2ProductId: item.level2ProductId!,
-        level3ProductId: item.level3ProductId!,
-        customizations: item.configuration as Level3Customization[]
+        level1ProductId: selectedLevel1.id,
+        level2ProductId: selectedLevel2.id,
+        level3ProductId: selectedLevel3.id,
+        customizations: level3Customizations
       });
     }
   };
@@ -219,9 +221,8 @@ const BOMBuilder = ({ canSeePrices, onBOMUpdate, onDiscountUpdate, userId }: BOM
   const handleDGASelect = (product: Level1Product) => {
     setSelectedDGA(product);
     if (product) {
-      const newBOMItem = {
+      const newBOMItem: BOMItem = {
         id: `dga-${product.id}`,
-        type: 'dga',
         product: product,
         quantity: 1,
         enabled: true,
@@ -234,9 +235,8 @@ const BOMBuilder = ({ canSeePrices, onBOMUpdate, onDiscountUpdate, userId }: BOM
   const handlePDSelect = (product: Level1Product) => {
     setSelectedPD(product);
     if (product) {
-      const newBOMItem = {
+      const newBOMItem: BOMItem = {
         id: `pd-${product.id}`,
-        type: 'pd',
         product: product,
         quantity: 1,
         enabled: true,
@@ -277,17 +277,17 @@ const BOMBuilder = ({ canSeePrices, onBOMUpdate, onDiscountUpdate, userId }: BOM
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <Level1ProductSelector
-                    products={level1Products}
+                    level1Products={level1Products}
                     onSelect={handleLevel1Select}
-                    selected={selectedLevel1}
+                    selectedLevel1={selectedLevel1}
                   />
                 </div>
                 <div>
                   {selectedLevel1 && (
                     <Level2OptionsSelector
-                      level2Products={level2Products}
+                      level1Product={selectedLevel1}
                       onSelect={handleLevel2Select}
-                      selected={selectedLevel2}
+                      selectedLevel2={selectedLevel2}
                     />
                   )}
                 </div>
@@ -311,17 +311,17 @@ const BOMBuilder = ({ canSeePrices, onBOMUpdate, onDiscountUpdate, userId }: BOM
 
             <TabsContent value="dga" className="mt-4">
               <DGAProductSelector
-                products={dgaProducts}
+                dgaProducts={dgaProducts}
                 onSelect={handleDGASelect}
-                selected={selectedDGA}
+                selectedDGA={selectedDGA}
               />
             </TabsContent>
 
             <TabsContent value="pd" className="mt-4">
               <PDProductSelector
-                products={pdProducts}
+                pdProducts={pdProducts}
                 onSelect={handlePDSelect}
-                selected={selectedPD}
+                selectedPD={selectedPD}
               />
             </TabsContent>
 
@@ -329,9 +329,9 @@ const BOMBuilder = ({ canSeePrices, onBOMUpdate, onDiscountUpdate, userId }: BOM
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <ChassisSelector
-                    chassisOptions={chassisOptions}
+                    chassis={chassisOptions}
                     onSelect={handleChassisSelect}
-                    selected={selectedChassis}
+                    selectedChassis={selectedChassis}
                   />
                 </div>
                 <div>
@@ -347,10 +347,14 @@ const BOMBuilder = ({ canSeePrices, onBOMUpdate, onDiscountUpdate, userId }: BOM
                     />
                   )}
                 </div>
-                {selectedSlot !== null && (
+                {selectedSlot !== null && selectedChassis && (
                   <SlotCardSelector
-                    onSelect={handleSlotCardSelect}
+                    chassis={selectedChassis}
+                    slot={selectedSlot}
+                    onCardSelect={handleSlotCardSelect}
                     onClose={() => setSelectedSlot(null)}
+                    canSeePrices={canSeePrices}
+                    currentSlotAssignments={slotAssignments}
                   />
                 )}
               </div>
@@ -361,7 +365,7 @@ const BOMBuilder = ({ canSeePrices, onBOMUpdate, onDiscountUpdate, userId }: BOM
 
       {/* BOM Display */}
       <BOMDisplay 
-        items={bomItems}
+        bomItems={bomItems}
         canSeePrices={canSeePrices}
         onEdit={handleBOMConfigurationEdit}
         onDelete={handleDeleteBOMItem}
@@ -373,7 +377,7 @@ const BOMBuilder = ({ canSeePrices, onBOMUpdate, onDiscountUpdate, userId }: BOM
       <DiscountSection 
         bomItems={bomItems}
         canSeePrices={canSeePrices}
-        onDiscountUpdate={onDiscountUpdate}
+        onDiscountChange={onDiscountUpdate}
       />
 
       {/* Move Submit Quote Request button here - at the bottom of Discount Section */}
@@ -390,7 +394,7 @@ const BOMBuilder = ({ canSeePrices, onBOMUpdate, onDiscountUpdate, userId }: BOM
       </Card>
 
       {/* Quote Fields Configuration */}
-      <QuoteFieldsSection />
+      <QuoteFieldsSection onFieldsChange={() => {}} />
 
       {/* QTMS Configuration Editor Dialog */}
       {editingQTMS && (

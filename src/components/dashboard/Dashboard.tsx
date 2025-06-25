@@ -1,57 +1,62 @@
 
-import { useState } from "react";
-import { User } from "@/types/auth";
-import Sidebar from "./Sidebar";
-import DashboardOverview from "./DashboardOverview";
-import BOMBuilder from "../bom/BOMBuilder";
-import QuoteManager from "../quotes/QuoteManager";
-import AdminPanel from "../admin/AdminPanel";
-import { BOMItem } from "@/types/product";
+import { useState, useEffect } from 'react';
+import { User } from '@/types/auth';
+import DashboardOverview from './DashboardOverview';
+import BOMBuilder from '@/components/bom/BOMBuilder';
+import QuoteManager from '@/components/quotes/QuoteManager';
+import AdminPanel from '@/components/admin/AdminPanel';
+import Sidebar from './Sidebar';
+import { BOMItem } from '@/types/product';
 
 interface DashboardProps {
   user: User;
-  onLogout: () => void;
 }
 
-type ActiveView = 'overview' | 'bom' | 'quotes' | 'admin';
-
-const Dashboard = ({ user, onLogout }: DashboardProps) => {
-  const [activeView, setActiveView] = useState<ActiveView>('overview');
+const Dashboard = ({ user }: DashboardProps) => {
+  const [activeView, setActiveView] = useState<string>('overview');
   const [bomItems, setBomItems] = useState<BOMItem[]>([]);
+  const [discount, setDiscount] = useState<number>(0);
+
+  const canSeePrices = user.role === 'admin' || user.role === 'level2' || user.role === 'level3';
 
   const handleBOMUpdate = (items: BOMItem[]) => {
     setBomItems(items);
+  };
+
+  const handleDiscountUpdate = (newDiscount: number) => {
+    setDiscount(newDiscount);
   };
 
   const renderContent = () => {
     switch (activeView) {
       case 'overview':
         return <DashboardOverview user={user} />;
-      case 'bom':
+      case 'bom-builder':
         return (
           <BOMBuilder 
             onBOMUpdate={handleBOMUpdate}
-            canSeePrices={user.role === 'admin'}
+            onDiscountUpdate={handleDiscountUpdate}
+            canSeePrices={canSeePrices}
+            userId={user.id}
           />
         );
       case 'quotes':
         return <QuoteManager user={user} />;
       case 'admin':
-        return user.role === 'admin' ? <AdminPanel user={user} /> : <div className="text-white">Access Denied</div>;
+        return user.role === 'admin' ? <AdminPanel user={user} /> : <div>Access Denied</div>;
       default:
         return <DashboardOverview user={user} />;
     }
   };
 
   return (
-    <div className="min-h-screen bg-black flex">
-      <Sidebar 
+    <div className="flex h-screen bg-black">
+      <Sidebar
         user={user}
         activeView={activeView}
         onViewChange={setActiveView}
-        onLogout={onLogout}
       />
-      <main className="flex-1 ml-64 p-8">
+      <main className="flex-1 overflow-y-auto">
         {renderContent()}
       </main>
     </div>
