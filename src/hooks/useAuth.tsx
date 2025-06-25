@@ -32,45 +32,83 @@ function useProvideAuth(): AuthContextType {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Shared logic to fetch profile & clear loading
+  // flag to avoid double-fetch
+  let profileFetched = false;
+
+  // fetch profile helper
   const fetchProfile = async (uid: string) => {
+    if (profileFetched) {
+      console.debug('[useAuth] fetchProfile skipped (already fetched)');
+      return;
+    }
+    profileFetched = true;
+    console.debug('[useAuth] fetchProfile start for', uid);
+
     try {
-      const { data: profile, error } = await supabase
+      const { data, error } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', uid)
         .single();
 
-      if (error) {
-        console.error('Error fetching profile:', error);
+      if (error && error.code !== 'PGRST116') { 
+        // 116 means no rows—handle below
+        console.error('[useAuth] error fetching profile:', error);
         setUser(null);
-      } else if (profile) {
+      } else if (data) {
+        console.debug('[useAuth] profile data:', data);
         const appUser: AppUser = {
-          id: profile.id,
-          name: `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || 'User',
-          email: profile.email,
-          role: profile.role as 'level1' | 'level2' | 'admin',
-          department: profile.department
+          id: data.id,
+          name: `${data.first_name || ''} ${data.last_name || ''}`.trim() || 'User',
+          email: data.email,
+          role: data.role as 'level1' | 'level2' | 'admin',
+          department: data.department
         };
         setUser(appUser);
+      } else {
+        console.warn('[useAuth] no profile found for', uid);
+        setUser(null);
       }
     } catch (err) {
-      console.error('Unexpected error fetching profile:', err);
+      console.error('[useAuth] unexpected fetch error:', err);
       setUser(null);
     } finally {
+      console.debug('[useAuth] fetchProfile complete');
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    // 1) Listen to auth state changes
-    const { data: listener } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        console.debug('onAuthStateChange:', event, session?.user?.email);
+    // Reset the flag on each effect run
+    profileFetched = false;
 
+    // 1) Session check  
+    supabase.auth
+      .getSession()
+      .then(({ data: { session } }) => {
+        console.debug('[useAuth] getSession result:', session?.user?.email);
         setSession(session);
         if (session?.user) {
-          await fetchProfile(session.user.id);
+          // defer to avoid async in listener
+          setTimeout(() => fetchProfile(session.user!.id), 0);
+        } else {
+          setLoading(false);
+        }
+      })
+      .catch((err) => {
+        console.error('[useAuth] getSession error:', err);
+        setLoading(false);
+      });
+
+    // 2) Auth state listener
+    const { data: listener } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        console.debug('[useAuth] onAuthStateChange:', event, session?.user?.email);
+        setSession(session);
+        if (session?.user) {
+          // Reset flag and defer profile fetch to next tick
+          profileFetched = false;
+          setTimeout(() => fetchProfile(session.user!.id), 0);
         } else {
           // signed out
           setUser(null);
@@ -78,23 +116,6 @@ function useProvideAuth(): AuthContextType {
         }
       }
     );
-
-    // 2) Immediately check for existing session
-    supabase.auth
-      .getSession()
-      .then(({ data: { session } }) => {
-        console.debug('getSession result:', session?.user?.email);
-        if (session?.user) {
-          setSession(session);
-          return fetchProfile(session.user.id);
-        } else {
-          setLoading(false);
-        }
-      })
-      .catch((err) => {
-        console.error('Error getting session:', err);
-        setLoading(false);
-      });
 
     return () => {
       listener.subscription.unsubscribe();
