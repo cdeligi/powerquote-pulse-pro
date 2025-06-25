@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -6,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuoteValidation } from './QuoteFieldValidation';
 
@@ -26,6 +28,8 @@ interface QuoteFieldsSectionProps {
 const QuoteFieldsSection = ({ quoteFields, onFieldChange }: QuoteFieldsSectionProps) => {
   const [configuredFields, setConfiguredFields] = useState<QuoteField[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const { validation } = useQuoteValidation(quoteFields, configuredFields);
 
   useEffect(() => {
     fetchQuoteFields();
@@ -148,11 +152,14 @@ const QuoteFieldsSection = ({ quoteFields, onFieldChange }: QuoteFieldsSectionPr
         <CardTitle className="text-white">Quote Information</CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
-        {/* Show validation errors */}
-        <useQuoteValidation 
-          quoteFields={quoteFields} 
-          requiredFields={configuredFields} 
-        />
+        {/* Show validation errors if any */}
+        {!validation.isValid && validation.missingFields.length > 0 && (
+          <Alert className="border-red-500 bg-red-900/20">
+            <AlertDescription className="text-red-400">
+              Please fill in the following required fields: {validation.missingFields.join(', ')}
+            </AlertDescription>
+          </Alert>
+        )}
 
         {configuredFields.length === 0 ? (
           <div className="text-gray-400 text-center py-4">

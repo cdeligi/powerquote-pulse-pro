@@ -66,7 +66,6 @@ const QuoteDetails = ({
 
   return (
     <div className="space-y-6">
-      {/* Quote Information */}
       <Card className="bg-gray-900 border-gray-800">
         <CardHeader>
           <CardTitle className="text-white flex items-center justify-between">
@@ -104,7 +103,6 @@ const QuoteDetails = ({
         </CardContent>
       </Card>
 
-      {/* BOM Items */}
       <Card className="bg-gray-900 border-gray-800">
         <CardHeader>
           <CardTitle className="text-white">BOM Items</CardTitle>
@@ -115,12 +113,12 @@ const QuoteDetails = ({
               <div key={index} className="p-3 bg-gray-800 rounded border border-gray-700">
                 <div className="flex justify-between items-start">
                   <div>
-                    <h4 className="text-white font-medium">{item.name}</h4>
-                    <p className="text-gray-400 text-sm">{item.description}</p>
+                    <h4 className="text-white font-medium">{item.name || item.product?.name || 'Unknown Item'}</h4>
+                    <p className="text-gray-400 text-sm">{item.description || item.product?.description || 'No description'}</p>
                   </div>
                   <div className="text-right">
                     <p className="text-white">Qty: {item.quantity}</p>
-                    <p className="text-white">${item.unitPrice.toLocaleString()}</p>
+                    <p className="text-white">${(item.unitPrice || item.unit_price || 0).toLocaleString()}</p>
                   </div>
                 </div>
               </div>
@@ -129,14 +127,12 @@ const QuoteDetails = ({
         </CardContent>
       </Card>
 
-      {/* Approval Actions */}
       {quote.status === 'pending_approval' && (
         <Card className="bg-gray-900 border-gray-800">
           <CardHeader>
             <CardTitle className="text-white">Approval Actions</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {/* Action Selection Buttons */}
             <div className="grid grid-cols-3 gap-3">
               <Button
                 onClick={() => setSelectedAction('approve')}
@@ -181,7 +177,6 @@ const QuoteDetails = ({
               </Button>
             </div>
 
-            {/* Action-specific Forms */}
             {selectedAction === 'approve' && (
               <div className="space-y-3 p-4 bg-green-900/20 border border-green-600 rounded-lg">
                 <Label htmlFor="approval-notes" className="text-white">

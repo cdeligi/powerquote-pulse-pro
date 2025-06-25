@@ -5,36 +5,49 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useState } from "react";
-import { useQuoteValidation, validateQuoteField } from './QuoteFieldValidation';
+import { BOMItem } from "@/hooks/useQuotes";
+import { User } from "@/types/auth";
 
 interface QuoteSubmissionDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSubmit: (data: any) => void;
-  quoteData: any;
+  onSubmit: (quoteId: string) => void;
+  bomItems: BOMItem[];
+  quoteFields: Record<string, any>;
+  discountPercentage: number;
+  discountJustification: string;
+  onClose: () => void;
+  canSeePrices: boolean;
+  user: User;
 }
 
 const QuoteSubmissionDialog = ({ 
   open, 
   onOpenChange, 
   onSubmit, 
-  quoteData 
+  bomItems,
+  quoteFields,
+  discountPercentage,
+  discountJustification,
+  onClose,
+  canSeePrices,
+  user
 }: QuoteSubmissionDialogProps) => {
   const [formData, setFormData] = useState({
-    customerName: '',
-    oracleCustomerId: '',
-    sfdcOpportunity: '',
-    notes: ''
+    customerName: quoteFields.customerName || '',
+    oracleCustomerId: quoteFields.oracleCustomerId || '',
+    sfdcOpportunity: quoteFields.sfdcOpportunity || '',
+    notes: quoteFields.notes || ''
   });
 
-  const { validation } = useQuoteValidation(formData, []);
-
   const handleSubmit = () => {
-    if (validation.isValid) {
-      onSubmit({ ...quoteData, ...formData });
-      onOpenChange(false);
-    }
+    // Generate a quote ID and submit
+    const quoteId = `Q-${Date.now()}`;
+    onSubmit(quoteId);
+    onOpenChange(false);
   };
+
+  const isFormValid = formData.customerName && formData.oracleCustomerId && formData.sfdcOpportunity;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -45,32 +58,35 @@ const QuoteSubmissionDialog = ({
         
         <div className="space-y-4">
           <div>
-            <Label htmlFor="customerName" className="text-white">Customer Name</Label>
+            <Label htmlFor="customerName" className="text-white">Customer Name *</Label>
             <Input
               id="customerName"
               value={formData.customerName}
               onChange={(e) => setFormData(prev => ({ ...prev, customerName: e.target.value }))}
               className="bg-gray-700 border-gray-600 text-white"
+              required
             />
           </div>
           
           <div>
-            <Label htmlFor="oracleId" className="text-white">Oracle Customer ID</Label>
+            <Label htmlFor="oracleId" className="text-white">Oracle Customer ID *</Label>
             <Input
               id="oracleId"
               value={formData.oracleCustomerId}
               onChange={(e) => setFormData(prev => ({ ...prev, oracleCustomerId: e.target.value }))}
               className="bg-gray-700 border-gray-600 text-white"
+              required
             />
           </div>
           
           <div>
-            <Label htmlFor="sfdcOpp" className="text-white">SFDC Opportunity</Label>
+            <Label htmlFor="sfdcOpp" className="text-white">SFDC Opportunity *</Label>
             <Input
               id="sfdcOpp"
               value={formData.sfdcOpportunity}
               onChange={(e) => setFormData(prev => ({ ...prev, sfdcOpportunity: e.target.value }))}
               className="bg-gray-700 border-gray-600 text-white"
+              required
             />
           </div>
           
@@ -83,14 +99,31 @@ const QuoteSubmissionDialog = ({
               className="bg-gray-700 border-gray-600 text-white"
             />
           </div>
+
+          {canSeePrices && (
+            <div className="pt-4 border-t border-gray-700">
+              <div className="text-sm text-gray-400 mb-2">
+                Quote Summary: {bomItems.length} items
+              </div>
+              {discountPercentage > 0 && (
+                <div className="text-sm text-yellow-400">
+                  Discount: {discountPercentage}% - {discountJustification}
+                </div>
+              )}
+            </div>
+          )}
           
           <div className="flex space-x-2">
-            <Button onClick={handleSubmit} className="flex-1">
+            <Button 
+              onClick={handleSubmit} 
+              className="flex-1"
+              disabled={!isFormValid}
+            >
               Submit Quote
             </Button>
             <Button 
               variant="outline" 
-              onClick={() => onOpenChange(false)}
+              onClick={onClose}
               className="flex-1 border-gray-600 text-gray-300"
             >
               Cancel

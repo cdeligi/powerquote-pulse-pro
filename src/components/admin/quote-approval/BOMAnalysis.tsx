@@ -5,56 +5,50 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Edit3, Save, X } from 'lucide-react';
 import { useState } from 'react';
-
-interface BOMItem {
-  id: string;
-  product_id: string;
-  name: string;
-  description?: string;
-  part_number?: string;
-  quantity: number;
-  unit_price: number;
-  unit_cost: number;
-  total_price: number;
-  total_cost: number;
-  margin: number;
-  configuration_data?: any;
-  product_type?: string;
-}
+import { Quote, BOMItemWithDetails } from '@/hooks/useQuotes';
 
 interface BOMAnalysisProps {
-  bomItems: BOMItem[];
-  onPriceUpdate: (itemId: string, newPrice: number) => void;
-  canEditPrices: boolean;
+  quote: Quote;
+  bomItems: BOMItemWithDetails[];
+  loadingBom: boolean;
+  editingPrices: Record<string, string>;
+  priceEditReason: string;
+  onPriceEdit: (itemId: string, price: string) => void;
+  onPriceEditCancel: (itemId: string) => void;
+  onPriceUpdate: (itemId: string) => void;
+  onPriceEditReasonChange: (reason: string) => void;
 }
 
-const BOMAnalysis = ({ bomItems, onPriceUpdate, canEditPrices }: BOMAnalysisProps) => {
-  const [editingItem, setEditingItem] = useState<string | null>(null);
-  const [editPrice, setEditPrice] = useState<number>(0);
-
-  const handleEditStart = (item: BOMItem) => {
-    setEditingItem(item.id);
-    setEditPrice(item.unit_price);
+const BOMAnalysis = ({ 
+  quote, 
+  bomItems, 
+  loadingBom, 
+  editingPrices, 
+  priceEditReason,
+  onPriceEdit,
+  onPriceEditCancel,
+  onPriceUpdate,
+  onPriceEditReasonChange
+}: BOMAnalysisProps) => {
+  const handleEditStart = (item: BOMItemWithDetails) => {
+    onPriceEdit(item.id, item.unit_price?.toString() || '0');
   };
 
   const handleEditSave = (itemId: string) => {
-    onPriceUpdate(itemId, editPrice);
-    setEditingItem(null);
+    onPriceUpdate(itemId);
   };
 
-  const handleEditCancel = () => {
-    setEditingItem(null);
-    setEditPrice(0);
+  const handleEditCancel = (itemId: string) => {
+    onPriceEditCancel(itemId);
   };
 
   const calculateUpdatedTotals = () => {
     const totalRevenue = bomItems.reduce((sum, item) => {
-      return sum + (item.unit_price * item.quantity);
+      return sum + ((item.unit_price || 0) * item.quantity);
     }, 0);
     
-    // Fix: Calculate total cost properly as unit_cost × quantity
     const totalCost = bomItems.reduce((sum, item) => {
-      return sum + (item.unit_cost * item.quantity);
+      return sum + ((item.unit_cost || 0) * item.quantity);
     }, 0);
     
     const grossProfit = totalRevenue - totalCost;
@@ -69,6 +63,21 @@ const BOMAnalysis = ({ bomItems, onPriceUpdate, canEditPrices }: BOMAnalysisProp
   };
 
   const totals = calculateUpdatedTotals();
+
+  if (loadingBom) {
+    return (
+      <Card className="bg-gray-900 border-gray-800">
+        <CardHeader>
+          <CardTitle className="text-white">BOM Analysis</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-gray-400 text-center py-8">
+            Loading BOM items...
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
 
   if (bomItems.length === 0) {
     return (
@@ -112,17 +121,15 @@ const BOMAnalysis = ({ bomItems, onPriceUpdate, canEditPrices }: BOMAnalysisProp
                   )}
                 </div>
                 
-                {canEditPrices && (
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => handleEditStart(item)}
-                    className="h-6 w-6 p-0 text-gray-400 hover:text-white"
-                    title="Edit unit price"
-                  >
-                    <Edit3 className="h-3 w-3" />
-                  </Button>
-                )}
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => handleEditStart(item)}
+                  className="h-6 w-6 p-0 text-gray-400 hover:text-white"
+                  title="Edit unit price"
+                >
+                  <Edit3 className="h-3 w-3" />
+                </Button>
               </div>
               
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
@@ -133,13 +140,13 @@ const BOMAnalysis = ({ bomItems, onPriceUpdate, canEditPrices }: BOMAnalysisProp
                 
                 <div>
                   <span className="text-gray-400">Unit Price:</span>
-                  {editingItem === item.id ? (
+                  {editingPrices[item.id] ? (
                     <div className="flex items-center space-x-1 mt-1">
                       <Input
                         type="number"
                         step="0.01"
-                        value={editPrice}
-                        onChange={(e) => setEditPrice(parseFloat(e.target.value) || 0)}
+                        value={editingPrices[item.id]}
+                        onChange={(e) => onPriceEdit(item.id, e.target.value)}
                         className="w-20 h-6 text-xs bg-gray-700 border-gray-600 text-white"
                       />
                       <Button
@@ -152,7 +159,7 @@ const BOMAnalysis = ({ bomItems, onPriceUpdate, canEditPrices }: BOMAnalysisProp
                       <Button
                         size="sm"
                         variant="ghost"
-                        onClick={handleEditCancel}
+                        onClick={() => handleEditCancel(item.id)}
                         className="h-5 w-5 p-0 text-gray-400 hover:text-white"
                       >
                         <X className="h-3 w-3" />
@@ -160,7 +167,7 @@ const BOMAnalysis = ({ bomItems, onPriceUpdate, canEditPrices }: BOMAnalysisProp
                     </div>
                   ) : (
                     <div className="text-white font-medium">
-                      ${item.unit_price.toLocaleString()}
+                      ${(item.unit_price || 0).toLocaleString()}
                     </div>
                   )}
                 </div>
@@ -168,14 +175,14 @@ const BOMAnalysis = ({ bomItems, onPriceUpdate, canEditPrices }: BOMAnalysisProp
                 <div>
                   <span className="text-gray-400">Total Price:</span>
                   <div className="text-white font-medium">
-                    ${(item.unit_price * item.quantity).toLocaleString()}
+                    ${((item.unit_price || 0) * item.quantity).toLocaleString()}
                   </div>
                 </div>
                 
                 <div>
                   <span className="text-gray-400">Total Cost:</span>
                   <div className="text-white font-medium">
-                    ${(item.unit_cost * item.quantity).toLocaleString()}
+                    ${((item.unit_cost || 0) * item.quantity).toLocaleString()}
                   </div>
                 </div>
               </div>
@@ -185,10 +192,10 @@ const BOMAnalysis = ({ bomItems, onPriceUpdate, canEditPrices }: BOMAnalysisProp
                   <span className="text-gray-400">Item Margin:</span>
                   <div className="text-right">
                     <span className={`font-medium ${
-                      item.margin >= 30 ? 'text-green-400' : 
-                      item.margin >= 20 ? 'text-yellow-400' : 'text-red-400'
+                      (item.margin || 0) >= 30 ? 'text-green-400' : 
+                      (item.margin || 0) >= 20 ? 'text-yellow-400' : 'text-red-400'
                     }`}>
-                      {item.margin.toFixed(1)}%
+                      {(item.margin || 0).toFixed(1)}%
                     </span>
                   </div>
                 </div>
@@ -198,7 +205,6 @@ const BOMAnalysis = ({ bomItems, onPriceUpdate, canEditPrices }: BOMAnalysisProp
         </CardContent>
       </Card>
 
-      {/* Project Financial Summary */}
       <Card className="bg-gray-900 border-gray-800">
         <CardHeader>
           <CardTitle className="text-white">Project Financial Summary</CardTitle>
