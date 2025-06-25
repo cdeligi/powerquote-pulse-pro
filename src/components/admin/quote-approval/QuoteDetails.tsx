@@ -113,12 +113,12 @@ const QuoteDetails = ({
               <div key={index} className="p-3 bg-gray-800 rounded border border-gray-700">
                 <div className="flex justify-between items-start">
                   <div>
-                    <h4 className="text-white font-medium">{item.name || item.product?.name || 'Unknown Item'}</h4>
-                    <p className="text-gray-400 text-sm">{item.description || item.product?.description || 'No description'}</p>
+                    <h4 className="text-white font-medium">{item.product?.name || 'Unknown Item'}</h4>
+                    <p className="text-gray-400 text-sm">{item.product?.description || 'No description'}</p>
                   </div>
                   <div className="text-right">
                     <p className="text-white">Qty: {item.quantity}</p>
-                    <p className="text-white">${(item.unitPrice || item.unit_price || 0).toLocaleString()}</p>
+                    <p className="text-white">${(item.product?.price || 0).toLocaleString()}</p>
                   </div>
                 </div>
               </div>

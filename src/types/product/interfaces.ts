@@ -144,6 +144,8 @@ export interface Level2Option extends Level3Product {
 export interface Level3Customization {
   id: string;
   name: string;
+  parentOptionId: string;
+  type: string;
   description?: string;
   options: string[];
   price: number;

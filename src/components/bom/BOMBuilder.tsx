@@ -548,6 +548,8 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
       {/* Quote Submission Dialog */}
       {showQuoteSubmission && (
         <QuoteSubmissionDialog
+          open={showQuoteSubmission}
+          onOpenChange={setShowQuoteSubmission}
           bomItems={bomItems}
           quoteFields={quoteFields}
           discountPercentage={discountPercentage}

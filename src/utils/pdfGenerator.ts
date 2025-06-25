@@ -1,5 +1,6 @@
 
-import { BOMItem, Quote } from '@/types/product';
+import { BOMItem } from '@/types/product';
+import { Quote } from '@/types/quote';
 
 export const generateQuotePDF = (
   bomItems: BOMItem[],

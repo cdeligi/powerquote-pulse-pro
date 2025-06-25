@@ -1,3 +1,4 @@
+
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { FileText } from "lucide-react";
 import { Quote, BOMItemWithDetails } from "@/hooks/useQuotes";
@@ -8,7 +9,7 @@ import ApprovalActions from "./ApprovalActions";
 interface QuoteDetailsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  quote: Quote | null;
+  quote: Partial<Quote> | null;
   bomItems: BOMItemWithDetails[];
   loadingBom: boolean;
   editingPrices: Record<string, string>;
@@ -61,10 +62,10 @@ export const QuoteDetailsDialog = ({
         </DialogHeader>
         
         <div className="space-y-6">
-          <QuoteInformation quote={quote} />
+          <QuoteInformation quote={quote as Quote} />
           
           <BOMAnalysis
-            quote={quote}
+            quote={quote as Quote}
             bomItems={bomItems}
             loadingBom={loadingBom}
             editingPrices={editingPrices}
@@ -76,7 +77,7 @@ export const QuoteDetailsDialog = ({
           />
 
           <ApprovalActions
-            quote={quote}
+            quote={quote as Quote}
             approvedDiscount={approvedDiscount}
             approvalNotes={approvalNotes}
             rejectionReason={rejectionReason}
