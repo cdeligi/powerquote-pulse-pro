@@ -1,12 +1,12 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Level1Product } from "@/types/product";
+import { Level1Product, AssetType } from "@/types/product";
 import { productDataService } from "@/services/productDataService";
 
 interface Level1ProductFormProps {
@@ -28,12 +28,23 @@ const Level1ProductForm = ({ onSubmit, initialData }: Level1ProductFormProps) =>
     image: initialData?.image || ''
   });
 
-  // Get asset types from service
-  const assetTypes = productDataService.getAssetTypes();
+  const [assetTypes, setAssetTypes] = useState<AssetType[]>([]);
+
+  useEffect(() => {
+    const fetchAssetTypes = async () => {
+      const types = await productDataService.getAssetTypes();
+      setAssetTypes(types);
+    };
+    fetchAssetTypes();
+  }, []);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSubmit(formData);
+    onSubmit({
+      ...formData,
+      customizations: [],
+      hasQuantitySelection: false
+    });
   };
 
   return (

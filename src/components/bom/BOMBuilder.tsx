@@ -58,16 +58,16 @@ const BOMBuilder = ({ canSeePrices, onBOMUpdate, onDiscountUpdate, userId }: BOM
 
   useEffect(() => {
     const fetchInitialData = async () => {
-      const level1 = await productDataService.getAllLevel1Products();
+      const [level1, chassis, dga, pd] = await Promise.all([
+        productDataService.getAllLevel1Products(),
+        productDataService.getChassisOptions(),
+        productDataService.getProductsByCategory('dga'),
+        productDataService.getProductsByCategory('power-distribution')
+      ]);
+      
       setLevel1Products(level1);
-
-      const chassis = await productDataService.getChassisOptions();
       setChassisOptions(chassis);
-
-      const dga = await productDataService.getProductsByCategory('dga');
       setDGAProducts(dga);
-
-      const pd = await productDataService.getProductsByCategory('power-distribution');
       setPDProducts(pd);
     };
 
@@ -277,17 +277,16 @@ const BOMBuilder = ({ canSeePrices, onBOMUpdate, onDiscountUpdate, userId }: BOM
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <Level1ProductSelector
-                    level1Products={level1Products}
-                    onSelect={handleLevel1Select}
-                    selectedLevel1={selectedLevel1}
+                    onProductSelect={handleLevel1Select}
+                    selectedProduct={selectedLevel1}
                   />
                 </div>
                 <div>
                   {selectedLevel1 && (
                     <Level2OptionsSelector
                       level1Product={selectedLevel1}
-                      onSelect={handleLevel2Select}
-                      selectedLevel2={selectedLevel2}
+                      onProductSelect={handleLevel2Select}
+                      selectedProduct={selectedLevel2}
                     />
                   )}
                 </div>
@@ -311,17 +310,15 @@ const BOMBuilder = ({ canSeePrices, onBOMUpdate, onDiscountUpdate, userId }: BOM
 
             <TabsContent value="dga" className="mt-4">
               <DGAProductSelector
-                dgaProducts={dgaProducts}
-                onSelect={handleDGASelect}
-                selectedDGA={selectedDGA}
+                onProductSelect={handleDGASelect}
+                selectedProduct={selectedDGA}
               />
             </TabsContent>
 
             <TabsContent value="pd" className="mt-4">
               <PDProductSelector
-                pdProducts={pdProducts}
-                onSelect={handlePDSelect}
-                selectedPD={selectedPD}
+                onProductSelect={handlePDSelect}
+                selectedProduct={selectedPD}
               />
             </TabsContent>
 
@@ -329,8 +326,7 @@ const BOMBuilder = ({ canSeePrices, onBOMUpdate, onDiscountUpdate, userId }: BOM
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <ChassisSelector
-                    chassis={chassisOptions}
-                    onSelect={handleChassisSelect}
+                    onChassisSelect={handleChassisSelect}
                     selectedChassis={selectedChassis}
                   />
                 </div>
@@ -367,7 +363,6 @@ const BOMBuilder = ({ canSeePrices, onBOMUpdate, onDiscountUpdate, userId }: BOM
       <BOMDisplay 
         bomItems={bomItems}
         canSeePrices={canSeePrices}
-        onEdit={handleBOMConfigurationEdit}
         onDelete={handleDeleteBOMItem}
         onToggle={handleToggleBOMItem}
         onQuantityChange={handleQuantityChange}

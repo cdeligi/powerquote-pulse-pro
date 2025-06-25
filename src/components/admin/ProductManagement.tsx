@@ -1,4 +1,5 @@
-import { useState } from "react";
+
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -32,12 +33,38 @@ const ProductManagement = ({ user }: ProductManagementProps) => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogType, setDialogType] = useState<'level1' | 'level2' | 'level3'>('level1');
   const [refreshKey, setRefreshKey] = useState(0);
+  const [level1Products, setLevel1Products] = useState<Level1Product[]>([]);
+  const [level2Products, setLevel2Products] = useState<Level2Product[]>([]);
+  const [level3Products, setLevel3Products] = useState<Level3Product[]>([]);
+  const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
-  // Use productDataService instead of local state
-  const level1Products = productDataService.getLevel1Products();
-  const level2Products = productDataService.getLevel2Products();
-  const level3Products = productDataService.getLevel3Products();
+  useEffect(() => {
+    const fetchProducts = async () => {
+      setLoading(true);
+      try {
+        const [l1Products, l2Products, l3Products] = await Promise.all([
+          productDataService.getAllLevel1Products(),
+          productDataService.getAllLevel2Products(),
+          productDataService.getAllLevel3Products()
+        ]);
+        setLevel1Products(l1Products);
+        setLevel2Products(l2Products);
+        setLevel3Products(l3Products);
+      } catch (error) {
+        console.error('Error fetching products:', error);
+        toast({
+          title: "Error",
+          description: "Failed to fetch products",
+          variant: "destructive"
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchProducts();
+  }, [refreshKey, toast]);
 
   // Helper functions
   const getLevel2ProductsForLevel1 = (level1Id: string) => {
@@ -67,30 +94,46 @@ const ProductManagement = ({ user }: ProductManagementProps) => {
   };
 
   // CRUD Operations
-  const handleCreateLevel1Product = (productData: Omit<Level1Product, 'id'>) => {
-    const newProduct = productDataService.createLevel1Product(productData);
-    setDialogOpen(false);
-    setEditingProduct(null);
-    forceRefresh();
-    toast({
-      title: "Success",
-      description: "Level 1 product created successfully"
-    });
+  const handleCreateLevel1Product = async (productData: Omit<Level1Product, 'id'>) => {
+    try {
+      await productDataService.createLevel1Product(productData);
+      setDialogOpen(false);
+      setEditingProduct(null);
+      forceRefresh();
+      toast({
+        title: "Success",
+        description: "Level 1 product created successfully"
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to create product",
+        variant: "destructive"
+      });
+    }
   };
 
-  const handleUpdateLevel1Product = (productData: Omit<Level1Product, 'id'>) => {
+  const handleUpdateLevel1Product = async (productData: Omit<Level1Product, 'id'>) => {
     if (!editingProduct) return;
-    productDataService.updateLevel1Product(editingProduct.id, productData);
-    setDialogOpen(false);
-    setEditingProduct(null);
-    forceRefresh();
-    toast({
-      title: "Success",
-      description: "Level 1 product updated successfully"
-    });
+    try {
+      await productDataService.updateLevel1Product(editingProduct.id, productData);
+      setDialogOpen(false);
+      setEditingProduct(null);
+      forceRefresh();
+      toast({
+        title: "Success",
+        description: "Level 1 product updated successfully"
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to update product",
+        variant: "destructive"
+      });
+    }
   };
 
-  const handleDeleteLevel1Product = (productId: string) => {
+  const handleDeleteLevel1Product = async (productId: string) => {
     // Check for dependencies
     const dependentLevel2 = level2Products.filter(p => p.parentProductId === productId);
     if (dependentLevel2.length > 0) {
@@ -102,38 +145,62 @@ const ProductManagement = ({ user }: ProductManagementProps) => {
       return;
     }
     
-    productDataService.deleteLevel1Product(productId);
-    forceRefresh();
-    toast({
-      title: "Success",
-      description: "Level 1 product deleted successfully"
-    });
+    try {
+      await productDataService.deleteLevel1Product(productId);
+      forceRefresh();
+      toast({
+        title: "Success",
+        description: "Level 1 product deleted successfully"
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to delete product",
+        variant: "destructive"
+      });
+    }
   };
 
-  const handleCreateLevel2Product = (productData: Omit<Level2Product, 'id'>) => {
-    const newProduct = productDataService.createLevel2Product(productData);
-    setDialogOpen(false);
-    setEditingProduct(null);
-    forceRefresh();
-    toast({
-      title: "Success",
-      description: "Level 2 product created successfully"
-    });
+  const handleCreateLevel2Product = async (productData: Omit<Level2Product, 'id'>) => {
+    try {
+      await productDataService.createLevel2Product(productData);
+      setDialogOpen(false);
+      setEditingProduct(null);
+      forceRefresh();
+      toast({
+        title: "Success",
+        description: "Level 2 product created successfully"
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to create product",
+        variant: "destructive"
+      });
+    }
   };
 
-  const handleUpdateLevel2Product = (productData: Omit<Level2Product, 'id'>) => {
+  const handleUpdateLevel2Product = async (productData: Omit<Level2Product, 'id'>) => {
     if (!editingProduct) return;
-    productDataService.updateLevel2Product(editingProduct.id, productData);
-    setDialogOpen(false);
-    setEditingProduct(null);
-    forceRefresh();
-    toast({
-      title: "Success",
-      description: "Level 2 product updated successfully"
-    });
+    try {
+      await productDataService.updateLevel2Product(editingProduct.id, productData);
+      setDialogOpen(false);
+      setEditingProduct(null);
+      forceRefresh();
+      toast({
+        title: "Success",
+        description: "Level 2 product updated successfully"
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to update product",
+        variant: "destructive"
+      });
+    }
   };
 
-  const handleDeleteLevel2Product = (productId: string) => {
+  const handleDeleteLevel2Product = async (productId: string) => {
     // Check for dependencies
     const dependentLevel3 = level3Products.filter(p => p.parentProductId === productId);
     if (dependentLevel3.length > 0) {
@@ -145,44 +212,76 @@ const ProductManagement = ({ user }: ProductManagementProps) => {
       return;
     }
     
-    productDataService.deleteLevel2Product(productId);
-    forceRefresh();
-    toast({
-      title: "Success",
-      description: "Level 2 product deleted successfully"
-    });
+    try {
+      await productDataService.deleteLevel2Product(productId);
+      forceRefresh();
+      toast({
+        title: "Success",
+        description: "Level 2 product deleted successfully"
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to delete product",
+        variant: "destructive"
+      });
+    }
   };
 
-  const handleCreateLevel3Product = (productData: Omit<Level3Product, 'id'>) => {
-    const newProduct = productDataService.createLevel3Product(productData);
-    setDialogOpen(false);
-    setEditingProduct(null);
-    forceRefresh();
-    toast({
-      title: "Success",
-      description: "Level 3 product created successfully"
-    });
+  const handleCreateLevel3Product = async (productData: Omit<Level3Product, 'id'>) => {
+    try {
+      await productDataService.createLevel3Product(productData);
+      setDialogOpen(false);
+      setEditingProduct(null);
+      forceRefresh();
+      toast({
+        title: "Success",
+        description: "Level 3 product created successfully"
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to create product",
+        variant: "destructive"
+      });
+    }
   };
 
-  const handleUpdateLevel3Product = (productData: Omit<Level3Product, 'id'>) => {
+  const handleUpdateLevel3Product = async (productData: Omit<Level3Product, 'id'>) => {
     if (!editingProduct) return;
-    productDataService.updateLevel3Product(editingProduct.id, productData);
-    setDialogOpen(false);
-    setEditingProduct(null);
-    forceRefresh();
-    toast({
-      title: "Success",
-      description: "Level 3 product updated successfully"
-    });
+    try {
+      await productDataService.updateLevel3Product(editingProduct.id, productData);
+      setDialogOpen(false);
+      setEditingProduct(null);
+      forceRefresh();
+      toast({
+        title: "Success",
+        description: "Level 3 product updated successfully"
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to update product",
+        variant: "destructive"
+      });
+    }
   };
 
-  const handleDeleteLevel3Product = (productId: string) => {
-    productDataService.deleteLevel3Product(productId);
-    forceRefresh();
-    toast({
-      title: "Success",
-      description: "Level 3 product deleted successfully"
-    });
+  const handleDeleteLevel3Product = async (productId: string) => {
+    try {
+      await productDataService.deleteLevel3Product(productId);
+      forceRefresh();
+      toast({
+        title: "Success",
+        description: "Level 3 product deleted successfully"
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to delete product",
+        variant: "descriptive"
+      });
+    }
   };
 
   const openEditDialog = (product: any, type: 'level1' | 'level2' | 'level3') => {
@@ -196,6 +295,14 @@ const ProductManagement = ({ user }: ProductManagementProps) => {
     setDialogType(type);
     setDialogOpen(true);
   };
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <div className="text-white">Loading products...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6" key={refreshKey}>
@@ -277,9 +384,11 @@ const ProductManagement = ({ user }: ProductManagementProps) => {
                               {product.type}
                             </Badge>
                           )}
-                          <Badge variant="outline" className="text-xs">
-                            {product.partNumber}
-                          </Badge>
+                          {product.partNumber && (
+                            <Badge variant="outline" className="text-xs">
+                              {product.partNumber}
+                            </Badge>
+                          )}
                           <Badge 
                             variant="outline" 
                             className={product.enabled ? "border-green-500 text-green-400" : "border-red-500 text-red-400"}
@@ -390,9 +499,11 @@ const ProductManagement = ({ user }: ProductManagementProps) => {
                           <Badge variant="outline" className="text-xs">
                             {product.type}
                           </Badge>
-                          <Badge variant="outline" className="text-xs">
-                            {product.partNumber}
-                          </Badge>
+                          {product.partNumber && (
+                            <Badge variant="outline" className="text-xs">
+                              {product.partNumber}
+                            </Badge>
+                          )}
                           <Badge 
                             variant="outline" 
                             className={product.enabled ? "border-green-500 text-green-400" : "border-red-500 text-red-400"}
@@ -448,7 +559,7 @@ const ProductManagement = ({ user }: ProductManagementProps) => {
                         <div className="flex flex-wrap gap-2">
                           {Object.entries(product.specifications).map(([key, value]) => (
                             <Badge key={key} variant="outline" className="text-xs">
-                              {key}: {value}
+                              {key}: {Array.isArray(value) ? value.join(', ') : String(value)}
                             </Badge>
                           ))}
                         </div>
@@ -500,9 +611,11 @@ const ProductManagement = ({ user }: ProductManagementProps) => {
                           <Badge variant="outline" className="text-xs capitalize">
                             {product.type}
                           </Badge>
-                          <Badge variant="outline" className="text-xs">
-                            {product.partNumber}
-                          </Badge>
+                          {product.partNumber && (
+                            <Badge variant="outline" className="text-xs">
+                              {product.partNumber}
+                            </Badge>
+                          )}
                           <Badge 
                             variant="outline" 
                             className={product.enabled ? "border-green-500 text-green-400" : "border-red-500 text-red-400"}
@@ -554,7 +667,7 @@ const ProductManagement = ({ user }: ProductManagementProps) => {
                         <div className="flex flex-wrap gap-2">
                           {Object.entries(product.specifications).map(([key, value]) => (
                             <Badge key={key} variant="outline" className="text-xs">
-                              {key}: {Array.isArray(value) ? value.join(', ') : value}
+                              {key}: {Array.isArray(value) ? value.join(', ') : String(value)}
                             </Badge>
                           ))}
                         </div>

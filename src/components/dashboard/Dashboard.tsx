@@ -10,9 +10,10 @@ import { BOMItem } from '@/types/product';
 
 interface DashboardProps {
   user: User;
+  onLogout: () => Promise<void>;
 }
 
-const Dashboard = ({ user }: DashboardProps) => {
+const Dashboard = ({ user, onLogout }: DashboardProps) => {
   const [activeView, setActiveView] = useState<string>('overview');
   const [bomItems, setBomItems] = useState<BOMItem[]>([]);
   const [discount, setDiscount] = useState<number>(0);
@@ -55,6 +56,7 @@ const Dashboard = ({ user }: DashboardProps) => {
         user={user}
         activeView={activeView}
         onViewChange={setActiveView}
+        onLogout={onLogout}
       />
       <main className="flex-1 overflow-y-auto">
         {renderContent()}

@@ -1,5 +1,5 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -12,7 +12,35 @@ interface Level1ProductSelectorProps {
 }
 
 const Level1ProductSelector = ({ onProductSelect, selectedProduct }: Level1ProductSelectorProps) => {
-  const [products] = useState(() => productDataService.getLevel1Products().filter(p => p.enabled));
+  const [products, setProducts] = useState<Level1Product[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchProducts = async () => {
+      setLoading(true);
+      try {
+        const allProducts = await productDataService.getLevel1Products();
+        setProducts(allProducts.filter(p => p.enabled));
+      } catch (error) {
+        console.error('Error fetching products:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchProducts();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="space-y-4">
+        <h3 className="text-xl font-medium text-white">Select Main Product Category</h3>
+        <div className="text-center py-8">
+          <p className="text-gray-400">Loading products...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
@@ -59,7 +87,7 @@ const Level1ProductSelector = ({ onProductSelect, selectedProduct }: Level1Produ
         ))}
       </div>
       
-      {products.length === 0 && (
+      {products.length === 0 && !loading && (
         <div className="text-center py-8">
           <p className="text-gray-400">No products available. Please create some products in the Admin Panel.</p>
         </div>
