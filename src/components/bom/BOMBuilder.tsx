@@ -20,6 +20,7 @@ import QuoteSubmissionDialog from './QuoteSubmissionDialog';
 import QTMSConfigurationEditor from './QTMSConfigurationEditor';
 import { consolidateQTMSConfiguration, createQTMSBOMItem, ConsolidatedQTMS, QTMSConfiguration } from '@/utils/qtmsConsolidation';
 import { findOptimalBushingPlacement, findExistingBushingSlots, isBushingCard } from '@/utils/bushingValidation';
+import { useAuth } from '@/hooks/useAuth';
 
 interface BOMBuilderProps {
   onBOMUpdate: (items: BOMItem[]) => void;
@@ -27,6 +28,9 @@ interface BOMBuilderProps {
 }
 
 const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
+  // Add authentication
+  const { user, loading } = useAuth();
+
   const [selectedLevel1Product, setSelectedLevel1Product] = useState<Level1Product | null>(null);
   const [selectedLevel2Options, setSelectedLevel2Options] = useState<Level2Product[]>([]);
   const [selectedChassis, setSelectedChassis] = useState<Level2Product | null>(null);
@@ -45,6 +49,27 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
 
   // Get all Level 1 products for dynamic tabs
   const level1Products = productDataService.getLevel1Products().filter(p => p.enabled);
+
+  // Show loading state if authentication is still loading
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-white">Loading...</div>
+      </div>
+    );
+  }
+
+  // Show authentication required message if user is not logged in
+  if (!user) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-white text-center">
+          <p className="mb-4">Please log in to use the BOM Builder</p>
+          <p className="text-gray-400">Authentication is required to submit quotes</p>
+        </div>
+      </div>
+    );
+  }
 
   // Set default active tab when products are loaded
   useEffect(() => {
@@ -94,9 +119,7 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
       const updated = { ...prev };
       const card = updated[slot];
       
-      // If it's a bushing card, clear ALL bushing cards from the chassis
       if (card && isBushingCard(card)) {
-        // Find all bushing slots and clear them
         const bushingSlots = findExistingBushingSlots(updated);
         bushingSlots.forEach(bushingSlot => {
           delete updated[bushingSlot];
@@ -110,7 +133,6 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
   };
 
   const handleCardSelect = (card: Level3Product, slot?: number) => {
-    // Special handling for bushing cards
     if (isBushingCard(card)) {
       if (!selectedChassis) return;
       
@@ -120,25 +142,21 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
         return;
       }
 
-      // Clear existing cards if needed
       setSlotAssignments(prev => {
         const updated = { ...prev };
         
-        // Clear existing bushing cards
         if (placement.shouldClearExisting) {
           placement.existingSlotsTolear.forEach(slotToClear => {
             delete updated[slotToClear];
           });
         }
         
-        // Place the bushing card in both slots
         updated[placement.primarySlot] = card;
         updated[placement.secondarySlot] = card;
         
         return updated;
       });
 
-      // Check if card needs configuration
       if (card.name.toLowerCase().includes('bushing')) {
         const newItem: BOMItem = {
           id: `${Date.now()}-${Math.random()}`,
@@ -155,7 +173,6 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
       return;
     }
 
-    // Check if card needs configuration
     if (card.name.toLowerCase().includes('analog')) {
       const newItem: BOMItem = {
         id: `${Date.now()}-${Math.random()}`,
@@ -176,7 +193,6 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
       }));
       setSelectedSlot(null);
     } else {
-      // Add directly to BOM for non-chassis items
       const newItem: BOMItem = {
         id: `${Date.now()}-${Math.random()}`,
         product: card,
@@ -200,13 +216,11 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
     };
 
     if (configuringCard.slot !== undefined) {
-      // Add to slot assignments for chassis cards
       setSlotAssignments(prev => ({
         ...prev,
         [configuringCard.slot!]: configuringCard.product as Level3Product
       }));
     } else {
-      // Add directly to BOM
       const updatedItems = [...bomItems, configuredItem];
       setBomItems(updatedItems);
       onBOMUpdate(updatedItems);
@@ -217,7 +231,6 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
   };
 
   const handleDGAProductSelect = (product: Level1Product, configuration?: Record<string, any>, level2Options?: Level2Product[]) => {
-    // Handle DGA product selection
     const newItem: BOMItem = {
       id: `${Date.now()}-${Math.random()}`,
       product: product,
@@ -228,7 +241,6 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
     
     const updatedItems = [...bomItems, newItem];
     
-    // Add level 2 options as separate items
     if (level2Options) {
       level2Options.forEach(option => {
         const optionItem: BOMItem = {
@@ -252,24 +264,20 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
   const handleAddChassisAndCardsToBOM = () => {
     if (!selectedChassis) return;
 
-    // Consolidate QTMS configuration
     const consolidatedQTMS = consolidateQTMSConfiguration(
       selectedChassis,
       slotAssignments,
       hasRemoteDisplay,
-      {}, // analogConfigurations - will be implemented separately
-      {} // bushingConfigurations - will be implemented separately
+      {},
+      {}
     );
 
-    // Create the BOM item directly
     const bomItem = createQTMSBOMItem(consolidatedQTMS);
     
-    // Add directly to BOM without showing popup
     const updatedItems = [...bomItems, bomItem];
     setBomItems(updatedItems);
     onBOMUpdate(updatedItems);
 
-    // Reset chassis selection after adding to BOM
     setSelectedChassis(null);
     setSlotAssignments({});
     setSelectedSlot(null);
@@ -278,7 +286,6 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
 
   const handleBOMConfigurationEdit = (item: BOMItem) => {
     if (item.product.type === 'QTMS' && item.configuration) {
-      // Convert BOM item back to ConsolidatedQTMS format for editing
       const consolidatedQTMS: ConsolidatedQTMS = {
         id: item.id,
         name: item.product.name,
@@ -286,11 +293,10 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
         partNumber: item.partNumber || item.product.partNumber || '',
         price: item.product.price || 0,
         configuration: item.configuration as QTMSConfiguration,
-        components: [] // Will be recalculated in editor
+        components: []
       };
       setEditingQTMS(consolidatedQTMS);
     } else {
-      // For other configurable items, set as configuring card
       setConfiguringBOMItem(item);
     }
   };
@@ -298,21 +304,17 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
   const handleQTMSConfigurationSave = (updatedQTMS: ConsolidatedQTMS) => {
     console.log('Saving QTMS configuration:', updatedQTMS);
     
-    // Create the updated BOM item
     const updatedBOMItem = createQTMSBOMItem(updatedQTMS);
     
-    // Check if this QTMS item already exists in the BOM
     const existingItemIndex = bomItems.findIndex(item => item.id === updatedQTMS.id);
     
     let updatedItems;
     if (existingItemIndex >= 0) {
-      // Update existing item
       console.log('Updating existing QTMS item at index:', existingItemIndex);
       updatedItems = bomItems.map((item, index) => 
         index === existingItemIndex ? updatedBOMItem : item
       );
     } else {
-      // Add as new item
       console.log('Adding new QTMS item to BOM');
       updatedItems = [...bomItems, updatedBOMItem];
     }
@@ -326,7 +328,6 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
   const handleSubmitQuote = (quoteId: string) => {
     console.log('Quote submitted with ID:', quoteId);
     setShowQuoteSubmission(false);
-    // Reset BOM after successful submission
     setBomItems([]);
     setQuoteFields({});
     setDiscountPercentage(0);
@@ -348,6 +349,7 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
     setDiscountJustification(justification);
   };
 
+  // Render product content based on selected tab
   const renderProductContent = (productId: string) => {
     const product = level1Products.find(p => p.id === productId);
     if (!product) return null;
@@ -449,6 +451,8 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
               <CardTitle className="text-white">BOM Builder</CardTitle>
               <CardDescription className="text-gray-400">
                 Build your Bill of Materials by selecting products and configurations
+                <br />
+                <span className="text-green-400">Logged in as: {user.name} ({user.email})</span>
               </CardDescription>
             </CardHeader>
           </Card>
@@ -551,6 +555,7 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
           onSubmit={handleSubmitQuote}
           onClose={() => setShowQuoteSubmission(false)}
           canSeePrices={canSeePrices}
+          user={user}
         />
       )}
     </div>

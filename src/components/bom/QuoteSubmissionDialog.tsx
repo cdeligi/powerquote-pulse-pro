@@ -7,7 +7,9 @@ import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { CheckCircle, AlertCircle, FileText } from 'lucide-react';
 import { BOMItem } from '@/types/product';
+import { User } from '@/types/auth';
 import { supabase } from '@/integrations/supabase/client';
+import { calculateItemCost, calculateItemRevenue, calculateItemMargin } from '@/utils/marginCalculations';
 
 interface QuoteSubmissionDialogProps {
   bomItems: BOMItem[];
@@ -17,6 +19,7 @@ interface QuoteSubmissionDialogProps {
   onSubmit: (quoteId: string) => void;
   onClose: () => void;
   canSeePrices: boolean;
+  user: User;
 }
 
 const QuoteSubmissionDialog = ({
@@ -26,14 +29,15 @@ const QuoteSubmissionDialog = ({
   discountJustification,
   onSubmit,
   onClose,
-  canSeePrices
+  canSeePrices,
+  user
 }: QuoteSubmissionDialogProps) => {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const calculateTotals = () => {
     const originalValue = bomItems.reduce((total, item) => {
-      return total + ((item.product.price || 0) * item.quantity);
+      return total + calculateItemRevenue(item);
     }, 0);
     
     const discountAmount = originalValue * (discountPercentage / 100);
@@ -56,8 +60,15 @@ const QuoteSubmissionDialog = ({
   };
 
   const handleSubmit = async () => {
+    console.log('Starting quote submission for user:', user);
+    
     if (!validateRequiredFields()) {
       setError('Please fill in all required fields');
+      return;
+    }
+
+    if (!user || !user.id) {
+      setError('User authentication required. Please log in again.');
       return;
     }
 
@@ -68,20 +79,32 @@ const QuoteSubmissionDialog = ({
       const { originalValue, discountedValue } = calculateTotals();
       const quoteId = `QUOTE-${Date.now()}`;
 
-      // Calculate costs and margins (simplified for demo)
+      // Calculate total costs and margins using the utility functions
       const totalCost = bomItems.reduce((total, item) => {
-        return total + ((item.product.cost || item.product.price * 0.6) * item.quantity);
+        return total + calculateItemCost(item);
       }, 0);
 
-      const originalMargin = ((originalValue - totalCost) / originalValue) * 100;
-      const discountedMargin = ((discountedValue - totalCost) / discountedValue) * 100;
+      const originalMargin = originalValue > 0 ? ((originalValue - totalCost) / originalValue) * 100 : 0;
+      const discountedMargin = discountedValue > 0 ? ((discountedValue - totalCost) / discountedValue) * 100 : 0;
+
+      console.log('Submitting quote with data:', {
+        quoteId,
+        userId: user.id,
+        userName: user.name,
+        userEmail: user.email,
+        originalValue,
+        discountedValue,
+        totalCost,
+        originalMargin,
+        discountedMargin
+      });
 
       // Submit quote to database
       const { error: quoteError } = await supabase
         .from('quotes')
         .insert({
           id: quoteId,
-          user_id: 'temp-user-id', // Replace with actual user ID when auth is implemented
+          user_id: user.id,
           customer_name: quoteFields.customerName || 'Unknown Customer',
           oracle_customer_id: quoteFields.oracleCustomerId || '',
           sfdc_opportunity: quoteFields.sfdcOpportunity || `OPP-${Date.now()}`,
@@ -99,36 +122,53 @@ const QuoteSubmissionDialog = ({
           gross_profit: discountedValue - totalCost,
           is_rep_involved: quoteFields.isRepInvolved || false,
           quote_fields: quoteFields,
-          status: 'pending'
+          status: 'pending',
+          submitted_by_name: user.name,
+          submitted_by_email: user.email
         });
 
-      if (quoteError) throw quoteError;
+      if (quoteError) {
+        console.error('Quote insertion error:', quoteError);
+        throw new Error(`Failed to create quote: ${quoteError.message}`);
+      }
 
-      // Submit BOM items
-      const bomItemsData = bomItems.map(item => ({
-        quote_id: quoteId,
-        product_id: item.product.id,
-        name: item.product.name,
-        description: item.product.description || '',
-        part_number: item.product.partNumber || item.product.id,
-        quantity: item.quantity,
-        unit_price: item.product.price || 0,
-        unit_cost: item.product.cost || (item.product.price || 0) * 0.6,
-        total_price: (item.product.price || 0) * item.quantity,
-        total_cost: (item.product.cost || (item.product.price || 0) * 0.6) * item.quantity,
-        margin: item.product.price ? ((item.product.price - (item.product.cost || item.product.price * 0.6)) / item.product.price) * 100 : 0
-      }));
+      console.log('Quote created successfully, now creating BOM items...');
+
+      // Submit BOM items with detailed calculations
+      const bomItemsData = bomItems.map(item => {
+        const itemRevenue = calculateItemRevenue(item);
+        const itemCost = calculateItemCost(item);
+        const itemMargin = calculateItemMargin(item);
+
+        return {
+          quote_id: quoteId,
+          product_id: item.product.id,
+          name: item.product.name,
+          description: item.product.description || '',
+          part_number: item.partNumber || item.product.partNumber || item.product.id,
+          quantity: item.quantity,
+          unit_price: item.product.price || 0,
+          unit_cost: item.product.cost || (item.product.price || 0) * 0.6,
+          total_price: itemRevenue,
+          total_cost: itemCost,
+          margin: itemMargin
+        };
+      });
 
       const { error: bomError } = await supabase
         .from('bom_items')
         .insert(bomItemsData);
 
-      if (bomError) throw bomError;
+      if (bomError) {
+        console.error('BOM items insertion error:', bomError);
+        throw new Error(`Failed to create BOM items: ${bomError.message}`);
+      }
 
+      console.log('Quote and BOM items created successfully');
       onSubmit(quoteId);
     } catch (error) {
       console.error('Error submitting quote:', error);
-      setError('Failed to submit quote. Please try again.');
+      setError(error instanceof Error ? error.message : 'Failed to submit quote. Please try again.');
     } finally {
       setSubmitting(false);
     }
@@ -148,6 +188,35 @@ const QuoteSubmissionDialog = ({
         </DialogHeader>
         
         <div className="space-y-6">
+          {/* User Info Display */}
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-white">Submitted By</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                <div className="flex justify-between">
+                  <span className="text-gray-300">Name:</span>
+                  <span className="text-white">{user.name}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-300">Email:</span>
+                  <span className="text-white">{user.email}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-300">Role:</span>
+                  <span className="text-white capitalize">{user.role}</span>
+                </div>
+                {user.department && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-300">Department:</span>
+                    <span className="text-white">{user.department}</span>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Validation Status */}
           {!isValid && (
             <Alert className="bg-red-900/20 border-red-600">
@@ -207,10 +276,15 @@ const QuoteSubmissionDialog = ({
                     <div>
                       <span className="text-white">{item.product.name}</span>
                       <span className="text-gray-400 ml-2">x{item.quantity}</span>
+                      {canSeePrices && (
+                        <span className="text-gray-400 ml-2">
+                          (Margin: {calculateItemMargin(item).toFixed(1)}%)
+                        </span>
+                      )}
                     </div>
                     {canSeePrices && (
                       <span className="text-gray-300">
-                        ${((item.product.price || 0) * item.quantity).toLocaleString()}
+                        ${calculateItemRevenue(item).toLocaleString()}
                       </span>
                     )}
                   </div>
