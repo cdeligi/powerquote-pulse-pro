@@ -49,14 +49,17 @@ export type Database = {
       }
       bom_items: {
         Row: {
+          approved_unit_price: number | null
           configuration_data: Json | null
           created_at: string
           description: string | null
           id: string
           margin: number
           name: string
+          original_unit_price: number | null
           parent_quote_item_id: string | null
           part_number: string | null
+          price_adjustment_history: Json | null
           product_id: string
           product_type: string | null
           quantity: number
@@ -67,14 +70,17 @@ export type Database = {
           unit_price: number
         }
         Insert: {
+          approved_unit_price?: number | null
           configuration_data?: Json | null
           created_at?: string
           description?: string | null
           id?: string
           margin?: number
           name: string
+          original_unit_price?: number | null
           parent_quote_item_id?: string | null
           part_number?: string | null
+          price_adjustment_history?: Json | null
           product_id: string
           product_type?: string | null
           quantity: number
@@ -85,14 +91,17 @@ export type Database = {
           unit_price: number
         }
         Update: {
+          approved_unit_price?: number | null
           configuration_data?: Json | null
           created_at?: string
           description?: string | null
           id?: string
           margin?: number
           name?: string
+          original_unit_price?: number | null
           parent_quote_item_id?: string | null
           part_number?: string | null
+          price_adjustment_history?: Json | null
           product_id?: string
           product_type?: string | null
           quantity?: number
@@ -303,6 +312,7 @@ export type Database = {
         Row: {
           approval_notes: string | null
           approved_discount: number | null
+          approved_prices: Json | null
           counter_offers: Json | null
           created_at: string
           currency: string
@@ -315,8 +325,10 @@ export type Database = {
           is_rep_involved: boolean
           oracle_customer_id: string
           original_margin: number
+          original_prices: Json | null
           original_quote_value: number
           payment_terms: string
+          price_adjustments: Json | null
           priority: string
           quote_fields: Json | null
           rejection_reason: string | null
@@ -335,6 +347,7 @@ export type Database = {
         Insert: {
           approval_notes?: string | null
           approved_discount?: number | null
+          approved_prices?: Json | null
           counter_offers?: Json | null
           created_at?: string
           currency?: string
@@ -347,8 +360,10 @@ export type Database = {
           is_rep_involved?: boolean
           oracle_customer_id: string
           original_margin: number
+          original_prices?: Json | null
           original_quote_value: number
           payment_terms: string
+          price_adjustments?: Json | null
           priority?: string
           quote_fields?: Json | null
           rejection_reason?: string | null
@@ -367,6 +382,7 @@ export type Database = {
         Update: {
           approval_notes?: string | null
           approved_discount?: number | null
+          approved_prices?: Json | null
           counter_offers?: Json | null
           created_at?: string
           currency?: string
@@ -379,8 +395,10 @@ export type Database = {
           is_rep_involved?: boolean
           oracle_customer_id?: string
           original_margin?: number
+          original_prices?: Json | null
           original_quote_value?: number
           payment_terms?: string
+          price_adjustments?: Json | null
           priority?: string
           quote_fields?: Json | null
           rejection_reason?: string | null

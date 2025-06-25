@@ -1,5 +1,5 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -16,6 +16,15 @@ import {
   isDynamicProduct, 
   isQTMSConfiguration 
 } from '@/utils/qtmsValidation';
+import { QuoteFieldValidation, validateQuoteFields } from './QuoteFieldValidation';
+
+interface QuoteField {
+  id: string;
+  label: string;
+  type: string;
+  required: boolean;
+  enabled: boolean;
+}
 
 interface QuoteSubmissionDialogProps {
   bomItems: BOMItem[];
@@ -40,6 +49,34 @@ const QuoteSubmissionDialog = ({
 }: QuoteSubmissionDialogProps) => {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [configuredFields, setConfiguredFields] = useState<QuoteField[]>([]);
+  const [fieldsLoading, setFieldsLoading] = useState(true);
+
+  useEffect(() => {
+    fetchQuoteFields();
+  }, []);
+
+  const fetchQuoteFields = async () => {
+    console.log('Fetching quote field configurations for validation...');
+    try {
+      const { data, error } = await supabase
+        .from('quote_fields')
+        .select('*')
+        .eq('enabled', true);
+
+      if (error) {
+        console.error('Error fetching quote fields:', error);
+        return;
+      }
+
+      console.log('Fetched quote fields for validation:', data);
+      setConfiguredFields(data || []);
+    } catch (error) {
+      console.error('Failed to fetch quote fields:', error);
+    } finally {
+      setFieldsLoading(false);
+    }
+  };
 
   const calculateTotals = () => {
     const originalValue = bomItems.reduce((total, item) => {
@@ -57,12 +94,8 @@ const QuoteSubmissionDialog = ({
   };
 
   const validateRequiredFields = () => {
-    // Check for required quote fields that are empty
-    const requiredFields = Object.keys(quoteFields).filter(key => 
-      quoteFields[key] === '' || quoteFields[key] === null || quoteFields[key] === undefined
-    );
-    
-    return requiredFields.length === 0;
+    if (fieldsLoading) return false;
+    return validateQuoteFields(quoteFields, configuredFields);
   };
 
   const validateProductsExist = async () => {
@@ -138,7 +171,10 @@ const QuoteSubmissionDialog = ({
       unit_cost: item.product.cost || (item.product.price || 0) * 0.6,
       total_price: itemRevenue,
       total_cost: itemCost,
-      margin: itemMargin
+      margin: itemMargin,
+      original_unit_price: item.product.price || 0,
+      approved_unit_price: item.product.price || 0,
+      price_adjustment_history: []
     };
 
     // Use placeholder product IDs for dynamic configurations to avoid foreign key issues
@@ -171,7 +207,7 @@ const QuoteSubmissionDialog = ({
     console.log('Starting quote submission for user:', user);
     
     if (!validateRequiredFields()) {
-      setError('Please fill in all required fields');
+      setError('Please fill in all required fields before submitting the quote.');
       return;
     }
 
@@ -270,7 +306,7 @@ const QuoteSubmissionDialog = ({
   };
 
   const { originalValue, discountAmount, discountedValue } = calculateTotals();
-  const isValid = validateRequiredFields();
+  const isValid = validateRequiredFields() && !fieldsLoading;
 
   return (
     <Dialog open={true} onOpenChange={onClose}>
@@ -312,14 +348,12 @@ const QuoteSubmissionDialog = ({
             </CardContent>
           </Card>
 
-          {/* Validation Status */}
-          {!isValid && (
-            <Alert className="bg-red-900/20 border-red-600">
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription className="text-red-400">
-                Please fill in all required fields before submitting the quote.
-              </AlertDescription>
-            </Alert>
+          {/* Field Validation */}
+          {!fieldsLoading && (
+            <QuoteFieldValidation 
+              quoteFields={quoteFields} 
+              requiredFields={configuredFields} 
+            />
           )}
 
           {/* Quote Summary */}
@@ -427,7 +461,7 @@ const QuoteSubmissionDialog = ({
           <Button
             onClick={handleSubmit}
             className="bg-green-600 hover:bg-green-700 text-white"
-            disabled={submitting || !isValid}
+            disabled={submitting || !isValid || fieldsLoading}
           >
             {submitting ? 'Submitting...' : 'Submit Quote'}
           </Button>

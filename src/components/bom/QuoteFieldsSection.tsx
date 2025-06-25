@@ -1,140 +1,97 @@
 
 import { useState, useEffect } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { QuoteFieldValidation } from './QuoteFieldValidation';
 
 interface QuoteField {
   id: string;
   label: string;
-  type: 'text' | 'textarea' | 'number' | 'select' | 'date' | 'email' | 'tel';
+  type: string;
   required: boolean;
   enabled: boolean;
-  options?: string[];
-  display_order: number;
+  options?: any[];
 }
 
 interface QuoteFieldsSectionProps {
-  onFieldsChange: (fields: Record<string, any>) => void;
-  initialValues?: Record<string, any>;
+  quoteFields: Record<string, any>;
+  onFieldChange: (fieldId: string, value: any) => void;
 }
 
-const QuoteFieldsSection = ({ onFieldsChange, initialValues = {} }: QuoteFieldsSectionProps) => {
-  const [quoteFields, setQuoteFields] = useState<QuoteField[]>([]);
-  const [fieldValues, setFieldValues] = useState<Record<string, any>>(initialValues);
+const QuoteFieldsSection = ({ quoteFields, onFieldChange }: QuoteFieldsSectionProps) => {
+  const [configuredFields, setConfiguredFields] = useState<QuoteField[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchQuoteFields();
   }, []);
 
   const fetchQuoteFields = async () => {
+    console.log('Fetching quote field configurations...');
     try {
-      console.log('Fetching enabled quote fields...');
-      setLoading(true);
-      setError(null);
-      
-      // This query will use the "Anyone can view enabled quote fields" policy
       const { data, error } = await supabase
         .from('quote_fields')
         .select('*')
         .eq('enabled', true)
-        .order('display_order');
+        .order('display_order', { ascending: true });
 
       if (error) {
-        console.error('Supabase error:', error);
-        throw error;
-      }
-      
-      console.log('Raw quote fields data:', data);
-
-      if (!data || data.length === 0) {
-        console.log('No enabled quote fields found in database');
-        setQuoteFields([]);
+        console.error('Error fetching quote fields:', error);
         return;
       }
 
-      const fields = data.map(field => {
-        console.log('Processing field:', field);
-        
-        // Handle options parsing
-        let parsedOptions: string[] | undefined = undefined;
-        if (field.options) {
-          if (Array.isArray(field.options)) {
-            parsedOptions = field.options;
-          } else if (typeof field.options === 'string') {
-            try {
-              const parsed = JSON.parse(field.options);
-              parsedOptions = Array.isArray(parsed) ? parsed : undefined;
-            } catch (parseError) {
-              console.error(`Error parsing options for field ${field.id}:`, parseError);
-              parsedOptions = undefined;
-            }
-          }
-        }
-
-        return {
-          id: field.id,
-          label: field.label,
-          type: field.type as QuoteField['type'],
-          required: field.required || false,
-          enabled: field.enabled || true,
-          options: parsedOptions,
-          display_order: field.display_order || 0
-        };
-      });
-
-      console.log('Processed quote fields:', fields);
-      setQuoteFields(fields);
+      console.log('Fetched quote fields:', data);
+      setConfiguredFields(data || []);
     } catch (error) {
-      console.error('Error fetching quote fields:', error);
-      setError('Unable to load quote fields. Please try again later.');
+      console.error('Failed to fetch quote fields:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleFieldChange = (fieldId: string, value: any) => {
-    console.log('Field change:', fieldId, value);
-    const updatedValues = { ...fieldValues, [fieldId]: value };
-    setFieldValues(updatedValues);
-    onFieldsChange(updatedValues);
-  };
-
   const renderField = (field: QuoteField) => {
-    const value = fieldValues[field.id] || '';
+    const value = quoteFields[field.id] || '';
+    const isRequired = field.required;
+
+    const commonProps = {
+      className: `bg-gray-700 border-gray-600 text-white ${isRequired ? 'border-red-500' : ''}`,
+      value,
+      onChange: (e: any) => onFieldChange(field.id, e.target?.value || e)
+    };
 
     switch (field.type) {
+      case 'text':
+        return (
+          <Input
+            {...commonProps}
+            placeholder={`Enter ${field.label.toLowerCase()}...`}
+          />
+        );
+
       case 'textarea':
         return (
           <Textarea
-            value={value}
-            onChange={(e) => handleFieldChange(field.id, e.target.value)}
-            className="bg-gray-800 border-gray-700 text-white text-sm"
-            required={field.required}
-            rows={2}
+            {...commonProps}
+            rows={3}
+            placeholder={`Enter ${field.label.toLowerCase()}...`}
           />
         );
 
       case 'select':
         return (
-          <Select
-            value={value}
-            onValueChange={(val) => handleFieldChange(field.id, val)}
-          >
-            <SelectTrigger className="bg-gray-800 border-gray-700 text-white text-sm h-9">
-              <SelectValue placeholder={`Select ${field.label.toLowerCase()}`} />
+          <Select value={value} onValueChange={(newValue) => onFieldChange(field.id, newValue)}>
+            <SelectTrigger className={`bg-gray-700 border-gray-600 text-white ${isRequired ? 'border-red-500' : ''}`}>
+              <SelectValue placeholder={`Select ${field.label.toLowerCase()}...`} />
             </SelectTrigger>
-            <SelectContent className="bg-gray-800 border-gray-700">
+            <SelectContent className="bg-gray-700 border-gray-600">
               {field.options?.map((option) => (
-                <SelectItem key={option} value={option} className="text-white text-sm">
+                <SelectItem key={option} value={option}>
                   {option}
                 </SelectItem>
               ))}
@@ -142,58 +99,35 @@ const QuoteFieldsSection = ({ onFieldsChange, initialValues = {} }: QuoteFieldsS
           </Select>
         );
 
+      case 'checkbox':
+        return (
+          <div className="flex items-center space-x-2">
+            <Checkbox
+              id={field.id}
+              checked={value === true || value === 'true'}
+              onCheckedChange={(checked) => onFieldChange(field.id, checked)}
+              className="border-gray-600"
+            />
+            <Label htmlFor={field.id} className="text-white text-sm">
+              {field.label}
+            </Label>
+          </div>
+        );
+
       case 'number':
         return (
           <Input
+            {...commonProps}
             type="number"
-            value={value}
-            onChange={(e) => handleFieldChange(field.id, e.target.value)}
-            className="bg-gray-800 border-gray-700 text-white text-sm h-9"
-            required={field.required}
-          />
-        );
-
-      case 'email':
-        return (
-          <Input
-            type="email"
-            value={value}
-            onChange={(e) => handleFieldChange(field.id, e.target.value)}
-            className="bg-gray-800 border-gray-700 text-white text-sm h-9"
-            required={field.required}
-          />
-        );
-
-      case 'tel':
-        return (
-          <Input
-            type="tel"
-            value={value}
-            onChange={(e) => handleFieldChange(field.id, e.target.value)}
-            className="bg-gray-800 border-gray-700 text-white text-sm h-9"
-            required={field.required}
-          />
-        );
-
-      case 'date':
-        return (
-          <Input
-            type="date"
-            value={value}
-            onChange={(e) => handleFieldChange(field.id, e.target.value)}
-            className="bg-gray-800 border-gray-700 text-white text-sm h-9"
-            required={field.required}
+            placeholder={`Enter ${field.label.toLowerCase()}...`}
           />
         );
 
       default:
         return (
           <Input
-            type="text"
-            value={value}
-            onChange={(e) => handleFieldChange(field.id, e.target.value)}
-            className="bg-gray-800 border-gray-700 text-white text-sm h-9"
-            required={field.required}
+            {...commonProps}
+            placeholder={`Enter ${field.label.toLowerCase()}...`}
           />
         );
     }
@@ -201,80 +135,53 @@ const QuoteFieldsSection = ({ onFieldsChange, initialValues = {} }: QuoteFieldsS
 
   if (loading) {
     return (
-      <Card className="bg-gray-900 border-gray-800">
-        <CardContent className="py-8">
-          <div className="flex items-center justify-center">
-            <Loader2 className="h-6 w-6 animate-spin text-white mr-2" />
-            <span className="text-gray-400 text-sm">Loading quote fields...</span>
-          </div>
+      <Card className="bg-gray-800 border-gray-700">
+        <CardContent className="p-6">
+          <div className="text-white">Loading quote fields...</div>
         </CardContent>
-      </Card>
-    );
-  }
-
-  if (error) {
-    return (
-      <Card className="bg-gray-900 border-gray-800">
-        <CardContent className="py-4">
-          <Alert className="bg-red-900/20 border-red-600">
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription className="text-red-400">
-              {error}
-              <button 
-                onClick={fetchQuoteFields}
-                className="ml-2 text-blue-400 hover:text-blue-300 underline"
-              >
-                Retry
-              </button>
-            </AlertDescription>
-          </Alert>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  if (quoteFields.length === 0) {
-    return (
-      <Card className="bg-gray-900 border-gray-800">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-white text-lg">Quote Information</CardTitle>
-          <CardDescription className="text-gray-400 text-sm">
-            No quote fields are currently enabled. Please contact your administrator to configure quote fields.
-          </CardDescription>
-        </CardHeader>
       </Card>
     );
   }
 
   return (
-    <Card className="bg-gray-900 border-gray-800">
-      <CardHeader className="pb-3">
-        <CardTitle className="text-white text-lg flex items-center justify-between">
-          Quote Information
-          <Badge variant="outline" className="text-xs text-gray-300 border-gray-600">
-            {quoteFields.length} fields
-          </Badge>
-        </CardTitle>
-        <CardDescription className="text-gray-400 text-sm">
-          Complete the required fields for your quote request
-        </CardDescription>
+    <Card className="bg-gray-800 border-gray-700">
+      <CardHeader>
+        <CardTitle className="text-white">Quote Information</CardTitle>
       </CardHeader>
-      <CardContent className="pt-0">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6 gap-3">
-          {quoteFields.map((field) => (
-            <div key={field.id} className="space-y-1.5">
-              <Label htmlFor={field.id} className="text-white text-xs flex items-center gap-1.5">
-                {field.label}
-                {field.required && (
-                  <Badge variant="outline" className="text-xs px-1 py-0 h-4 border-red-500 text-red-400">
-                    *
-                  </Badge>
+      <CardContent className="space-y-6">
+        {/* Show validation errors */}
+        <QuoteFieldValidation 
+          quoteFields={quoteFields} 
+          requiredFields={configuredFields} 
+        />
+
+        {configuredFields.length === 0 ? (
+          <div className="text-gray-400 text-center py-4">
+            No quote fields have been configured. Please contact your administrator to set up quote fields.
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {configuredFields.map((field) => (
+              <div key={field.id} className="space-y-2">
+                <Label htmlFor={field.id} className="text-white flex items-center space-x-2">
+                  <span>{field.label}</span>
+                  {field.required && (
+                    <Badge variant="outline" className="text-xs text-red-400 border-red-400">
+                      Required
+                    </Badge>
+                  )}
+                </Label>
+                {field.type === 'checkbox' ? (
+                  renderField(field)
+                ) : (
+                  <div>
+                    {renderField(field)}
+                  </div>
                 )}
-              </Label>
-              {renderField(field)}
-            </div>
-          ))}
-        </div>
+              </div>
+            ))}
+          </div>
+        )}
       </CardContent>
     </Card>
   );
