@@ -93,19 +93,19 @@ const AdminPanel = ({ user }: AdminPanelProps) => {
                 </TabsContent>
 
                 <TabsContent value="users" className="mt-0">
-                  <UserManagement user={user} />
+                  <UserManagement />
                 </TabsContent>
 
                 <TabsContent value="products" className="mt-0">
-                  <ProductManagement user={user} />
+                  <ProductManagement />
                 </TabsContent>
 
                 <TabsContent value="quote-fields" className="mt-0">
-                  <QuoteFieldConfiguration user={user} />
+                  <QuoteFieldConfiguration />
                 </TabsContent>
 
                 <TabsContent value="analytics" className="mt-0">
-                  <MarginDashboard bomItems={[]} user={user} />
+                  <MarginDashboard />
                 </TabsContent>
 
                 <TabsContent value="settings" className="mt-0">

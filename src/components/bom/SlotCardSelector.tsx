@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -27,32 +27,6 @@ const SlotCardSelector = ({
   currentSlotAssignments = {}
 }: SlotCardSelectorProps) => {
   const [selectedFiberInputs, setSelectedFiberInputs] = useState<number>(4);
-  const [availableCards, setAvailableCards] = useState<any[]>([]);
-
-  useEffect(() => {
-    const fetchCards = async () => {
-      const level3Products = await productDataService.getLevel3ProductsByLevel2(chassis.id);
-      
-      // Convert to the expected format
-      const cards = level3Products.map(product => ({
-        id: product.id,
-        name: product.name,
-        parentProductId: product.parentProductId,
-        type: product.type,
-        description: product.description,
-        price: product.price,
-        enabled: product.enabled,
-        slotRequirement: product.specifications?.slotRequirement || 1,
-        compatibleChassis: product.specifications?.compatibleChassis || [chassis.type],
-        specifications: product.specifications,
-        partNumber: product.partNumber
-      }));
-      
-      setAvailableCards(cards);
-    };
-    
-    fetchCards();
-  }, [chassis.id, chassis.type]);
 
   const getCardTypeColor = (cardType: string) => {
     switch (cardType) {
@@ -66,6 +40,28 @@ const SlotCardSelector = ({
       default: return 'text-white border-gray-500';
     }
   };
+
+  // Get available cards from productDataService
+  const getAvailableCards = () => {
+    const level3Products = productDataService.getLevel3ProductsForLevel2(chassis.id);
+    
+    // Convert to the expected format
+    return level3Products.map(product => ({
+      id: product.id,
+      name: product.name,
+      parentProductId: product.parentProductId,
+      type: product.type,
+      description: product.description,
+      price: product.price,
+      enabled: product.enabled,
+      slotRequirement: product.specifications?.slotRequirement || 1,
+      compatibleChassis: product.specifications?.compatibleChassis || [chassis.type],
+      specifications: product.specifications,
+      partNumber: product.partNumber
+    }));
+  };
+
+  const availableCards = getAvailableCards();
 
   // Filter cards based on chassis compatibility, bushing validation, and LTX slot 8 restriction
   const getCompatibleCards = () => {

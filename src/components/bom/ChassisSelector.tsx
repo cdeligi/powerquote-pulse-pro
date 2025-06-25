@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Level2Product } from "@/types/product";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -14,15 +14,10 @@ interface ChassisSelectorProps {
 }
 
 const ChassisSelector = ({ onChassisSelect, selectedChassis, canSeePrices }: ChassisSelectorProps) => {
-  const [chassisOptions, setChassisOptions] = useState<Level2Product[]>([]);
-
-  useEffect(() => {
-    const fetchChassis = async () => {
-      const options = await productDataService.getLevel2ProductsByLevel1('qtms');
-      setChassisOptions(options.filter(chassis => ['LTX', 'MTX', 'STX'].includes(chassis.type) && chassis.enabled));
-    };
-    fetchChassis();
-  }, []);
+  // Get chassis options from productDataService
+  const chassisOptions: Level2Product[] = productDataService
+    .getLevel2ProductsForLevel1('qtms')
+    .filter(chassis => ['LTX', 'MTX', 'STX'].includes(chassis.type) && chassis.enabled);
 
   return (
     <div className="space-y-4">

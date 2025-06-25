@@ -1,5 +1,4 @@
 
-import { useState, useEffect } from "react";
 import { Level2Product, Level3Product } from "@/types/product";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -16,15 +15,8 @@ interface CardLibraryProps {
 }
 
 const CardLibrary = ({ chassis, onCardSelect, canSeePrices }: CardLibraryProps) => {
-  const [allCards, setAllCards] = useState<Level3Product[]>([]);
-
-  useEffect(() => {
-    const fetchCards = async () => {
-      const cards = await productDataService.getLevel3ProductsByLevel2(chassis.id);
-      setAllCards(cards);
-    };
-    fetchCards();
-  }, [chassis.id]);
+  // Get all cards for this chassis from productDataService
+  const allCards = productDataService.getLevel3ProductsForLevel2(chassis.id);
 
   // Group cards by type
   const cardsByType = {

@@ -57,16 +57,16 @@ const BOMBuilder = ({ canSeePrices, onBOMUpdate, onDiscountUpdate, userId }: BOM
 
   useEffect(() => {
     const fetchInitialData = async () => {
-      const [level1, chassis, dga, pd] = await Promise.all([
-        productDataService.getAllLevel1Products(),
-        productDataService.getChassisOptions(),
-        productDataService.getProductsByCategory('dga'),
-        productDataService.getProductsByCategory('power-distribution')
-      ]);
-      
+      const level1 = await productDataService.getLevel1Products();
       setLevel1Products(level1);
+
+      const chassis = await productDataService.getChassisOptions();
       setChassisOptions(chassis);
+
+      const dga = await productDataService.getProductsByCategory('dga');
       setDGAProducts(dga);
+
+      const pd = await productDataService.getProductsByCategory('power-distribution');
       setPDProducts(pd);
     };
 
@@ -140,27 +140,44 @@ const BOMBuilder = ({ canSeePrices, onBOMUpdate, onDiscountUpdate, userId }: BOM
     }
   };
 
-  const handleSaveQTMSConfiguration = (consolidatedQTMS: any) => {
-    const correctedQTMS = consolidateQTMSConfiguration(consolidatedQTMS);
-    const newBOMItem = createQTMSBOMItem(correctedQTMS);
+  const handleSaveQTMSConfiguration = (qtmsConfiguration: EditingQTMSConfig) => {
+    const consolidatedConfig = consolidateQTMSConfiguration(qtmsConfiguration);
+    const newBOMItem = createQTMSBOMItem(
+      selectedLevel1!,
+      selectedLevel2!,
+      selectedLevel3!,
+      consolidatedConfig
+    );
+
     setBomItems([...bomItems, newBOMItem]);
     setEditingQTMS(null);
   };
 
   const handleBOMConfigurationEdit = (item: BOMItem) => {
-    // For QTMS items, open the configuration editor
-    if (item.product && selectedLevel1 && selectedLevel2 && selectedLevel3) {
+    if (item.type === 'qtms') {
       setEditingQTMS({
-        level1ProductId: selectedLevel1.id,
-        level2ProductId: selectedLevel2.id,
-        level3ProductId: selectedLevel3.id,
-        customizations: level3Customizations
+        level1ProductId: item.level1ProductId!,
+        level2ProductId: item.level2ProductId!,
+        level3ProductId: item.level3ProductId!,
+        customizations: item.configuration as Level3Customization[]
       });
     }
   };
 
-  const handleUpdateBOM = (items: BOMItem[]) => {
-    setBomItems(items);
+  const handleDeleteBOMItem = (itemId: string) => {
+    setBomItems(bomItems.filter(item => item.id !== itemId));
+  };
+
+  const handleToggleBOMItem = (itemId: string) => {
+    setBomItems(bomItems.map(item =>
+      item.id === itemId ? { ...item, enabled: !item.enabled } : item
+    ));
+  };
+
+  const handleQuantityChange = (itemId: string, quantity: number) => {
+    setBomItems(bomItems.map(item =>
+      item.id === itemId ? { ...item, quantity } : item
+    ));
   };
 
   const handleChassisSelect = (chassis: Chassis) => {
@@ -202,8 +219,9 @@ const BOMBuilder = ({ canSeePrices, onBOMUpdate, onDiscountUpdate, userId }: BOM
   const handleDGASelect = (product: Level1Product) => {
     setSelectedDGA(product);
     if (product) {
-      const newBOMItem: BOMItem = {
+      const newBOMItem = {
         id: `dga-${product.id}`,
+        type: 'dga',
         product: product,
         quantity: 1,
         enabled: true,
@@ -216,8 +234,9 @@ const BOMBuilder = ({ canSeePrices, onBOMUpdate, onDiscountUpdate, userId }: BOM
   const handlePDSelect = (product: Level1Product) => {
     setSelectedPD(product);
     if (product) {
-      const newBOMItem: BOMItem = {
+      const newBOMItem = {
         id: `pd-${product.id}`,
+        type: 'pd',
         product: product,
         quantity: 1,
         enabled: true,
@@ -258,16 +277,17 @@ const BOMBuilder = ({ canSeePrices, onBOMUpdate, onDiscountUpdate, userId }: BOM
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <Level1ProductSelector
-                    onProductSelect={handleLevel1Select}
-                    selectedProduct={selectedLevel1}
+                    products={level1Products}
+                    onSelect={handleLevel1Select}
+                    selected={selectedLevel1}
                   />
                 </div>
                 <div>
                   {selectedLevel1 && (
                     <Level2OptionsSelector
-                      level1Product={selectedLevel1}
-                      selectedOptions={selectedLevel2 ? [selectedLevel2] : []}
-                      onOptionToggle={handleLevel2Select}
+                      level2Products={level2Products}
+                      onSelect={handleLevel2Select}
+                      selected={selectedLevel2}
                     />
                   )}
                 </div>
@@ -291,15 +311,17 @@ const BOMBuilder = ({ canSeePrices, onBOMUpdate, onDiscountUpdate, userId }: BOM
 
             <TabsContent value="dga" className="mt-4">
               <DGAProductSelector
-                onProductSelect={handleDGASelect}
-                canSeePrices={canSeePrices}
+                products={dgaProducts}
+                onSelect={handleDGASelect}
+                selected={selectedDGA}
               />
             </TabsContent>
 
             <TabsContent value="pd" className="mt-4">
               <PDProductSelector
-                onProductSelect={handlePDSelect}
-                canSeePrices={canSeePrices}
+                products={pdProducts}
+                onSelect={handlePDSelect}
+                selected={selectedPD}
               />
             </TabsContent>
 
@@ -307,9 +329,9 @@ const BOMBuilder = ({ canSeePrices, onBOMUpdate, onDiscountUpdate, userId }: BOM
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <ChassisSelector
-                    onChassisSelect={handleChassisSelect}
-                    selectedChassis={selectedChassis}
-                    canSeePrices={canSeePrices}
+                    chassisOptions={chassisOptions}
+                    onSelect={handleChassisSelect}
+                    selected={selectedChassis}
                   />
                 </div>
                 <div>
@@ -325,14 +347,10 @@ const BOMBuilder = ({ canSeePrices, onBOMUpdate, onDiscountUpdate, userId }: BOM
                     />
                   )}
                 </div>
-                {selectedSlot !== null && selectedChassis && (
+                {selectedSlot !== null && (
                   <SlotCardSelector
-                    chassis={selectedChassis}
-                    slot={selectedSlot}
-                    onCardSelect={handleSlotCardSelect}
+                    onSelect={handleSlotCardSelect}
                     onClose={() => setSelectedSlot(null)}
-                    canSeePrices={canSeePrices}
-                    currentSlotAssignments={slotAssignments}
                   />
                 )}
               </div>
@@ -343,16 +361,19 @@ const BOMBuilder = ({ canSeePrices, onBOMUpdate, onDiscountUpdate, userId }: BOM
 
       {/* BOM Display */}
       <BOMDisplay 
-        bomItems={bomItems}
+        items={bomItems}
         canSeePrices={canSeePrices}
-        onUpdateBOM={handleUpdateBOM}
+        onEdit={handleBOMConfigurationEdit}
+        onDelete={handleDeleteBOMItem}
+        onToggle={handleToggleBOMItem}
+        onQuantityChange={handleQuantityChange}
       />
 
       {/* Discount Configuration */}
       <DiscountSection 
         bomItems={bomItems}
         canSeePrices={canSeePrices}
-        onDiscountChange={onDiscountUpdate}
+        onDiscountUpdate={onDiscountUpdate}
       />
 
       {/* Move Submit Quote Request button here - at the bottom of Discount Section */}
@@ -369,26 +390,14 @@ const BOMBuilder = ({ canSeePrices, onBOMUpdate, onDiscountUpdate, userId }: BOM
       </Card>
 
       {/* Quote Fields Configuration */}
-      <QuoteFieldsSection onFieldsChange={() => {}} />
+      <QuoteFieldsSection />
 
       {/* QTMS Configuration Editor Dialog */}
       {editingQTMS && (
         <QTMSConfigurationEditor
-          consolidatedQTMS={{
-            id: `qtms-${Date.now()}`,
-            name: `${selectedLevel1?.name} - ${selectedLevel2?.name} - ${selectedLevel3?.name}`,
-            description: `Custom QTMS configuration`,
-            partNumber: `QTMS-${Date.now()}`,
-            price: 0,
-            configuration: {
-              chassis: selectedLevel2 as any,
-              slotAssignments: {},
-              hasRemoteDisplay: false
-            },
-            components: []
-          }}
+          qtmsConfiguration={editingQTMS}
           onSave={handleSaveQTMSConfiguration}
-          onClose={() => setEditingQTMS(null)}
+          onCancel={() => setEditingQTMS(null)}
           canSeePrices={canSeePrices}
         />
       )}

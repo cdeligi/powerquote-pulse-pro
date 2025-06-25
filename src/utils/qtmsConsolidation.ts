@@ -1,5 +1,5 @@
 
-import { BOMItem, Level1Product, Level2Product, Level3Product, Level3Customization } from '@/types/product';
+import { BOMItem, Level2Product, Level3Product } from '@/types/product';
 import { generateQTMSPartNumber } from '@/types/product/part-number-utils';
 
 export interface QTMSConfiguration {
@@ -21,30 +21,104 @@ export interface ConsolidatedQTMS {
 }
 
 export const consolidateQTMSConfiguration = (
-  consolidatedConfig: ConsolidatedQTMS
+  chassis: Level2Product,
+  slotAssignments: Record<number, Level3Product>,
+  hasRemoteDisplay: boolean,
+  analogConfigurations?: Record<string, any>,
+  bushingConfigurations?: Record<string, any>
 ): ConsolidatedQTMS => {
-  // Return the same configuration - this function is for consistency
-  return consolidatedConfig;
+  // Create component BOM items
+  const chassisItem: BOMItem = {
+    id: `${Date.now()}-chassis`,
+    product: chassis,
+    quantity: 1,
+    enabled: true,
+    partNumber: chassis.partNumber
+  };
+
+  const cardItems: BOMItem[] = Object.entries(slotAssignments).map(([slot, card]) => ({
+    id: `${Date.now()}-card-${slot}`,
+    product: card,
+    quantity: 1,
+    slot: parseInt(slot),
+    enabled: true,
+    partNumber: card.partNumber
+  }));
+
+  const components = [chassisItem, ...cardItems];
+
+  // Add remote display if selected
+  if (hasRemoteDisplay) {
+    const remoteDisplayItem: BOMItem = {
+      id: `${Date.now()}-remote-display`,
+      product: {
+        id: 'remote-display',
+        name: 'Remote Display',
+        type: 'accessory',
+        description: 'Remote display for QTMS chassis',
+        price: 850,
+        enabled: true,
+        partNumber: 'QTMS-RD-001'
+      } as any,
+      quantity: 1,
+      enabled: true,
+      partNumber: 'QTMS-RD-001'
+    };
+    components.push(remoteDisplayItem);
+  }
+
+  // Calculate total price
+  const totalPrice = components.reduce((sum, item) => sum + (item.product.price || 0), 0);
+
+  // Generate consolidated part number
+  const partNumber = generateQTMSPartNumber(
+    chassis as any,
+    Object.values(slotAssignments) as any[],
+    hasRemoteDisplay,
+    slotAssignments as any,
+    analogConfigurations,
+    bushingConfigurations
+  );
+
+  // Create description
+  const cardCount = Object.keys(slotAssignments).length;
+  const description = `${chassis.name} with ${cardCount} card${cardCount !== 1 ? 's' : ''}${hasRemoteDisplay ? ' and Remote Display' : ''}`;
+
+  const configuration: QTMSConfiguration = {
+    chassis,
+    slotAssignments,
+    hasRemoteDisplay,
+    analogConfigurations,
+    bushingConfigurations
+  };
+
+  return {
+    id: `qtms-${Date.now()}`,
+    name: `QTMS ${chassis.type} Configuration`,
+    description,
+    partNumber,
+    price: totalPrice,
+    configuration,
+    components
+  };
 };
 
-export const createQTMSBOMItem = (
-  consolidatedConfig: ConsolidatedQTMS
-): BOMItem => {
+export const createQTMSBOMItem = (consolidatedQTMS: ConsolidatedQTMS): BOMItem => {
   return {
-    id: consolidatedConfig.id,
+    id: consolidatedQTMS.id,
     product: {
-      id: consolidatedConfig.id,
-      name: consolidatedConfig.name,
+      id: consolidatedQTMS.id,
+      name: consolidatedQTMS.name,
       type: 'QTMS',
-      description: consolidatedConfig.description,
-      price: consolidatedConfig.price,
+      description: consolidatedQTMS.description,
+      price: consolidatedQTMS.price,
       enabled: true,
-      partNumber: consolidatedConfig.partNumber
+      partNumber: consolidatedQTMS.partNumber
     } as any,
     quantity: 1,
     enabled: true,
-    configuration: consolidatedConfig.configuration,
-    partNumber: consolidatedConfig.partNumber
+    configuration: consolidatedQTMS.configuration,
+    partNumber: consolidatedQTMS.partNumber
   };
 };
 
@@ -56,14 +130,11 @@ export const updateQTMSConfiguration = (
   analogConfigurations?: Record<string, any>,
   bushingConfigurations?: Record<string, any>
 ): ConsolidatedQTMS => {
-  return {
-    ...existingQTMS,
-    configuration: {
-      ...existingQTMS.configuration,
-      slotAssignments: newSlotAssignments,
-      hasRemoteDisplay: newHasRemoteDisplay,
-      analogConfigurations,
-      bushingConfigurations
-    }
-  };
+  return consolidateQTMSConfiguration(
+    existingQTMS.configuration.chassis,
+    newSlotAssignments,
+    newHasRemoteDisplay,
+    analogConfigurations,
+    bushingConfigurations
+  );
 };
