@@ -8,7 +8,7 @@ import { useState } from 'react';
 import { Quote, BOMItemWithDetails } from '@/hooks/useQuotes';
 
 interface BOMAnalysisProps {
-  quote: Quote;
+  quote: Partial<Quote>;
   bomItems: BOMItemWithDetails[];
   loadingBom: boolean;
   editingPrices: Record<string, string>;

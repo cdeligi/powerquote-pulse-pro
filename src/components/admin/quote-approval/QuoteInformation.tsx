@@ -4,7 +4,7 @@ import { Label } from "@/components/ui/label";
 import { Quote } from "@/hooks/useQuotes";
 
 interface QuoteInformationProps {
-  quote: Quote;
+  quote: Partial<Quote>;
 }
 
 export const QuoteInformation = ({ quote }: QuoteInformationProps) => {
@@ -17,31 +17,31 @@ export const QuoteInformation = ({ quote }: QuoteInformationProps) => {
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
           <div>
             <Label className="text-gray-400">Customer</Label>
-            <p className="text-white font-medium">{quote.customer_name}</p>
+            <p className="text-white font-medium">{quote?.customer_name || 'N/A'}</p>
           </div>
           <div>
             <Label className="text-gray-400">Oracle ID</Label>
-            <p className="text-white font-medium">{quote.oracle_customer_id}</p>
+            <p className="text-white font-medium">{quote?.oracle_customer_id || 'N/A'}</p>
           </div>
           <div>
             <Label className="text-gray-400">SFDC Opportunity</Label>
-            <p className="text-white font-medium">{quote.sfdc_opportunity}</p>
+            <p className="text-white font-medium">{quote?.sfdc_opportunity || 'N/A'}</p>
           </div>
           <div>
             <Label className="text-gray-400">Payment Terms</Label>
-            <p className="text-white font-medium">{quote.payment_terms}</p>
+            <p className="text-white font-medium">{quote?.payment_terms || 'N/A'}</p>
           </div>
           <div>
             <Label className="text-gray-400">Shipping Terms</Label>
-            <p className="text-white font-medium">{quote.shipping_terms}</p>
+            <p className="text-white font-medium">{quote?.shipping_terms || 'N/A'}</p>
           </div>
           <div>
             <Label className="text-gray-400">Currency</Label>
-            <p className="text-white font-medium">{quote.currency}</p>
+            <p className="text-white font-medium">{quote?.currency || 'N/A'}</p>
           </div>
         </div>
         
-        {quote.quote_fields && Object.keys(quote.quote_fields).length > 0 && (
+        {quote?.quote_fields && Object.keys(quote.quote_fields).length > 0 && (
           <div className="mt-4">
             <Label className="text-gray-400">Additional Fields</Label>
             <div className="grid grid-cols-2 gap-2 mt-2">

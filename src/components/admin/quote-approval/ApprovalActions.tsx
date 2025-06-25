@@ -6,10 +6,10 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { CheckCircle, XCircle, MessageSquare } from 'lucide-react';
-import { Quote } from '@/types/quote';
+import { Quote } from '@/hooks/useQuotes';
 
 interface ApprovalActionsProps {
-  quote: Quote;
+  quote: Partial<Quote>;
   approvedDiscount: string;
   approvalNotes: string;
   rejectionReason: string;
@@ -46,21 +46,21 @@ const ApprovalActions = ({
   };
 
   const getStatusBadge = () => {
-    switch (quote.status) {
+    switch (quote?.status) {
       case 'approved':
         return <Badge className="bg-green-600 text-white">Approved</Badge>;
       case 'rejected':
         return <Badge className="bg-red-600 text-white">Rejected</Badge>;
-      case 'pending_approval':
+      case 'pending':
         return <Badge className="bg-yellow-600 text-white">Pending Approval</Badge>;
-      case 'draft':
-        return <Badge className="bg-gray-600 text-white">Draft</Badge>;
+      case 'under-review':
+        return <Badge className="bg-blue-600 text-white">Under Review</Badge>;
       default:
         return <Badge className="bg-gray-600 text-white">Unknown</Badge>;
     }
   };
 
-  if (quote.status !== 'pending_approval') {
+  if (quote?.status !== 'pending') {
     return (
       <Card className="bg-gray-900 border-gray-800">
         <CardHeader>
@@ -71,7 +71,7 @@ const ApprovalActions = ({
         </CardHeader>
         <CardContent>
           <p className="text-gray-400">
-            This quote has already been {quote.status.replace('_', ' ')}.
+            This quote has already been {quote?.status?.replace('_', ' ')}.
           </p>
         </CardContent>
       </Card>
