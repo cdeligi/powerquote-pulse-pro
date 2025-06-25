@@ -1,3 +1,4 @@
+
 import { Chassis, Card as ProductCard } from "@/types/product";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -27,10 +28,26 @@ const RackVisualizer = ({
   
   const bushingSlots = getBushingOccupiedSlots(slotAssignments);
 
+  const getCardTypeColor = (cardType: string) => {
+    switch (cardType) {
+      case 'relay': return 'bg-red-600';
+      case 'analog': return 'bg-blue-600';
+      case 'bushing': return 'bg-orange-600';
+      case 'fiber': return 'bg-green-600';
+      case 'display': return 'bg-purple-600';
+      case 'communication': return 'bg-cyan-600';
+      case 'digital': return 'bg-yellow-600';
+      default: return 'bg-green-600';
+    }
+  };
+
   const getSlotColor = (slot: number) => {
     if (slot === 0) return 'bg-blue-600'; // CPU slot (slot 0)
     if (selectedSlot === slot) return 'bg-yellow-600'; // Selected slot
-    if (slotAssignments[slot]) return 'bg-green-600'; // Occupied
+    
+    if (slotAssignments[slot]) {
+      return getCardTypeColor(slotAssignments[slot].type);
+    }
     
     // Special color for LTX slot 8 (display only)
     if (chassis.type === 'LTX' && slot === 8) return 'bg-purple-700'; // Display slot
@@ -123,7 +140,7 @@ const RackVisualizer = ({
         {slot === 0 && <Cpu className="h-4 w-4 mr-1" />}
         {getSlotLabel(slot)}
         
-        {/* Clear button for occupied slots (only show on primary slot for bushing cards) */}
+        {/* Clear button for occupied slots (including display cards in slot 8) */}
         {slot !== 0 && slotAssignments[slot] && !isSecondaryBushingSlot && (
           <Button
             size="sm"
@@ -242,7 +259,7 @@ const RackVisualizer = ({
             </div>
           )}
           
-          {/* Legend */}
+          {/* Updated Legend with Color Coding */}
           <div className="flex flex-wrap gap-4 pt-4 border-t border-gray-700">
             <div className="flex items-center space-x-2">
               <div className="w-4 h-4 bg-blue-600 rounded"></div>
@@ -253,19 +270,33 @@ const RackVisualizer = ({
               <span className="text-sm text-gray-400">Selected</span>
             </div>
             <div className="flex items-center space-x-2">
-              <div className="w-4 h-4 bg-green-600 rounded"></div>
-              <span className="text-sm text-gray-400">Occupied</span>
+              <div className="w-4 h-4 bg-red-600 rounded"></div>
+              <span className="text-sm text-gray-400">Relay</span>
+            </div>
+            <div className="flex items-center space-x-2">
+              <div className="w-4 h-4 bg-blue-600 rounded"></div>
+              <span className="text-sm text-gray-400">Analog</span>
             </div>
             <div className="flex items-center space-x-2">
               <div className="w-4 h-4 bg-orange-600 rounded"></div>
-              <span className="text-sm text-gray-400">Bushing Card</span>
+              <span className="text-sm text-gray-400">Bushing</span>
             </div>
-            {chassis.type === 'LTX' && (
-              <div className="flex items-center space-x-2">
-                <div className="w-4 h-4 bg-purple-700 rounded"></div>
-                <span className="text-sm text-gray-400">Display Only</span>
-              </div>
-            )}
+            <div className="flex items-center space-x-2">
+              <div className="w-4 h-4 bg-green-600 rounded"></div>
+              <span className="text-sm text-gray-400">Fiber</span>
+            </div>
+            <div className="flex items-center space-x-2">
+              <div className="w-4 h-4 bg-purple-600 rounded"></div>
+              <span className="text-sm text-gray-400">Display</span>
+            </div>
+            <div className="flex items-center space-x-2">
+              <div className="w-4 h-4 bg-cyan-600 rounded"></div>
+              <span className="text-sm text-gray-400">Communication</span>
+            </div>
+            <div className="flex items-center space-x-2">
+              <div className="w-4 h-4 bg-yellow-600 rounded"></div>
+              <span className="text-sm text-gray-400">Digital</span>
+            </div>
             <div className="flex items-center space-x-2">
               <div className="w-4 h-4 bg-gray-700 rounded"></div>
               <span className="text-sm text-gray-400">Available</span>

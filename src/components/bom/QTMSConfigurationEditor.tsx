@@ -1,16 +1,13 @@
-
 import { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Settings, Monitor } from 'lucide-react';
 import { ConsolidatedQTMS } from '@/utils/qtmsConsolidation';
 import { Level3Product, Level3Customization, BOMItem } from '@/types/product';
 import RackVisualizer from './RackVisualizer';
 import SlotCardSelector from './SlotCardSelector';
-import CardLibrary from './CardLibrary';
 import AnalogCardConfigurator from './AnalogCardConfigurator';
 import BushingCardConfigurator from './BushingCardConfigurator';
 import { findOptimalBushingPlacement, findExistingBushingSlots, isBushingCard } from '@/utils/bushingValidation';
@@ -48,6 +45,19 @@ const QTMSConfigurationEditor = ({
     });
     setCardConfigurations(initialConfigs);
   });
+
+  const getCardTypeColor = (cardType: string) => {
+    switch (cardType) {
+      case 'relay': return 'text-red-400 border-red-400';
+      case 'analog': return 'text-blue-400 border-blue-400';
+      case 'bushing': return 'text-orange-400 border-orange-400';
+      case 'fiber': return 'text-green-400 border-green-400';
+      case 'display': return 'text-purple-400 border-purple-400';
+      case 'communication': return 'text-cyan-400 border-cyan-400';
+      case 'digital': return 'text-yellow-400 border-yellow-400';
+      default: return 'text-white border-gray-500';
+    }
+  };
 
   const handleSlotClick = (slot: number) => {
     setSelectedSlot(slot);
@@ -300,88 +310,71 @@ const QTMSConfigurationEditor = ({
               </CardContent>
             </Card>
 
-            <Tabs defaultValue="rack" className="w-full">
-              <TabsList className="grid w-full grid-cols-2 bg-gray-800">
-                <TabsTrigger value="rack" className="text-white data-[state=active]:bg-red-600">
-                  Rack Configuration
-                </TabsTrigger>
-                <TabsTrigger value="cards" className="text-white data-[state=active]:bg-red-600">
-                  Card Library
-                </TabsTrigger>
-              </TabsList>
-              
-              <TabsContent value="rack" className="space-y-6">
-                {/* Rack Visualizer for Editing */}
-                <RackVisualizer
-                  chassis={consolidatedQTMS.configuration.chassis as any}
-                  slotAssignments={editedSlotAssignments as any}
-                  onSlotClick={handleSlotClick}
-                  onSlotClear={handleSlotClear}
-                  selectedSlot={selectedSlot}
-                  hasRemoteDisplay={editedHasRemoteDisplay}
-                  onRemoteDisplayToggle={handleRemoteDisplayToggle}
-                />
+            {/* Rack Configuration - Removed Tabs */}
+            <RackVisualizer
+              chassis={consolidatedQTMS.configuration.chassis as any}
+              slotAssignments={editedSlotAssignments as any}
+              onSlotClick={handleSlotClick}
+              onSlotClear={handleSlotClear}
+              selectedSlot={selectedSlot}
+              hasRemoteDisplay={editedHasRemoteDisplay}
+              onRemoteDisplayToggle={handleRemoteDisplayToggle}
+            />
 
-                {/* Configuration Changes Summary */}
-                {Object.keys(editedSlotAssignments).length > 0 && (
-                  <Card className="bg-gray-800 border-gray-700">
-                    <CardHeader>
-                      <CardTitle className="text-white">Current Configuration</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-3">
-                        {Object.entries(editedSlotAssignments).map(([slot, card]) => {
-                          const cardKey = `slot-${slot}`;
-                          const hasConfiguration = cardConfigurations[cardKey]?.length > 0;
-                          
-                          return (
-                            <div key={slot} className="flex justify-between items-center p-3 bg-gray-700 rounded">
-                              <div>
-                                <div className="flex items-center space-x-2">
-                                  <Badge variant="outline" className="text-blue-400 border-blue-400">
-                                    Slot {slot}
-                                  </Badge>
-                                  <span className="text-white font-medium">{card.name}</span>
-                                  {hasConfiguration && (
-                                    <Badge variant="outline" className="text-purple-400 border-purple-400">
-                                      Configured
-                                    </Badge>
-                                  )}
-                                  {consolidatedQTMS.configuration.chassis.type === 'LTX' && parseInt(slot) === 8 && (
-                                    <Badge variant="outline" className="text-purple-400 border-purple-400">
-                                      Display Slot
-                                    </Badge>
-                                  )}
-                                </div>
-                                <div className="text-gray-400 text-sm">{card.description}</div>
-                                {hasConfiguration && (
-                                  <div className="text-xs text-purple-300 mt-1">
-                                    {cardConfigurations[cardKey].length} customization(s) applied
-                                  </div>
-                                )}
-                              </div>
-                              <div className="text-right">
-                                {canSeePrices && (
-                                  <div className="text-white">${card.price?.toLocaleString() || '—'}</div>
-                                )}
-                              </div>
+            {/* Configuration Changes Summary with Color Coding */}
+            {Object.keys(editedSlotAssignments).length > 0 && (
+              <Card className="bg-gray-800 border-gray-700">
+                <CardHeader>
+                  <CardTitle className="text-white">Current Configuration</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {Object.entries(editedSlotAssignments).map(([slot, card]) => {
+                      const cardKey = `slot-${slot}`;
+                      const hasConfiguration = cardConfigurations[cardKey]?.length > 0;
+                      const colorClass = getCardTypeColor(card.type);
+                      
+                      return (
+                        <div key={slot} className="flex justify-between items-center p-3 bg-gray-700 rounded">
+                          <div>
+                            <div className="flex items-center space-x-2">
+                              <Badge variant="outline" className="text-blue-400 border-blue-400">
+                                Slot {slot}
+                              </Badge>
+                              <span className="text-white font-medium">{card.name}</span>
+                              <Badge variant="outline" className={colorClass}>
+                                {card.type}
+                              </Badge>
+                              {hasConfiguration && (
+                                <Badge variant="outline" className="text-purple-400 border-purple-400">
+                                  Configured
+                                </Badge>
+                              )}
+                              {consolidatedQTMS.configuration.chassis.type === 'LTX' && parseInt(slot) === 8 && (
+                                <Badge variant="outline" className="text-purple-400 border-purple-400">
+                                  Display Slot
+                                </Badge>
+                              )}
                             </div>
-                          );
-                        })}
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
-              </TabsContent>
-              
-              <TabsContent value="cards">
-                <CardLibrary
-                  chassis={consolidatedQTMS.configuration.chassis as any}
-                  onCardSelect={handleCardSelect}
-                  canSeePrices={canSeePrices}
-                />
-              </TabsContent>
-            </Tabs>
+                            <div className="text-gray-400 text-sm">{card.description}</div>
+                            {hasConfiguration && (
+                              <div className="text-xs text-purple-300 mt-1">
+                                {cardConfigurations[cardKey].length} customization(s) applied
+                              </div>
+                            )}
+                          </div>
+                          <div className="text-right">
+                            {canSeePrices && (
+                              <div className="text-white">${card.price?.toLocaleString() || '—'}</div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
             {/* Remote Display Status */}
             <Card className="bg-gray-800 border-gray-700">

@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -28,6 +27,19 @@ const SlotCardSelector = ({
   currentSlotAssignments = {}
 }: SlotCardSelectorProps) => {
   const [selectedFiberInputs, setSelectedFiberInputs] = useState<number>(4);
+
+  const getCardTypeColor = (cardType: string) => {
+    switch (cardType) {
+      case 'relay': return 'text-red-400 border-red-400';
+      case 'analog': return 'text-blue-400 border-blue-400';
+      case 'bushing': return 'text-orange-400 border-orange-400';
+      case 'fiber': return 'text-green-400 border-green-400';
+      case 'display': return 'text-purple-400 border-purple-400';
+      case 'communication': return 'text-cyan-400 border-cyan-400';
+      case 'digital': return 'text-yellow-400 border-yellow-400';
+      default: return 'text-white border-gray-500';
+    }
+  };
 
   // Get available cards from productDataService
   const getAvailableCards = () => {
@@ -159,79 +171,83 @@ const SlotCardSelector = ({
         )}
         
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
-          {compatibleCards.map((card) => (
-            <Card key={card.id} className="bg-gray-800 border-gray-700 hover:border-red-600 transition-all cursor-pointer">
-              <CardHeader>
-                <CardTitle className="text-white text-lg flex items-center justify-between">
-                  {card.name}
-                  {needsConfiguration(card) && (
-                    <Settings className="h-4 w-4 text-blue-400" />
-                  )}
-                </CardTitle>
-                <CardDescription className="text-gray-400">
-                  {card.description}
-                </CardDescription>
-                <div className="flex gap-2 flex-wrap">
-                  <Badge variant="outline" className="text-white border-gray-500">
-                    {card.slotRequirement} slot{card.slotRequirement > 1 ? 's' : ''}
-                  </Badge>
-                  <Badge variant="outline" className="text-white border-gray-500">
-                    {card.type}
-                  </Badge>
-                  {card.specifications?.inputs && (
+          {compatibleCards.map((card) => {
+            const colorClass = getCardTypeColor(card.type);
+            
+            return (
+              <Card key={card.id} className="bg-gray-800 border-gray-700 hover:border-red-600 transition-all cursor-pointer">
+                <CardHeader>
+                  <CardTitle className="text-white text-lg flex items-center justify-between">
+                    {card.name}
+                    {needsConfiguration(card) && (
+                      <Settings className="h-4 w-4 text-blue-400" />
+                    )}
+                  </CardTitle>
+                  <CardDescription className="text-gray-400">
+                    {card.description}
+                  </CardDescription>
+                  <div className="flex gap-2 flex-wrap">
                     <Badge variant="outline" className="text-white border-gray-500">
-                      {card.specifications.inputs} inputs
+                      {card.slotRequirement} slot{card.slotRequirement > 1 ? 's' : ''}
                     </Badge>
-                  )}
-                  {card.type === 'display' && chassis.type === 'LTX' && slot !== 8 && (
-                    <Badge variant="outline" className="text-yellow-400 border-yellow-400">
-                      → Slot 8
+                    <Badge variant="outline" className={colorClass}>
+                      {card.type}
                     </Badge>
-                  )}
-                  {needsConfiguration(card) && (
-                    <Badge variant="outline" className="text-blue-400 border-blue-400">
-                      Config Required
-                    </Badge>
-                  )}
-                  {isBushingCard(card as any) && (
-                    <Badge variant="outline" className="text-orange-400 border-orange-400">
-                      2-Slot Card
-                    </Badge>
-                  )}
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2 mb-4">
-                  {Object.entries(card.specifications || {}).map(([key, value]) => (
-                    <div key={key} className="flex justify-between text-sm">
-                      <span className="text-gray-400 capitalize">{key}:</span>
-                      <span className="text-white">{String(value)}</span>
-                    </div>
-                  ))}
-                  {isBushingCard(card as any) && (
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-400">Occupies Slots:</span>
-                      <span className="text-orange-400">{slot}, {slot + 1}</span>
-                    </div>
-                  )}
-                </div>
-                
-                <div className="flex justify-between items-center mb-4">
-                  <span className="text-white font-bold">
-                    {canSeePrices ? `$${card.price.toLocaleString()}` : '—'}
-                  </span>
-                  <span className="text-gray-400 text-xs">{card.partNumber}</span>
-                </div>
-                
-                <Button 
-                  className="w-full bg-red-600 hover:bg-red-700 text-white"
-                  onClick={() => handleCardSelect(card)}
-                >
-                  {needsConfiguration(card) ? 'Configure Card' : 'Select Card'}
-                </Button>
-              </CardContent>
-            </Card>
-          ))}
+                    {card.specifications?.inputs && (
+                      <Badge variant="outline" className="text-white border-gray-500">
+                        {card.specifications.inputs} inputs
+                      </Badge>
+                    )}
+                    {card.type === 'display' && chassis.type === 'LTX' && slot !== 8 && (
+                      <Badge variant="outline" className="text-yellow-400 border-yellow-400">
+                        → Slot 8
+                      </Badge>
+                    )}
+                    {needsConfiguration(card) && (
+                      <Badge variant="outline" className="text-blue-400 border-blue-400">
+                        Config Required
+                      </Badge>
+                    )}
+                    {isBushingCard(card as any) && (
+                      <Badge variant="outline" className="text-orange-400 border-orange-400">
+                        2-Slot Card
+                      </Badge>
+                    )}
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2 mb-4">
+                    {Object.entries(card.specifications || {}).map(([key, value]) => (
+                      <div key={key} className="flex justify-between text-sm">
+                        <span className="text-gray-400 capitalize">{key}:</span>
+                        <span className="text-white">{String(value)}</span>
+                      </div>
+                    ))}
+                    {isBushingCard(card as any) && (
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-400">Occupies Slots:</span>
+                        <span className="text-orange-400">{slot}, {slot + 1}</span>
+                      </div>
+                    )}
+                  </div>
+                  
+                  <div className="flex justify-between items-center mb-4">
+                    <span className="text-white font-bold">
+                      {canSeePrices ? `$${card.price.toLocaleString()}` : '—'}
+                    </span>
+                    <span className="text-gray-400 text-xs">{card.partNumber}</span>
+                  </div>
+                  
+                  <Button 
+                    className="w-full bg-red-600 hover:bg-red-700 text-white"
+                    onClick={() => handleCardSelect(card)}
+                  >
+                    {needsConfiguration(card) ? 'Configure Card' : 'Select Card'}
+                  </Button>
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
         
         {compatibleCards.length === 0 && (
