@@ -287,13 +287,28 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
   };
 
   const handleQTMSConfigurationSave = (updatedQTMS: ConsolidatedQTMS) => {
-    // Update the existing BOM item with new configuration
+    console.log('Saving QTMS configuration:', updatedQTMS);
+    
+    // Create the updated BOM item
     const updatedBOMItem = createQTMSBOMItem(updatedQTMS);
     
-    const updatedItems = bomItems.map(item => 
-      item.id === updatedQTMS.id ? updatedBOMItem : item
-    );
+    // Check if this QTMS item already exists in the BOM
+    const existingItemIndex = bomItems.findIndex(item => item.id === updatedQTMS.id);
     
+    let updatedItems;
+    if (existingItemIndex >= 0) {
+      // Update existing item
+      console.log('Updating existing QTMS item at index:', existingItemIndex);
+      updatedItems = bomItems.map((item, index) => 
+        index === existingItemIndex ? updatedBOMItem : item
+      );
+    } else {
+      // Add as new item
+      console.log('Adding new QTMS item to BOM');
+      updatedItems = [...bomItems, updatedBOMItem];
+    }
+    
+    console.log('Updated BOM items:', updatedItems);
     setBomItems(updatedItems);
     onBOMUpdate(updatedItems);
     setEditingQTMS(null);
