@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -19,7 +20,7 @@ import QuoteFieldsSection from './QuoteFieldsSection';
 import DiscountSection from './DiscountSection';
 import QuoteSubmissionDialog from './QuoteSubmissionDialog';
 import QTMSConfigurationEditor from './QTMSConfigurationEditor';
-import { consolidateQTMSConfiguration, createQTMSBOMItem, ConsolidatedQTMS } from '@/utils/qtmsConsolidation';
+import { consolidateQTMSConfiguration, createQTMSBOMItem, ConsolidatedQTMS, QTMSConfiguration } from '@/utils/qtmsConsolidation';
 import { findOptimalBushingPlacement, findExistingBushingSlots, isBushingCard } from '@/utils/bushingValidation';
 
 interface BOMBuilderProps {
