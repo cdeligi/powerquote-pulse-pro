@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -478,25 +477,27 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
               </TabsContent>
             ))}
           </Tabs>
+        </div>
 
-          {/* Card Configuration Dialogs */}
-          {configuringCard && configuringCard.product.name.toLowerCase().includes('analog') && (
-            <AnalogCardConfigurator
-              bomItem={configuringCard}
-              onSave={handleCardConfiguration}
-              onClose={() => setConfiguringCard(null)}
-            />
-          )}
+        {/* Right side - BOM Display and Discount (1/3 width) */}
+        <div className="lg:col-span-1 space-y-6">
+          <BOMDisplay
+            bomItems={bomItems}
+            onUpdateBOM={handleBOMUpdate}
+            onEditConfiguration={handleBOMConfigurationEdit}
+            canSeePrices={canSeePrices}
+          />
+          
+          {/* Discount Section with Submit Quote Button */}
+          <DiscountSection
+            bomItems={bomItems}
+            onDiscountChange={handleDiscountChange}
+            canSeePrices={canSeePrices}
+            initialDiscount={discountPercentage}
+            initialJustification={discountJustification}
+          />
 
-          {configuringCard && configuringCard.product.name.toLowerCase().includes('bushing') && (
-            <BushingCardConfigurator
-              bomItem={configuringCard}
-              onSave={handleCardConfiguration}
-              onClose={() => setConfiguringCard(null)}
-            />
-          )}
-
-          {/* Submit Quote Button */}
+          {/* Submit Quote Button - Moved here to bottom of discount section */}
           {bomItems.length > 0 && (
             <Card className="bg-gray-900 border-gray-800">
               <CardContent className="pt-6">
@@ -510,39 +511,25 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
               </CardContent>
             </Card>
           )}
-
-          {/* Slot Card Selector Dialog */}
-          {selectedSlot !== null && selectedChassis && (
-            <SlotCardSelector
-              chassis={selectedChassis as any}
-              slot={selectedSlot}
-              onCardSelect={handleCardSelect}
-              onClose={() => setSelectedSlot(null)}
-              canSeePrices={canSeePrices}
-              currentSlotAssignments={slotAssignments}
-            />
-          )}
-        </div>
-
-        {/* Right side - BOM Display and Discount (1/3 width) */}
-        <div className="lg:col-span-1 space-y-6">
-          <BOMDisplay
-            bomItems={bomItems}
-            onUpdateBOM={handleBOMUpdate}
-            onEditConfiguration={handleBOMConfigurationEdit}
-            canSeePrices={canSeePrices}
-          />
-          
-          {/* Discount Section - Shows after products are selected */}
-          <DiscountSection
-            bomItems={bomItems}
-            onDiscountChange={handleDiscountChange}
-            canSeePrices={canSeePrices}
-            initialDiscount={discountPercentage}
-            initialJustification={discountJustification}
-          />
         </div>
       </div>
+
+      {/* Card Configuration Dialogs */}
+      {configuringCard && configuringCard.product.name.toLowerCase().includes('analog') && (
+        <AnalogCardConfigurator
+          bomItem={configuringCard}
+          onSave={handleCardConfiguration}
+          onClose={() => setConfiguringCard(null)}
+        />
+      )}
+
+      {configuringCard && configuringCard.product.name.toLowerCase().includes('bushing') && (
+        <BushingCardConfigurator
+          bomItem={configuringCard}
+          onSave={handleCardConfiguration}
+          onClose={() => setConfiguringCard(null)}
+        />
+      )}
 
       {/* QTMS Configuration Editor */}
       {editingQTMS && (
