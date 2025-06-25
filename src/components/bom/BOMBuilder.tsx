@@ -142,7 +142,12 @@ const BOMBuilder = ({ canSeePrices, onBOMUpdate, onDiscountUpdate, userId }: BOM
   };
 
   const handleSaveQTMSConfiguration = (qtmsConfiguration: EditingQTMSConfig) => {
-    const consolidatedConfig = consolidateQTMSConfiguration(qtmsConfiguration);
+    const consolidatedConfig = consolidateQTMSConfiguration(
+      qtmsConfiguration.level1ProductId,
+      qtmsConfiguration.level2ProductId,
+      qtmsConfiguration.level3ProductId,
+      qtmsConfiguration.customizations
+    );
     const newBOMItem = createQTMSBOMItem(
       selectedLevel1!,
       selectedLevel2!,
@@ -166,14 +171,8 @@ const BOMBuilder = ({ canSeePrices, onBOMUpdate, onDiscountUpdate, userId }: BOM
     }
   };
 
-  const handleDeleteBOMItem = (itemId: string) => {
-    setBomItems(bomItems.filter(item => item.id !== itemId));
-  };
-
-  const handleToggleBOMItem = (itemId: string) => {
-    setBomItems(bomItems.map(item =>
-      item.id === itemId ? { ...item, enabled: !item.enabled } : item
-    ));
+  const handleUpdateBOM = (items: BOMItem[]) => {
+    setBomItems(items);
   };
 
   const handleQuantityChange = (itemId: string, quantity: number) => {
@@ -285,8 +284,8 @@ const BOMBuilder = ({ canSeePrices, onBOMUpdate, onDiscountUpdate, userId }: BOM
                   {selectedLevel1 && (
                     <Level2OptionsSelector
                       level1Product={selectedLevel1}
-                      onProductSelect={handleLevel2Select}
-                      selectedProduct={selectedLevel2}
+                      selectedOptions={selectedLevel2 ? [selectedLevel2] : []}
+                      onOptionToggle={handleLevel2Select}
                     />
                   )}
                 </div>
@@ -311,14 +310,12 @@ const BOMBuilder = ({ canSeePrices, onBOMUpdate, onDiscountUpdate, userId }: BOM
             <TabsContent value="dga" className="mt-4">
               <DGAProductSelector
                 onProductSelect={handleDGASelect}
-                selectedProduct={selectedDGA}
               />
             </TabsContent>
 
             <TabsContent value="pd" className="mt-4">
               <PDProductSelector
                 onProductSelect={handlePDSelect}
-                selectedProduct={selectedPD}
               />
             </TabsContent>
 
@@ -328,6 +325,7 @@ const BOMBuilder = ({ canSeePrices, onBOMUpdate, onDiscountUpdate, userId }: BOM
                   <ChassisSelector
                     onChassisSelect={handleChassisSelect}
                     selectedChassis={selectedChassis}
+                    canSeePrices={canSeePrices}
                   />
                 </div>
                 <div>
@@ -363,8 +361,7 @@ const BOMBuilder = ({ canSeePrices, onBOMUpdate, onDiscountUpdate, userId }: BOM
       <BOMDisplay 
         bomItems={bomItems}
         canSeePrices={canSeePrices}
-        onDelete={handleDeleteBOMItem}
-        onToggle={handleToggleBOMItem}
+        onUpdateBOM={handleUpdateBOM}
         onQuantityChange={handleQuantityChange}
       />
 

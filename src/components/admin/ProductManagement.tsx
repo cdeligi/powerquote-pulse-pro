@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -279,7 +278,7 @@ const ProductManagement = ({ user }: ProductManagementProps) => {
       toast({
         title: "Error",
         description: "Failed to delete product",
-        variant: "descriptive"
+        variant: "destructive"
       });
     }
   };
@@ -341,7 +340,6 @@ const ProductManagement = ({ user }: ProductManagementProps) => {
           </TabsTrigger>
         </TabsList>
 
-        {/* Level 1 Products */}
         <TabsContent value="level1" className="space-y-6">
           <div className="flex justify-between items-center">
             <div>
@@ -458,7 +456,6 @@ const ProductManagement = ({ user }: ProductManagementProps) => {
           </div>
         </TabsContent>
 
-        {/* Level 2 Products */}
         <TabsContent value="level2" className="space-y-6">
           <div className="flex justify-between items-center">
             <div>
@@ -572,7 +569,6 @@ const ProductManagement = ({ user }: ProductManagementProps) => {
           </div>
         </TabsContent>
 
-        {/* Level 3 Products */}
         <TabsContent value="level3" className="space-y-6">
           <div className="flex justify-between items-center">
             <div>
