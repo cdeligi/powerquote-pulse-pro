@@ -1,6 +1,9 @@
 
 import { BOMItem } from "./product";
 
+export type QuotePriority = 'High' | 'Medium' | 'Low' | 'Urgent';
+export type Currency = 'USD' | 'EURO' | 'GBP' | 'CAD';
+
 export interface Quote {
   id: string;
   items: BOMItem[];
@@ -11,11 +14,11 @@ export interface Quote {
   customerName: string;
   oracleCustomerId: string;
   sfdcOpportunity: string; // Mandatory SFDC Opportunity ID
-  priority: 'High' | 'Medium' | 'Low' | 'Urgent';
+  priority: QuotePriority;
   isRepInvolved: boolean;
   shippingTerms: string;
   paymentTerms: string;
-  quoteCurrency: 'USD' | 'EURO' | 'GBP' | 'CAD';
+  quoteCurrency: Currency;
   createdAt: string;
   updatedAt: string;
   createdBy?: string;

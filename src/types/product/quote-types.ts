@@ -20,6 +20,9 @@ export type PaymentTerms =
   | '120'
   | (string & {});
 
+export type QuotePriority = 'High' | 'Medium' | 'Low' | 'Urgent';
+export type Currency = 'USD' | 'EURO' | 'GBP' | 'CAD';
+
 export interface Quote {
   id: string;
   userId: string;
@@ -35,10 +38,10 @@ export interface Quote {
   oracleCustomerId?: string;
   customerName?: string;
   sfdcOpportunity: string; // Mandatory SFDC Opportunity ID
-  priority: 'High' | 'Medium' | 'Low' | 'Urgent';
+  priority: QuotePriority;
   termsAndConditions?: string;
   isRepInvolved?: boolean;
   shippingTerms?: ShippingTerms;
   paymentTerms?: PaymentTerms;
-  quoteCurrency?: 'USD' | 'EURO' | 'GBP' | 'CAD';
+  quoteCurrency?: Currency;
 }
