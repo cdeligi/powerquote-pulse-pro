@@ -1,4 +1,4 @@
-import { Chassis, Card as ProductCard } from "@/types/product";
+import { Chassis, Card as ProductCard, Level3Product } from "@/types/product";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -7,7 +7,7 @@ import { getBushingOccupiedSlots, isBushingCard } from "@/utils/bushingValidatio
 
 interface RackVisualizerProps {
   chassis: Chassis;
-  slotAssignments: Record<number, ProductCard>;
+  slotAssignments: Record<number, Level3Product>;
   onSlotClick: (slot: number) => void;
   onSlotClear: (slot: number) => void;
   selectedSlot?: number | null;
