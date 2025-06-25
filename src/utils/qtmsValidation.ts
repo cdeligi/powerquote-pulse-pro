@@ -78,5 +78,5 @@ export const isQTMSConfiguration = (bomItem: BOMItem): boolean => {
 
 export const isDynamicProduct = (bomItem: BOMItem): boolean => {
   return isQTMSConfiguration(bomItem) || 
-         (bomItem.product.id.includes('-') && bomItem.product.id.match(/\d{13}/)); // Timestamp pattern
+         (bomItem.product.id.includes('-') && Boolean(bomItem.product.id.match(/\d{13}/)));
 };
