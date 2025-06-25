@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -141,20 +140,8 @@ const BOMBuilder = ({ canSeePrices, onBOMUpdate, onDiscountUpdate, userId }: BOM
     }
   };
 
-  const handleSaveQTMSConfiguration = (qtmsConfiguration: EditingQTMSConfig) => {
-    const consolidatedConfig = consolidateQTMSConfiguration(
-      qtmsConfiguration.level1ProductId,
-      qtmsConfiguration.level2ProductId,
-      qtmsConfiguration.level3ProductId,
-      qtmsConfiguration.customizations
-    );
-    const newBOMItem = createQTMSBOMItem(
-      selectedLevel1!,
-      selectedLevel2!,
-      selectedLevel3!,
-      consolidatedConfig
-    );
-
+  const handleSaveQTMSConfiguration = (consolidatedQTMS: any) => {
+    const newBOMItem = createQTMSBOMItem(consolidatedQTMS);
     setBomItems([...bomItems, newBOMItem]);
     setEditingQTMS(null);
   };
@@ -173,12 +160,6 @@ const BOMBuilder = ({ canSeePrices, onBOMUpdate, onDiscountUpdate, userId }: BOM
 
   const handleUpdateBOM = (items: BOMItem[]) => {
     setBomItems(items);
-  };
-
-  const handleQuantityChange = (itemId: string, quantity: number) => {
-    setBomItems(bomItems.map(item =>
-      item.id === itemId ? { ...item, quantity } : item
-    ));
   };
 
   const handleChassisSelect = (chassis: Chassis) => {
@@ -310,12 +291,14 @@ const BOMBuilder = ({ canSeePrices, onBOMUpdate, onDiscountUpdate, userId }: BOM
             <TabsContent value="dga" className="mt-4">
               <DGAProductSelector
                 onProductSelect={handleDGASelect}
+                canSeePrices={canSeePrices}
               />
             </TabsContent>
 
             <TabsContent value="pd" className="mt-4">
               <PDProductSelector
                 onProductSelect={handlePDSelect}
+                canSeePrices={canSeePrices}
               />
             </TabsContent>
 
@@ -362,7 +345,6 @@ const BOMBuilder = ({ canSeePrices, onBOMUpdate, onDiscountUpdate, userId }: BOM
         bomItems={bomItems}
         canSeePrices={canSeePrices}
         onUpdateBOM={handleUpdateBOM}
-        onQuantityChange={handleQuantityChange}
       />
 
       {/* Discount Configuration */}

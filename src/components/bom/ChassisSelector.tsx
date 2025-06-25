@@ -16,7 +16,7 @@ interface ChassisSelectorProps {
 const ChassisSelector = ({ onChassisSelect, selectedChassis, canSeePrices }: ChassisSelectorProps) => {
   // Get chassis options from productDataService
   const chassisOptions: Level2Product[] = productDataService
-    .getLevel2ProductsForLevel1('qtms')
+    .getLevel2ProductsByLevel1('qtms')
     .filter(chassis => ['LTX', 'MTX', 'STX'].includes(chassis.type) && chassis.enabled);
 
   return (

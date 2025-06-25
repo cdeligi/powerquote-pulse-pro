@@ -16,7 +16,7 @@ interface CardLibraryProps {
 
 const CardLibrary = ({ chassis, onCardSelect, canSeePrices }: CardLibraryProps) => {
   // Get all cards for this chassis from productDataService
-  const allCards = productDataService.getLevel3ProductsForLevel2(chassis.id);
+  const allCards = productDataService.getLevel3ProductsByLevel2(chassis.id);
 
   // Group cards by type
   const cardsByType = {

@@ -15,7 +15,7 @@ const Level2OptionsSelector = ({ level1Product, selectedOptions, onOptionToggle 
   const [availableOptions, setAvailableOptions] = useState<Level2Product[]>([]);
 
   useEffect(() => {
-    const options = productDataService.getLevel2ProductsForLevel1(level1Product.id).filter(p => p.enabled);
+    const options = productDataService.getLevel2ProductsByLevel1(level1Product.id).filter(p => p.enabled);
     setAvailableOptions(options);
   }, [level1Product.id]);
 
