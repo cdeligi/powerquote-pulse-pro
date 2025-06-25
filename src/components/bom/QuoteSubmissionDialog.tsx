@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { BOMItem } from "@/types/product";
 import { User } from "@/types/auth";
 
@@ -34,11 +34,23 @@ const QuoteSubmissionDialog = ({
   user
 }: QuoteSubmissionDialogProps) => {
   const [formData, setFormData] = useState({
-    customerName: quoteFields.customerName || '',
-    oracleCustomerId: quoteFields.oracleCustomerId || '',
-    sfdcOpportunity: quoteFields.sfdcOpportunity || '',
-    notes: quoteFields.notes || ''
+    customerName: '',
+    oracleCustomerId: '',
+    sfdcOpportunity: '',
+    notes: ''
   });
+
+  // Initialize form data from quoteFields when dialog opens
+  useEffect(() => {
+    if (open && quoteFields) {
+      setFormData({
+        customerName: quoteFields.customerName || '',
+        oracleCustomerId: quoteFields.oracleCustomerId || '',
+        sfdcOpportunity: quoteFields.sfdcOpportunity || '',
+        notes: quoteFields.notes || ''
+      });
+    }
+  }, [open, quoteFields]);
 
   const handleSubmit = () => {
     // Generate a quote ID and submit

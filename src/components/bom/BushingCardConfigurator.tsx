@@ -60,7 +60,9 @@ const BushingCardConfigurator = ({ bomItem, onSave, onClose }: BushingCardConfig
     
     for (let i = 1; i <= numberOfBushings; i++) {
       customizations.push({
-        id: `bushing-${i}`,
+        id: `bushing-${i}-${bomItem.id}`,
+        parentOptionId: bomItem.id,
+        type: 'bushing_config',
         name: `Bushing ${i}: ${bushingConfigurations[i]}`,
         description: `Bushing ${i} tap model configuration`,
         options: [bushingConfigurations[i]],

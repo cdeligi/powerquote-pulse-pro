@@ -52,6 +52,8 @@ const AnalogCardConfigurator = ({ bomItem, onSave, onClose }: AnalogCardConfigur
       const sensorType = channelConfigs[channel];
       customizations.push({
         id: `analog-ch${channel}-${bomItem.id}`,
+        parentOptionId: bomItem.id,
+        type: 'analog_sensor',
         name: sensorType,
         description: `Channel ${channel} sensor configuration`,
         options: [sensorType],
