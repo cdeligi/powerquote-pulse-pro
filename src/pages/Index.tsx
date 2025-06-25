@@ -5,7 +5,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { Loader2 } from "lucide-react";
 
 const Index = () => {
-  const { user, loading, signIn, signOut } = useAuth();
+  const { user, loading, signOut } = useAuth();
 
   const handleLogout = async () => {
     const { error } = await signOut();
@@ -28,7 +28,7 @@ const Index = () => {
   if (!user) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center">
-        <LoginForm onLogin={() => {}} signIn={signIn} />
+        <LoginForm onLogin={() => {}} />
       </div>
     );
   }

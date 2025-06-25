@@ -9,13 +9,14 @@ import { Shield, Zap } from "lucide-react";
 import UserRegistrationForm from "./UserRegistrationForm";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
 
 interface LoginFormProps {
   onLogin: (user: User) => void;
-  signIn: (email: string, password: string) => Promise<{ error: any }>;
 }
 
-const LoginForm = ({ onLogin, signIn }: LoginFormProps) => {
+const LoginForm = ({ onLogin }: LoginFormProps) => {
+  const { signIn } = useAuth();
   const [credentials, setCredentials] = useState<LoginCredentials>({
     email: '',
     password: ''
