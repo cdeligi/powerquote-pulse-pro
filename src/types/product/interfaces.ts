@@ -10,7 +10,7 @@ export interface AssetType {
 export interface Level1Product {
   id: string;
   name: string;
-  type?: string; // Restored as optional for backward compatibility
+  type: string; // Made mandatory since code depends on it for branching
   category?: string; // Optional internal category for organization
   description: string;
   price: number;
