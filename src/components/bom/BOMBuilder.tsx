@@ -37,6 +37,7 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
   const [activeTab, setActiveTab] = useState<string>('');
   const [hasRemoteDisplay, setHasRemoteDisplay] = useState<boolean>(false);
   const [configuringCard, setConfiguringCard] = useState<BOMItem | null>(null);
+  const [configuringBOMItem, setConfiguringBOMItem] = useState<BOMItem | null>(null);
   const [quoteFields, setQuoteFields] = useState<Record<string, any>>({});
   const [discountPercentage, setDiscountPercentage] = useState<number>(0);
   const [discountJustification, setDiscountJustification] = useState<string>('');
@@ -265,18 +266,35 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
     setEditingQTMS(consolidatedQTMS);
   };
 
+  const handleBOMConfigurationEdit = (item: BOMItem) => {
+    if (item.product.type === 'QTMS' && item.configuration) {
+      // Convert BOM item back to ConsolidatedQTMS format for editing
+      const consolidatedQTMS: ConsolidatedQTMS = {
+        id: item.id,
+        name: item.product.name,
+        description: item.product.description || '',
+        partNumber: item.partNumber || item.product.partNumber || '',
+        price: item.product.price || 0,
+        configuration: item.configuration as QTMSConfiguration,
+        components: [] // Will be recalculated in editor
+      };
+      setEditingQTMS(consolidatedQTMS);
+    } else {
+      // For other configurable items, set as configuring card
+      setConfiguringBOMItem(item);
+    }
+  };
+
   const handleQTMSConfigurationSave = (updatedQTMS: ConsolidatedQTMS) => {
-    // Create consolidated BOM item
-    const qtmsBOMItem = createQTMSBOMItem(updatedQTMS);
+    // Update the existing BOM item with new configuration
+    const updatedBOMItem = createQTMSBOMItem(updatedQTMS);
     
-    const updatedItems = [...bomItems, qtmsBOMItem];
+    const updatedItems = bomItems.map(item => 
+      item.id === updatedQTMS.id ? updatedBOMItem : item
+    );
+    
     setBomItems(updatedItems);
     onBOMUpdate(updatedItems);
-    
-    // Clear chassis configuration
-    setSelectedChassis(null);
-    setSlotAssignments({});
-    setHasRemoteDisplay(false);
     setEditingQTMS(null);
   };
 
@@ -491,6 +509,7 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
           <BOMDisplay
             bomItems={bomItems}
             onUpdateBOM={handleBOMUpdate}
+            onEditConfiguration={handleBOMConfigurationEdit}
             canSeePrices={canSeePrices}
           />
           

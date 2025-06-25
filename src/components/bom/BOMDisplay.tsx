@@ -4,16 +4,17 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Trash2, Edit3, Save, X } from 'lucide-react';
+import { Trash2, Edit3, Save, X, Settings } from 'lucide-react';
 import { BOMItem } from '@/types/product';
 
 interface BOMDisplayProps {
   bomItems: BOMItem[];
   onUpdateBOM: (items: BOMItem[]) => void;
+  onEditConfiguration?: (item: BOMItem) => void;
   canSeePrices: boolean;
 }
 
-const BOMDisplay = ({ bomItems, onUpdateBOM, canSeePrices }: BOMDisplayProps) => {
+const BOMDisplay = ({ bomItems, onUpdateBOM, onEditConfiguration, canSeePrices }: BOMDisplayProps) => {
   const [editingItem, setEditingItem] = useState<string | null>(null);
   const [editQuantity, setEditQuantity] = useState<number>(1);
 
@@ -40,11 +41,26 @@ const BOMDisplay = ({ bomItems, onUpdateBOM, canSeePrices }: BOMDisplayProps) =>
     onUpdateBOM(updatedItems);
   };
 
+  const handleConfigurationEdit = (item: BOMItem) => {
+    if (onEditConfiguration) {
+      onEditConfiguration(item);
+    }
+  };
+
   const calculateTotal = () => {
     return bomItems.reduce((total, item) => {
       const price = item.product.price || 0;
       return total + (price * item.quantity);
     }, 0);
+  };
+
+  const isConfigurableItem = (item: BOMItem) => {
+    // Check if item is a consolidated QTMS configuration
+    return item.product.type === 'QTMS' || item.configuration;
+  };
+
+  const getPartNumber = (item: BOMItem) => {
+    return item.partNumber || item.product.partNumber || 'N/A';
   };
 
   if (bomItems.length === 0) {
@@ -81,14 +97,37 @@ const BOMDisplay = ({ bomItems, onUpdateBOM, canSeePrices }: BOMDisplayProps) =>
                 {item.product.description && (
                   <p className="text-gray-400 text-xs mt-1">{item.product.description}</p>
                 )}
-                {item.slot && (
-                  <Badge variant="outline" className="text-xs mt-1 text-blue-400 border-blue-400">
-                    Slot {item.slot}
+                
+                {/* Part Number Display */}
+                <div className="flex items-center space-x-2 mt-1">
+                  <Badge variant="outline" className="text-xs text-green-400 border-green-400">
+                    P/N: {getPartNumber(item)}
                   </Badge>
-                )}
+                  {item.slot && (
+                    <Badge variant="outline" className="text-xs text-blue-400 border-blue-400">
+                      Slot {item.slot}
+                    </Badge>
+                  )}
+                  {isConfigurableItem(item) && (
+                    <Badge variant="outline" className="text-xs text-purple-400 border-purple-400">
+                      Configurable
+                    </Badge>
+                  )}
+                </div>
               </div>
               
               <div className="flex items-center space-x-2 ml-2">
+                {isConfigurableItem(item) && onEditConfiguration && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => handleConfigurationEdit(item)}
+                    className="h-6 w-6 p-0 text-purple-400 hover:text-purple-300"
+                    title="Edit configuration"
+                  >
+                    <Settings className="h-3 w-3" />
+                  </Button>
+                )}
                 <Button
                   size="sm"
                   variant="ghost"

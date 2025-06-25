@@ -1,3 +1,4 @@
+
 import { Chassis, Card, Level1Product } from './interfaces';
 
 export const generateQTMSPartNumber = (
@@ -54,7 +55,12 @@ export const generateQTMSPartNumber = (
           }
           break;
         case 'fiber': 
-          slotCode = 'F';
+          // Add input count for fiber cards
+          if (card.specifications?.inputs) {
+            slotCode = `F${card.specifications.inputs}`;
+          } else {
+            slotCode = 'F';
+          }
           break;
         case 'display': 
           slotCode = 'D';
@@ -113,6 +119,27 @@ export const generateProductPartNumber = (product: Level1Product, configuration?
   // Add channel configuration for QPDM
   if (product.type === 'QPDM' && configuration?.channels === '6-channel') {
     partNumber += '-6CH';
+  }
+  
+  return partNumber;
+};
+
+// Generate part number for individual cards
+export const generateCardPartNumber = (card: Card, configuration?: Record<string, any>): string => {
+  let partNumber = card.partNumber || card.id.toUpperCase();
+  
+  // Add configuration details if available
+  if (configuration) {
+    // For analog cards with sensor configuration
+    if (card.type === 'analog' && configuration.sensorTypes) {
+      const uniqueSensors = [...new Set(Object.values(configuration.sensorTypes))];
+      partNumber += `-${uniqueSensors.length}S`;
+    }
+    
+    // For bushing cards with bushing count
+    if (card.type === 'bushing' && configuration.numberOfBushings) {
+      partNumber += `-${configuration.numberOfBushings}B`;
+    }
   }
   
   return partNumber;

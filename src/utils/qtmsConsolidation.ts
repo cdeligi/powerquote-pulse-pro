@@ -32,7 +32,8 @@ export const consolidateQTMSConfiguration = (
     id: `${Date.now()}-chassis`,
     product: chassis,
     quantity: 1,
-    enabled: true
+    enabled: true,
+    partNumber: chassis.partNumber
   };
 
   const cardItems: BOMItem[] = Object.entries(slotAssignments).map(([slot, card]) => ({
@@ -40,7 +41,8 @@ export const consolidateQTMSConfiguration = (
     product: card,
     quantity: 1,
     slot: parseInt(slot),
-    enabled: true
+    enabled: true,
+    partNumber: card.partNumber
   }));
 
   const components = [chassisItem, ...cardItems];
@@ -55,10 +57,12 @@ export const consolidateQTMSConfiguration = (
         type: 'accessory',
         description: 'Remote display for QTMS chassis',
         price: 850,
-        enabled: true
+        enabled: true,
+        partNumber: 'QTMS-RD-001'
       } as any,
       quantity: 1,
-      enabled: true
+      enabled: true,
+      partNumber: 'QTMS-RD-001'
     };
     components.push(remoteDisplayItem);
   }
@@ -113,6 +117,24 @@ export const createQTMSBOMItem = (consolidatedQTMS: ConsolidatedQTMS): BOMItem =
     } as any,
     quantity: 1,
     enabled: true,
-    configuration: consolidatedQTMS.configuration
+    configuration: consolidatedQTMS.configuration,
+    partNumber: consolidatedQTMS.partNumber
   };
+};
+
+// Update existing QTMS configuration with new data
+export const updateQTMSConfiguration = (
+  existingQTMS: ConsolidatedQTMS,
+  newSlotAssignments: Record<number, Level3Product>,
+  newHasRemoteDisplay: boolean,
+  analogConfigurations?: Record<string, any>,
+  bushingConfigurations?: Record<string, any>
+): ConsolidatedQTMS => {
+  return consolidateQTMSConfiguration(
+    existingQTMS.configuration.chassis,
+    newSlotAssignments,
+    newHasRemoteDisplay,
+    analogConfigurations,
+    bushingConfigurations
+  );
 };
