@@ -65,6 +65,7 @@ export interface Level3Product {
   };
   partNumber?: string;
   image?: string;
+  productInfoUrl?: string;
 }
 
 // Type unions for backward compatibility
