@@ -24,6 +24,10 @@ export interface Quote {
   createdBy?: string;
   approvedBy?: string;
   rejectionReason?: string;
+  counter_offers?: any[];
+  reviewed_by?: string;
+  reviewed_at?: string;
+  approval_notes?: string;
 }
 
 export interface QuoteItem {

@@ -1,10 +1,9 @@
-
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { FileText } from "lucide-react";
 import { Quote, BOMItemWithDetails } from "@/hooks/useQuotes";
 import { QuoteInformation } from "./QuoteInformation";
-import { BOMAnalysis } from "./BOMAnalysis";
-import { ApprovalActions } from "./ApprovalActions";
+import BOMAnalysis from "./BOMAnalysis";
+import ApprovalActions from "./ApprovalActions";
 
 interface QuoteDetailsDialogProps {
   open: boolean;

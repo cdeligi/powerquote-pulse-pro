@@ -1,18 +1,20 @@
+
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Quote } from '@/types/quote';
 import { User } from '@/types/auth';
 import { toast } from "@/components/ui/use-toast"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Button } from "@/components/ui/button"
 import QuoteTable from './quote-approval/QuoteTable';
 import QuoteDetails from './quote-approval/QuoteDetails';
-import { ReloadIcon } from 'lucide-react';
+import { RefreshCw } from 'lucide-react';
 
 interface EnhancedQuoteApprovalDashboardProps {
   user: User | null;
 }
 
-const EnhancedQuoteApprovalDashboard = () => {
+const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboardProps) => {
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [selectedQuote, setSelectedQuote] = useState<Quote | null>(null);
   const [loading, setLoading] = useState(true);
@@ -65,9 +67,9 @@ const EnhancedQuoteApprovalDashboard = () => {
 
   const filteredQuotes = quotes.filter(quote => {
     if (activeTab === "pending") {
-      return quote.status === 'pending';
+      return quote.status === 'pending_approval';
     } else {
-      return quote.status !== 'pending';
+      return quote.status !== 'pending_approval';
     }
   });
 
@@ -164,12 +166,6 @@ const EnhancedQuoteApprovalDashboard = () => {
     }
   };
 
-  const user = {
-    id: 'some-user-id',
-    name: 'Test User',
-    email: 'test@example.com'
-  };
-
   return (
     <div className="container mx-auto p-6">
       <h1 className="text-3xl font-semibold text-white mb-6">Quote Approval Dashboard</h1>
@@ -187,7 +183,7 @@ const EnhancedQuoteApprovalDashboard = () => {
           {activeTab === "pending" ? "Pending Quotes" : "Reviewed Quotes"}
         </h2>
         <Button variant="outline" disabled={loading} onClick={refetch}>
-          <ReloadIcon className="mr-2 h-4 w-4 animate-spin" />
+          <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
           {loading ? "Loading..." : "Refresh"}
         </Button>
       </div>

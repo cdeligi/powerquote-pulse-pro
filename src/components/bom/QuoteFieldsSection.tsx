@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -8,7 +7,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
-import { QuoteFieldValidation } from './QuoteFieldValidation';
+import { useQuoteValidation } from './QuoteFieldValidation';
 
 interface QuoteField {
   id: string;
@@ -150,7 +149,7 @@ const QuoteFieldsSection = ({ quoteFields, onFieldChange }: QuoteFieldsSectionPr
       </CardHeader>
       <CardContent className="space-y-6">
         {/* Show validation errors */}
-        <QuoteFieldValidation 
+        <useQuoteValidation 
           quoteFields={quoteFields} 
           requiredFields={configuredFields} 
         />
