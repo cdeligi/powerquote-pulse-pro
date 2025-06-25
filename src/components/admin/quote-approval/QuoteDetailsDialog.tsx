@@ -5,7 +5,8 @@
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { FileText } from "lucide-react";
-import { Quote, BOMItemWithDetails } from "@/hooks/useQuotes";
+import type { Quote } from "@/types/quote";
+import { BOMItemWithDetails } from "@/hooks/useQuotes";
 import { QuoteInformation } from "./QuoteInformation";
 import BOMAnalysis from "./BOMAnalysis";
 import ApprovalActions from "./ApprovalActions";
@@ -61,37 +62,43 @@ export const QuoteDetailsDialog = ({
         <DialogHeader>
           <DialogTitle className="text-white flex items-center">
             <FileText className="mr-2 h-5 w-5" />
-            Enhanced Quote Review - {quote.id}
+            Enhanced Quote Review - {quote.id || 'Unknown'}
           </DialogTitle>
         </DialogHeader>
         
         <div className="space-y-6">
-          <QuoteInformation quote={quote as Quote} />
+          {quote.id && (
+            <QuoteInformation quote={quote as Quote} />
+          )}
           
-          <BOMAnalysis
-            quote={quote as Quote}
-            bomItems={bomItems}
-            loadingBom={loadingBom}
-            editingPrices={editingPrices}
-            priceEditReason={priceEditReason}
-            onPriceEdit={onPriceEdit}
-            onPriceEditCancel={onPriceEditCancel}
-            onPriceUpdate={onPriceUpdate}
-            onPriceEditReasonChange={onPriceEditReasonChange}
-          />
+          {quote.id && (
+            <BOMAnalysis
+              quote={quote as Quote}
+              bomItems={bomItems}
+              loadingBom={loadingBom}
+              editingPrices={editingPrices}
+              priceEditReason={priceEditReason}
+              onPriceEdit={onPriceEdit}
+              onPriceEditCancel={onPriceEditCancel}
+              onPriceUpdate={onPriceUpdate}
+              onPriceEditReasonChange={onPriceEditReasonChange}
+            />
+          )}
 
-          <ApprovalActions
-            quote={quote as Quote}
-            approvedDiscount={approvedDiscount}
-            approvalNotes={approvalNotes}
-            rejectionReason={rejectionReason}
-            onApprovedDiscountChange={onApprovedDiscountChange}
-            onApprovalNotesChange={onApprovalNotesChange}
-            onRejectionReasonChange={onRejectionReasonChange}
-            onApprove={onApprove}
-            onReject={onReject}
-            onClose={() => onOpenChange(false)}
-          />
+          {quote.id && (
+            <ApprovalActions
+              quote={quote as Quote}
+              approvedDiscount={approvedDiscount}
+              approvalNotes={approvalNotes}
+              rejectionReason={rejectionReason}
+              onApprovedDiscountChange={onApprovedDiscountChange}
+              onApprovalNotesChange={onApprovalNotesChange}
+              onRejectionReasonChange={onRejectionReasonChange}
+              onApprove={onApprove}
+              onReject={onReject}
+              onClose={() => onOpenChange(false)}
+            />
+          )}
         </div>
       </DialogContent>
     </Dialog>
