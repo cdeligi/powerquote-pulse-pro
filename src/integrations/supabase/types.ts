@@ -49,13 +49,16 @@ export type Database = {
       }
       bom_items: {
         Row: {
+          configuration_data: Json | null
           created_at: string
           description: string | null
           id: string
           margin: number
           name: string
+          parent_quote_item_id: string | null
           part_number: string | null
           product_id: string
+          product_type: string | null
           quantity: number
           quote_id: string
           total_cost: number
@@ -64,13 +67,16 @@ export type Database = {
           unit_price: number
         }
         Insert: {
+          configuration_data?: Json | null
           created_at?: string
           description?: string | null
           id?: string
           margin?: number
           name: string
+          parent_quote_item_id?: string | null
           part_number?: string | null
           product_id: string
+          product_type?: string | null
           quantity: number
           quote_id: string
           total_cost?: number
@@ -79,13 +85,16 @@ export type Database = {
           unit_price: number
         }
         Update: {
+          configuration_data?: Json | null
           created_at?: string
           description?: string | null
           id?: string
           margin?: number
           name?: string
+          parent_quote_item_id?: string | null
           part_number?: string | null
           product_id?: string
+          product_type?: string | null
           quantity?: number
           quote_id?: string
           total_cost?: number

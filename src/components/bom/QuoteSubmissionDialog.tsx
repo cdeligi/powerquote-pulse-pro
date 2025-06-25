@@ -10,6 +10,12 @@ import { BOMItem } from '@/types/product';
 import { User } from '@/types/auth';
 import { supabase } from '@/integrations/supabase/client';
 import { calculateItemCost, calculateItemRevenue, calculateItemMargin } from '@/utils/marginCalculations';
+import { 
+  extractQTMSComponents, 
+  validateQTMSComponents, 
+  isDynamicProduct, 
+  isQTMSConfiguration 
+} from '@/utils/qtmsValidation';
 
 interface QuoteSubmissionDialogProps {
   bomItems: BOMItem[];
@@ -62,34 +68,93 @@ const QuoteSubmissionDialog = ({
   const validateProductsExist = async () => {
     console.log('Validating products exist in database...');
     
-    // Get all unique product IDs from BOM items
-    const productIds = bomItems.map(item => item.product.id);
-    console.log('Product IDs to validate:', productIds);
+    // Separate standard products from dynamic configurations
+    const standardProducts: string[] = [];
+    const dynamicConfigurations: BOMItem[] = [];
     
-    // Check if products exist in database
-    const { data: products, error: productsError } = await supabase
-      .from('products')
-      .select('id')
-      .in('id', productIds);
-    
-    if (productsError) {
-      console.error('Error checking products:', productsError);
-      throw new Error(`Failed to validate products: ${productsError.message}`);
+    bomItems.forEach(item => {
+      if (isDynamicProduct(item)) {
+        dynamicConfigurations.push(item);
+      } else {
+        standardProducts.push(item.product.id);
+      }
+    });
+
+    console.log('Standard products to validate:', standardProducts);
+    console.log('Dynamic configurations to validate:', dynamicConfigurations.length);
+
+    // Validate standard products
+    if (standardProducts.length > 0) {
+      const { data: products, error: productsError } = await supabase
+        .from('products')
+        .select('id')
+        .in('id', standardProducts);
+      
+      if (productsError) {
+        console.error('Error checking standard products:', productsError);
+        throw new Error(`Failed to validate standard products: ${productsError.message}`);
+      }
+      
+      const existingProductIds = new Set(products?.map(p => p.id) || []);
+      const missingProducts = standardProducts.filter(id => !existingProductIds.has(id));
+      
+      if (missingProducts.length > 0) {
+        console.error('Missing standard products in database:', missingProducts);
+        throw new Error(`Standard products not found in database: ${missingProducts.join(', ')}`);
+      }
+    }
+
+    // Validate components for dynamic configurations
+    for (const config of dynamicConfigurations) {
+      if (isQTMSConfiguration(config)) {
+        const componentIds = extractQTMSComponents(config);
+        console.log(`Validating QTMS configuration ${config.product.id} components:`, componentIds);
+        
+        const validationResult = await validateQTMSComponents(componentIds);
+        
+        if (!validationResult.isValid) {
+          console.error(`QTMS configuration ${config.product.id} has missing components:`, validationResult.missingComponents);
+          throw new Error(`QTMS configuration ${config.product.name} has missing components: ${validationResult.missingComponents.join(', ')}`);
+        }
+      }
     }
     
-    console.log('Products found in database:', products);
-    
-    // Check if all products exist
-    const existingProductIds = new Set(products?.map(p => p.id) || []);
-    const missingProducts = productIds.filter(id => !existingProductIds.has(id));
-    
-    if (missingProducts.length > 0) {
-      console.error('Missing products in database:', missingProducts);
-      throw new Error(`Products not found in database: ${missingProducts.join(', ')}`);
-    }
-    
-    console.log('All products validated successfully');
+    console.log('All products and configurations validated successfully');
     return true;
+  };
+
+  const createBOMItemData = (item: BOMItem, quoteId: string) => {
+    const itemRevenue = calculateItemRevenue(item);
+    const itemCost = calculateItemCost(item);
+    const itemMargin = calculateItemMargin(item);
+
+    const baseData = {
+      quote_id: quoteId,
+      product_id: item.product.id,
+      name: item.product.name,
+      description: item.product.description || '',
+      part_number: item.partNumber || item.product.partNumber || item.product.id,
+      quantity: item.quantity,
+      unit_price: item.product.price || 0,
+      unit_cost: item.product.cost || (item.product.price || 0) * 0.6,
+      total_price: itemRevenue,
+      total_cost: itemCost,
+      margin: itemMargin
+    };
+
+    // Add configuration data for dynamic products
+    if (isDynamicProduct(item)) {
+      return {
+        ...baseData,
+        product_type: isQTMSConfiguration(item) ? 'qtms_configuration' : 'dynamic_configuration',
+        configuration_data: item.configuration || null
+      };
+    }
+
+    return {
+      ...baseData,
+      product_type: 'standard'
+    };
   };
 
   const handleSubmit = async () => {
@@ -109,7 +174,7 @@ const QuoteSubmissionDialog = ({
     setError(null);
 
     try {
-      // Validate products exist in database
+      // Validate products and configurations exist in database
       await validateProductsExist();
       
       const { originalValue, discountedValue } = calculateTotals();
@@ -170,26 +235,8 @@ const QuoteSubmissionDialog = ({
 
       console.log('Quote created successfully, now creating BOM items...');
 
-      // Submit BOM items with detailed calculations
-      const bomItemsData = bomItems.map(item => {
-        const itemRevenue = calculateItemRevenue(item);
-        const itemCost = calculateItemCost(item);
-        const itemMargin = calculateItemMargin(item);
-
-        return {
-          quote_id: quoteId,
-          product_id: item.product.id,
-          name: item.product.name,
-          description: item.product.description || '',
-          part_number: item.partNumber || item.product.partNumber || item.product.id,
-          quantity: item.quantity,
-          unit_price: item.product.price || 0,
-          unit_cost: item.product.cost || (item.product.price || 0) * 0.6,
-          total_price: itemRevenue,
-          total_cost: itemCost,
-          margin: itemMargin
-        };
-      });
+      // Submit BOM items with enhanced configuration data
+      const bomItemsData = bomItems.map(item => createBOMItemData(item, quoteId));
 
       console.log('BOM items data to insert:', bomItemsData);
 
@@ -314,6 +361,11 @@ const QuoteSubmissionDialog = ({
                     <div>
                       <span className="text-white">{item.product.name}</span>
                       <span className="text-gray-400 ml-2">x{item.quantity}</span>
+                      {isDynamicProduct(item) && (
+                        <Badge variant="outline" className="ml-2 text-xs text-blue-400 border-blue-400">
+                          Configured
+                        </Badge>
+                      )}
                       {canSeePrices && (
                         <span className="text-gray-400 ml-2">
                           (Margin: {calculateItemMargin(item).toFixed(1)}%)
