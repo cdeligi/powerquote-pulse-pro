@@ -47,7 +47,7 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
   const [showQuoteSubmission, setShowQuoteSubmission] = useState(false);
   const [editingQTMS, setEditingQTMS] = useState<ConsolidatedQTMS | null>(null);
 
-  // Wrapper function to handle field changes properly
+  // Fixed field change handler to match expected signature
   const handleQuoteFieldChange = (fieldId: string, value: any) => {
     setQuoteFields(prev => ({ ...prev, [fieldId]: value }));
   };

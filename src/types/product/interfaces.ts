@@ -1,4 +1,3 @@
-
 // Level 0: Asset Types (Power Transformer, GIS, Breaker, etc.)
 export interface AssetType {
   id: string;
@@ -91,6 +90,7 @@ export interface Chassis extends Level2Product {
 export interface Card extends Level3Product {
   slotRequirement: number;
   compatibleChassis: string[];
+  enabled?: boolean; // Made optional since many static card objects omit it
 }
 
 export interface Level2Option extends Level3Product {
