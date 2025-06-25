@@ -75,7 +75,7 @@ const QuoteSubmissionDialog = ({
       const grossProfit = discountedValue - totalCost;
       const discountedMargin = discountedValue > 0 ? (grossProfit / discountedValue) * 100 : 0;
 
-      // Create quote in database with pending_approval status
+      // Create quote in database with pending status
       const { error: quoteError } = await supabase
         .from('quotes')
         .insert({
@@ -83,7 +83,7 @@ const QuoteSubmissionDialog = ({
           customer_name: formData.customerName,
           oracle_customer_id: formData.oracleCustomerId,
           sfdc_opportunity: formData.sfdcOpportunity,
-          status: 'pending_approval',
+          status: 'pending',
           user_id: user.id,
           submitted_by_name: user.name,
           submitted_by_email: user.email,

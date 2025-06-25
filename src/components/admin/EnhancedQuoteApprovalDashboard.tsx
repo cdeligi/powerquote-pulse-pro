@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Quote } from '@/types/quote';
@@ -67,9 +66,9 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
 
   const filteredQuotes = quotes.filter(quote => {
     if (activeTab === "pending") {
-      return quote.status === 'pending_approval';
+      return quote.status === 'pending';
     } else {
-      return quote.status !== 'pending_approval';
+      return quote.status !== 'pending';
     }
   });
 
