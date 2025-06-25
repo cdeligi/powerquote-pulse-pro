@@ -1,274 +1,225 @@
-
-import { useState, useEffect } from "react";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { 
-  Clock,
-  FileText,
-  CheckCircle,
-  XCircle,
-  Loader2
-} from "lucide-react";
-import { User as UserType } from "@/types/auth";
-import { useToast } from "@/hooks/use-toast";
-import { useQuotes, Quote, BOMItemWithDetails } from "@/hooks/useQuotes";
-import { QuoteCard } from "./quote-approval/QuoteCard";
-import { QuoteDetailsDialog } from "./quote-approval/QuoteDetailsDialog";
+import { useState, useEffect } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { Quote } from '@/types/quote';
+import { User } from '@/types/auth';
+import { toast } from "@/components/ui/use-toast"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import QuoteTable from './quote-approval/QuoteTable';
+import QuoteDetails from './quote-approval/QuoteDetails';
+import { ReloadIcon } from 'lucide-react';
 
 interface EnhancedQuoteApprovalDashboardProps {
-  user: UserType;
+  user: User | null;
 }
 
-const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboardProps) => {
-  const { quotes, loading, fetchBOMItems, updateQuoteStatus, updateBOMItemPrice } = useQuotes();
+const EnhancedQuoteApprovalDashboard = () => {
+  const [quotes, setQuotes] = useState<Quote[]>([]);
   const [selectedQuote, setSelectedQuote] = useState<Quote | null>(null);
-  const [bomItems, setBomItems] = useState<BOMItemWithDetails[]>([]);
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState('pending');
-  const [approvalNotes, setApprovalNotes] = useState('');
-  const [rejectionReason, setRejectionReason] = useState('');
-  const [approvedDiscount, setApprovedDiscount] = useState('');
-  const [editingPrices, setEditingPrices] = useState<Record<string, string>>({});
-  const [priceEditReason, setPriceEditReason] = useState('');
-  const [loadingBom, setLoadingBom] = useState(false);
-  const { toast } = useToast();
+  const [loading, setLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState<{ [quoteId: string]: boolean }>({});
+  const [activeTab, setActiveTab] = useState("pending");
 
-  const getFilteredQuotes = () => {
-    switch (activeTab) {
-      case 'pending': return quotes.filter(q => q.status === 'pending');
-      case 'under-review': return quotes.filter(q => q.status === 'under-review');
-      case 'approved': return quotes.filter(q => q.status === 'approved');
-      case 'rejected': return quotes.filter(q => q.status === 'rejected');
-      default: return quotes;
-    }
-  };
-
-  const handleApprove = async () => {
-    if (!selectedQuote) return;
-    
+  const fetchData = async () => {
+    setLoading(true);
     try {
-      await updateQuoteStatus(
-        selectedQuote.id,
-        'approved',
-        parseFloat(approvedDiscount) || selectedQuote.requested_discount,
-        approvalNotes
-      );
-      setDialogOpen(false);
-      resetForm();
-    } catch (error) {
-      console.error('Failed to approve quote:', error);
-    }
-  };
+      const { data, error } = await supabase
+        .from('quotes')
+        .select(`
+          *,
+          bom_items (
+            *,
+            product: products (*)
+          )
+        `)
+        .order('created_at', { ascending: false });
 
-  const handleReject = async () => {
-    if (!selectedQuote || !rejectionReason.trim()) return;
-    
-    try {
-      await updateQuoteStatus(
-        selectedQuote.id,
-        'rejected',
-        undefined,
-        undefined,
-        rejectionReason
-      );
-      setDialogOpen(false);
-      resetForm();
+      if (error) {
+        console.error('Error fetching quotes:', error);
+        toast({
+          title: "Error",
+          description: "Failed to fetch quotes. Please try again.",
+          variant: "destructive",
+        });
+      } else {
+        setQuotes(data as Quote[]);
+      }
     } catch (error) {
-      console.error('Failed to reject quote:', error);
-    }
-  };
-
-  const handlePriceUpdate = async (bomItemId: string) => {
-    const newPrice = editingPrices[bomItemId];
-    if (!newPrice || !priceEditReason.trim()) {
+      console.error('Unexpected error fetching quotes:', error);
       toast({
-        title: "Missing Information",
-        description: "Please enter both new price and reason for change",
-        variant: "destructive"
+        title: "Error",
+        description: "An unexpected error occurred. Please try again.",
+        variant: "destructive",
       });
-      return;
-    }
-
-    try {
-      await updateBOMItemPrice(bomItemId, parseFloat(newPrice), priceEditReason);
-      
-      // Update local state
-      setBomItems(prev => prev.map(item => 
-        item.id === bomItemId 
-          ? { 
-              ...item, 
-              unit_price: parseFloat(newPrice),
-              total_price: parseFloat(newPrice) * item.quantity,
-              approved_unit_price: parseFloat(newPrice)
-            }
-          : item
-      ));
-      
-      // Clear editing state
-      setEditingPrices(prev => {
-        const newState = { ...prev };
-        delete newState[bomItemId];
-        return newState;
-      });
-      setPriceEditReason('');
-    } catch (error) {
-      console.error('Failed to update price:', error);
-    }
-  };
-
-  const openQuoteDialog = async (quote: Quote) => {
-    setSelectedQuote(quote);
-    setApprovedDiscount(quote.requested_discount.toString());
-    setLoadingBom(true);
-    setDialogOpen(true);
-    
-    try {
-      const items = await fetchBOMItems(quote.id);
-      setBomItems(items);
-    } catch (error) {
-      console.error('Failed to load BOM items:', error);
     } finally {
-      setLoadingBom(false);
+      setLoading(false);
     }
   };
 
-  const handleQuickApprove = async (quoteId: string) => {
-    const quote = quotes.find(q => q.id === quoteId);
-    if (!quote) return;
+  const refetch = async () => {
+    await fetchData();
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const filteredQuotes = quotes.filter(quote => {
+    if (activeTab === "pending") {
+      return quote.status === 'pending';
+    } else {
+      return quote.status !== 'pending';
+    }
+  });
+
+  const handleQuoteSelect = (quote: Quote) => {
+    setSelectedQuote(quote);
+  };
+
+  const handleQuoteAction = async (
+    quoteId: string,
+    action: 'approve' | 'reject' | 'counter_offer',
+    notes?: string,
+    updatedBOMItems?: any[]
+  ) => {
+    setActionLoading(prev => ({ ...prev, [quoteId]: true }));
     
     try {
-      await updateQuoteStatus(quoteId, 'approved', quote.requested_discount);
+      const updates: any = {
+        status: action === 'approve' ? 'approved' : action === 'reject' ? 'rejected' : 'counter_offered',
+        reviewed_by: user?.id,
+        reviewed_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+
+      if (action === 'approve') {
+        updates.approval_notes = notes || '';
+      } else if (action === 'reject') {
+        updates.rejection_reason = notes || '';
+      } else if (action === 'counter_offer') {
+        updates.approval_notes = notes || '';
+        // Add counter offer to the counter_offers array
+        const existingCounterOffers = quotes.find(q => q.id === quoteId)?.counter_offers || [];
+        updates.counter_offers = [
+          ...existingCounterOffers,
+          {
+            id: Date.now().toString(),
+            notes: notes || '',
+            created_at: new Date().toISOString(),
+            created_by: user?.id
+          }
+        ];
+      }
+
+      // Update BOM items if provided
+      if (updatedBOMItems && updatedBOMItems.length > 0) {
+        // First update the quote
+        const { error: quoteError } = await supabase
+          .from('quotes')
+          .update(updates)
+          .eq('id', quoteId);
+
+        if (quoteError) throw quoteError;
+
+        // Then update BOM items
+        for (const item of updatedBOMItems) {
+          const { error: bomError } = await supabase
+            .from('bom_items')
+            .update({
+              approved_unit_price: item.unit_price,
+              total_price: item.unit_price * item.quantity,
+              margin: item.margin
+            })
+            .eq('id', item.id);
+
+          if (bomError) throw bomError;
+        }
+      } else {
+        // Just update the quote
+        const { error } = await supabase
+          .from('quotes')
+          .update(updates)
+          .eq('id', quoteId);
+
+        if (error) throw error;
+      }
+
+      // Show success message
+      toast({
+        title: "Success",
+        description: `Quote ${action === 'approve' ? 'approved' : action === 'reject' ? 'rejected' : 'counter offered'} successfully`,
+      });
+
+      // Refresh quotes to show updated status
+      await refetch();
+      
     } catch (error) {
-      console.error('Failed to approve quote:', error);
+      console.error(`Error ${action}ing quote:`, error);
+      toast({
+        title: "Error",
+        description: `Failed to ${action} quote. Please try again.`,
+        variant: "destructive",
+      });
+    } finally {
+      setActionLoading(prev => ({ ...prev, [quoteId]: false }));
     }
   };
 
-  const resetForm = () => {
-    setApprovalNotes('');
-    setRejectionReason('');
-    setApprovedDiscount('');
-    setEditingPrices({});
-    setPriceEditReason('');
-    setBomItems([]);
+  const user = {
+    id: 'some-user-id',
+    name: 'Test User',
+    email: 'test@example.com'
   };
-
-  const handlePriceEdit = (itemId: string, price: string) => {
-    setEditingPrices(prev => ({ ...prev, [itemId]: price }));
-  };
-
-  const handlePriceEditCancel = (itemId: string) => {
-    setEditingPrices(prev => {
-      const newState = { ...prev };
-      delete newState[itemId];
-      return newState;
-    });
-  };
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin text-white" />
-        <span className="ml-2 text-white">Loading quotes...</span>
-      </div>
-    );
-  }
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h2 className="text-2xl font-bold text-white">Enhanced Quote Approval Dashboard</h2>
-          <p className="text-gray-400">Review submitted quotes with detailed BOM analysis and price control</p>
-        </div>
-        <div className="flex space-x-4">
-          <Card className="bg-gray-900 border-gray-800">
-            <CardContent className="p-4">
-              <div className="flex items-center space-x-2">
-                <Clock className="h-4 w-4 text-yellow-400" />
-                <span className="text-sm text-gray-400">Pending Approval</span>
-                <Badge variant="outline" className="border-yellow-500 text-yellow-400">
-                  {quotes.filter(q => q.status === 'pending').length}
-                </Badge>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
+    <div className="container mx-auto p-6">
+      <h1 className="text-3xl font-semibold text-white mb-6">Quote Approval Dashboard</h1>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-4 bg-gray-800">
-          <TabsTrigger 
-            value="pending" 
-            className="text-white data-[state=active]:bg-red-600 data-[state=active]:text-white"
-          >
-            <Clock className="h-4 w-4 mr-2" />
-            Pending ({quotes.filter(q => q.status === 'pending').length})
-          </TabsTrigger>
-          <TabsTrigger 
-            value="under-review" 
-            className="text-white data-[state=active]:bg-red-600 data-[state=active]:text-white"
-          >
-            <FileText className="h-4 w-4 mr-2" />
-            Under Review ({quotes.filter(q => q.status === 'under-review').length})
-          </TabsTrigger>
-          <TabsTrigger 
-            value="approved" 
-            className="text-white data-[state=active]:bg-red-600 data-[state=active]:text-white"
-          >
-            <CheckCircle className="h-4 w-4 mr-2" />
-            Approved ({quotes.filter(q => q.status === 'approved').length})
-          </TabsTrigger>
-          <TabsTrigger 
-            value="rejected" 
-            className="text-white data-[state=active]:bg-red-600 data-[state=active]:text-white"
-          >
-            <XCircle className="h-4 w-4 mr-2" />
-            Rejected ({quotes.filter(q => q.status === 'rejected').length})
-          </TabsTrigger>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-4">
+        <TabsList>
+          <TabsTrigger value="pending">Pending Quotes</TabsTrigger>
+          <TabsTrigger value="reviewed">Reviewed Quotes</TabsTrigger>
         </TabsList>
-
-        <TabsContent value={activeTab} className="mt-6">
-          <div className="grid gap-4">
-            {getFilteredQuotes().map((quote) => (
-              <QuoteCard
-                key={quote.id}
-                quote={quote}
-                onReviewClick={openQuoteDialog}
-                onQuickApprove={handleQuickApprove}
-              />
-            ))}
-          </div>
-
-          {getFilteredQuotes().length === 0 && (
-            <div className="text-center py-12">
-              <p className="text-gray-400">No quotes found in this category.</p>
-            </div>
-          )}
-        </TabsContent>
+        
       </Tabs>
 
-      <QuoteDetailsDialog
-        open={dialogOpen}
-        onOpenChange={setDialogOpen}
-        quote={selectedQuote}
-        bomItems={bomItems}
-        loadingBom={loadingBom}
-        editingPrices={editingPrices}
-        priceEditReason={priceEditReason}
-        approvedDiscount={approvedDiscount}
-        approvalNotes={approvalNotes}
-        rejectionReason={rejectionReason}
-        onPriceEdit={handlePriceEdit}
-        onPriceEditCancel={handlePriceEditCancel}
-        onPriceUpdate={handlePriceUpdate}
-        onPriceEditReasonChange={setPriceEditReason}
-        onApprovedDiscountChange={setApprovedDiscount}
-        onApprovalNotesChange={setApprovalNotes}
-        onRejectionReasonChange={setRejectionReason}
-        onApprove={handleApprove}
-        onReject={handleReject}
-      />
+      <div className="mb-4 flex items-center justify-between">
+        <h2 className="text-2xl text-gray-300">
+          {activeTab === "pending" ? "Pending Quotes" : "Reviewed Quotes"}
+        </h2>
+        <Button variant="outline" disabled={loading} onClick={refetch}>
+          <ReloadIcon className="mr-2 h-4 w-4 animate-spin" />
+          {loading ? "Loading..." : "Refresh"}
+        </Button>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Quote List */}
+        <div className="lg:col-span-1">
+          <QuoteTable
+            quotes={filteredQuotes}
+            loading={loading}
+            onQuoteSelect={handleQuoteSelect}
+          />
+        </div>
+
+        {/* Quote Details and Actions */}
+        <div className="lg:col-span-1">
+          {selectedQuote ? (
+            <QuoteDetails
+              quote={selectedQuote}
+              onApprove={(notes, updatedBOMItems) => handleQuoteAction(selectedQuote.id, 'approve', notes, updatedBOMItems)}
+              onReject={notes => handleQuoteAction(selectedQuote.id, 'reject', notes)}
+              onCounterOffer={notes => handleQuoteAction(selectedQuote.id, 'counter_offer', notes)}
+              isLoading={actionLoading[selectedQuote.id] || false}
+              user={user}
+            />
+          ) : (
+            <div className="bg-gray-900 border-gray-800 rounded-md p-4 text-gray-400 text-center">
+              Select a quote to view details and take action.
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 };

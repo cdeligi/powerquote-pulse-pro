@@ -1,300 +1,247 @@
 
-import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { 
-  Calculator,
-  Edit3,
-  History,
-  TrendingUp,
-  Loader2
-} from "lucide-react";
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
-} from "@/components/ui/table";
-import { BOMItemWithDetails, Quote } from "@/hooks/useQuotes";
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Edit3, Save, X } from 'lucide-react';
+import { useState } from 'react';
 
-interface BOMAnalysisProps {
-  quote: Quote;
-  bomItems: BOMItemWithDetails[];
-  loadingBom: boolean;
-  editingPrices: Record<string, string>;
-  priceEditReason: string;
-  onPriceEdit: (itemId: string, price: string) => void;
-  onPriceEditCancel: (itemId: string) => void;
-  onPriceUpdate: (itemId: string) => void;
-  onPriceEditReasonChange: (reason: string) => void;
+interface BOMItem {
+  id: string;
+  product_id: string;
+  name: string;
+  description?: string;
+  part_number?: string;
+  quantity: number;
+  unit_price: number;
+  unit_cost: number;
+  total_price: number;
+  total_cost: number;
+  margin: number;
+  configuration_data?: any;
+  product_type?: string;
 }
 
-export const BOMAnalysis = ({ 
-  quote, 
-  bomItems, 
-  loadingBom, 
-  editingPrices, 
-  priceEditReason, 
-  onPriceEdit, 
-  onPriceEditCancel, 
-  onPriceUpdate, 
-  onPriceEditReasonChange 
-}: BOMAnalysisProps) => {
+interface BOMAnalysisProps {
+  bomItems: BOMItem[];
+  onPriceUpdate: (itemId: string, newPrice: number) => void;
+  canEditPrices: boolean;
+}
+
+const BOMAnalysis = ({ bomItems, onPriceUpdate, canEditPrices }: BOMAnalysisProps) => {
+  const [editingItem, setEditingItem] = useState<string | null>(null);
+  const [editPrice, setEditPrice] = useState<number>(0);
+
+  const handleEditStart = (item: BOMItem) => {
+    setEditingItem(item.id);
+    setEditPrice(item.unit_price);
+  };
+
+  const handleEditSave = (itemId: string) => {
+    onPriceUpdate(itemId, editPrice);
+    setEditingItem(null);
+  };
+
+  const handleEditCancel = () => {
+    setEditingItem(null);
+    setEditPrice(0);
+  };
+
   const calculateUpdatedTotals = () => {
-    if (!bomItems.length) return null;
-
-    const originalTotal = bomItems.reduce((sum, item) => sum + item.total_price, 0);
-    const updatedTotal = bomItems.reduce((sum, item) => {
-      const editPrice = editingPrices[item.id];
-      const price = editPrice ? parseFloat(editPrice) : item.unit_price;
-      return sum + (price * item.quantity);
+    const totalRevenue = bomItems.reduce((sum, item) => {
+      return sum + (item.unit_price * item.quantity);
     }, 0);
-    const totalCost = bomItems.reduce((sum, item) => sum + item.total_cost, 0);
-    const updatedMargin = updatedTotal > 0 ? ((updatedTotal - totalCost) / updatedTotal) * 100 : 0;
-    const profit = updatedTotal - totalCost;
-
+    
+    // Fix: Calculate total cost properly as unit_cost × quantity
+    const totalCost = bomItems.reduce((sum, item) => {
+      return sum + (item.unit_cost * item.quantity);
+    }, 0);
+    
+    const grossProfit = totalRevenue - totalCost;
+    const marginPercentage = totalRevenue > 0 ? (grossProfit / totalRevenue) * 100 : 0;
+    
     return {
-      originalTotal,
-      updatedTotal,
+      totalRevenue,
       totalCost,
-      updatedMargin,
-      profit,
-      hasChanges: Math.abs(originalTotal - updatedTotal) > 0.01
+      grossProfit,
+      marginPercentage
     };
   };
 
   const totals = calculateUpdatedTotals();
 
+  if (bomItems.length === 0) {
+    return (
+      <Card className="bg-gray-900 border-gray-800">
+        <CardHeader>
+          <CardTitle className="text-white">BOM Analysis</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-gray-400 text-center py-8">
+            No BOM items found for this quote.
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
-    <Card className="bg-gray-800 border-gray-700">
-      <CardHeader>
-        <CardTitle className="text-white flex items-center">
-          <Calculator className="mr-2 h-5 w-5" />
-          Bill of Materials & Cost Analysis
-          {totals?.hasChanges && (
-            <Badge className="ml-2 bg-orange-600">
-              Prices Modified
+    <div className="space-y-6">
+      <Card className="bg-gray-900 border-gray-800">
+        <CardHeader>
+          <CardTitle className="text-white flex items-center justify-between">
+            BOM Analysis
+            <Badge variant="outline" className="text-white border-gray-500">
+              {bomItems.length} items
             </Badge>
-          )}
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        {loadingBom ? (
-          <div className="flex items-center justify-center py-8">
-            <Loader2 className="h-6 w-6 animate-spin text-white mr-2" />
-            <span className="text-white">Loading BOM items...</span>
-          </div>
-        ) : (
-          <>
-            <div className="bg-gray-700 rounded-lg overflow-hidden">
-              <Table>
-                <TableHeader>
-                  <TableRow className="border-gray-600">
-                    <TableHead className="text-gray-300">Product</TableHead>
-                    <TableHead className="text-gray-300 text-center">Qty</TableHead>
-                    <TableHead className="text-gray-300 text-right">List Price</TableHead>
-                    <TableHead className="text-gray-300 text-right">Current Price</TableHead>
-                    <TableHead className="text-gray-300 text-right">Unit Cost</TableHead>
-                    <TableHead className="text-gray-300 text-right">Total Revenue</TableHead>
-                    <TableHead className="text-gray-300 text-right">Total Cost</TableHead>
-                    <TableHead className="text-gray-300 text-right">Margin %</TableHead>
-                    <TableHead className="text-gray-300 text-center">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {bomItems.map((item) => {
-                    const isEditing = editingPrices[item.id] !== undefined;
-                    const currentPrice = isEditing ? parseFloat(editingPrices[item.id]) : item.unit_price;
-                    const totalRevenue = currentPrice * item.quantity;
-                    const margin = currentPrice > 0 && item.unit_cost > 0 ? ((currentPrice - item.unit_cost) / currentPrice) * 100 : 0;
-                    const hasHistory = item.price_adjustment_history && item.price_adjustment_history.length > 0;
-                    
-                    return (
-                      <TableRow key={item.id} className="border-gray-600">
-                        <TableCell className="text-white">
-                          <div>
-                            <p className="font-medium">{item.name}</p>
-                            {item.part_number && (
-                              <p className="text-gray-400 text-xs">PN: {item.part_number}</p>
-                            )}
-                            {item.product_type !== 'standard' && (
-                              <Badge variant="outline" className="text-xs text-blue-400 border-blue-400 mt-1">
-                                {item.product_type.replace('_', ' ').toUpperCase()}
-                              </Badge>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-white text-center">{item.quantity}</TableCell>
-                        <TableCell className="text-gray-400 text-right">
-                          {quote.currency} {item.original_unit_price.toLocaleString()}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {isEditing ? (
-                            <Input
-                              type="number"
-                              value={editingPrices[item.id]}
-                              onChange={(e) => onPriceEdit(item.id, e.target.value)}
-                              className="bg-gray-700 border-gray-600 text-white w-24 text-right"
-                              step="0.01"
-                            />
-                          ) : (
-                            <span className={`text-white ${item.unit_price !== item.original_unit_price ? 'font-bold text-green-400' : ''}`}>
-                              {quote.currency} {item.unit_price.toLocaleString()}
-                            </span>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-orange-400 text-right">
-                          {quote.currency} {item.unit_cost.toLocaleString()}
-                        </TableCell>
-                        <TableCell className="text-white text-right">
-                          {quote.currency} {totalRevenue.toLocaleString()}
-                        </TableCell>
-                        <TableCell className="text-orange-400 text-right">
-                          {quote.currency} {item.total_cost.toLocaleString()}
-                        </TableCell>
-                        <TableCell className={`text-right font-medium ${
-                          margin >= 40 ? 'text-green-400' :
-                          margin >= 25 ? 'text-yellow-400' : 'text-red-400'
-                        }`}>
-                          {margin.toFixed(1)}%
-                        </TableCell>
-                        <TableCell className="text-center">
-                          <div className="flex items-center justify-center space-x-1">
-                            {isEditing ? (
-                              <>
-                                <Button
-                                  size="sm"
-                                  onClick={() => onPriceUpdate(item.id)}
-                                  className="bg-green-600 hover:bg-green-700 h-6 px-2 text-xs"
-                                  disabled={!priceEditReason.trim()}
-                                >
-                                  Save
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  onClick={() => onPriceEditCancel(item.id)}
-                                  className="h-6 px-2 text-xs text-gray-400"
-                                >
-                                  Cancel
-                                </Button>
-                              </>
-                            ) : (
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => onPriceEdit(item.id, item.unit_price.toString())}
-                                className="h-6 px-2 text-xs text-blue-400 hover:text-blue-300"
-                              >
-                                <Edit3 className="h-3 w-3" />
-                              </Button>
-                            )}
-                            {hasHistory && (
-                              <Badge variant="outline" className="text-xs text-purple-400 border-purple-400">
-                                <History className="h-2 w-2 mr-1" />
-                                {item.price_adjustment_history.length}
-                              </Badge>
-                            )}
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </div>
-
-            {/* Price Edit Reason */}
-            {Object.keys(editingPrices).length > 0 && (
-              <div className="mt-4 p-4 bg-blue-900/20 border border-blue-600/20 rounded">
-                <Label htmlFor="price-reason" className="text-white">Reason for Price Adjustment</Label>
-                <Textarea
-                  id="price-reason"
-                  value={priceEditReason}
-                  onChange={(e) => onPriceEditReasonChange(e.target.value)}
-                  placeholder="Enter reason for price changes..."
-                  className="bg-gray-700 border-gray-600 text-white mt-2"
-                  rows={2}
-                />
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {bomItems.map((item) => (
+            <div key={item.id} className="p-4 bg-gray-800 rounded-lg border border-gray-700">
+              <div className="flex justify-between items-start mb-3">
+                <div className="flex-1 min-w-0">
+                  <h4 className="text-white font-medium truncate">{item.name}</h4>
+                  {item.description && (
+                    <p className="text-gray-400 text-sm mt-1">{item.description}</p>
+                  )}
+                  {item.part_number && (
+                    <Badge variant="outline" className="text-xs text-green-400 border-green-400 mt-2">
+                      P/N: {item.part_number}
+                    </Badge>
+                  )}
+                </div>
+                
+                {canEditPrices && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => handleEditStart(item)}
+                    className="h-6 w-6 p-0 text-gray-400 hover:text-white"
+                    title="Edit unit price"
+                  >
+                    <Edit3 className="h-3 w-3" />
+                  </Button>
+                )}
               </div>
-            )}
-
-            {/* Updated Totals */}
-            {totals && (
-              <div className="mt-4 p-4 bg-gray-700 rounded">
-                <h4 className="text-white font-medium mb-3 flex items-center">
-                  <TrendingUp className="mr-2 h-4 w-4" />
-                  Project Financial Summary
-                </h4>
-                <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
-                  <div>
-                    <p className="text-gray-400">Original Revenue</p>
-                    <p className="text-white font-semibold">
-                      {quote.currency} {totals.originalTotal.toLocaleString()}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-gray-400">Current Revenue</p>
-                    <p className={`font-semibold ${totals.hasChanges ? 'text-green-400' : 'text-white'}`}>
-                      {quote.currency} {totals.updatedTotal.toLocaleString()}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-gray-400">Total Cost</p>
-                    <p className="text-orange-400 font-semibold">
-                      {quote.currency} {totals.totalCost.toLocaleString()}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-gray-400">Project Margin</p>
-                    <p className={`font-semibold ${
-                      totals.updatedMargin >= 40 ? 'text-green-400' :
-                      totals.updatedMargin >= 25 ? 'text-yellow-400' : 'text-red-400'
-                    }`}>
-                      {totals.updatedMargin.toFixed(1)}%
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-gray-400">Gross Profit</p>
-                    <p className="text-green-400 font-semibold">
-                      {quote.currency} {totals.profit.toLocaleString()}
-                    </p>
+              
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                <div>
+                  <span className="text-gray-400">Quantity:</span>
+                  <div className="text-white font-medium">{item.quantity}</div>
+                </div>
+                
+                <div>
+                  <span className="text-gray-400">Unit Price:</span>
+                  {editingItem === item.id ? (
+                    <div className="flex items-center space-x-1 mt-1">
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={editPrice}
+                        onChange={(e) => setEditPrice(parseFloat(e.target.value) || 0)}
+                        className="w-20 h-6 text-xs bg-gray-700 border-gray-600 text-white"
+                      />
+                      <Button
+                        size="sm"
+                        onClick={() => handleEditSave(item.id)}
+                        className="h-5 w-5 p-0 bg-green-600 hover:bg-green-700"
+                      >
+                        <Save className="h-3 w-3" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={handleEditCancel}
+                        className="h-5 w-5 p-0 text-gray-400 hover:text-white"
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="text-white font-medium">
+                      ${item.unit_price.toLocaleString()}
+                    </div>
+                  )}
+                </div>
+                
+                <div>
+                  <span className="text-gray-400">Total Price:</span>
+                  <div className="text-white font-medium">
+                    ${(item.unit_price * item.quantity).toLocaleString()}
                   </div>
                 </div>
                 
-                {/* Standard vs Requested Margin Comparison */}
-                <div className="mt-4 pt-4 border-t border-gray-600">
-                  <div className="grid grid-cols-3 gap-4 text-sm">
-                    <div>
-                      <p className="text-gray-400">Standard Margin</p>
-                      <p className="text-blue-400 font-semibold">{quote.original_margin.toFixed(1)}%</p>
-                    </div>
-                    <div>
-                      <p className="text-gray-400">Requested Margin</p>
-                      <p className="text-yellow-400 font-semibold">{quote.discounted_margin.toFixed(1)}%</p>
-                    </div>
-                    <div>
-                      <p className="text-gray-400">Current Margin</p>
-                      <p className={`font-semibold ${
-                        totals.updatedMargin >= 40 ? 'text-green-400' :
-                        totals.updatedMargin >= 25 ? 'text-yellow-400' : 'text-red-400'
-                      }`}>
-                        {totals.updatedMargin.toFixed(1)}%
-                      </p>
-                    </div>
+                <div>
+                  <span className="text-gray-400">Total Cost:</span>
+                  <div className="text-white font-medium">
+                    ${(item.unit_cost * item.quantity).toLocaleString()}
                   </div>
                 </div>
               </div>
-            )}
-          </>
-        )}
-      </CardContent>
-    </Card>
+              
+              <div className="mt-3 pt-3 border-t border-gray-700">
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-gray-400">Item Margin:</span>
+                  <div className="text-right">
+                    <span className={`font-medium ${
+                      item.margin >= 30 ? 'text-green-400' : 
+                      item.margin >= 20 ? 'text-yellow-400' : 'text-red-400'
+                    }`}>
+                      {item.margin.toFixed(1)}%
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+
+      {/* Project Financial Summary */}
+      <Card className="bg-gray-900 border-gray-800">
+        <CardHeader>
+          <CardTitle className="text-white">Project Financial Summary</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 gap-6">
+            <div className="space-y-3">
+              <div className="flex justify-between">
+                <span className="text-gray-400">Total Revenue:</span>
+                <span className="text-white font-semibold">
+                  ${totals.totalRevenue.toLocaleString()}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-400">Total Cost:</span>
+                <span className="text-white font-semibold">
+                  ${totals.totalCost.toLocaleString()}
+                </span>
+              </div>
+              <div className="flex justify-between border-t border-gray-700 pt-3">
+                <span className="text-gray-400">Gross Profit:</span>
+                <span className="text-white font-bold">
+                  ${totals.grossProfit.toLocaleString()}
+                </span>
+              </div>
+            </div>
+            
+            <div className="flex items-center justify-center">
+              <div className="text-center">
+                <div className="text-gray-400 text-sm mb-2">Overall Margin</div>
+                <div className={`text-3xl font-bold ${
+                  totals.marginPercentage >= 30 ? 'text-green-400' : 
+                  totals.marginPercentage >= 20 ? 'text-yellow-400' : 'text-red-400'
+                }`}>
+                  {totals.marginPercentage.toFixed(1)}%
+                </div>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
   );
 };
+
+export default BOMAnalysis;

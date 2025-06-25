@@ -1,67 +1,103 @@
 
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertTriangle } from 'lucide-react';
+import { useState, useEffect } from 'react';
 
-interface QuoteField {
+export interface ValidationResult {
+  isValid: boolean;
+  missingFields: string[];
+}
+
+export interface QuoteField {
   id: string;
   label: string;
   type: string;
   required: boolean;
   enabled: boolean;
+  options?: string[];
 }
 
-interface QuoteFieldValidationProps {
-  quoteFields: Record<string, any>;
-  requiredFields: QuoteField[];
-}
+export const useQuoteValidation = (
+  quoteFields: Record<string, any>,
+  availableFields: QuoteField[]
+) => {
+  const [validation, setValidation] = useState<ValidationResult>({
+    isValid: true,
+    missingFields: []
+  });
 
-export const QuoteFieldValidation = ({ quoteFields, requiredFields }: QuoteFieldValidationProps) => {
-  const validateRequiredFields = () => {
+  const validateFields = () => {
+    const enabledRequiredFields = availableFields.filter(field => field.enabled && field.required);
     const missingFields: string[] = [];
-    
-    requiredFields.forEach(field => {
-      if (field.required && field.enabled) {
-        const value = quoteFields[field.id];
-        if (!value || value === '' || value === null || value === undefined) {
-          missingFields.push(field.label);
-        }
+
+    enabledRequiredFields.forEach(field => {
+      const value = quoteFields[field.id];
+      
+      // Check if field is empty or undefined
+      if (!value || (typeof value === 'string' && value.trim() === '')) {
+        missingFields.push(field.label);
       }
     });
+
+    const isValid = missingFields.length === 0;
     
-    return missingFields;
+    setValidation({
+      isValid,
+      missingFields
+    });
+
+    return { isValid, missingFields };
   };
 
-  const missingFields = validateRequiredFields();
+  useEffect(() => {
+    validateFields();
+  }, [quoteFields, availableFields]);
 
-  if (missingFields.length === 0) {
-    return null;
-  }
-
-  return (
-    <Alert className="bg-red-900/20 border-red-600 mb-4">
-      <AlertTriangle className="h-4 w-4" />
-      <AlertDescription className="text-red-400">
-        <div className="font-medium mb-2">Required fields missing:</div>
-        <ul className="list-disc list-inside space-y-1">
-          {missingFields.map((field, index) => (
-            <li key={index} className="text-sm">{field}</li>
-          ))}
-        </ul>
-        <div className="mt-2 text-sm">
-          Please fill in all required fields before submitting the quote.
-        </div>
-      </AlertDescription>
-    </Alert>
-  );
+  return {
+    validation,
+    validateFields
+  };
 };
 
-export const validateQuoteFields = (quoteFields: Record<string, any>, requiredFields: QuoteField[]): boolean => {
-  const missingFields = requiredFields.filter(field => {
-    if (!field.required || !field.enabled) return false;
+// Individual field validation helper
+export const validateQuoteField = (
+  field: QuoteField,
+  value: any
+): { isValid: boolean; errorMessage?: string } => {
+  if (!field.enabled) {
+    return { isValid: true };
+  }
+
+  if (field.required) {
+    if (!value || (typeof value === 'string' && value.trim() === '')) {
+      return {
+        isValid: false,
+        errorMessage: `${field.label} is required`
+      };
+    }
+  }
+
+  // Type-specific validation
+  switch (field.type) {
+    case 'email':
+      if (value && typeof value === 'string') {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(value)) {
+          return {
+            isValid: false,
+            errorMessage: 'Please enter a valid email address'
+          };
+        }
+      }
+      break;
     
-    const value = quoteFields[field.id];
-    return !value || value === '' || value === null || value === undefined;
-  });
-  
-  return missingFields.length === 0;
+    case 'number':
+      if (value && isNaN(Number(value))) {
+        return {
+          isValid: false,
+          errorMessage: 'Please enter a valid number'
+        };
+      }
+      break;
+  }
+
+  return { isValid: true };
 };

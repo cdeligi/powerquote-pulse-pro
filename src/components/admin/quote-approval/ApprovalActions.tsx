@@ -1,131 +1,235 @@
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { CheckCircle, XCircle } from "lucide-react";
-import { Quote } from "@/hooks/useQuotes";
+import { useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { CheckCircle, XCircle, MessageSquare } from 'lucide-react';
 
 interface ApprovalActionsProps {
-  quote: Quote;
-  approvedDiscount: string;
-  approvalNotes: string;
-  rejectionReason: string;
-  onApprovedDiscountChange: (discount: string) => void;
-  onApprovalNotesChange: (notes: string) => void;
-  onRejectionReasonChange: (reason: string) => void;
-  onApprove: () => void;
-  onReject: () => void;
-  onClose: () => void;
+  quoteId: string;
+  currentStatus: string;
+  onApprove: (notes: string) => void;
+  onReject: (reason: string) => void;
+  onCounterOffer: (notes: string) => void;
+  isLoading: boolean;
 }
 
-export const ApprovalActions = ({ 
-  quote, 
-  approvedDiscount, 
-  approvalNotes, 
-  rejectionReason, 
-  onApprovedDiscountChange, 
-  onApprovalNotesChange, 
-  onRejectionReasonChange, 
-  onApprove, 
-  onReject, 
-  onClose 
+const ApprovalActions = ({
+  quoteId,
+  currentStatus,
+  onApprove,
+  onReject,
+  onCounterOffer,
+  isLoading
 }: ApprovalActionsProps) => {
-  const getStatusColor = (status: Quote['status']) => {
-    switch (status) {
-      case 'pending': return 'border-yellow-500 text-yellow-400';
-      case 'under-review': return 'border-blue-500 text-blue-400';
-      case 'approved': return 'border-green-500 text-green-400';
-      case 'rejected': return 'border-red-500 text-red-400';
-      default: return 'border-gray-500 text-gray-400';
+  const [approvalNotes, setApprovalNotes] = useState('');
+  const [rejectionReason, setRejectionReason] = useState('');
+  const [counterOfferNotes, setCounterOfferNotes] = useState('');
+  const [selectedAction, setSelectedAction] = useState<'approve' | 'reject' | 'counter' | null>(null);
+
+  const handleApprove = () => {
+    onApprove(approvalNotes);
+    setApprovalNotes('');
+    setSelectedAction(null);
+  };
+
+  const handleReject = () => {
+    onReject(rejectionReason);
+    setRejectionReason('');
+    setSelectedAction(null);
+  };
+
+  const handleCounterOffer = () => {
+    onCounterOffer(counterOfferNotes);
+    setCounterOfferNotes('');
+    setSelectedAction(null);
+  };
+
+  const getStatusBadge = () => {
+    switch (currentStatus) {
+      case 'approved':
+        return <Badge className="bg-green-600 text-white">Approved</Badge>;
+      case 'rejected':
+        return <Badge className="bg-red-600 text-white">Rejected</Badge>;
+      case 'counter_offered':
+        return <Badge className="bg-yellow-600 text-white">Counter Offered</Badge>;
+      default:
+        return <Badge className="bg-gray-600 text-white">Pending Review</Badge>;
     }
   };
 
+  if (currentStatus !== 'pending') {
+    return (
+      <Card className="bg-gray-900 border-gray-800">
+        <CardHeader>
+          <CardTitle className="text-white flex items-center justify-between">
+            Quote Status
+            {getStatusBadge()}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-gray-400">
+            This quote has already been {currentStatus.replace('_', ' ')}.
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
-    <Card className="bg-gray-800 border-gray-700">
+    <Card className="bg-gray-900 border-gray-800">
       <CardHeader>
         <CardTitle className="text-white">Approval Actions</CardTitle>
       </CardHeader>
-      <CardContent>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-          <div>
-            <Label htmlFor="approved-discount" className="text-white">Approved Discount (%)</Label>
-            <Input
-              id="approved-discount"
-              type="number"
-              value={approvedDiscount}
-              onChange={(e) => onApprovedDiscountChange(e.target.value)}
-              className="bg-gray-700 border-gray-600 text-white mt-2"
-              min="0"
-              max="50"
+      <CardContent className="space-y-4">
+        {/* Action Selection Buttons */}
+        <div className="grid grid-cols-3 gap-3">
+          <Button
+            onClick={() => setSelectedAction('approve')}
+            variant={selectedAction === 'approve' ? 'default' : 'outline'}
+            className={`${
+              selectedAction === 'approve' 
+                ? 'bg-green-600 hover:bg-green-700 text-white' 
+                : 'border-green-600 text-green-400 hover:bg-green-600 hover:text-white'
+            }`}
+            disabled={isLoading}
+          >
+            <CheckCircle className="h-4 w-4 mr-2" />
+            Approve
+          </Button>
+          
+          <Button
+            onClick={() => setSelectedAction('counter')}
+            variant={selectedAction === 'counter' ? 'default' : 'outline'}
+            className={`${
+              selectedAction === 'counter' 
+                ? 'bg-yellow-600 hover:bg-yellow-700 text-white' 
+                : 'border-yellow-600 text-yellow-400 hover:bg-yellow-600 hover:text-white'
+            }`}
+            disabled={isLoading}
+          >
+            <MessageSquare className="h-4 w-4 mr-2" />
+            Counter Offer
+          </Button>
+          
+          <Button
+            onClick={() => setSelectedAction('reject')}
+            variant={selectedAction === 'reject' ? 'default' : 'outline'}
+            className={`${
+              selectedAction === 'reject' 
+                ? 'bg-red-600 hover:bg-red-700 text-white' 
+                : 'border-red-600 text-red-400 hover:bg-red-600 hover:text-white'
+            }`}
+            disabled={isLoading}
+          >
+            <XCircle className="h-4 w-4 mr-2" />
+            Reject
+          </Button>
+        </div>
+
+        {/* Action-specific Forms */}
+        {selectedAction === 'approve' && (
+          <div className="space-y-3 p-4 bg-green-900/20 border border-green-600 rounded-lg">
+            <Label htmlFor="approval-notes" className="text-white">
+              Approval Notes (Optional)
+            </Label>
+            <Textarea
+              id="approval-notes"
+              value={approvalNotes}
+              onChange={(e) => setApprovalNotes(e.target.value)}
+              placeholder="Add any notes about the approval..."
+              className="bg-gray-800 border-gray-700 text-white min-h-[80px]"
             />
-          </div>
-          <div>
-            <Label className="text-white">Quote Status</Label>
-            <div className="mt-2">
-              <Badge className={getStatusColor(quote.status)}>
-                {quote.status.charAt(0).toUpperCase() + quote.status.slice(1)}
-              </Badge>
+            <div className="flex space-x-2">
+              <Button
+                onClick={handleApprove}
+                className="bg-green-600 hover:bg-green-700 text-white"
+                disabled={isLoading}
+              >
+                {isLoading ? 'Processing...' : 'Confirm Approval'}
+              </Button>
+              <Button
+                onClick={() => setSelectedAction(null)}
+                variant="outline"
+                className="border-gray-600 text-gray-300 hover:bg-gray-800"
+                disabled={isLoading}
+              >
+                Cancel
+              </Button>
             </div>
           </div>
-        </div>
-        
-        <div className="mb-4">
-          <Label htmlFor="approval-notes" className="text-white">Approval Notes</Label>
-          <Textarea
-            id="approval-notes"
-            value={approvalNotes}
-            onChange={(e) => onApprovalNotesChange(e.target.value)}
-            className="bg-gray-700 border-gray-600 text-white mt-2"
-            placeholder="Add notes for approval..."
-            rows={3}
-          />
-        </div>
+        )}
 
-        <div className="mb-4">
-          <Label htmlFor="rejection-reason" className="text-white">Rejection Reason (if rejecting)</Label>
-          <Textarea
-            id="rejection-reason"
-            value={rejectionReason}
-            onChange={(e) => onRejectionReasonChange(e.target.value)}
-            className="bg-gray-700 border-gray-600 text-white mt-2"
-            placeholder="Provide detailed reason for rejection..."
-            rows={3}
-          />
-        </div>
-
-        <div className="flex justify-end space-x-3">
-          <Button
-            variant="outline"
-            onClick={onClose}
-            className="border-gray-600 text-gray-300"
-          >
-            Close
-          </Button>
-          {quote.status === 'pending' && (
-            <>
+        {selectedAction === 'counter' && (
+          <div className="space-y-3 p-4 bg-yellow-900/20 border border-yellow-600 rounded-lg">
+            <Label htmlFor="counter-notes" className="text-white">
+              Counter Offer Notes *
+            </Label>
+            <Textarea
+              id="counter-notes"
+              value={counterOfferNotes}
+              onChange={(e) => setCounterOfferNotes(e.target.value)}
+              placeholder="Explain the counter offer terms and adjustments..."
+              className="bg-gray-800 border-gray-700 text-white min-h-[100px]"
+              required
+            />
+            <div className="flex space-x-2">
               <Button
-                onClick={onReject}
+                onClick={handleCounterOffer}
+                className="bg-yellow-600 hover:bg-yellow-700 text-white"
+                disabled={isLoading || !counterOfferNotes.trim()}
+              >
+                {isLoading ? 'Processing...' : 'Send Counter Offer'}
+              </Button>
+              <Button
+                onClick={() => setSelectedAction(null)}
                 variant="outline"
-                className="border-red-600 text-red-400 hover:bg-red-900/20"
-                disabled={!rejectionReason.trim()}
+                className="border-gray-600 text-gray-300 hover:bg-gray-800"
+                disabled={isLoading}
               >
-                <XCircle className="h-4 w-4 mr-1" />
-                Reject Quote
+                Cancel
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {selectedAction === 'reject' && (
+          <div className="space-y-3 p-4 bg-red-900/20 border border-red-600 rounded-lg">
+            <Label htmlFor="rejection-reason" className="text-white">
+              Rejection Reason *
+            </Label>
+            <Textarea
+              id="rejection-reason"
+              value={rejectionReason}
+              onChange={(e) => setRejectionReason(e.target.value)}
+              placeholder="Explain why this quote is being rejected..."
+              className="bg-gray-800 border-gray-700 text-white min-h-[100px]"
+              required
+            />
+            <div className="flex space-x-2">
+              <Button
+                onClick={handleReject}
+                className="bg-red-600 hover:bg-red-700 text-white"
+                disabled={isLoading || !rejectionReason.trim()}
+              >
+                {isLoading ? 'Processing...' : 'Confirm Rejection'}
               </Button>
               <Button
-                onClick={onApprove}
-                className="bg-green-600 hover:bg-green-700"
+                onClick={() => setSelectedAction(null)}
+                variant="outline"
+                className="border-gray-600 text-gray-300 hover:bg-gray-800"
+                disabled={isLoading}
               >
-                <CheckCircle className="h-4 w-4 mr-1" />
-                Approve Quote
+                Cancel
               </Button>
-            </>
-          )}
-        </div>
+            </div>
+          </div>
+        )}
       </CardContent>
     </Card>
   );
 };
+
+export default ApprovalActions;
