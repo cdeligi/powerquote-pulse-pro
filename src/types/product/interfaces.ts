@@ -1,3 +1,4 @@
+
 // Level 0: Asset Types (Power Transformer, GIS, Breaker, etc.)
 export interface AssetType {
   id: string;
@@ -52,7 +53,7 @@ export interface Level3Product {
   description: string;
   price: number;
   cost?: number;
-  enabled: boolean;
+  enabled?: boolean; // Made optional since many static card objects omit it
   specifications?: {
     slotRequirement?: number;
     inputs?: number;
