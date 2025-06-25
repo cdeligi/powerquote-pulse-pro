@@ -18,7 +18,7 @@ const Dashboard = ({ user, onLogout }: DashboardProps) => {
   const [bomItems, setBomItems] = useState<BOMItem[]>([]);
   const [discount, setDiscount] = useState<number>(0);
 
-  const canSeePrices = user.role === 'admin' || user.role === 'level2' || user.role === 'level3';
+  const canSeePrices = user.role === 'admin' || user.role === 'level2';
 
   const handleBOMUpdate = (items: BOMItem[]) => {
     setBomItems(items);
