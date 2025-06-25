@@ -47,6 +47,11 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
   const [showQuoteSubmission, setShowQuoteSubmission] = useState(false);
   const [editingQTMS, setEditingQTMS] = useState<ConsolidatedQTMS | null>(null);
 
+  // Wrapper function to handle field changes properly
+  const handleQuoteFieldChange = (fieldId: string, value: any) => {
+    setQuoteFields(prev => ({ ...prev, [fieldId]: value }));
+  };
+
   // Get all Level 1 products for dynamic tabs
   const level1Products = productDataService.getLevel1Products().filter(p => p.enabled);
 
@@ -319,10 +324,6 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
     onBOMUpdate(updatedItems);
   };
 
-  const handleQuoteFieldsChange = (fields: Record<string, any>) => {
-    setQuoteFields(fields);
-  };
-
   const handleDiscountChange = (discount: number, justification: string) => {
     setDiscountPercentage(discount);
     setDiscountJustification(justification);
@@ -438,8 +439,8 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
     <div className="space-y-6">
       {/* Quote Fields Section - Always at the top */}
       <QuoteFieldsSection
-        onFieldChange={setQuoteFields}
-        initialValues={quoteFields}
+        quoteFields={quoteFields}
+        onFieldChange={handleQuoteFieldChange}
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full">
