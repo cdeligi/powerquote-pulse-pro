@@ -56,6 +56,19 @@ export const QuoteDetailsDialog = ({
 }: QuoteDetailsDialogProps) => {
   if (!quote) return null;
 
+  // Type guard to check if quote has required properties for full Quote
+  const hasRequiredQuoteProperties = (q: Partial<Quote>): q is Quote => {
+    return !!(q.id && q.customer_name && q.oracle_customer_id && q.sfdc_opportunity && 
+             q.user_id && q.status && q.priority && q.payment_terms && q.shipping_terms &&
+             q.created_at && q.updated_at && typeof q.original_quote_value === 'number' &&
+             typeof q.total_cost === 'number' && typeof q.original_margin === 'number' &&
+             typeof q.requested_discount === 'number' && typeof q.discounted_value === 'number' &&
+             typeof q.discounted_margin === 'number' && typeof q.gross_profit === 'number' &&
+             typeof q.is_rep_involved === 'boolean' && q.currency);
+  };
+
+  const isFullQuote = hasRequiredQuoteProperties(quote);
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="bg-gray-900 border-gray-800 max-w-6xl max-h-[90vh] overflow-y-auto">
@@ -67,13 +80,13 @@ export const QuoteDetailsDialog = ({
         </DialogHeader>
         
         <div className="space-y-6">
-          {quote.id && (
-            <QuoteInformation quote={quote as Quote} />
+          {isFullQuote && (
+            <QuoteInformation quote={quote} />
           )}
           
-          {quote.id && (
+          {isFullQuote && (
             <BOMAnalysis
-              quote={quote as Quote}
+              quote={quote}
               bomItems={bomItems}
               loadingBom={loadingBom}
               editingPrices={editingPrices}
@@ -85,9 +98,9 @@ export const QuoteDetailsDialog = ({
             />
           )}
 
-          {quote.id && (
+          {isFullQuote && (
             <ApprovalActions
-              quote={quote as Quote}
+              quote={quote}
               approvedDiscount={approvedDiscount}
               approvalNotes={approvalNotes}
               rejectionReason={rejectionReason}
@@ -98,6 +111,12 @@ export const QuoteDetailsDialog = ({
               onReject={onReject}
               onClose={() => onOpenChange(false)}
             />
+          )}
+
+          {!isFullQuote && (
+            <div className="bg-gray-800 border-gray-700 rounded-md p-4 text-gray-400 text-center">
+              Quote data is incomplete. Please ensure all required fields are available.
+            </div>
           )}
         </div>
       </DialogContent>
