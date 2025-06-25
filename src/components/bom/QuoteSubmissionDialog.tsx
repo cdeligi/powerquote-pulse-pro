@@ -8,6 +8,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { CheckCircle, AlertCircle, FileText } from 'lucide-react';
 import { BOMItem } from '@/types/product';
 import { supabase } from '@/integrations/supabase/client';
+import { User } from '@/types/auth';
 
 interface QuoteSubmissionDialogProps {
   bomItems: BOMItem[];
@@ -17,6 +18,7 @@ interface QuoteSubmissionDialogProps {
   onSubmit: (quoteId: string) => void;
   onClose: () => void;
   canSeePrices: boolean;
+  user: User;
 }
 
 const QuoteSubmissionDialog = ({
@@ -26,7 +28,8 @@ const QuoteSubmissionDialog = ({
   discountJustification,
   onSubmit,
   onClose,
-  canSeePrices
+  canSeePrices,
+  user
 }: QuoteSubmissionDialogProps) => {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -47,7 +50,6 @@ const QuoteSubmissionDialog = ({
   };
 
   const validateRequiredFields = () => {
-    // Check for required quote fields that are empty
     const requiredFields = Object.keys(quoteFields).filter(key => 
       quoteFields[key] === '' || quoteFields[key] === null || quoteFields[key] === undefined
     );
@@ -68,7 +70,7 @@ const QuoteSubmissionDialog = ({
       const { originalValue, discountedValue } = calculateTotals();
       const quoteId = `QUOTE-${Date.now()}`;
 
-      // Calculate costs and margins (simplified for demo)
+      // Calculate costs and margins
       const totalCost = bomItems.reduce((total, item) => {
         return total + ((item.product.cost || item.product.price * 0.6) * item.quantity);
       }, 0);
@@ -76,12 +78,12 @@ const QuoteSubmissionDialog = ({
       const originalMargin = ((originalValue - totalCost) / originalValue) * 100;
       const discountedMargin = ((discountedValue - totalCost) / discountedValue) * 100;
 
-      // Submit quote to database
+      // Submit quote to database with user information
       const { error: quoteError } = await supabase
         .from('quotes')
         .insert({
           id: quoteId,
-          user_id: 'temp-user-id', // Replace with actual user ID when auth is implemented
+          user_id: user.id,
           customer_name: quoteFields.customerName || 'Unknown Customer',
           oracle_customer_id: quoteFields.oracleCustomerId || '',
           sfdc_opportunity: quoteFields.sfdcOpportunity || `OPP-${Date.now()}`,
@@ -99,7 +101,9 @@ const QuoteSubmissionDialog = ({
           gross_profit: discountedValue - totalCost,
           is_rep_involved: quoteFields.isRepInvolved || false,
           quote_fields: quoteFields,
-          status: 'pending'
+          status: 'pending',
+          submitted_by_name: `${user.firstName} ${user.lastName}`,
+          submitted_by_email: user.email
         });
 
       if (quoteError) throw quoteError;
