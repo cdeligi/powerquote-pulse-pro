@@ -1,423 +1,569 @@
+
 import { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { AlertCircle, ShoppingCart, FileText, Settings, DollarSign, Eye, EyeOff } from 'lucide-react';
-import { BOMItem, Level1Product, Card as CardType, Chassis, ConsolidatedQTMS } from '@/types/product';
-import { User } from '@/types/auth';
-import { validateBushingConfiguration } from '@/utils/bushingValidation';
-import { consolidateQTMSProducts } from '@/utils/qtmsConsolidation';
-import Level1ProductSelector from './Level1ProductSelector';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { BOMItem, Level1Product, Level2Product, Level3Product, Level3Customization } from '@/types/product';
 import Level2OptionsSelector from './Level2OptionsSelector';
-import BOMDisplay from './BOMDisplay';
 import ChassisSelector from './ChassisSelector';
-import CardLibrary from './CardLibrary';
-import SlotCardSelector from './SlotCardSelector';
 import RackVisualizer from './RackVisualizer';
-import QTMSConfigurationEditor from './QTMSConfigurationEditor';
-import DiscountSection from './DiscountSection';
+import SlotCardSelector from './SlotCardSelector';
+import DGAProductSelector from './DGAProductSelector';
+import PDProductSelector from './PDProductSelector';
+import BOMDisplay from './BOMDisplay';
+import AnalogCardConfigurator from './AnalogCardConfigurator';
+import BushingCardConfigurator from './BushingCardConfigurator';
+import { productDataService } from '@/services/productDataService';
 import QuoteFieldsSection from './QuoteFieldsSection';
+import DiscountSection from './DiscountSection';
 import QuoteSubmissionDialog from './QuoteSubmissionDialog';
+import QTMSConfigurationEditor from './QTMSConfigurationEditor';
+import { consolidateQTMSConfiguration, createQTMSBOMItem, ConsolidatedQTMS, QTMSConfiguration } from '@/utils/qtmsConsolidation';
+import { findOptimalBushingPlacement, findExistingBushingSlots, isBushingCard } from '@/utils/bushingValidation';
 
 interface BOMBuilderProps {
-  user: User;
+  onBOMUpdate: (items: BOMItem[]) => void;
+  canSeePrices: boolean;
 }
 
-interface EditingQTMSConfig {
-  qtmsId: string;
-  editingConfig: ConsolidatedQTMS;
-}
-
-const BOMBuilder = ({ user }: BOMBuilderProps) => {
+const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
+  const [selectedLevel1Product, setSelectedLevel1Product] = useState<Level1Product | null>(null);
+  const [selectedLevel2Options, setSelectedLevel2Options] = useState<Level2Product[]>([]);
+  const [selectedChassis, setSelectedChassis] = useState<Level2Product | null>(null);
+  const [slotAssignments, setSlotAssignments] = useState<Record<number, Level3Product>>({});
+  const [selectedSlot, setSelectedSlot] = useState<number | null>(null);
   const [bomItems, setBomItems] = useState<BOMItem[]>([]);
-  const [selectedLevel1, setSelectedLevel1] = useState<Level1Product | null>(null);
-  const [selectedChassis, setSelectedChassis] = useState<Chassis | null>(null);
-  const [selectedCards, setSelectedCards] = useState<CardType[]>([]);
-  const [slotAssignments, setSlotAssignments] = useState<Record<number, string>>({});
-  const [activeTab, setActiveTab] = useState('products');
-  const [showPrices, setShowPrices] = useState(user.role !== 'level1');
-  const [consolidatedQTMS, setConsolidatedQTMS] = useState<ConsolidatedQTMS[]>([]);
-  const [editingQTMSConfig, setEditingQTMSConfig] = useState<EditingQTMSConfig | null>(null);
-  const [discountPercentage, setDiscountPercentage] = useState(0);
-  const [discountJustification, setDiscountJustification] = useState('');
+  const [activeTab, setActiveTab] = useState<string>('');
+  const [hasRemoteDisplay, setHasRemoteDisplay] = useState<boolean>(false);
+  const [configuringCard, setConfiguringCard] = useState<BOMItem | null>(null);
+  const [configuringBOMItem, setConfiguringBOMItem] = useState<BOMItem | null>(null);
   const [quoteFields, setQuoteFields] = useState<Record<string, any>>({});
+  const [discountPercentage, setDiscountPercentage] = useState<number>(0);
+  const [discountJustification, setDiscountJustification] = useState<string>('');
   const [showQuoteSubmission, setShowQuoteSubmission] = useState(false);
+  const [editingQTMS, setEditingQTMS] = useState<ConsolidatedQTMS | null>(null);
 
-  const canSeePrices = user.role !== 'level1';
+  // Get all Level 1 products for dynamic tabs
+  const level1Products = productDataService.getLevel1Products().filter(p => p.enabled);
 
+  // Set default active tab when products are loaded
   useEffect(() => {
-    const consolidated = consolidateQTMSProducts(bomItems);
-    setConsolidatedQTMS(consolidated);
-  }, [bomItems]);
+    if (level1Products.length > 0 && !activeTab) {
+      setActiveTab(level1Products[0].id);
+    }
+  }, [level1Products.length, activeTab]);
 
-  const handleAddToBOM = (item: BOMItem) => {
-    setBomItems(prev => {
-      const existingIndex = prev.findIndex(
-        existing => existing.product.id === item.product.id && existing.slot === item.slot
-      );
+  // Update selected product when tab changes
+  useEffect(() => {
+    if (activeTab) {
+      const product = level1Products.find(p => p.id === activeTab);
+      if (product && selectedLevel1Product?.id !== activeTab) {
+        setSelectedLevel1Product(product);
+        setSelectedLevel2Options([]);
+        setSelectedChassis(null);
+        setSlotAssignments({});
+        setSelectedSlot(null);
+      }
+    }
+  }, [activeTab, level1Products, selectedLevel1Product?.id]);
+
+  const handleLevel2OptionToggle = (option: Level2Product) => {
+    setSelectedLevel2Options(prev => {
+      const exists = prev.find(item => item.id === option.id);
+      if (exists) {
+        return prev.filter(item => item.id !== option.id);
+      } else {
+        return [...prev, option];
+      }
+    });
+  };
+
+  const handleChassisSelect = (chassis: Level2Product) => {
+    setSelectedChassis(chassis);
+    setSlotAssignments({});
+    setSelectedSlot(null);
+    setHasRemoteDisplay(false);
+  };
+
+  const handleSlotClick = (slot: number) => {
+    setSelectedSlot(slot);
+  };
+
+  const handleSlotClear = (slot: number) => {
+    setSlotAssignments(prev => {
+      const updated = { ...prev };
+      const card = updated[slot];
       
-      if (existingIndex >= 0) {
-        const updated = [...prev];
-        updated[existingIndex] = { ...updated[existingIndex], quantity: updated[existingIndex].quantity + item.quantity };
-        return updated;
+      // If it's a bushing card, clear ALL bushing cards from the chassis
+      if (card && isBushingCard(card)) {
+        // Find all bushing slots and clear them
+        const bushingSlots = findExistingBushingSlots(updated);
+        bushingSlots.forEach(bushingSlot => {
+          delete updated[bushingSlot];
+        });
+      } else {
+        delete updated[slot];
       }
       
-      return [...prev, { ...item, id: `${item.product.id}-${Date.now()}` }];
+      return updated;
     });
   };
 
-  const handleRemoveFromBOM = (itemId: string) => {
-    setBomItems(prev => prev.filter(item => item.id !== itemId));
-  };
+  const handleCardSelect = (card: Level3Product, slot?: number) => {
+    // Special handling for bushing cards
+    if (isBushingCard(card)) {
+      if (!selectedChassis) return;
+      
+      const placement = findOptimalBushingPlacement(selectedChassis, slotAssignments);
+      if (!placement) {
+        console.error('Cannot place bushing card - no valid placement found');
+        return;
+      }
 
-  const handleUpdateQuantity = (itemId: string, quantity: number) => {
-    setBomItems(prev => prev.map(item =>
-      item.id === itemId ? { ...item, quantity } : item
-    ));
-  };
+      // Clear existing cards if needed
+      setSlotAssignments(prev => {
+        const updated = { ...prev };
+        
+        // Clear existing bushing cards
+        if (placement.shouldClearExisting) {
+          placement.existingSlotsTolear.forEach(slotToClear => {
+            delete updated[slotToClear];
+          });
+        }
+        
+        // Place the bushing card in both slots
+        updated[placement.primarySlot] = card;
+        updated[placement.secondarySlot] = card;
+        
+        return updated;
+      });
 
-  const handleToggleItem = (itemId: string) => {
-    setBomItems(prev => prev.map(item =>
-      item.id === itemId ? { ...item, enabled: !item.enabled } : item
-    ));
-  };
+      // Check if card needs configuration
+      if (card.name.toLowerCase().includes('bushing')) {
+        const newItem: BOMItem = {
+          id: `${Date.now()}-${Math.random()}`,
+          product: card,
+          quantity: 1,
+          slot: placement.primarySlot,
+          enabled: true
+        };
+        setConfiguringCard(newItem);
+        return;
+      }
 
-  const handleLevel1Select = (product: Level1Product) => {
-    setSelectedLevel1(product);
-    setActiveTab('level2-options');
-  };
-
-  const handleLevel2Add = (item: BOMItem) => {
-    handleAddToBOM(item);
-  };
-
-  const handleChassisSelect = (chassis: Chassis) => {
-    setSelectedChassis(chassis);
-    handleAddToBOM({
-      id: `chassis-${chassis.id}`,
-      product: chassis,
-      quantity: 1,
-      enabled: true
-    });
-  };
-
-  const handleCardAdd = (card: CardType, slot?: number) => {
-    if (slot !== undefined) {
-      setSlotAssignments(prev => ({ ...prev, [slot]: card.id }));
+      setSelectedSlot(null);
+      return;
     }
-    
-    const bomItem: BOMItem = {
-      id: `card-${card.id}-${slot || Date.now()}`,
-      product: card,
+
+    // Check if card needs configuration
+    if (card.name.toLowerCase().includes('analog')) {
+      const newItem: BOMItem = {
+        id: `${Date.now()}-${Math.random()}`,
+        product: card,
+        quantity: 1,
+        slot: slot || selectedSlot,
+        enabled: true
+      };
+      setConfiguringCard(newItem);
+      return;
+    }
+
+    if (selectedSlot !== null || slot !== undefined) {
+      const targetSlot = slot !== undefined ? slot : selectedSlot!;
+      setSlotAssignments(prev => ({
+        ...prev,
+        [targetSlot]: card
+      }));
+      setSelectedSlot(null);
+    } else {
+      // Add directly to BOM for non-chassis items
+      const newItem: BOMItem = {
+        id: `${Date.now()}-${Math.random()}`,
+        product: card,
+        quantity: 1,
+        slot,
+        enabled: true
+      };
+      
+      const updatedItems = [...bomItems, newItem];
+      setBomItems(updatedItems);
+      onBOMUpdate(updatedItems);
+    }
+  };
+
+  const handleCardConfiguration = (customizations: Level3Customization[]) => {
+    if (!configuringCard) return;
+
+    const configuredItem: BOMItem = {
+      ...configuringCard,
+      level3Customizations: customizations
+    };
+
+    if (configuringCard.slot !== undefined) {
+      // Add to slot assignments for chassis cards
+      setSlotAssignments(prev => ({
+        ...prev,
+        [configuringCard.slot!]: configuringCard.product as Level3Product
+      }));
+    } else {
+      // Add directly to BOM
+      const updatedItems = [...bomItems, configuredItem];
+      setBomItems(updatedItems);
+      onBOMUpdate(updatedItems);
+    }
+
+    setConfiguringCard(null);
+    setSelectedSlot(null);
+  };
+
+  const handleDGAProductSelect = (product: Level1Product, configuration?: Record<string, any>, level2Options?: Level2Product[]) => {
+    // Handle DGA product selection
+    const newItem: BOMItem = {
+      id: `${Date.now()}-${Math.random()}`,
+      product: product,
       quantity: 1,
       enabled: true,
-      slot
+      configuration
     };
     
-    handleAddToBOM(bomItem);
-  };
-
-  const handleEditQTMSConfig = (qtmsId: string) => {
-    const qtmsConfig = consolidatedQTMS.find(q => q.id === qtmsId);
-    if (qtmsConfig) {
-      setEditingQTMSConfig({
-        qtmsId,
-        editingConfig: qtmsConfig
+    const updatedItems = [...bomItems, newItem];
+    
+    // Add level 2 options as separate items
+    if (level2Options) {
+      level2Options.forEach(option => {
+        const optionItem: BOMItem = {
+          id: `${Date.now()}-${Math.random()}-${option.id}`,
+          product: option as any,
+          quantity: 1,
+          enabled: true
+        };
+        updatedItems.push(optionItem);
       });
     }
-  };
-
-  const handleSaveQTMSConfig = (consolidatedQTMS: ConsolidatedQTMS) => {
-    const updatedItems = bomItems.map(item => {
-      if (item.product.id.startsWith('QTMS') && consolidatedQTMS.items.some(qtmsItem => qtmsItem.id === item.id)) {
-        const qtmsItem = consolidatedQTMS.items.find(qi => qi.id === item.id);
-        return qtmsItem ? { ...item, ...qtmsItem } : item;
-      }
-      return item;
-    });
     
     setBomItems(updatedItems);
-    setEditingQTMSConfig(null);
+    onBOMUpdate(updatedItems);
   };
 
-  const handleQuoteSubmit = (quoteId: string) => {
-    console.log('Quote submitted with ID:', quoteId);
-    setShowQuoteSubmission(false);
-    // Reset form or show success message
-    setBomItems([]);
-    setDiscountPercentage(0);
-    setDiscountJustification('');
-    setQuoteFields({});
+  const handleRemoteDisplayToggle = (enabled: boolean) => {
+    setHasRemoteDisplay(enabled);
   };
 
-  const validateBOM = () => {
-    const errors: string[] = [];
+  const handleAddChassisAndCardsToBOM = () => {
+    if (!selectedChassis) return;
+
+    // Consolidate QTMS configuration
+    const consolidatedQTMS = consolidateQTMSConfiguration(
+      selectedChassis,
+      slotAssignments,
+      hasRemoteDisplay,
+      {}, // analogConfigurations - will be implemented separately
+      {} // bushingConfigurations - will be implemented separately
+    );
+
+    // Create the BOM item directly
+    const bomItem = createQTMSBOMItem(consolidatedQTMS);
     
-    // Check for enabled items
-    const enabledItems = bomItems.filter(item => item.enabled);
-    if (enabledItems.length === 0) {
-      errors.push('At least one item must be enabled in the BOM');
+    // Add directly to BOM without showing popup
+    const updatedItems = [...bomItems, bomItem];
+    setBomItems(updatedItems);
+    onBOMUpdate(updatedItems);
+
+    // Reset chassis selection after adding to BOM
+    setSelectedChassis(null);
+    setSlotAssignments({});
+    setSelectedSlot(null);
+    setHasRemoteDisplay(false);
+  };
+
+  const handleBOMConfigurationEdit = (item: BOMItem) => {
+    if (item.product.type === 'QTMS' && item.configuration) {
+      // Convert BOM item back to ConsolidatedQTMS format for editing
+      const consolidatedQTMS: ConsolidatedQTMS = {
+        id: item.id,
+        name: item.product.name,
+        description: item.product.description || '',
+        partNumber: item.partNumber || item.product.partNumber || '',
+        price: item.product.price || 0,
+        configuration: item.configuration as QTMSConfiguration,
+        components: [] // Will be recalculated in editor
+      };
+      setEditingQTMS(consolidatedQTMS);
+    } else {
+      // For other configurable items, set as configuring card
+      setConfiguringBOMItem(item);
+    }
+  };
+
+  const handleQTMSConfigurationSave = (updatedQTMS: ConsolidatedQTMS) => {
+    console.log('Saving QTMS configuration:', updatedQTMS);
+    
+    // Create the updated BOM item
+    const updatedBOMItem = createQTMSBOMItem(updatedQTMS);
+    
+    // Check if this QTMS item already exists in the BOM
+    const existingItemIndex = bomItems.findIndex(item => item.id === updatedQTMS.id);
+    
+    let updatedItems;
+    if (existingItemIndex >= 0) {
+      // Update existing item
+      console.log('Updating existing QTMS item at index:', existingItemIndex);
+      updatedItems = bomItems.map((item, index) => 
+        index === existingItemIndex ? updatedBOMItem : item
+      );
+    } else {
+      // Add as new item
+      console.log('Adding new QTMS item to BOM');
+      updatedItems = [...bomItems, updatedBOMItem];
     }
     
-    // Validate bushing configurations
-    const bushingErrors = validateBushingConfiguration(bomItems);
-    errors.push(...bushingErrors);
-    
-    return errors;
+    console.log('Updated BOM items:', updatedItems);
+    setBomItems(updatedItems);
+    onBOMUpdate(updatedItems);
+    setEditingQTMS(null);
   };
 
-  const calculateTotals = () => {
-    const enabledItems = bomItems.filter(item => item.enabled);
-    const subtotal = enabledItems.reduce((total, item) => {
-      return total + ((item.product.price || 0) * item.quantity);
-    }, 0);
-    
-    const discountAmount = subtotal * (discountPercentage / 100);
-    const total = subtotal - discountAmount;
-    
-    return { subtotal, discountAmount, total };
+  const handleSubmitQuote = (quoteId: string) => {
+    console.log('Quote submitted with ID:', quoteId);
+    setShowQuoteSubmission(false);
+    // Reset BOM after successful submission
+    setBomItems([]);
+    setQuoteFields({});
+    setDiscountPercentage(0);
+    setDiscountJustification('');
+    onBOMUpdate([]);
   };
 
-  const errors = validateBOM();
-  const { subtotal, discountAmount, total } = calculateTotals();
-  const hasValidBOM = errors.length === 0 && bomItems.filter(item => item.enabled).length > 0;
+  const handleBOMUpdate = (updatedItems: BOMItem[]) => {
+    setBomItems(updatedItems);
+    onBOMUpdate(updatedItems);
+  };
+
+  const handleQuoteFieldsChange = (fields: Record<string, any>) => {
+    setQuoteFields(fields);
+  };
+
+  const handleDiscountChange = (discount: number, justification: string) => {
+    setDiscountPercentage(discount);
+    setDiscountJustification(justification);
+  };
+
+  const renderProductContent = (productId: string) => {
+    const product = level1Products.find(p => p.id === productId);
+    if (!product) return null;
+
+    switch (productId) {
+      case 'qtms':
+        return (
+          <div className="space-y-6">
+            <ChassisSelector
+              onChassisSelect={handleChassisSelect}
+              selectedChassis={selectedChassis}
+              canSeePrices={canSeePrices}
+            />
+            
+            {selectedChassis && (
+              <div className="space-y-6">
+                <RackVisualizer
+                  chassis={selectedChassis as any}
+                  slotAssignments={slotAssignments as any}
+                  onSlotClick={handleSlotClick}
+                  onSlotClear={handleSlotClear}
+                  selectedSlot={selectedSlot}
+                  hasRemoteDisplay={hasRemoteDisplay}
+                  onRemoteDisplayToggle={handleRemoteDisplayToggle}
+                />
+                
+                {Object.keys(slotAssignments).length > 0 && (
+                  <Card className="bg-gray-900 border-gray-800">
+                    <CardContent className="pt-6">
+                      <button
+                        onClick={handleAddChassisAndCardsToBOM}
+                        className="w-full bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded font-medium"
+                      >
+                        Add Chassis & Cards to BOM
+                      </button>
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
+            )}
+            
+            {selectedSlot !== null && selectedChassis && (
+              <SlotCardSelector
+                chassis={selectedChassis as any}
+                slot={selectedSlot}
+                onCardSelect={handleCardSelect}
+                onClose={() => setSelectedSlot(null)}
+                canSeePrices={canSeePrices}
+                currentSlotAssignments={slotAssignments}
+              />
+            )}
+          </div>
+        );
+      
+      case 'dga':
+        return (
+          <DGAProductSelector
+            onProductSelect={handleDGAProductSelect}
+            canSeePrices={canSeePrices}
+          />
+        );
+      
+      case 'partial-discharge':
+        return (
+          <PDProductSelector
+            onProductSelect={handleDGAProductSelect}
+            canSeePrices={canSeePrices}
+          />
+        );
+      
+      default:
+        return (
+          <div className="space-y-6">
+            {selectedLevel1Product && (
+              <Level2OptionsSelector
+                level1Product={selectedLevel1Product}
+                selectedOptions={selectedLevel2Options}
+                onOptionToggle={handleLevel2OptionToggle}
+              />
+            )}
+          </div>
+        );
+    }
+  };
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold text-white">BOM Builder</h1>
-          <p className="text-gray-400">Build your Bill of Materials step by step</p>
-        </div>
-        <div className="flex items-center space-x-4">
-          {canSeePrices && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setShowPrices(!showPrices)}
-              className="text-gray-400 hover:text-white"
-            >
-              {showPrices ? <EyeOff className="h-4 w-4 mr-2" /> : <Eye className="h-4 w-4 mr-2" />}
-              {showPrices ? 'Hide Prices' : 'Show Prices'}
-            </Button>
-          )}
-          <Badge variant="outline" className="text-blue-400 border-blue-400">
-            {bomItems.filter(item => item.enabled).length} items
-          </Badge>
-        </div>
-      </div>
+      {/* Quote Fields Section - Always at the top */}
+      <QuoteFieldsSection 
+        onFieldsChange={handleQuoteFieldsChange}
+        initialValues={quoteFields}
+      />
 
-      {/* Error Display */}
-      {errors.length > 0 && (
-        <Alert className="bg-red-900/20 border-red-600">
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription className="text-red-400">
-            <ul className="list-disc list-inside space-y-1">
-              {errors.map((error, index) => (
-                <li key={index}>{error}</li>
-              ))}
-            </ul>
-          </AlertDescription>
-        </Alert>
-      )}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full">
+        {/* Left side - Product selection (2/3 width) */}
+        <div className="lg:col-span-2 space-y-6">
+          <Card className="bg-gray-900 border-gray-800">
+            <CardHeader>
+              <CardTitle className="text-white">BOM Builder</CardTitle>
+              <CardDescription className="text-gray-400">
+                Build your Bill of Materials by selecting products and configurations
+              </CardDescription>
+            </CardHeader>
+          </Card>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Main Content */}
-        <div className="lg:col-span-2">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-6 bg-gray-800">
-              <TabsTrigger value="products" className="text-white data-[state=active]:bg-red-600 data-[state=active]:text-white">
-                Products
-              </TabsTrigger>
-              <TabsTrigger value="level2-options" className="text-white data-[state=active]:bg-red-600 data-[state=active]:text-white" disabled={!selectedLevel1}>
-                Options
-              </TabsTrigger>
-              <TabsTrigger value="chassis" className="text-white data-[state=active]:bg-red-600 data-[state=active]:text-white">
-                Chassis
-              </TabsTrigger>
-              <TabsTrigger value="cards" className="text-white data-[state=active]:bg-red-600 data-[state=active]:text-white">
-                Cards
-              </TabsTrigger>
-              <TabsTrigger value="slots" className="text-white data-[state=active]:bg-red-600 data-[state=active]:text-white" disabled={!selectedChassis}>
-                Slots
-              </TabsTrigger>
-              <TabsTrigger value="visualizer" className="text-white data-[state=active]:bg-red-600 data-[state=active]:text-white">
-                Visualizer
-              </TabsTrigger>
+            <TabsList className="grid w-full bg-gray-800" style={{ gridTemplateColumns: `repeat(${level1Products.length}, 1fr)` }}>
+              {level1Products.map((product) => (
+                <TabsTrigger 
+                  key={product.id}
+                  value={product.id} 
+                  className="text-white data-[state=active]:bg-red-600 data-[state=active]:text-white"
+                >
+                  {product.name}
+                  {product.category && (
+                    <Badge variant="outline" className="ml-2 text-xs">
+                      {product.category}
+                    </Badge>
+                  )}
+                </TabsTrigger>
+              ))}
             </TabsList>
-
-            <TabsContent value="products" className="mt-6">
-              <Level1ProductSelector 
-                onSelect={handleLevel1Select}
-                canSeePrices={canSeePrices && showPrices}
-              />
-            </TabsContent>
-
-            <TabsContent value="level2-options" className="mt-6">
-              {selectedLevel1 && (
-                <Level2OptionsSelector 
-                  level1Product={selectedLevel1}
-                  onAdd={handleLevel2Add}
-                  canSeePrices={canSeePrices && showPrices}
-                />
-              )}
-            </TabsContent>
-
-            <TabsContent value="chassis" className="mt-6">
-              <ChassisSelector 
-                onSelect={handleChassisSelect}
-                canSeePrices={canSeePrices && showPrices}
-              />
-            </TabsContent>
-
-            <TabsContent value="cards" className="mt-6">
-              <CardLibrary 
-                onAdd={handleCardAdd}
-                canSeePrices={canSeePrices && showPrices}
-              />
-            </TabsContent>
-
-            <TabsContent value="slots" className="mt-6">
-              {selectedChassis && (
-                <SlotCardSelector 
-                  chassis={selectedChassis}
-                  slotAssignments={slotAssignments}
-                  onCardAdd={handleCardAdd}
-                  canSeePrices={canSeePrices && showPrices}
-                />
-              )}
-            </TabsContent>
-
-            <TabsContent value="visualizer" className="mt-6">
-              <RackVisualizer 
-                bomItems={bomItems.filter(item => item.enabled)}
-              />
-            </TabsContent>
+            
+            {level1Products.map((product) => (
+              <TabsContent key={product.id} value={product.id} className="mt-6">
+                {renderProductContent(product.id)}
+              </TabsContent>
+            ))}
           </Tabs>
-        </div>
 
-        {/* BOM Sidebar */}
-        <div className="space-y-6">
-          <BOMDisplay
-            items={bomItems}
-            onRemoveItem={handleRemoveFromBOM}
-            onUpdateQuantity={handleUpdateQuantity}
-            onToggleItem={handleToggleItem}
-            canSeePrices={canSeePrices && showPrices}
-          />
-
-          {/* QTMS Configuration */}
-          {consolidatedQTMS.length > 0 && (
-            <Card className="bg-gray-900 border-gray-800">
-              <CardHeader>
-                <CardTitle className="text-white flex items-center">
-                  <Settings className="mr-2 h-4 w-4" />
-                  QTMS Configuration
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {consolidatedQTMS.map((qtms) => (
-                  <div key={qtms.id} className="flex justify-between items-center p-3 bg-gray-800 rounded">
-                    <div>
-                      <p className="text-white font-medium">{qtms.baseProduct.name}</p>
-                      <p className="text-gray-400 text-sm">{qtms.items.length} items configured</p>
-                    </div>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => handleEditQTMSConfig(qtms.id)}
-                      className="border-blue-600 text-blue-400 hover:bg-blue-900/20"
-                    >
-                      Configure
-                    </Button>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
+          {/* Card Configuration Dialogs */}
+          {configuringCard && configuringCard.product.name.toLowerCase().includes('analog') && (
+            <AnalogCardConfigurator
+              bomItem={configuringCard}
+              onSave={handleCardConfiguration}
+              onClose={() => setConfiguringCard(null)}
+            />
           )}
 
-          {/* Discount Section */}
-          <DiscountSection
-            discountPercentage={discountPercentage}
-            discountJustification={discountJustification}
-            onDiscountChange={setDiscountPercentage}
-            onJustificationChange={setDiscountJustification}
-            canSeePrices={canSeePrices}
-          />
-
-          {/* Quote Fields */}
-          <QuoteFieldsSection
-            quoteFields={quoteFields}
-            onFieldsChange={setQuoteFields}
-            user={user}
-          />
-
-          {/* Pricing Summary */}
-          {canSeePrices && showPrices && (
-            <Card className="bg-gray-900 border-gray-800">
-              <CardHeader>
-                <CardTitle className="text-white flex items-center">
-                  <DollarSign className="mr-2 h-4 w-4" />
-                  Pricing Summary
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="flex justify-between">
-                  <span className="text-gray-400">Subtotal:</span>
-                  <span className="text-white font-bold">${subtotal.toLocaleString()}</span>
-                </div>
-                {discountPercentage > 0 && (
-                  <div className="flex justify-between">
-                    <span className="text-gray-400">Discount ({discountPercentage}%):</span>
-                    <span className="text-red-400 font-bold">-${discountAmount.toLocaleString()}</span>
-                  </div>
-                )}
-                <Separator className="bg-gray-700" />
-                <div className="flex justify-between">
-                  <span className="text-white font-bold">Total:</span>
-                  <span className="text-green-400 font-bold text-lg">${total.toLocaleString()}</span>
-                </div>
-              </CardContent>
-            </Card>
+          {configuringCard && configuringCard.product.name.toLowerCase().includes('bushing') && (
+            <BushingCardConfigurator
+              bomItem={configuringCard}
+              onSave={handleCardConfiguration}
+              onClose={() => setConfiguringCard(null)}
+            />
           )}
 
           {/* Submit Quote Button */}
-          <Button
-            onClick={() => setShowQuoteSubmission(true)}
-            disabled={!hasValidBOM}
-            className="w-full bg-green-600 hover:bg-green-700 text-white"
-            size="lg"
-          >
-            <FileText className="mr-2 h-4 w-4" />
-            Submit Quote Request
-          </Button>
+          {bomItems.length > 0 && (
+            <Card className="bg-gray-900 border-gray-800">
+              <CardContent className="pt-6">
+                <Button
+                  onClick={() => setShowQuoteSubmission(true)}
+                  className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3"
+                  size="lg"
+                >
+                  Submit Quote Request ({bomItems.length} items)
+                </Button>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Slot Card Selector Dialog */}
+          {selectedSlot !== null && selectedChassis && (
+            <SlotCardSelector
+              chassis={selectedChassis as any}
+              slot={selectedSlot}
+              onCardSelect={handleCardSelect}
+              onClose={() => setSelectedSlot(null)}
+              canSeePrices={canSeePrices}
+              currentSlotAssignments={slotAssignments}
+            />
+          )}
+        </div>
+
+        {/* Right side - BOM Display and Discount (1/3 width) */}
+        <div className="lg:col-span-1 space-y-6">
+          <BOMDisplay
+            bomItems={bomItems}
+            onUpdateBOM={handleBOMUpdate}
+            onEditConfiguration={handleBOMConfigurationEdit}
+            canSeePrices={canSeePrices}
+          />
+          
+          {/* Discount Section - Shows after products are selected */}
+          <DiscountSection
+            bomItems={bomItems}
+            onDiscountChange={handleDiscountChange}
+            canSeePrices={canSeePrices}
+            initialDiscount={discountPercentage}
+            initialJustification={discountJustification}
+          />
         </div>
       </div>
 
-      {/* QTMS Configuration Editor Modal */}
-      {editingQTMSConfig && (
+      {/* QTMS Configuration Editor */}
+      {editingQTMS && (
         <QTMSConfigurationEditor
-          consolidatedQTMS={editingQTMSConfig.editingConfig}
-          onSave={handleSaveQTMSConfig}
-          onCancel={() => setEditingQTMSConfig(null)}
-          canSeePrices={canSeePrices && showPrices}
+          consolidatedQTMS={editingQTMS}
+          onSave={handleQTMSConfigurationSave}
+          onClose={() => setEditingQTMS(null)}
+          canSeePrices={canSeePrices}
         />
       )}
 
       {/* Quote Submission Dialog */}
       {showQuoteSubmission && (
         <QuoteSubmissionDialog
-          bomItems={bomItems.filter(item => item.enabled)}
+          bomItems={bomItems}
           quoteFields={quoteFields}
           discountPercentage={discountPercentage}
           discountJustification={discountJustification}
-          onSubmit={handleQuoteSubmit}
+          onSubmit={handleSubmitQuote}
           onClose={() => setShowQuoteSubmission(false)}
-          canSeePrices={canSeePrices && showPrices}
-          user={user}
+          canSeePrices={canSeePrices}
         />
       )}
     </div>

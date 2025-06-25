@@ -110,78 +110,6 @@ export type Database = {
           },
         ]
       }
-      level1_level2_relationships: {
-        Row: {
-          created_at: string
-          id: string
-          level1_product_id: string
-          level2_product_id: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          level1_product_id: string
-          level2_product_id: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          level1_product_id?: string
-          level2_product_id?: string
-        }
-        Relationships: []
-      }
-      level2_level3_relationships: {
-        Row: {
-          created_at: string
-          id: string
-          level2_product_id: string
-          level3_product_id: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          level2_product_id: string
-          level3_product_id: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          level2_product_id?: string
-          level3_product_id?: string
-        }
-        Relationships: []
-      }
-      margin_thresholds: {
-        Row: {
-          created_at: string | null
-          id: string
-          minimum_margin_percent: number
-          requires_approval: boolean | null
-          threshold_name: string
-          updated_at: string | null
-          warning_message: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          id?: string
-          minimum_margin_percent: number
-          requires_approval?: boolean | null
-          threshold_name: string
-          updated_at?: string | null
-          warning_message?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          id?: string
-          minimum_margin_percent?: number
-          requires_approval?: boolean | null
-          threshold_name?: string
-          updated_at?: string | null
-          warning_message?: string | null
-        }
-        Relationships: []
-      }
       products: {
         Row: {
           category: string | null
@@ -292,9 +220,6 @@ export type Database = {
       }
       quotes: {
         Row: {
-          approval_notes: string | null
-          approved_discount: number | null
-          counter_offers: Json | null
           created_at: string
           currency: string
           customer_name: string
@@ -317,16 +242,11 @@ export type Database = {
           sfdc_opportunity: string
           shipping_terms: string
           status: string
-          submitted_by_email: string | null
-          submitted_by_name: string | null
           total_cost: number
           updated_at: string
           user_id: string
         }
         Insert: {
-          approval_notes?: string | null
-          approved_discount?: number | null
-          counter_offers?: Json | null
           created_at?: string
           currency?: string
           customer_name: string
@@ -349,16 +269,11 @@ export type Database = {
           sfdc_opportunity: string
           shipping_terms: string
           status?: string
-          submitted_by_email?: string | null
-          submitted_by_name?: string | null
           total_cost: number
           updated_at?: string
           user_id: string
         }
         Update: {
-          approval_notes?: string | null
-          approved_discount?: number | null
-          counter_offers?: Json | null
           created_at?: string
           currency?: string
           customer_name?: string
@@ -381,8 +296,6 @@ export type Database = {
           sfdc_opportunity?: string
           shipping_terms?: string
           status?: string
-          submitted_by_email?: string | null
-          submitted_by_name?: string | null
           total_cost?: number
           updated_at?: string
           user_id?: string
