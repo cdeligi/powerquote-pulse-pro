@@ -78,7 +78,7 @@ Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-trick
 
 ## Environment Variables
 
-Create a `.env` file in the project root and define your Supabase credentials. These values are used by the application and the Supabase CLI:
+Copy `.env.example` to `.env` in the project root and add your Supabase credentials. The `.env` file is ignored by Git, so you'll need to create it yourself whenever you clone the repo. These values are used by the application and the Supabase CLI:
 
 ```dotenv
 VITE_SUPABASE_URL=<your-supabase-url>
