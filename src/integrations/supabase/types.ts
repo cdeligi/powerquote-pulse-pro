@@ -140,13 +140,6 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "bom_items_product_id_fkey"
-            columns: ["product_id"]
-            isOneToOne: false
-            referencedRelation: "products"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "bom_items_quote_id_fkey"
             columns: ["quote_id"]
             isOneToOne: false
