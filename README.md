@@ -75,3 +75,48 @@ Yes, you can!
 To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
 
 Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+
+## Environment Variables
+
+Create a `.env` file in the project root and define your Supabase credentials. These values are used by the application and the Supabase CLI:
+
+```dotenv
+VITE_SUPABASE_URL=<your-supabase-url>
+VITE_SUPABASE_ANON_KEY=<your-supabase-anon-key>
+```
+
+If you plan to run migrations you will also need to authenticate the Supabase CLI with `SUPABASE_ACCESS_TOKEN`.
+
+## Installing Dependencies
+
+Install all project dependencies with npm:
+
+```sh
+npm i
+```
+
+## Running the Development Server
+
+Launch the Vite dev server on <http://localhost:8080>:
+
+```sh
+npm run dev
+```
+
+## Running Supabase Migrations
+
+With the Supabase CLI installed and authenticated, apply the migrations in the `supabase` directory with:
+
+```sh
+npx supabase db push
+```
+
+## Cypress Tests
+
+End-to-end tests are located in the `cypress/` folder. Execute them in headless mode with:
+
+```sh
+npx cypress run
+```
+
+You can also open the interactive runner using `npx cypress open`.
