@@ -45,6 +45,54 @@ const DEFAULT_LEVEL1_PRODUCTS: Level1Product[] = [
     enabled: true,
     partNumber: 'PD-1000',
     image: 'https://qualitrolcorp.com/wp-content/uploads/2024/01/Partial_Discharge_Monitor.png'
+  },
+  {
+    id: 'tm8',
+    name: 'TM8 - Advanced DGA Monitor',
+    type: 'TM8',
+    category: 'DGA Monitors',
+    description: 'Multi-gas transformer monitoring system',
+    price: 24500,
+    cost: 14700,
+    enabled: true,
+    partNumber: 'TM8-001',
+    productInfoUrl: 'https://qualitrol.com/tm8'
+  },
+  {
+    id: 'tm3',
+    name: 'TM3 - Compact DGA Monitor',
+    type: 'TM3',
+    category: 'DGA Monitors',
+    description: 'Essential dissolved gas analysis monitoring',
+    price: 18200,
+    cost: 10920,
+    enabled: true,
+    partNumber: 'TM3-001',
+    productInfoUrl: 'https://qualitrol.com/tm3'
+  },
+  {
+    id: 'tm1',
+    name: 'TM1 - Basic DGA Monitor',
+    type: 'TM1',
+    category: 'DGA Monitors',
+    description: 'Single-gas hydrogen monitoring system',
+    price: 12800,
+    cost: 7680,
+    enabled: true,
+    partNumber: 'TM1-001',
+    productInfoUrl: 'https://qualitrol.com/tm1'
+  },
+  {
+    id: 'qpdm',
+    name: 'QPDM - Partial Discharge Monitor',
+    type: 'QPDM',
+    category: 'PD Monitors',
+    description: 'Advanced partial discharge monitoring system',
+    price: 18500,
+    cost: 11100,
+    enabled: true,
+    partNumber: 'QPDM-001',
+    productInfoUrl: 'https://qualitrol.com/qpdm'
   }
 ];
 
