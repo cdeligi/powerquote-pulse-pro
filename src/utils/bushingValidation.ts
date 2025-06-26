@@ -11,7 +11,10 @@ export interface BushingPlacement {
   primarySlot: number;
   secondarySlot: number;
   shouldClearExisting: boolean;
-  existingSlotsTolear: number[];
+  /**
+   * Slots that should be cleared before placing a new bushing card
+   */
+  existingSlotsToClear: number[];
 }
 
 export const getBushingSlotConfiguration = (chassisType: string): { allowedPlacements: number[][] } => {
@@ -50,7 +53,7 @@ export const findOptimalBushingPlacement = (
         primarySlot,
         secondarySlot,
         shouldClearExisting: existingBushingSlots.length > 0,
-        existingSlotsTolear: existingBushingSlots
+        existingSlotsToClear: existingBushingSlots
       };
     }
   }
@@ -67,7 +70,7 @@ export const findOptimalBushingPlacement = (
         primarySlot: fallbackPrimary,
         secondarySlot: fallbackSecondary,
         shouldClearExisting: existingBushingSlots.length > 0,
-        existingSlotsTolear: existingBushingSlots
+        existingSlotsToClear: existingBushingSlots
       };
     }
     
@@ -77,7 +80,7 @@ export const findOptimalBushingPlacement = (
       primarySlot: primaryPrimary,
       secondarySlot: primarySecondary,
       shouldClearExisting: true,
-      existingSlotsTolear: [...existingBushingSlots, primaryPrimary, primarySecondary]
+      existingSlotsToClear: [...existingBushingSlots, primaryPrimary, primarySecondary]
     };
   }
 

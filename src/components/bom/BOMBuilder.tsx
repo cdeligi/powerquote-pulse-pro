@@ -130,7 +130,7 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
         const updated = { ...prev };
         
         if (placement.shouldClearExisting) {
-          placement.existingSlotsTolear.forEach(slotToClear => {
+          placement.existingSlotsToClear.forEach(slotToClear => {
             delete updated[slotToClear];
           });
         }
