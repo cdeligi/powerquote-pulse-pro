@@ -1,3 +1,4 @@
+
 /**
  * © 2025 Qualitrol Corp. All rights reserved.
  */
@@ -163,6 +164,9 @@ export interface BOMItem {
   enabled: boolean;
   slot?: number;
   partNumber?: string;
+  configuration?: Record<string, any>;
+  level2Options?: Level2Product[];
+  level3Customizations?: Level3Customization[];
   
   // Additional properties for admin quote management
   name?: string;
