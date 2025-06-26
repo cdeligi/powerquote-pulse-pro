@@ -25,6 +25,7 @@ const DGAProductSelector = ({ onProductSelect, canSeePrices }: DGAProductSelecto
       type: 'TM8',
       description: 'Multi-gas transformer monitoring system',
       price: 24500,
+      cost: 14700,
       enabled: true,
       partNumber: 'TM8-001',
       productInfoUrl: 'https://qualitrol.com/tm8'
@@ -35,6 +36,7 @@ const DGAProductSelector = ({ onProductSelect, canSeePrices }: DGAProductSelecto
       type: 'TM3',
       description: 'Essential dissolved gas analysis monitoring',
       price: 18200,
+      cost: 10920,
       enabled: true,
       partNumber: 'TM3-001',
       productInfoUrl: 'https://qualitrol.com/tm3'
@@ -45,6 +47,7 @@ const DGAProductSelector = ({ onProductSelect, canSeePrices }: DGAProductSelecto
       type: 'TM1',
       description: 'Single-gas hydrogen monitoring system',
       price: 12800,
+      cost: 7680,
       enabled: true,
       partNumber: 'TM1-001',
       productInfoUrl: 'https://qualitrol.com/tm1'
@@ -59,6 +62,7 @@ const DGAProductSelector = ({ onProductSelect, canSeePrices }: DGAProductSelecto
       type: 'CalGas',
       description: 'Precision calibration gas for DGA monitors',
       price: 450,
+      cost: 270,
       enabled: false,
       partNumber: 'CAL-GAS-001'
     },
@@ -69,6 +73,7 @@ const DGAProductSelector = ({ onProductSelect, canSeePrices }: DGAProductSelecto
       type: 'Standard',
       description: 'High-purity helium carrier gas supply',
       price: 280,
+      cost: 168,
       enabled: false,
       partNumber: 'HE-GAS-001'
     },
@@ -79,6 +84,7 @@ const DGAProductSelector = ({ onProductSelect, canSeePrices }: DGAProductSelecto
       type: 'Moisture',
       description: 'Additional moisture detection capability',
       price: 320,
+      cost: 192,
       enabled: false,
       partNumber: 'MOIST-001'
     },
@@ -89,6 +95,7 @@ const DGAProductSelector = ({ onProductSelect, canSeePrices }: DGAProductSelecto
       type: 'Standard',
       description: 'Analog output interface module',
       price: 180,
+      cost: 108,
       enabled: false,
       partNumber: '420MA-001'
     }
