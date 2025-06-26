@@ -22,11 +22,9 @@ import Level2OptionForm from "./product-forms/Level2OptionForm";
 import CardForm from "./product-forms/CardForm";
 import { useToast } from "@/hooks/use-toast";
 import { productDataService } from "@/services/productDataService";
-codex/adicionar-ícone-de-motor-nas-telas-de-gerenciamento
 import AnalogDefaultsDialog from "./defaults/AnalogDefaultsDialog";
 import BushingDefaultsDialog from "./defaults/BushingDefaultsDialog";
 import SensorConfigManagement from "./SensorConfigManagement";
-main
 
 interface ProductManagementProps {
   user: User;
@@ -209,11 +207,14 @@ const ProductManagement = ({ user }: ProductManagementProps) => {
     if (product.name.toLowerCase().includes('analog')) {
       setSettingsType('analog');
       setSettingsProduct(product);
+      setActiveTab('analog-config');
     } else if (product.name.toLowerCase().includes('bushing')) {
       setSettingsType('bushing');
       setSettingsProduct(product);
+      setActiveTab('bushing-config');
+    } else {
+      setActiveTab('defaults');
     }
-    setActiveTab('defaults');
   };
 
   return (
@@ -229,7 +230,7 @@ const ProductManagement = ({ user }: ProductManagementProps) => {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-4 bg-gray-800">
+        <TabsList className="grid w-full grid-cols-7 bg-gray-800">
           <TabsTrigger 
             value="level1" 
             className="text-white data-[state=active]:bg-red-600 data-[state=active]:text-white"
@@ -252,18 +253,34 @@ const ProductManagement = ({ user }: ProductManagementProps) => {
             Level 3: Components ({level3Products.length})
           </TabsTrigger>
           <TabsTrigger
-          codex/add-tab-for-product-customization-defaults
             value="defaults"
             className="text-white data-[state=active]:bg-red-600 data-[state=active]:text-white"
           >
             <SlidersHorizontal className="h-4 w-4 mr-2" />
             Defaults
-
+          </TabsTrigger>
+          <TabsTrigger
             value="sensor-config"
             className="text-white data-[state=active]:bg-red-600 data-[state=active]:text-white"
           >
             <Settings className="h-4 w-4 mr-2" />
             Sensor Config
+          codex/add-tabs-for-analog-and-bushing-config
+          </TabsTrigger>
+          <TabsTrigger
+            value="analog-config"
+            className="text-white data-[state=active]:bg-red-600 data-[state=active]:text-white"
+          >
+            <SlidersHorizontal className="h-4 w-4 mr-2" />
+            Analog Config
+          </TabsTrigger>
+          <TabsTrigger
+            value="bushing-config"
+            className="text-white data-[state=active]:bg-red-600 data-[state=active]:text-white"
+          >
+            <SlidersHorizontal className="h-4 w-4 mr-2" />
+            Bushing Config
+
         main
           </TabsTrigger>
         </TabsList>
@@ -610,7 +627,10 @@ const ProductManagement = ({ user }: ProductManagementProps) => {
             })}
           </div>
         </TabsContent>
-       codex/add-tab-for-product-customization-defaults
+        codex/add-tabs-for-analog-and-bushing-config
+
+
+        main
         <TabsContent value="defaults" className="space-y-6">
           {settingsProduct && settingsType === 'analog' && (
             <AnalogDefaultsDialog
@@ -630,14 +650,43 @@ const ProductManagement = ({ user }: ProductManagementProps) => {
               }}
             />
           )}
-          {!settingsProduct && (
-            <p className="text-gray-400">Select a component from the Components tab to configure defaults.</p>
-          )}
+            {!settingsProduct && (
+              <p className="text-gray-400">Select a component from the Components tab to configure defaults.</p>
+            )}
+          </TabsContent>
 
+        <TabsContent value="analog-config" className="space-y-6">
+          {settingsProduct && settingsType === 'analog' ? (
+            <AnalogDefaultsDialog
+              product={settingsProduct}
+              onClose={() => {
+                setSettingsProduct(null);
+                setSettingsType(null);
+              }}
+            />
+          ) : (
+            <p className="text-gray-400">Select an analog component from the Components tab to configure defaults.</p>
+          )}
+          <SensorConfigManagement showBushing={false} />
+        </TabsContent>
+
+        <TabsContent value="bushing-config" className="space-y-6">
+          {settingsProduct && settingsType === 'bushing' ? (
+            <BushingDefaultsDialog
+              product={settingsProduct}
+              onClose={() => {
+                setSettingsProduct(null);
+                setSettingsType(null);
+              }}
+            />
+          ) : (
+            <p className="text-gray-400">Select a bushing component from the Components tab to configure defaults.</p>
+          )}
+          <SensorConfigManagement showAnalog={false} />
+        </TabsContent>
 
         <TabsContent value="sensor-config" className="space-y-6">
           <SensorConfigManagement />
-      main
         </TabsContent>
       </Tabs>
 

@@ -21,18 +21,14 @@ interface BushingCardConfiguratorProps {
 
 
 const BushingCardConfigurator = ({ bomItem, onSave, onClose }: BushingCardConfiguratorProps) => {
-codex/adicionar-ícone-de-motor-nas-telas-de-gerenciamento
   const stored = localStorage.getItem(`bushingDefaults_${bomItem.product.id}`);
-  const parsed = stored ? JSON.parse(stored) as {numberOfBushings: number; configs: Record<number, string>} : null;
-  const [numberOfBushings, setNumberOfBushings] = useState<number>(parsed?.numberOfBushings || 1);
-  const [bushingConfigurations, setBushingConfigurations] = useState<Record<number, string>>(() => parsed?.configs || { 1: 'Standard' });
+  const parsed = stored ? (JSON.parse(stored) as { numberOfBushings: number; configs: Record<number, string> }) : null;
 
   const tapModels = productDataService.getBushingTapModels();
-  const [numberOfBushings, setNumberOfBushings] = useState<number>(1);
-  const [bushingConfigurations, setBushingConfigurations] = useState<Record<number, string>>({
-    1: tapModels[0]?.name || 'Standard'
-  });
-main
+  const [numberOfBushings, setNumberOfBushings] = useState<number>(parsed?.numberOfBushings || 1);
+  const [bushingConfigurations, setBushingConfigurations] = useState<Record<number, string>>(
+    () => parsed?.configs || { 1: tapModels[0]?.name || 'Standard' }
+  );
 
   const handleNumberOfBushingsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = parseInt(e.target.value, 10);
