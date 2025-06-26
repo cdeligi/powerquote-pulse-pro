@@ -16,7 +16,8 @@ import BushingCardConfigurator from './BushingCardConfigurator';
 import { productDataService } from '@/services/productDataService';
 import QuoteFieldsSection from './QuoteFieldsSection';
 import DiscountSection from './DiscountSection';
-import QuoteSubmissionDialog from './QuoteSubmissionDialog';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from '@/components/ui/use-toast';
 import QTMSConfigurationEditor from './QTMSConfigurationEditor';
 import { consolidateQTMSConfiguration, createQTMSBOMItem, ConsolidatedQTMS, QTMSConfiguration } from '@/utils/qtmsConsolidation';
 import { findOptimalBushingPlacement, findExistingBushingSlots, isBushingCard } from '@/utils/bushingValidation';
@@ -44,7 +45,7 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
   const [quoteFields, setQuoteFields] = useState<Record<string, any>>({});
   const [discountPercentage, setDiscountPercentage] = useState<number>(0);
   const [discountJustification, setDiscountJustification] = useState<string>('');
-  const [showQuoteSubmission, setShowQuoteSubmission] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [editingQTMS, setEditingQTMS] = useState<ConsolidatedQTMS | null>(null);
 
   // Fixed field change handler to match expected signature
@@ -311,7 +312,6 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
 
   const handleSubmitQuote = (quoteId: string) => {
     console.log('Quote submitted with ID:', quoteId);
-    setShowQuoteSubmission(false);
     setBomItems([]);
     setQuoteFields({});
     setDiscountPercentage(0);
@@ -327,6 +327,139 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
   const handleDiscountChange = (discount: number, justification: string) => {
     setDiscountPercentage(discount);
     setDiscountJustification(justification);
+  };
+
+  const submitQuoteRequest = async () => {
+    if (isSubmitting) return;
+
+    setIsSubmitting(true);
+
+    try {
+      const quoteId = `Q-${Date.now()}`;
+
+      const originalQuoteValue = bomItems.reduce(
+        (sum, item) => sum + item.product.price * item.quantity,
+        0
+      );
+      const discountedValue =
+        originalQuoteValue * (1 - discountPercentage / 100);
+      const totalCost = bomItems.reduce(
+        (sum, item) => sum + (item.product.cost || 0) * item.quantity,
+        0
+      );
+      const grossProfit = discountedValue - totalCost;
+      const discountedMargin =
+        discountedValue > 0 ? (grossProfit / discountedValue) * 100 : 0;
+
+      const { error: quoteError } = await supabase.from('quotes').insert({
+        id: quoteId,
+        customer_name: quoteFields.customerName,
+        oracle_customer_id: quoteFields.oracleCustomerId,
+        sfdc_opportunity: quoteFields.sfdcOpportunity,
+        status: 'pending_approval',
+        user_id: user!.id,
+        submitted_by_name: user!.name,
+        submitted_by_email: user!.email,
+        original_quote_value: originalQuoteValue,
+        requested_discount: discountPercentage,
+        discount_justification: discountJustification,
+        discounted_value: discountedValue,
+        total_cost: totalCost,
+        gross_profit: grossProfit,
+        original_margin:
+          originalQuoteValue > 0
+            ? ((originalQuoteValue - totalCost) / originalQuoteValue) * 100
+            : 0,
+        discounted_margin: discountedMargin,
+        quote_fields: quoteFields,
+        priority: 'Medium',
+        currency: 'USD',
+        payment_terms: 'Net 30',
+        shipping_terms: 'FOB Origin',
+      });
+
+      if (quoteError) {
+        console.error('SUPABASE ERROR:', quoteError);
+        toast({
+          title: 'Submission Failed',
+          description:
+            quoteError.message || 'Unknown error. Check console for more info.',
+          variant: 'destructive',
+        });
+        setIsSubmitting(false);
+        return;
+      }
+
+      for (const item of bomItems) {
+        const { error: bomError } = await supabase.from('bom_items').insert({
+          quote_id: quoteId,
+          product_id: item.product.id,
+          name: item.product.name,
+          description: item.product.description || '',
+          part_number: item.product.partNumber || item.partNumber || '',
+          quantity: item.quantity,
+          unit_price: item.product.price,
+          unit_cost: item.product.cost || 0,
+          total_price: item.product.price * item.quantity,
+          total_cost: (item.product.cost || 0) * item.quantity,
+          margin:
+            item.product.price > 0
+              ? ((item.product.price - (item.product.cost || 0)) /
+                  item.product.price) *
+                100
+              : 0,
+          original_unit_price: item.product.price,
+          approved_unit_price: item.product.price,
+          configuration_data: item.configuration || {},
+          product_type: item.product.type || 'standard',
+        });
+
+        if (bomError) {
+          console.error('SUPABASE BOM ERROR:', bomError);
+          toast({
+            title: 'BOM Item Error',
+            description: bomError.message || 'Failed to create BOM item',
+            variant: 'destructive',
+          });
+          throw bomError;
+        }
+      }
+
+      try {
+        const { data: adminIds } = await supabase.rpc('get_admin_user_ids');
+        if (adminIds && adminIds.length > 0) {
+          await supabase.from('admin_notifications').insert({
+            quote_id: quoteId,
+            notification_type: 'quote_pending_approval',
+            sent_to: adminIds,
+            message_content: {
+              customer_name: quoteFields.customerName,
+              submitted_by: user!.name,
+              quote_value: discountedValue,
+              discount_percentage: discountPercentage,
+            },
+          });
+        }
+      } catch (notificationError) {
+        console.error('Failed to send admin notifications:', notificationError);
+      }
+
+      toast({
+        title: 'Quote Submitted Successfully',
+        description: `Quote ${quoteId} has been submitted for approval.`,
+      });
+
+      handleSubmitQuote(quoteId);
+    } catch (error) {
+      console.error('Error submitting quote:', error);
+      toast({
+        title: 'Submission Failed',
+        description: 'Failed to submit quote. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   // Render product content based on selected tab
@@ -506,11 +639,12 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
             <Card className="bg-gray-900 border-gray-800">
               <CardContent className="pt-6">
                 <Button
-                  onClick={() => setShowQuoteSubmission(true)}
+                  onClick={submitQuoteRequest}
                   className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3"
                   size="lg"
+                  disabled={isSubmitting}
                 >
-                  Submit Quote Request ({bomItems.length} items)
+                  {isSubmitting ? 'Submitting...' : `Submit Quote Request (${bomItems.length} items)`}
                 </Button>
               </CardContent>
             </Card>
@@ -545,21 +679,7 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
         />
       )}
 
-      {/* Quote Submission Dialog */}
-      {showQuoteSubmission && (
-        <QuoteSubmissionDialog
-          open={showQuoteSubmission}
-          onOpenChange={setShowQuoteSubmission}
-          bomItems={bomItems}
-          quoteFields={quoteFields}
-          discountPercentage={discountPercentage}
-          discountJustification={discountJustification}
-          onSubmit={handleSubmitQuote}
-          onClose={() => setShowQuoteSubmission(false)}
-          canSeePrices={canSeePrices}
-          user={user}
-        />
-      )}
+      {/* End of dialogs */}
     </div>
   );
 };
