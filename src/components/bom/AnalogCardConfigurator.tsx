@@ -21,17 +21,10 @@ interface AnalogCardConfiguratorProps {
 }
 
 const AnalogCardConfigurator = ({ bomItem, onSave, onClose }: AnalogCardConfiguratorProps) => {
-codex/adicionar-ícone-de-motor-nas-telas-de-gerenciamento
-  const [channelConfigs, setChannelConfigs] = useState<Record<number, AnalogSensorType>>(() => {
-    const configs: Record<number, AnalogSensorType> = {};
-
-
   const sensorOptions = productDataService.getAnalogSensorTypes();
   const [channelConfigs, setChannelConfigs] = useState<Record<number, string>>(() => {
     // Initialize with existing configurations or default to first sensor type
     const configs: Record<number, string> = {};
-    
-main
     if (bomItem.level3Customizations) {
       bomItem.level3Customizations.forEach((config, index) => {
         if (config.name && sensorOptions.some(s => s.name === config.name)) {
@@ -45,10 +38,7 @@ main
       }
     }
 
-codex/adicionar-ícone-de-motor-nas-telas-de-gerenciamento
-
-    // Fill in any missing channels with default
-main
+  // Fill in any missing channels with default
     for (let i = 1; i <= 8; i++) {
       if (!configs[i]) {
         configs[i] = sensorOptions[0]?.name || '';
