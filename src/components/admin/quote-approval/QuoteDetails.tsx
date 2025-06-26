@@ -4,9 +4,10 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle, XCircle, MessageSquare, DollarSign } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { CheckCircle, XCircle, MessageSquare, DollarSign, Edit3, Save, X } from "lucide-react";
 import { useState } from "react";
-import { Quote } from "@/types/quote";
+import { Quote, BOMItemWithDetails } from "@/types/quote";
 import { User } from "@/types/auth";
 
 interface QuoteDetailsProps {
@@ -28,11 +29,25 @@ const QuoteDetails = ({
 }: QuoteDetailsProps) => {
   const [approvalNotes, setApprovalNotes] = useState('');
   const [rejectionReason, setRejectionReason] = useState('');
-  const [counterOfferNotes, setCounterOfferNotes] = useState('');
-  const [selectedAction, setSelectedAction] = useState<'approve' | 'reject' | 'counter' | null>(null);
+  const [selectedAction, setSelectedAction] = useState<'approve' | 'reject' | null>(null);
+  const [editingPrices, setEditingPrices] = useState<Record<string, string>>({});
+  const [bomItems, setBomItems] = useState<BOMItemWithDetails[]>(
+    (quote.bom_items || []).map(item => ({
+      ...item,
+      id: item.id || Math.random().toString(),
+      name: item.name || 'Unknown Item',
+      description: item.description || '',
+      part_number: item.part_number || '',
+      unit_price: item.unit_price || 0,
+      unit_cost: item.unit_cost || 0,
+      total_price: item.total_price || 0,
+      margin: item.margin || 0,
+      quantity: item.quantity || 1
+    }))
+  );
 
   const handleApprove = () => {
-    onApprove(approvalNotes);
+    onApprove(approvalNotes, bomItems);
     setApprovalNotes('');
     setSelectedAction(null);
   };
@@ -43,11 +58,50 @@ const QuoteDetails = ({
     setSelectedAction(null);
   };
 
-  const handleCounterOffer = () => {
-    onCounterOffer(counterOfferNotes);
-    setCounterOfferNotes('');
-    setSelectedAction(null);
+  const handlePriceEdit = (itemId: string, newPrice: string) => {
+    setEditingPrices(prev => ({ ...prev, [itemId]: newPrice }));
   };
+
+  const handlePriceUpdate = (itemId: string) => {
+    const newPrice = parseFloat(editingPrices[itemId] || '0');
+    setBomItems(prev => prev.map(item => {
+      if (item.id === itemId) {
+        const updatedItem = {
+          ...item,
+          unit_price: newPrice,
+          total_price: newPrice * item.quantity,
+          margin: newPrice > 0 ? ((newPrice - item.unit_cost) / newPrice) * 100 : 0
+        };
+        return updatedItem;
+      }
+      return item;
+    }));
+    
+    setEditingPrices(prev => {
+      const updated = { ...prev };
+      delete updated[itemId];
+      return updated;
+    });
+  };
+
+  const handlePriceEditCancel = (itemId: string) => {
+    setEditingPrices(prev => {
+      const updated = { ...prev };
+      delete updated[itemId];
+      return updated;
+    });
+  };
+
+  const calculateTotals = () => {
+    const totalRevenue = bomItems.reduce((sum, item) => sum + item.total_price, 0);
+    const totalCost = bomItems.reduce((sum, item) => sum + (item.unit_cost * item.quantity), 0);
+    const grossProfit = totalRevenue - totalCost;
+    const marginPercentage = totalRevenue > 0 ? (grossProfit / totalRevenue) * 100 : 0;
+    
+    return { totalRevenue, totalCost, grossProfit, marginPercentage };
+  };
+
+  const totals = calculateTotals();
 
   const getStatusBadge = () => {
     switch (quote.status) {
@@ -66,11 +120,21 @@ const QuoteDetails = ({
 
   return (
     <div className="space-y-6">
+      {/* Quote Header */}
       <Card className="bg-gray-900 border-gray-800">
         <CardHeader>
           <CardTitle className="text-white flex items-center justify-between">
             Quote Details - {quote.id}
-            {getStatusBadge()}
+            <div className="flex items-center space-x-2">
+              {getStatusBadge()}
+              <Badge className={`${
+                quote.priority === 'Urgent' ? 'bg-red-500' :
+                quote.priority === 'High' ? 'bg-orange-500' :
+                quote.priority === 'Medium' ? 'bg-yellow-500' : 'bg-green-500'
+              } text-white`}>
+                {quote.priority}
+              </Badge>
+            </div>
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -88,26 +152,16 @@ const QuoteDetails = ({
               <p className="text-white font-medium">{quote.sfdc_opportunity}</p>
             </div>
             <div>
-              <Label className="text-gray-400">Priority</Label>
-              <p className="text-white font-medium">{quote.priority}</p>
+              <Label className="text-gray-400">Rep Involved</Label>
+              <p className="text-white font-medium">{quote.is_rep_involved ? 'Yes' : 'No'}</p>
             </div>
             <div>
-              <Label className="text-gray-400">Original Value</Label>
-              <p className="text-white font-medium">{quote.currency} {quote.original_quote_value.toLocaleString()}</p>
+              <Label className="text-gray-400">Payment Terms</Label>
+              <p className="text-white font-medium">{quote.payment_terms}</p>
             </div>
             <div>
-              <Label className="text-gray-400">After Discount</Label>
-              <p className="text-white font-medium">{quote.currency} {quote.discounted_value.toLocaleString()}</p>
-            </div>
-            <div>
-              <Label className="text-gray-400">Requested Discount</Label>
-              <p className="text-white font-medium">{quote.requested_discount}%</p>
-            </div>
-            <div>
-              <Label className="text-gray-400">Margin</Label>
-              <p className={`font-medium ${quote.discounted_margin < 25 ? 'text-yellow-400' : 'text-green-400'}`}>
-                {quote.discounted_margin.toFixed(1)}%
-              </p>
+              <Label className="text-gray-400">Shipping Terms</Label>
+              <p className="text-white font-medium">{quote.shipping_terms}</p>
             </div>
           </div>
 
@@ -120,31 +174,157 @@ const QuoteDetails = ({
         </CardContent>
       </Card>
 
+      {/* Quote Fields */}
+      {quote.quote_fields && Object.keys(quote.quote_fields).length > 0 && (
+        <Card className="bg-gray-900 border-gray-800">
+          <CardHeader>
+            <CardTitle className="text-white">Additional Quote Fields</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {Object.entries(quote.quote_fields).map(([key, value]) => (
+              <div key={key} className="grid grid-cols-2 gap-4">
+                <Label className="text-gray-400 capitalize">{key.replace(/_/g, ' ')}</Label>
+                <p className="text-white">{String(value)}</p>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Financial Summary */}
+      <Card className="bg-gray-900 border-gray-800">
+        <CardHeader>
+          <CardTitle className="text-white">Project Financial Analysis</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="text-center p-4 bg-gray-800 rounded">
+              <p className="text-gray-400 text-sm">Original Value</p>
+              <p className="text-white text-xl font-bold">{quote.currency} {quote.original_quote_value.toLocaleString()}</p>
+            </div>
+            <div className="text-center p-4 bg-gray-800 rounded">
+              <p className="text-gray-400 text-sm">Current Total</p>
+              <p className="text-white text-xl font-bold">{quote.currency} {totals.totalRevenue.toLocaleString()}</p>
+            </div>
+            <div className="text-center p-4 bg-gray-800 rounded">
+              <p className="text-gray-400 text-sm">Total Cost</p>
+              <p className="text-orange-400 text-xl font-bold">{quote.currency} {totals.totalCost.toLocaleString()}</p>
+            </div>
+            <div className="text-center p-4 bg-gray-800 rounded">
+              <p className="text-gray-400 text-sm">Margin</p>
+              <p className={`text-xl font-bold ${
+                totals.marginPercentage >= 25 ? 'text-green-400' : 
+                totals.marginPercentage >= 15 ? 'text-yellow-400' : 'text-red-400'
+              }`}>
+                {totals.marginPercentage.toFixed(1)}%
+              </p>
+            </div>
+          </div>
+          <div className="mt-4 p-4 bg-gray-800 rounded">
+            <div className="flex justify-between items-center">
+              <span className="text-gray-400">Gross Profit:</span>
+              <span className="text-green-400 text-lg font-bold">
+                {quote.currency} {totals.grossProfit.toLocaleString()}
+              </span>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* BOM Items with Editing */}
       <Card className="bg-gray-900 border-gray-800">
         <CardHeader>
           <CardTitle className="text-white flex items-center">
             <DollarSign className="h-5 w-5 mr-2" />
-            BOM Items ({quote.bom_items?.length || 0})
+            BOM Items ({bomItems.length}) - Real-time Price Editing
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {quote.bom_items && quote.bom_items.length > 0 ? (
-            <div className="space-y-3">
-              {quote.bom_items.map((item, index) => (
-                <div key={item.id || index} className="p-3 bg-gray-800 rounded border border-gray-700">
-                  <div className="flex justify-between items-start">
+          {bomItems.length > 0 ? (
+            <div className="space-y-4">
+              {bomItems.map((item) => (
+                <div key={item.id} className="p-4 bg-gray-800 rounded border border-gray-700">
+                  <div className="flex justify-between items-start mb-3">
                     <div className="flex-1">
                       <h4 className="text-white font-medium">{item.name}</h4>
-                      <p className="text-gray-400 text-sm">{item.description}</p>
+                      {item.description && (
+                        <p className="text-gray-400 text-sm">{item.description}</p>
+                      )}
                       {item.part_number && (
-                        <p className="text-gray-500 text-xs">Part#: {item.part_number}</p>
+                        <Badge variant="outline" className="text-xs text-green-400 border-green-400 mt-1">
+                          P/N: {item.part_number}
+                        </Badge>
                       )}
                     </div>
-                    <div className="text-right ml-4">
-                      <p className="text-white font-medium">Qty: {item.quantity}</p>
-                      <p className="text-white">${item.unit_price.toLocaleString()} each</p>
-                      <p className="text-green-400 font-medium">${item.total_price.toLocaleString()} total</p>
-                      <p className="text-gray-400 text-sm">{item.margin.toFixed(1)}% margin</p>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => handlePriceEdit(item.id, item.unit_price.toString())}
+                      className="h-6 w-6 p-0 text-gray-400 hover:text-white"
+                      title="Edit unit price"
+                    >
+                      <Edit3 className="h-3 w-3" />
+                    </Button>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
+                    <div>
+                      <span className="text-gray-400">Quantity:</span>
+                      <div className="text-white font-medium">{item.quantity}</div>
+                    </div>
+                    
+                    <div>
+                      <span className="text-gray-400">Unit Price:</span>
+                      {editingPrices[item.id] ? (
+                        <div className="flex items-center space-x-1 mt-1">
+                          <Input
+                            type="number"
+                            step="0.01"
+                            value={editingPrices[item.id]}
+                            onChange={(e) => handlePriceEdit(item.id, e.target.value)}
+                            className="w-24 h-6 text-xs bg-gray-700 border-gray-600 text-white"
+                          />
+                          <Button
+                            size="sm"
+                            onClick={() => handlePriceUpdate(item.id)}
+                            className="h-5 w-5 p-0 bg-green-600 hover:bg-green-700"
+                          >
+                            <Save className="h-3 w-3" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => handlePriceEditCancel(item.id)}
+                            className="h-5 w-5 p-0 text-gray-400 hover:text-white"
+                          >
+                            <X className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="text-white font-medium">
+                          ${item.unit_price.toLocaleString()}
+                        </div>
+                      )}
+                    </div>
+                    
+                    <div>
+                      <span className="text-gray-400">Unit Cost:</span>
+                      <div className="text-orange-400 font-medium">${item.unit_cost.toLocaleString()}</div>
+                    </div>
+                    
+                    <div>
+                      <span className="text-gray-400">Total Price:</span>
+                      <div className="text-white font-medium">${item.total_price.toLocaleString()}</div>
+                    </div>
+                    
+                    <div>
+                      <span className="text-gray-400">Margin:</span>
+                      <div className={`font-medium ${
+                        item.margin >= 25 ? 'text-green-400' : 
+                        item.margin >= 15 ? 'text-yellow-400' : 'text-red-400'
+                      }`}>
+                        {item.margin.toFixed(1)}%
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -158,13 +338,14 @@ const QuoteDetails = ({
         </CardContent>
       </Card>
 
+      {/* Approval Actions */}
       {quote.status === 'pending_approval' && (
         <Card className="bg-gray-900 border-gray-800">
           <CardHeader>
             <CardTitle className="text-white">Approval Actions</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-2 gap-3">
               <Button
                 onClick={() => setSelectedAction('approve')}
                 variant={selectedAction === 'approve' ? 'default' : 'outline'}
@@ -176,21 +357,7 @@ const QuoteDetails = ({
                 disabled={isLoading}
               >
                 <CheckCircle className="h-4 w-4 mr-2" />
-                Approve
-              </Button>
-              
-              <Button
-                onClick={() => setSelectedAction('counter')}
-                variant={selectedAction === 'counter' ? 'default' : 'outline'}
-                className={`${
-                  selectedAction === 'counter' 
-                    ? 'bg-yellow-600 hover:bg-yellow-700 text-white' 
-                    : 'border-yellow-600 text-yellow-400 hover:bg-yellow-600 hover:text-white'
-                }`}
-                disabled={isLoading}
-              >
-                <MessageSquare className="h-4 w-4 mr-2" />
-                Counter Offer
+                Approve Quote
               </Button>
               
               <Button
@@ -204,7 +371,7 @@ const QuoteDetails = ({
                 disabled={isLoading}
               >
                 <XCircle className="h-4 w-4 mr-2" />
-                Reject
+                Reject Quote
               </Button>
             </div>
 
@@ -227,39 +394,6 @@ const QuoteDetails = ({
                     disabled={isLoading}
                   >
                     {isLoading ? 'Processing...' : 'Confirm Approval'}
-                  </Button>
-                  <Button
-                    onClick={() => setSelectedAction(null)}
-                    variant="outline"
-                    className="border-gray-600 text-gray-300 hover:bg-gray-800"
-                    disabled={isLoading}
-                  >
-                    Cancel
-                  </Button>
-                </div>
-              </div>
-            )}
-
-            {selectedAction === 'counter' && (
-              <div className="space-y-3 p-4 bg-yellow-900/20 border border-yellow-600 rounded-lg">
-                <Label htmlFor="counter-notes" className="text-white">
-                  Counter Offer Notes *
-                </Label>
-                <Textarea
-                  id="counter-notes"
-                  value={counterOfferNotes}
-                  onChange={(e) => setCounterOfferNotes(e.target.value)}
-                  placeholder="Explain the counter offer terms and adjustments..."
-                  className="bg-gray-800 border-gray-700 text-white min-h-[100px]"
-                  required
-                />
-                <div className="flex space-x-2">
-                  <Button
-                    onClick={handleCounterOffer}
-                    className="bg-yellow-600 hover:bg-yellow-700 text-white"
-                    disabled={isLoading || !counterOfferNotes.trim()}
-                  >
-                    {isLoading ? 'Processing...' : 'Send Counter Offer'}
                   </Button>
                   <Button
                     onClick={() => setSelectedAction(null)}
@@ -309,6 +443,7 @@ const QuoteDetails = ({
         </Card>
       )}
 
+      {/* Status Information for Non-Pending Quotes */}
       {quote.status !== 'pending_approval' && (
         <Card className="bg-gray-900 border-gray-800">
           <CardHeader>

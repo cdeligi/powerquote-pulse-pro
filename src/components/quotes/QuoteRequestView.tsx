@@ -80,7 +80,7 @@ const QuoteRequestView = ({
         SFDC Opportunity: ${poData.sfdcOpportunity}
         PO Number: ${poData.poNumber}
         PO Value: $${poData.poValue.toLocaleString()}
-        Customer: ${quote.customerName}
+        Customer: ${quote.customer_name}
         
         BOM attached for booking.
         
@@ -103,7 +103,7 @@ const QuoteRequestView = ({
           <div className="flex justify-between items-start">
             <div>
               <CardTitle className="text-white text-xl">Quote Request #{quote.id}</CardTitle>
-              <p className="text-gray-400">Submitted: {new Date(quote.createdAt).toLocaleDateString()}</p>
+              <p className="text-gray-400">Submitted: {new Date(quote.created_at).toLocaleDateString()}</p>
             </div>
             <div className="flex space-x-2">
               <Badge 
@@ -116,8 +116,8 @@ const QuoteRequestView = ({
                 <POSubmissionForm
                   quoteId={quote.id}
                   quoteBOM={bomItems}
-                  quoteTotal={quote.total}
-                  customerName={quote.customerName || 'Unknown Customer'}
+                  quoteTotal={quote.discounted_value}
+                  customerName={quote.customer_name || 'Unknown Customer'}
                   onSubmit={handlePOSubmission}
                 />
               )}
@@ -135,19 +135,19 @@ const QuoteRequestView = ({
           <CardContent className="space-y-3">
             <div>
               <Label className="text-gray-400">Customer Name</Label>
-              <p className="text-white font-medium">{quote.customerName}</p>
+              <p className="text-white font-medium">{quote.customer_name}</p>
             </div>
             <div>
               <Label className="text-gray-400">Oracle Customer ID</Label>
-              <p className="text-white font-medium">{quote.oracleCustomerId}</p>
+              <p className="text-white font-medium">{quote.oracle_customer_id}</p>
             </div>
             <div>
               <Label className="text-gray-400">SFDC Opportunity</Label>
-              <p className="text-white font-medium">{quote.sfdcOpportunity}</p>
+              <p className="text-white font-medium">{quote.sfdc_opportunity}</p>
             </div>
             <div>
               <Label className="text-gray-400">Rep Involved</Label>
-              <p className="text-white font-medium">{quote.isRepInvolved ? 'Yes' : 'No'}</p>
+              <p className="text-white font-medium">{quote.is_rep_involved ? 'Yes' : 'No'}</p>
             </div>
           </CardContent>
         </Card>
@@ -159,15 +159,15 @@ const QuoteRequestView = ({
           <CardContent className="space-y-3">
             <div>
               <Label className="text-gray-400">Currency</Label>
-              <p className="text-white font-medium">{quote.quoteCurrency}</p>
+              <p className="text-white font-medium">{quote.currency}</p>
             </div>
             <div>
               <Label className="text-gray-400">Shipping Terms</Label>
-              <p className="text-white font-medium">{quote.shippingTerms}</p>
+              <p className="text-white font-medium">{quote.shipping_terms}</p>
             </div>
             <div>
               <Label className="text-gray-400">Payment Terms</Label>
-              <p className="text-white font-medium">{quote.paymentTerms} days</p>
+              <p className="text-white font-medium">{quote.payment_terms}</p>
             </div>
           </CardContent>
         </Card>

@@ -47,3 +47,19 @@ export interface QuoteItem {
   unitPrice: number;
   enabled: boolean;
 }
+
+// Enhanced BOM Item for quote approval with admin editing capabilities
+export interface BOMItemWithDetails extends BOMItem {
+  id: string;
+  name: string;
+  description?: string;
+  part_number?: string;
+  unit_price: number;
+  unit_cost: number;
+  total_price: number;
+  margin: number;
+  quantity: number;
+  original_unit_price?: number;
+  approved_unit_price?: number;
+  price_adjustment_history?: any[];
+}
