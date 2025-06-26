@@ -51,7 +51,7 @@ const ApprovalActions = ({
         return <Badge className="bg-green-600 text-white">Approved</Badge>;
       case 'rejected':
         return <Badge className="bg-red-600 text-white">Rejected</Badge>;
-      case 'pending':
+      case 'pending_approval':
         return <Badge className="bg-yellow-600 text-white">Pending Approval</Badge>;
       case 'under-review':
         return <Badge className="bg-blue-600 text-white">Under Review</Badge>;
@@ -60,7 +60,7 @@ const ApprovalActions = ({
     }
   };
 
-  if (quote?.status !== 'pending') {
+  if (quote?.status !== 'pending_approval') {
     return (
       <Card className="bg-gray-900 border-gray-800">
         <CardHeader>

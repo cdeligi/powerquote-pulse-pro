@@ -18,7 +18,7 @@ interface QuoteCardProps {
 export const QuoteCard = ({ quote, onReviewClick, onQuickApprove }: QuoteCardProps) => {
   const getStatusColor = (status: Quote['status']) => {
     switch (status) {
-      case 'pending': return 'border-yellow-500 text-yellow-400';
+      case 'pending_approval': return 'border-yellow-500 text-yellow-400';
       case 'under-review': return 'border-blue-500 text-blue-400';
       case 'approved': return 'border-green-500 text-green-400';
       case 'rejected': return 'border-red-500 text-red-400';
@@ -117,7 +117,7 @@ export const QuoteCard = ({ quote, onReviewClick, onQuickApprove }: QuoteCardPro
             <FileText className="h-4 w-4 mr-1" />
             Review Details & BOM
           </Button>
-          {quote.status === 'pending' && (
+          {quote.status === 'pending_approval' && (
             <Button
               size="sm"
               onClick={() => onQuickApprove(quote.id)}

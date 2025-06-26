@@ -19,7 +19,7 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
   const [selectedQuote, setSelectedQuote] = useState<Quote | null>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<{ [quoteId: string]: boolean }>({});
-  const [activeTab, setActiveTab] = useState("pending");
+  const [activeTab, setActiveTab] = useState("pending_approval");
 
   const fetchData = async () => {
     setLoading(true);
@@ -66,10 +66,10 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
   }, []);
 
   const filteredQuotes = quotes.filter(quote => {
-    if (activeTab === "pending") {
-      return quote.status === 'pending_approval';
+    if (activeTab === "pending_approval") {
+      return quote.status === 'pending';
     } else {
-      return quote.status !== 'pending_approval';
+      return quote.status !== 'pending';
     }
   });
 
@@ -172,7 +172,7 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-4">
         <TabsList>
-          <TabsTrigger value="pending">Pending Quotes</TabsTrigger>
+          <TabsTrigger value="pending_approval">Pending Quotes</TabsTrigger>
           <TabsTrigger value="reviewed">Reviewed Quotes</TabsTrigger>
         </TabsList>
         
@@ -180,7 +180,7 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
 
       <div className="mb-4 flex items-center justify-between">
         <h2 className="text-2xl text-gray-300">
-          {activeTab === "pending" ? "Pending Quotes" : "Reviewed Quotes"}
+          {activeTab === "pending_approval" ? "Pending Quotes" : "Reviewed Quotes"}
         </h2>
         <Button variant="outline" disabled={loading} onClick={refetch}>
           <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
