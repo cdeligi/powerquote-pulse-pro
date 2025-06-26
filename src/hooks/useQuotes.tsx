@@ -207,8 +207,8 @@ export const useQuotes = () => {
 
       // Calculate new totals
       const newTotalPrice = newPrice * currentItem.quantity;
-      const newMargin = newPrice > 0
-        ? ((newPrice - currentItem.unit_cost) / newPrice) * 100
+      const newMargin = currentItem.unit_cost > 0 
+        ? ((newPrice - currentItem.unit_cost) / newPrice) * 100 
         : 0;
 
       // Create price adjustment history entry

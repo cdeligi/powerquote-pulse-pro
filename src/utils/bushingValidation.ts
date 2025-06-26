@@ -11,9 +11,6 @@ export interface BushingPlacement {
   primarySlot: number;
   secondarySlot: number;
   shouldClearExisting: boolean;
-  /**
-   * Slots that should be cleared before placing a new bushing card
-   */
   existingSlotsToClear: number[];
 }
 

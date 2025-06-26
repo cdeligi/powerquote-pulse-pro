@@ -67,8 +67,8 @@ const ProductManagement = ({ user }: ProductManagementProps) => {
   };
 
   // CRUD Operations
-  const handleCreateLevel1Product = async (productData: Omit<Level1Product, 'id'>) => {
-    const newProduct = await productDataService.createLevel1Product(productData);
+  const handleCreateLevel1Product = (productData: Omit<Level1Product, 'id'>) => {
+    const newProduct = productDataService.createLevel1Product(productData);
     setDialogOpen(false);
     setEditingProduct(null);
     forceRefresh();
@@ -78,9 +78,9 @@ const ProductManagement = ({ user }: ProductManagementProps) => {
     });
   };
 
-  const handleUpdateLevel1Product = async (productData: Omit<Level1Product, 'id'>) => {
+  const handleUpdateLevel1Product = (productData: Omit<Level1Product, 'id'>) => {
     if (!editingProduct) return;
-    await productDataService.updateLevel1Product(editingProduct.id, productData);
+    productDataService.updateLevel1Product(editingProduct.id, productData);
     setDialogOpen(false);
     setEditingProduct(null);
     forceRefresh();
@@ -90,7 +90,7 @@ const ProductManagement = ({ user }: ProductManagementProps) => {
     });
   };
 
-  const handleDeleteLevel1Product = async (productId: string) => {
+  const handleDeleteLevel1Product = (productId: string) => {
     // Check for dependencies
     const dependentLevel2 = level2Products.filter(p => p.parentProductId === productId);
     if (dependentLevel2.length > 0) {
@@ -102,7 +102,7 @@ const ProductManagement = ({ user }: ProductManagementProps) => {
       return;
     }
     
-    await productDataService.deleteLevel1Product(productId);
+    productDataService.deleteLevel1Product(productId);
     forceRefresh();
     toast({
       title: "Success",
@@ -110,8 +110,8 @@ const ProductManagement = ({ user }: ProductManagementProps) => {
     });
   };
 
-  const handleCreateLevel2Product = async (productData: Omit<Level2Product, 'id'>) => {
-    const newProduct = await productDataService.createLevel2Product(productData);
+  const handleCreateLevel2Product = (productData: Omit<Level2Product, 'id'>) => {
+    const newProduct = productDataService.createLevel2Product(productData);
     setDialogOpen(false);
     setEditingProduct(null);
     forceRefresh();
@@ -121,9 +121,9 @@ const ProductManagement = ({ user }: ProductManagementProps) => {
     });
   };
 
-  const handleUpdateLevel2Product = async (productData: Omit<Level2Product, 'id'>) => {
+  const handleUpdateLevel2Product = (productData: Omit<Level2Product, 'id'>) => {
     if (!editingProduct) return;
-    await productDataService.updateLevel2Product(editingProduct.id, productData);
+    productDataService.updateLevel2Product(editingProduct.id, productData);
     setDialogOpen(false);
     setEditingProduct(null);
     forceRefresh();
@@ -133,7 +133,7 @@ const ProductManagement = ({ user }: ProductManagementProps) => {
     });
   };
 
-  const handleDeleteLevel2Product = async (productId: string) => {
+  const handleDeleteLevel2Product = (productId: string) => {
     // Check for dependencies
     const dependentLevel3 = level3Products.filter(p => p.parentProductId === productId);
     if (dependentLevel3.length > 0) {
@@ -145,7 +145,7 @@ const ProductManagement = ({ user }: ProductManagementProps) => {
       return;
     }
     
-    await productDataService.deleteLevel2Product(productId);
+    productDataService.deleteLevel2Product(productId);
     forceRefresh();
     toast({
       title: "Success",
@@ -153,8 +153,8 @@ const ProductManagement = ({ user }: ProductManagementProps) => {
     });
   };
 
-  const handleCreateLevel3Product = async (productData: Omit<Level3Product, 'id'>) => {
-    const newProduct = await productDataService.createLevel3Product(productData);
+  const handleCreateLevel3Product = (productData: Omit<Level3Product, 'id'>) => {
+    const newProduct = productDataService.createLevel3Product(productData);
     setDialogOpen(false);
     setEditingProduct(null);
     forceRefresh();
@@ -164,9 +164,9 @@ const ProductManagement = ({ user }: ProductManagementProps) => {
     });
   };
 
-  const handleUpdateLevel3Product = async (productData: Omit<Level3Product, 'id'>) => {
+  const handleUpdateLevel3Product = (productData: Omit<Level3Product, 'id'>) => {
     if (!editingProduct) return;
-    await productDataService.updateLevel3Product(editingProduct.id, productData);
+    productDataService.updateLevel3Product(editingProduct.id, productData);
     setDialogOpen(false);
     setEditingProduct(null);
     forceRefresh();
@@ -176,8 +176,8 @@ const ProductManagement = ({ user }: ProductManagementProps) => {
     });
   };
 
-  const handleDeleteLevel3Product = async (productId: string) => {
-    await productDataService.deleteLevel3Product(productId);
+  const handleDeleteLevel3Product = (productId: string) => {
+    productDataService.deleteLevel3Product(productId);
     forceRefresh();
     toast({
       title: "Success",

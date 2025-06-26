@@ -1,5 +1,4 @@
 import { Level1Product, Level2Product, Level3Product, AssetType } from "@/types/product";
-import { supabase } from "@/integrations/supabase/client";
 
 const DEFAULT_ASSET_TYPES = [
   { id: 'power-transformer', name: 'Power Transformer', enabled: true },
@@ -46,54 +45,6 @@ const DEFAULT_LEVEL1_PRODUCTS: Level1Product[] = [
     enabled: true,
     partNumber: 'PD-1000',
     image: 'https://qualitrolcorp.com/wp-content/uploads/2024/01/Partial_Discharge_Monitor.png'
-  },
-  {
-    id: 'tm8',
-    name: 'TM8 - Advanced DGA Monitor',
-    type: 'TM8',
-    category: 'DGA Monitors',
-    description: 'Multi-gas transformer monitoring system',
-    price: 24500,
-    cost: 14700,
-    enabled: true,
-    partNumber: 'TM8-001',
-    productInfoUrl: 'https://qualitrol.com/tm8'
-  },
-  {
-    id: 'tm3',
-    name: 'TM3 - Compact DGA Monitor',
-    type: 'TM3',
-    category: 'DGA Monitors',
-    description: 'Essential dissolved gas analysis monitoring',
-    price: 18200,
-    cost: 10920,
-    enabled: true,
-    partNumber: 'TM3-001',
-    productInfoUrl: 'https://qualitrol.com/tm3'
-  },
-  {
-    id: 'tm1',
-    name: 'TM1 - Basic DGA Monitor',
-    type: 'TM1',
-    category: 'DGA Monitors',
-    description: 'Single-gas hydrogen monitoring system',
-    price: 12800,
-    cost: 7680,
-    enabled: true,
-    partNumber: 'TM1-001',
-    productInfoUrl: 'https://qualitrol.com/tm1'
-  },
-  {
-    id: 'qpdm',
-    name: 'QPDM - Partial Discharge Monitor',
-    type: 'QPDM',
-    category: 'PD Monitors',
-    description: 'Advanced partial discharge monitoring system',
-    price: 18500,
-    cost: 11100,
-    enabled: true,
-    partNumber: 'QPDM-001',
-    productInfoUrl: 'https://qualitrol.com/qpdm'
   }
 ];
 
@@ -657,27 +608,6 @@ class ProductDataService {
 
   constructor() {
     this.loadData();
-    // Fetch latest products from Supabase in the background
-    this.syncFromSupabase();
-  }
-
-  // Load products from Supabase and update local cache
-  async syncFromSupabase() {
-    try {
-      const [level1, level2, level3] = await Promise.all([
-        supabase.from('products').select('*').eq('category', 'level1'),
-        supabase.from('products').select('*').eq('category', 'level2'),
-        supabase.from('products').select('*').eq('category', 'level3')
-      ]);
-
-      if (!level1.error) this.level1Products = level1.data as Level1Product[];
-      if (!level2.error) this.level2Products = level2.data as Level2Product[];
-      if (!level3.error) this.level3Products = level3.data as Level3Product[];
-
-      this.saveData();
-    } catch (err) {
-      console.error('Failed to sync products from Supabase', err);
-    }
   }
 
   private loadData() {
@@ -738,53 +668,27 @@ class ProductDataService {
     return this.level1Products;
   }
 
-  async createLevel1Product(product: Omit<Level1Product, 'id'>): Promise<Level1Product | null> {
-    const newProduct: Level1Product = { ...product, id: `level1-${Date.now()}` };
-    const { error } = await supabase.from('products').insert({
-      id: newProduct.id,
-      name: newProduct.name,
-      description: newProduct.description,
-      price: newProduct.price,
-      cost: newProduct.cost ?? null,
-      category: 'level1',
-      is_active: newProduct.enabled
-    });
-
-    if (error) {
-      console.error('Failed to create level1 product in Supabase', error);
-      return null;
-    }
-
+  createLevel1Product(product: Omit<Level1Product, 'id'>): Level1Product {
+    const newProduct: Level1Product = {
+      ...product,
+      id: `level1-${Date.now()}`
+    };
     this.level1Products.push(newProduct);
     this.saveData();
     return newProduct;
   }
 
-  async updateLevel1Product(id: string, updates: Partial<Omit<Level1Product, 'id'>>): Promise<Level1Product | null> {
-    const { error } = await supabase.from('products').update({
-      name: updates.name,
-      description: updates.description,
-      price: updates.price,
-      cost: updates.cost,
-      is_active: updates.enabled
-    }).eq('id', id);
-
-    if (error) {
-      console.error('Failed to update level1 product in Supabase', error);
-    }
-
+  updateLevel1Product(id: string, updates: Partial<Omit<Level1Product, 'id'>>): Level1Product | null {
     const index = this.level1Products.findIndex(product => product.id === id);
     if (index !== -1) {
-      this.level1Products[index] = { ...this.level1Products[index], ...updates } as Level1Product;
+      this.level1Products[index] = { ...this.level1Products[index], ...updates };
       this.saveData();
       return this.level1Products[index];
     }
     return null;
   }
 
-  async deleteLevel1Product(id: string): Promise<void> {
-    const { error } = await supabase.from('products').delete().eq('id', id);
-    if (error) console.error('Failed to delete level1 product from Supabase', error);
+  deleteLevel1Product(id: string): void {
     this.level1Products = this.level1Products.filter(product => product.id !== id);
     this.saveData();
   }
@@ -798,55 +702,27 @@ class ProductDataService {
     return this.level2Products.filter(product => product.parentProductId === level1ProductId);
   }
 
-  async createLevel2Product(product: Omit<Level2Product, 'id'>): Promise<Level2Product | null> {
-    const newProduct: Level2Product = { ...product, id: `level2-${Date.now()}` };
-    const { error } = await supabase.from('products').insert({
-      id: newProduct.id,
-      name: newProduct.name,
-      description: newProduct.description,
-      price: newProduct.price,
-      cost: newProduct.cost ?? null,
-      category: 'level2',
-      subcategory: newProduct.parentProductId,
-      is_active: newProduct.enabled
-    });
-
-    if (error) {
-      console.error('Failed to create level2 product in Supabase', error);
-      return null;
-    }
-
+  createLevel2Product(product: Omit<Level2Product, 'id'>): Level2Product {
+    const newProduct: Level2Product = {
+      ...product,
+      id: `level2-${Date.now()}`
+    };
     this.level2Products.push(newProduct);
     this.saveData();
     return newProduct;
   }
 
-  async updateLevel2Product(id: string, updates: Partial<Omit<Level2Product, 'id'>>): Promise<Level2Product | null> {
-    const { error } = await supabase.from('products').update({
-      name: updates.name,
-      description: updates.description,
-      price: updates.price,
-      cost: updates.cost,
-      is_active: updates.enabled,
-      subcategory: updates.parentProductId
-    }).eq('id', id);
-
-    if (error) {
-      console.error('Failed to update level2 product in Supabase', error);
-    }
-
+  updateLevel2Product(id: string, updates: Partial<Omit<Level2Product, 'id'>>): Level2Product | null {
     const index = this.level2Products.findIndex(product => product.id === id);
     if (index !== -1) {
-      this.level2Products[index] = { ...this.level2Products[index], ...updates } as Level2Product;
+      this.level2Products[index] = { ...this.level2Products[index], ...updates };
       this.saveData();
       return this.level2Products[index];
     }
     return null;
   }
 
-  async deleteLevel2Product(id: string): Promise<void> {
-    const { error } = await supabase.from('products').delete().eq('id', id);
-    if (error) console.error('Failed to delete level2 product from Supabase', error);
+  deleteLevel2Product(id: string): void {
     this.level2Products = this.level2Products.filter(product => product.id !== id);
     this.saveData();
   }
@@ -860,55 +736,27 @@ class ProductDataService {
     return this.level3Products.filter(product => product.parentProductId === level2ProductId);
   }
 
-  async createLevel3Product(product: Omit<Level3Product, 'id'>): Promise<Level3Product | null> {
-    const newProduct: Level3Product = { ...product, id: `level3-${Date.now()}` };
-    const { error } = await supabase.from('products').insert({
-      id: newProduct.id,
-      name: newProduct.name,
-      description: newProduct.description,
-      price: newProduct.price,
-      cost: newProduct.cost ?? null,
-      category: 'level3',
-      subcategory: newProduct.parentProductId,
-      is_active: newProduct.enabled
-    });
-
-    if (error) {
-      console.error('Failed to create level3 product in Supabase', error);
-      return null;
-    }
-
+  createLevel3Product(product: Omit<Level3Product, 'id'>): Level3Product {
+    const newProduct: Level3Product = {
+      ...product,
+      id: `level3-${Date.now()}`
+    };
     this.level3Products.push(newProduct);
     this.saveData();
     return newProduct;
   }
 
-  async updateLevel3Product(id: string, updates: Partial<Omit<Level3Product, 'id'>>): Promise<Level3Product | null> {
-    const { error } = await supabase.from('products').update({
-      name: updates.name,
-      description: updates.description,
-      price: updates.price,
-      cost: updates.cost,
-      is_active: updates.enabled,
-      subcategory: updates.parentProductId
-    }).eq('id', id);
-
-    if (error) {
-      console.error('Failed to update level3 product in Supabase', error);
-    }
-
+  updateLevel3Product(id: string, updates: Partial<Omit<Level3Product, 'id'>>): Level3Product | null {
     const index = this.level3Products.findIndex(product => product.id === id);
     if (index !== -1) {
-      this.level3Products[index] = { ...this.level3Products[index], ...updates } as Level3Product;
+      this.level3Products[index] = { ...this.level3Products[index], ...updates };
       this.saveData();
       return this.level3Products[index];
     }
     return null;
   }
 
-  async deleteLevel3Product(id: string): Promise<void> {
-    const { error } = await supabase.from('products').delete().eq('id', id);
-    if (error) console.error('Failed to delete level3 product from Supabase', error);
+  deleteLevel3Product(id: string): void {
     this.level3Products = this.level3Products.filter(product => product.id !== id);
     this.saveData();
   }
