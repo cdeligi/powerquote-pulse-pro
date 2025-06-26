@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle, XCircle, MessageSquare } from "lucide-react";
+import { CheckCircle, XCircle, MessageSquare, DollarSign } from "lucide-react";
 import { useState } from "react";
 import { Quote } from "@/types/quote";
 import { User } from "@/types/auth";
@@ -74,56 +74,87 @@ const QuoteDetails = ({
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 gap-4 text-sm">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
             <div>
               <Label className="text-gray-400">Customer</Label>
-              <p className="text-white font-medium">{quote.customerName}</p>
+              <p className="text-white font-medium">{quote.customer_name}</p>
             </div>
             <div>
               <Label className="text-gray-400">Oracle Customer ID</Label>
-              <p className="text-white font-medium">{quote.oracleCustomerId}</p>
+              <p className="text-white font-medium">{quote.oracle_customer_id}</p>
             </div>
             <div>
               <Label className="text-gray-400">SFDC Opportunity</Label>
-              <p className="text-white font-medium">{quote.sfdcOpportunity}</p>
+              <p className="text-white font-medium">{quote.sfdc_opportunity}</p>
             </div>
             <div>
               <Label className="text-gray-400">Priority</Label>
               <p className="text-white font-medium">{quote.priority}</p>
             </div>
             <div>
-              <Label className="text-gray-400">Total</Label>
-              <p className="text-white font-medium">${quote.total.toLocaleString()}</p>
+              <Label className="text-gray-400">Original Value</Label>
+              <p className="text-white font-medium">{quote.currency} {quote.original_quote_value.toLocaleString()}</p>
             </div>
             <div>
-              <Label className="text-gray-400">Currency</Label>
-              <p className="text-white font-medium">{quote.quoteCurrency}</p>
+              <Label className="text-gray-400">After Discount</Label>
+              <p className="text-white font-medium">{quote.currency} {quote.discounted_value.toLocaleString()}</p>
+            </div>
+            <div>
+              <Label className="text-gray-400">Requested Discount</Label>
+              <p className="text-white font-medium">{quote.requested_discount}%</p>
+            </div>
+            <div>
+              <Label className="text-gray-400">Margin</Label>
+              <p className={`font-medium ${quote.discounted_margin < 25 ? 'text-yellow-400' : 'text-green-400'}`}>
+                {quote.discounted_margin.toFixed(1)}%
+              </p>
             </div>
           </div>
+
+          {quote.discount_justification && (
+            <div>
+              <Label className="text-gray-400">Discount Justification</Label>
+              <p className="text-gray-300 bg-gray-800 p-3 rounded mt-1">{quote.discount_justification}</p>
+            </div>
+          )}
         </CardContent>
       </Card>
 
       <Card className="bg-gray-900 border-gray-800">
         <CardHeader>
-          <CardTitle className="text-white">BOM Items</CardTitle>
+          <CardTitle className="text-white flex items-center">
+            <DollarSign className="h-5 w-5 mr-2" />
+            BOM Items ({quote.bom_items?.length || 0})
+          </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="space-y-3">
-            {quote.items.map((item, index) => (
-              <div key={index} className="p-3 bg-gray-800 rounded border border-gray-700">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <h4 className="text-white font-medium">{item.product?.name || 'Unknown Item'}</h4>
-                    <p className="text-gray-400 text-sm">{item.product?.description || 'No description'}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-white">Qty: {item.quantity}</p>
-                    <p className="text-white">${(item.product?.price || 0).toLocaleString()}</p>
+          {quote.bom_items && quote.bom_items.length > 0 ? (
+            <div className="space-y-3">
+              {quote.bom_items.map((item, index) => (
+                <div key={item.id || index} className="p-3 bg-gray-800 rounded border border-gray-700">
+                  <div className="flex justify-between items-start">
+                    <div className="flex-1">
+                      <h4 className="text-white font-medium">{item.name}</h4>
+                      <p className="text-gray-400 text-sm">{item.description}</p>
+                      {item.part_number && (
+                        <p className="text-gray-500 text-xs">Part#: {item.part_number}</p>
+                      )}
+                    </div>
+                    <div className="text-right ml-4">
+                      <p className="text-white font-medium">Qty: {item.quantity}</p>
+                      <p className="text-white">${item.unit_price.toLocaleString()} each</p>
+                      <p className="text-green-400 font-medium">${item.total_price.toLocaleString()} total</p>
+                      <p className="text-gray-400 text-sm">{item.margin.toFixed(1)}% margin</p>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-gray-400 text-center py-4">
+              No BOM items found for this quote.
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -274,6 +305,36 @@ const QuoteDetails = ({
                 </div>
               </div>
             )}
+          </CardContent>
+        </Card>
+      )}
+
+      {quote.status !== 'pending_approval' && (
+        <Card className="bg-gray-900 border-gray-800">
+          <CardHeader>
+            <CardTitle className="text-white">Quote Status</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              <p className="text-gray-400">
+                This quote has been <span className="text-white font-medium">{quote.status.replace('_', ' ')}</span>
+                {quote.reviewed_at && (
+                  <span> on {new Date(quote.reviewed_at).toLocaleDateString()}</span>
+                )}
+              </p>
+              {quote.approval_notes && (
+                <div>
+                  <Label className="text-gray-400">Approval Notes:</Label>
+                  <p className="text-gray-300 bg-gray-800 p-2 rounded mt-1">{quote.approval_notes}</p>
+                </div>
+              )}
+              {quote.rejection_reason && (
+                <div>
+                  <Label className="text-gray-400">Rejection Reason:</Label>
+                  <p className="text-gray-300 bg-gray-800 p-2 rounded mt-1">{quote.rejection_reason}</p>
+                </div>
+              )}
+            </div>
           </CardContent>
         </Card>
       )}

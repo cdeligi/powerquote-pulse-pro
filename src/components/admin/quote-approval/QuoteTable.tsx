@@ -47,6 +47,21 @@ const QuoteTable = ({ quotes, loading, onQuoteSelect }: QuoteTableProps) => {
     }
   };
 
+  const getPriorityColor = (priority: Quote['priority']) => {
+    switch (priority) {
+      case 'Urgent':
+        return 'bg-red-500 text-white';
+      case 'High':
+        return 'bg-orange-500 text-white';
+      case 'Medium':
+        return 'bg-yellow-500 text-white';
+      case 'Low':
+        return 'bg-green-500 text-white';
+      default:
+        return 'bg-gray-500 text-white';
+    }
+  };
+
   return (
     <Card className="bg-gray-900 border-gray-800">
       <CardHeader>
@@ -61,13 +76,17 @@ const QuoteTable = ({ quotes, loading, onQuoteSelect }: QuoteTableProps) => {
             <div className="flex justify-between items-start mb-3">
               <div>
                 <h4 className="text-white font-medium">{quote.id}</h4>
-                <p className="text-gray-400 text-sm">{quote.customerName}</p>
+                <p className="text-gray-400 text-sm">{quote.customer_name}</p>
+                <p className="text-gray-500 text-xs">Oracle: {quote.oracle_customer_id}</p>
               </div>
               <div className="flex items-center space-x-2">
                 <Badge className={getStatusColor(quote.status)}>
-                  {quote.status.replace('_', ' ')}
+                  {quote.status.replace('_', ' ').toUpperCase()}
                 </Badge>
-                {quote.total < 50000 && (
+                <Badge className={getPriorityColor(quote.priority)}>
+                  {quote.priority}
+                </Badge>
+                {quote.discounted_margin < 25 && (
                   <AlertTriangle className="h-4 w-4 text-yellow-400" />
                 )}
               </div>
@@ -75,14 +94,29 @@ const QuoteTable = ({ quotes, loading, onQuoteSelect }: QuoteTableProps) => {
             
             <div className="grid grid-cols-2 gap-4 text-sm mb-3">
               <div>
-                <span className="text-gray-400">Total:</span>
-                <span className="text-white ml-2">${quote.total.toLocaleString()}</span>
+                <span className="text-gray-400">Original Value:</span>
+                <span className="text-white ml-2">{quote.currency} {quote.original_quote_value.toLocaleString()}</span>
               </div>
               <div>
-                <span className="text-gray-400">Priority:</span>
-                <span className="text-white ml-2">{quote.priority}</span>
+                <span className="text-gray-400">After Discount:</span>
+                <span className="text-white ml-2">{quote.currency} {quote.discounted_value.toLocaleString()}</span>
+              </div>
+              <div>
+                <span className="text-gray-400">Margin:</span>
+                <span className="text-white ml-2">{quote.discounted_margin.toFixed(1)}%</span>
+              </div>
+              <div>
+                <span className="text-gray-400">BOM Items:</span>
+                <span className="text-white ml-2">{quote.bom_items?.length || 0}</span>
               </div>
             </div>
+
+            {quote.discount_justification && (
+              <div className="mb-3">
+                <p className="text-gray-400 text-xs mb-1">Discount Justification:</p>
+                <p className="text-gray-300 text-sm bg-gray-700 p-2 rounded">{quote.discount_justification}</p>
+              </div>
+            )}
             
             <Button
               variant="outline"
@@ -91,7 +125,7 @@ const QuoteTable = ({ quotes, loading, onQuoteSelect }: QuoteTableProps) => {
               className="w-full border-blue-600 text-blue-400 hover:bg-blue-900/20"
             >
               <FileText className="h-4 w-4 mr-1" />
-              View Details
+              View Details & BOM
             </Button>
           </div>
         ))}

@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Quote } from '@/types/quote';
 import { User } from '@/types/auth';
-import { toast } from "@/components/ui/use-toast"
+import { toast } from "@/hooks/use-toast"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
 import QuoteTable from './quote-approval/QuoteTable';
@@ -22,29 +22,47 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
   const [activeTab, setActiveTab] = useState("pending_approval");
 
   const fetchData = async () => {
+    console.log('Fetching quotes for approval dashboard...');
     setLoading(true);
     try {
-      const { data, error } = await supabase
+      const { data: quotesData, error: quotesError } = await supabase
         .from('quotes')
-        .select(`
-          *,
-          bom_items (
-            *,
-            product: products (*)
-          )
-        `)
+        .select('*')
         .order('created_at', { ascending: false });
 
-      if (error) {
-        console.error('Error fetching quotes:', error);
+      if (quotesError) {
+        console.error('Error fetching quotes:', quotesError);
         toast({
           title: "Error",
           description: "Failed to fetch quotes. Please try again.",
           variant: "destructive",
         });
-      } else {
-        setQuotes(data as Quote[]);
+        return;
       }
+
+      console.log(`Fetched ${quotesData?.length || 0} quotes from database`);
+
+      // Fetch BOM items for each quote
+      const quotesWithBOM = await Promise.all(
+        (quotesData || []).map(async (quote) => {
+          const { data: bomItems, error: bomError } = await supabase
+            .from('bom_items')
+            .select('*')
+            .eq('quote_id', quote.id);
+
+          if (bomError) {
+            console.error(`Error fetching BOM items for quote ${quote.id}:`, bomError);
+          }
+
+          return {
+            ...quote,
+            bom_items: bomItems || []
+          } as Quote;
+        })
+      );
+
+      console.log('Quotes with BOM items:', quotesWithBOM);
+      setQuotes(quotesWithBOM);
     } catch (error) {
       console.error('Unexpected error fetching quotes:', error);
       toast({
@@ -74,6 +92,7 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
   });
 
   const handleQuoteSelect = (quote: Quote) => {
+    console.log('Selected quote:', quote);
     setSelectedQuote(quote);
   };
 
@@ -83,6 +102,7 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
     notes?: string,
     updatedBOMItems?: any[]
   ) => {
+    console.log(`Processing ${action} for quote ${quoteId} with notes:`, notes);
     setActionLoading(prev => ({ ...prev, [quoteId]: true }));
     
     try {
@@ -166,16 +186,22 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
     }
   };
 
+  console.log('Current quotes state:', quotes);
+  console.log('Filtered quotes for tab:', activeTab, filteredQuotes);
+
   return (
     <div className="container mx-auto p-6">
       <h1 className="text-3xl font-semibold text-white mb-6">Quote Approval Dashboard</h1>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-4">
         <TabsList>
-          <TabsTrigger value="pending_approval">Pending Quotes</TabsTrigger>
-          <TabsTrigger value="reviewed">Reviewed Quotes</TabsTrigger>
+          <TabsTrigger value="pending_approval">
+            Pending Quotes ({quotes.filter(q => q.status === 'pending_approval').length})
+          </TabsTrigger>
+          <TabsTrigger value="reviewed">
+            Reviewed Quotes ({quotes.filter(q => q.status !== 'pending_approval').length})
+          </TabsTrigger>
         </TabsList>
-        
       </Tabs>
 
       <div className="mb-4 flex items-center justify-between">
@@ -183,7 +209,7 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
           {activeTab === "pending_approval" ? "Pending Quotes" : "Reviewed Quotes"}
         </h2>
         <Button variant="outline" disabled={loading} onClick={refetch}>
-          <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+          <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
           {loading ? "Loading..." : "Refresh"}
         </Button>
       </div>
