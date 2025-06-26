@@ -21,7 +21,11 @@ import Level2OptionForm from "./product-forms/Level2OptionForm";
 import CardForm from "./product-forms/CardForm";
 import { useToast } from "@/hooks/use-toast";
 import { productDataService } from "@/services/productDataService";
+codex/adicionar-ícone-de-motor-nas-telas-de-gerenciamento
+import AnalogDefaultsDialog from "./defaults/AnalogDefaultsDialog";
+import BushingDefaultsDialog from "./defaults/BushingDefaultsDialog";
 import SensorConfigManagement from "./SensorConfigManagement";
+main
 
 interface ProductManagementProps {
   user: User;
@@ -33,6 +37,8 @@ const ProductManagement = ({ user }: ProductManagementProps) => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogType, setDialogType] = useState<'level1' | 'level2' | 'level3'>('level1');
   const [refreshKey, setRefreshKey] = useState(0);
+  const [settingsProduct, setSettingsProduct] = useState<Level3Product | null>(null);
+  const [settingsType, setSettingsType] = useState<'analog' | 'bushing' | null>(null);
   const { toast } = useToast();
 
   // Use productDataService instead of local state
@@ -196,6 +202,16 @@ const ProductManagement = ({ user }: ProductManagementProps) => {
     setEditingProduct(null);
     setDialogType(type);
     setDialogOpen(true);
+  };
+
+  const openSettingsDialog = (product: Level3Product) => {
+    if (product.name.toLowerCase().includes('analog')) {
+      setSettingsType('analog');
+      setSettingsProduct(product);
+    } else if (product.name.toLowerCase().includes('bushing')) {
+      setSettingsType('bushing');
+      setSettingsProduct(product);
+    }
   };
 
   return (
@@ -514,17 +530,27 @@ const ProductManagement = ({ user }: ProductManagementProps) => {
                         </div>
                       </div>
                       <div className="flex space-x-2">
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
+                        <Button
+                          variant="ghost"
+                          size="sm"
                           className="text-blue-400 hover:text-blue-300"
                           onClick={() => openEditDialog(product, 'level3')}
                         >
                           <Edit2 className="h-4 w-4" />
                         </Button>
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
+                        {(product.name.toLowerCase().includes('analog') || product.name.toLowerCase().includes('bushing')) && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-gray-400 hover:text-gray-200"
+                            onClick={() => openSettingsDialog(product)}
+                          >
+                            <Settings className="h-4 w-4" />
+                          </Button>
+                        )}
+                        <Button
+                          variant="ghost"
+                          size="sm"
                           className="text-red-400 hover:text-red-300"
                           onClick={() => handleDeleteLevel3Product(product.id)}
                         >
@@ -607,6 +633,26 @@ const ProductManagement = ({ user }: ProductManagementProps) => {
           )}
         </DialogContent>
       </Dialog>
+
+      {settingsProduct && settingsType === 'analog' && (
+        <AnalogDefaultsDialog
+          product={settingsProduct}
+          onClose={() => {
+            setSettingsProduct(null);
+            setSettingsType(null);
+          }}
+        />
+      )}
+
+      {settingsProduct && settingsType === 'bushing' && (
+        <BushingDefaultsDialog
+          product={settingsProduct}
+          onClose={() => {
+            setSettingsProduct(null);
+            setSettingsType(null);
+          }}
+        />
+      )}
     </div>
   );
 };
