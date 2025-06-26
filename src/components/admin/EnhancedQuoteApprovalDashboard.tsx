@@ -272,6 +272,7 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
                 quotes={filteredQuotes}
                 loading={loading}
                 onQuoteSelect={handleQuoteSelect}
+                isAdmin={user?.role === 'admin'}
               />
             </div>
           </>
@@ -283,6 +284,7 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
                 quotes={filteredQuotes}
                 loading={loading}
                 onQuoteSelect={handleQuoteSelect}
+                isAdmin={user?.role === 'admin'}
               />
             </div>
 
