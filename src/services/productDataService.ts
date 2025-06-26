@@ -1,10 +1,19 @@
-import { Level1Product, Level2Product, Level3Product, AssetType } from "@/types/product";
+import {
+  Level1Product,
+  Level2Product,
+  Level3Product,
+  AssetType,
+  AnalogSensorOption,
+  BushingTapModelOption,
+} from "@/types/product";
 import { supabase } from "@/integrations/supabase/client";
 import {
   DEFAULT_ASSET_TYPES,
   DEFAULT_LEVEL1_PRODUCTS,
   DEFAULT_LEVEL2_PRODUCTS,
-  DEFAULT_LEVEL3_PRODUCTS
+  DEFAULT_LEVEL3_PRODUCTS,
+  DEFAULT_ANALOG_SENSORS,
+  DEFAULT_BUSHING_TAP_MODELS
 } from "@/data/productDefaults";
 
 class ProductDataService {
@@ -12,6 +21,8 @@ class ProductDataService {
   private level2Products: Level2Product[] = [];
   private level3Products: Level3Product[] = [];
   private assetTypes: AssetType[] = [];
+  private analogSensorTypes: AnalogSensorOption[] = [];
+  private bushingTapModels: BushingTapModelOption[] = [];
 
   constructor() {
     this.loadData();
@@ -20,6 +31,12 @@ class ProductDataService {
   private loadData() {
     const storedAssetTypes = localStorage.getItem('assetTypes');
     this.assetTypes = storedAssetTypes ? JSON.parse(storedAssetTypes) : [];
+
+    const storedAnalogSensorTypes = localStorage.getItem('analogSensorTypes');
+    this.analogSensorTypes = storedAnalogSensorTypes ? JSON.parse(storedAnalogSensorTypes) : [];
+
+    const storedBushingTapModels = localStorage.getItem('bushingTapModels');
+    this.bushingTapModels = storedBushingTapModels ? JSON.parse(storedBushingTapModels) : [];
 
     const storedLevel1Products = localStorage.getItem('level1Products');
     this.level1Products = storedLevel1Products ? JSON.parse(storedLevel1Products) : [];
@@ -35,6 +52,8 @@ class ProductDataService {
 
   private saveData() {
     localStorage.setItem('assetTypes', JSON.stringify(this.assetTypes));
+    localStorage.setItem('analogSensorTypes', JSON.stringify(this.analogSensorTypes));
+    localStorage.setItem('bushingTapModels', JSON.stringify(this.bushingTapModels));
     localStorage.setItem('level1Products', JSON.stringify(this.level1Products));
     localStorage.setItem('level2Products', JSON.stringify(this.level2Products));
     localStorage.setItem('level3Products', JSON.stringify(this.level3Products));
@@ -68,6 +87,90 @@ class ProductDataService {
   deleteAssetType(id: string) {
     this.assetTypes = this.assetTypes.filter(type => type.id !== id);
     this.saveData();
+  }
+
+  // Analog Sensor Types
+  getAnalogSensorTypes() {
+    return this.analogSensorTypes;
+  }
+
+  async createAnalogSensorType(sensor: Omit<AnalogSensorOption, 'id'>) {
+    const newSensor: AnalogSensorOption = { ...sensor, id: `sensor-${Date.now()}` };
+    this.analogSensorTypes.push(newSensor);
+    this.saveData();
+    try {
+      await supabase.from('analog_sensor_types').insert({ id: newSensor.id, name: newSensor.name, description: newSensor.description });
+    } catch (error) {
+      console.error('Failed to persist analog sensor type', error);
+    }
+    return newSensor;
+  }
+
+  async updateAnalogSensorType(id: string, updates: Partial<Omit<AnalogSensorOption, 'id'>>) {
+    const index = this.analogSensorTypes.findIndex(t => t.id === id);
+    if (index !== -1) {
+      this.analogSensorTypes[index] = { ...this.analogSensorTypes[index], ...updates };
+      this.saveData();
+      try {
+        await supabase.from('analog_sensor_types').update({ name: this.analogSensorTypes[index].name, description: this.analogSensorTypes[index].description }).eq('id', id);
+      } catch (error) {
+        console.error('Failed to update analog sensor type', error);
+      }
+      return this.analogSensorTypes[index];
+    }
+    return null;
+  }
+
+  async deleteAnalogSensorType(id: string) {
+    this.analogSensorTypes = this.analogSensorTypes.filter(t => t.id !== id);
+    this.saveData();
+    try {
+      await supabase.from('analog_sensor_types').delete().eq('id', id);
+    } catch (error) {
+      console.error('Failed to delete analog sensor type', error);
+    }
+  }
+
+  // Bushing Tap Models
+  getBushingTapModels() {
+    return this.bushingTapModels;
+  }
+
+  async createBushingTapModel(model: Omit<BushingTapModelOption, 'id'>) {
+    const newModel: BushingTapModelOption = { ...model, id: `bushing-${Date.now()}` };
+    this.bushingTapModels.push(newModel);
+    this.saveData();
+    try {
+      await supabase.from('bushing_tap_models').insert({ id: newModel.id, name: newModel.name });
+    } catch (error) {
+      console.error('Failed to persist bushing tap model', error);
+    }
+    return newModel;
+  }
+
+  async updateBushingTapModel(id: string, updates: Partial<Omit<BushingTapModelOption, 'id'>>) {
+    const index = this.bushingTapModels.findIndex(b => b.id === id);
+    if (index !== -1) {
+      this.bushingTapModels[index] = { ...this.bushingTapModels[index], ...updates };
+      this.saveData();
+      try {
+        await supabase.from('bushing_tap_models').update({ name: this.bushingTapModels[index].name }).eq('id', id);
+      } catch (error) {
+        console.error('Failed to update bushing tap model', error);
+      }
+      return this.bushingTapModels[index];
+    }
+    return null;
+  }
+
+  async deleteBushingTapModel(id: string) {
+    this.bushingTapModels = this.bushingTapModels.filter(b => b.id !== id);
+    this.saveData();
+    try {
+      await supabase.from('bushing_tap_models').delete().eq('id', id);
+    } catch (error) {
+      console.error('Failed to delete bushing tap model', error);
+    }
   }
 
   // Level 1 Products methods
@@ -349,6 +452,14 @@ class ProductDataService {
 
     if (this.level3Products.length === 0) {
       this.level3Products = [...DEFAULT_LEVEL3_PRODUCTS];
+    }
+
+    if (this.analogSensorTypes.length === 0) {
+      this.analogSensorTypes = [...DEFAULT_ANALOG_SENSORS];
+    }
+
+    if (this.bushingTapModels.length === 0) {
+      this.bushingTapModels = [...DEFAULT_BUSHING_TAP_MODELS];
     }
     this.saveData();
   }
