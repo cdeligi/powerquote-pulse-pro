@@ -5,8 +5,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { CheckCircle, XCircle, MessageSquare, DollarSign, Edit3, Save, X } from "lucide-react";
-import { useState } from "react";
+import { CheckCircle, XCircle, MessageSquare, DollarSign, Edit3, Save, X, Settings } from "lucide-react";
+import QTMSConfigurationEditor from "@/components/bom/QTMSConfigurationEditor";
+import { consolidateQTMSConfiguration, QTMSConfiguration, ConsolidatedQTMS } from "@/utils/qtmsConsolidation";
+import { useState, useEffect } from "react";
 import { Quote, BOMItemWithDetails } from "@/types/quote";
 import { User } from "@/types/auth";
 
@@ -46,6 +48,25 @@ const QuoteDetails = ({
       product: item.product
     }))
   );
+  const [qtmsConfig, setQtmsConfig] = useState<ConsolidatedQTMS | null>(null);
+  const [editingQTMS, setEditingQTMS] = useState(false);
+
+  useEffect(() => {
+    const item = bomItems.find(i => i.product.type === 'QTMS' && i.configuration);
+    if (item && item.configuration) {
+      const config = item.configuration as QTMSConfiguration;
+      const consolidated = consolidateQTMSConfiguration(
+        config.chassis,
+        config.slotAssignments,
+        config.hasRemoteDisplay,
+        config.analogConfigurations,
+        config.bushingConfigurations
+      );
+      setQtmsConfig({ ...consolidated, id: item.id, price: item.unit_price, name: item.name, description: item.description || '' });
+    } else {
+      setQtmsConfig(null);
+    }
+  }, [bomItems]);
 
   const handleApprove = () => {
     onApprove(approvalNotes, bomItems);
@@ -91,6 +112,28 @@ const QuoteDetails = ({
       delete updated[itemId];
       return updated;
     });
+  };
+
+  const handleQTMSConfigurationSave = (updated: ConsolidatedQTMS) => {
+    setBomItems(prev => prev.map(item => {
+      if (item.id === updated.id) {
+        const newItem = {
+          ...item,
+          name: updated.name,
+          description: updated.description,
+          part_number: updated.partNumber,
+          unit_price: updated.price,
+          total_price: updated.price * item.quantity,
+          margin: updated.price > 0 ? ((updated.price - item.unit_cost) / updated.price) * 100 : 0,
+          configuration: updated.configuration,
+          product: { ...item.product, name: updated.name, description: updated.description, price: updated.price, partNumber: updated.partNumber }
+        } as BOMItemWithDetails;
+        return newItem;
+      }
+      return item;
+    }));
+    setQtmsConfig(updated);
+    setEditingQTMS(false);
   };
 
   const calculateTotals = () => {
@@ -257,15 +300,30 @@ const QuoteDetails = ({
                         </Badge>
                       )}
                     </div>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => handlePriceEdit(item.id, item.unit_price.toString())}
-                      className="h-6 w-6 p-0 text-gray-400 hover:text-white"
-                      title="Edit unit price"
-                    >
-                      <Edit3 className="h-3 w-3" />
-                    </Button>
+                    <div className="flex space-x-1">
+                      {item.product.type === 'QTMS' && item.configuration && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => {
+                            setEditingQTMS(true);
+                          }}
+                          className="h-6 w-6 p-0 text-purple-400 hover:text-purple-300"
+                          title="Edit configuration"
+                        >
+                          <Settings className="h-3 w-3" />
+                        </Button>
+                      )}
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => handlePriceEdit(item.id, item.unit_price.toString())}
+                        className="h-6 w-6 p-0 text-gray-400 hover:text-white"
+                        title="Edit unit price"
+                      >
+                        <Edit3 className="h-3 w-3" />
+                      </Button>
+                    </div>
                   </div>
                   
                   <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
@@ -338,6 +396,16 @@ const QuoteDetails = ({
           )}
         </CardContent>
       </Card>
+
+      {qtmsConfig && (
+        <QTMSConfigurationEditor
+          consolidatedQTMS={qtmsConfig}
+          onSave={handleQTMSConfigurationSave}
+          onClose={() => setEditingQTMS(false)}
+          canSeePrices={true}
+          readOnly={!editingQTMS}
+        />
+      )}
 
       {/* Approval Actions */}
       {quote.status === 'pending_approval' && (
