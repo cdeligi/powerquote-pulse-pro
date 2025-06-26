@@ -599,3 +599,4 @@ export const DEFAULT_LEVEL3_PRODUCTS: Level3Product[] = [
     }
   }
 ];
+export { DEFAULT_ANALOG_SENSORS, DEFAULT_BUSHING_TAP_MODELS } from '@/types/product/sensor-config';

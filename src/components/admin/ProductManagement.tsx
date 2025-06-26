@@ -21,8 +21,11 @@ import Level2OptionForm from "./product-forms/Level2OptionForm";
 import CardForm from "./product-forms/CardForm";
 import { useToast } from "@/hooks/use-toast";
 import { productDataService } from "@/services/productDataService";
+codex/adicionar-ícone-de-motor-nas-telas-de-gerenciamento
 import AnalogDefaultsDialog from "./defaults/AnalogDefaultsDialog";
 import BushingDefaultsDialog from "./defaults/BushingDefaultsDialog";
+import SensorConfigManagement from "./SensorConfigManagement";
+main
 
 interface ProductManagementProps {
   user: User;
@@ -361,6 +364,7 @@ const ProductManagement = ({ user }: ProductManagementProps) => {
               );
             })}
           </div>
+          <SensorConfigManagement />
         </TabsContent>
 
         {/* Level 2 Products */}
