@@ -22,6 +22,9 @@ const QuoteTable = ({ quotes, loading, onQuoteSelect, isAdmin = false }: QuoteTa
 
 const QuoteTable = ({ quotes, loading, onQuoteSelect }: QuoteTableProps) => {
   const [expandedId, setExpandedId] = useState<string | null>(null);
+qnwid3-codex/implement-search-bar-with-filters
+
+main
 main
   if (loading) {
     return (
@@ -79,6 +82,38 @@ main
         <CardTitle className="text-white">Quotes ({quotes.length})</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
+      qnwid3-codex/implement-search-bar-with-filters
+        {quotes.map((quote) => {
+          const expanded = expandedId === quote.id;
+          return (
+            <div
+              key={quote.id}
+              className="p-4 bg-gray-800 rounded-lg border border-gray-700 hover:border-red-500 transition-colors"
+            >
+              <div className="flex justify-between items-start mb-2">
+                <div>
+                  <h4 className="text-white font-medium">{quote.id}</h4>
+                  <p className="text-gray-400 text-sm">{quote.customer_name}</p>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <p className="text-white font-medium">
+                    {quote.currency} {quote.discounted_value.toLocaleString()}
+                  </p>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setExpandedId(expanded ? null : quote.id)}
+                  >
+                    {expanded ? (
+                      <ChevronUp className="h-4 w-4" />
+                    ) : (
+                      <ChevronDown className="h-4 w-4" />
+                    )}
+                  </Button>
+                </div>
+              </div>
+
+
       codex/extend-quotetable-with-cost-and-margin-columns
         {quotes.map((quote) => (
           <div
@@ -160,6 +195,7 @@ main
               main
               </div>
 
+              main
               {expanded && (
                 <>
                   <div className="flex items-center space-x-2 mb-3">
