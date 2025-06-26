@@ -27,7 +27,6 @@ const PDProductSelector = ({ onProductSelect, canSeePrices }: PDProductSelectorP
       type: 'QPDM',
       description: 'Advanced partial discharge monitoring system',
       price: 18500,
-      cost: 13500,
       enabled: true,
       partNumber: 'QPDM-001',
       productInfoUrl: 'https://qualitrol.com/qpdm'
@@ -42,7 +41,6 @@ const PDProductSelector = ({ onProductSelect, canSeePrices }: PDProductSelectorP
       type: 'Standard',
       description: 'Enhanced PD pattern analysis software',
       price: 1200,
-      cost: 800,
       enabled: false,
       partNumber: 'QPDM-SW'
     },
@@ -53,7 +51,6 @@ const PDProductSelector = ({ onProductSelect, canSeePrices }: PDProductSelectorP
       type: 'Standard',
       description: 'External PD sensor for transformer monitoring',
       price: 3200,
-      cost: 2200,
       enabled: false,
       partNumber: 'PDS-001'
     },
@@ -64,7 +61,6 @@ const PDProductSelector = ({ onProductSelect, canSeePrices }: PDProductSelectorP
       type: 'Standard',
       description: 'Ultra-high frequency PD detection sensor',
       price: 4800,
-      cost: 3300,
       enabled: false,
       partNumber: 'UHF-001'
     },
@@ -75,7 +71,6 @@ const PDProductSelector = ({ onProductSelect, canSeePrices }: PDProductSelectorP
       type: 'Standard',
       description: 'Portable PD calibration source',
       price: 850,
-      cost: 600,
       enabled: false,
       partNumber: 'PDC-001'
     },
@@ -86,7 +81,6 @@ const PDProductSelector = ({ onProductSelect, canSeePrices }: PDProductSelectorP
       type: 'Standard',
       description: 'Low-noise UHF signal amplifier',
       price: 680,
-      cost: 450,
       enabled: false,
       partNumber: 'UHFA-001'
     }
