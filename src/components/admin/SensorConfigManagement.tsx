@@ -63,6 +63,11 @@ const SensorConfigManagement = () => {
     }
   };
 
+  const handleCancelBushing = () => {
+    setBushingForm({ name: "" });
+    setEditingBushingId(null);
+  };
+
   return (
     <div className="space-y-6">
       <Card className="bg-gray-900 border-gray-800">
@@ -114,11 +119,27 @@ const SensorConfigManagement = () => {
           ))}
           <div>
             <Label htmlFor="bushing-name" className="text-white text-sm">Name</Label>
-            <Input id="bushing-name" value={bushingForm.name} onChange={e => setBushingForm({ name: e.target.value })} className="bg-gray-800 border-gray-700 text-white" />
+            <Input
+              id="bushing-name"
+              value={bushingForm.name}
+              onChange={e => setBushingForm({ name: e.target.value })}
+              className="bg-gray-800 border-gray-700 text-white"
+            />
           </div>
-          <Button className="bg-red-600 hover:bg-red-700" onClick={handleSaveBushing} disabled={!bushingForm.name}>
-            {editingBushingId ? "Update" : "Add"} Tap Model
-          </Button>
+          <div className="flex space-x-2">
+            <Button
+              className="bg-red-600 hover:bg-red-700"
+              onClick={handleSaveBushing}
+              disabled={!bushingForm.name}
+            >
+              {editingBushingId ? "Update" : "Add"} Tap Model
+            </Button>
+            {editingBushingId && (
+              <Button variant="outline" onClick={handleCancelBushing}>
+                Cancel
+              </Button>
+            )}
+          </div>
         </CardContent>
       </Card>
     </div>
