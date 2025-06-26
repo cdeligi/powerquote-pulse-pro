@@ -1,4 +1,5 @@
 import { Level1Product, Level2Product, Level3Product, AssetType } from "@/types/product";
+import { supabase } from "@/integrations/supabase/client";
 import {
   DEFAULT_ASSET_TYPES,
   DEFAULT_LEVEL1_PRODUCTS,
@@ -74,29 +75,67 @@ class ProductDataService {
     return this.level1Products;
   }
 
-  createLevel1Product(product: Omit<Level1Product, 'id'>): Level1Product {
+  async createLevel1Product(product: Omit<Level1Product, 'id'>): Promise<Level1Product> {
     const newProduct: Level1Product = {
       ...product,
       id: `level1-${Date.now()}`
     };
     this.level1Products.push(newProduct);
     this.saveData();
+
+    try {
+      await supabase.from('products').insert({
+        id: newProduct.id,
+        name: newProduct.name,
+        description: newProduct.description,
+        category: 'level1',
+        subcategory: newProduct.type,
+        price: newProduct.price,
+        cost: newProduct.cost ?? null,
+        is_active: newProduct.enabled
+      });
+    } catch (error) {
+      console.error('Failed to persist level1 product', error);
+    }
+
     return newProduct;
   }
 
-  updateLevel1Product(id: string, updates: Partial<Omit<Level1Product, 'id'>>): Level1Product | null {
+  async updateLevel1Product(id: string, updates: Partial<Omit<Level1Product, 'id'>>): Promise<Level1Product | null> {
     const index = this.level1Products.findIndex(product => product.id === id);
     if (index !== -1) {
       this.level1Products[index] = { ...this.level1Products[index], ...updates };
       this.saveData();
+
+      try {
+        await supabase.from('products')
+          .update({
+            name: this.level1Products[index].name,
+            description: this.level1Products[index].description,
+            subcategory: this.level1Products[index].type,
+            price: this.level1Products[index].price,
+            cost: this.level1Products[index].cost ?? null,
+            is_active: this.level1Products[index].enabled
+          })
+          .eq('id', id);
+      } catch (error) {
+        console.error('Failed to update level1 product', error);
+      }
+
       return this.level1Products[index];
     }
     return null;
   }
 
-  deleteLevel1Product(id: string): void {
+  async deleteLevel1Product(id: string): Promise<void> {
     this.level1Products = this.level1Products.filter(product => product.id !== id);
     this.saveData();
+
+    try {
+      await supabase.from('products').delete().eq('id', id);
+    } catch (error) {
+      console.error('Failed to delete level1 product', error);
+    }
   }
 
   // Level 2 Products methods
@@ -108,29 +147,83 @@ class ProductDataService {
     return this.level2Products.filter(product => product.parentProductId === level1ProductId);
   }
 
-  createLevel2Product(product: Omit<Level2Product, 'id'>): Level2Product {
+  async createLevel2Product(product: Omit<Level2Product, 'id'>): Promise<Level2Product> {
     const newProduct: Level2Product = {
       ...product,
       id: `level2-${Date.now()}`
     };
     this.level2Products.push(newProduct);
     this.saveData();
+
+    try {
+      await supabase.from('products').insert({
+        id: newProduct.id,
+        name: newProduct.name,
+        description: newProduct.description,
+        category: 'level2',
+        subcategory: newProduct.type,
+        price: newProduct.price,
+        cost: newProduct.cost ?? null,
+        is_active: newProduct.enabled
+      });
+      await supabase.from('level1_level2_relationships').insert({
+        level1_product_id: newProduct.parentProductId,
+        level2_product_id: newProduct.id
+      });
+    } catch (error) {
+      console.error('Failed to persist level2 product', error);
+    }
+
     return newProduct;
   }
 
-  updateLevel2Product(id: string, updates: Partial<Omit<Level2Product, 'id'>>): Level2Product | null {
+  async updateLevel2Product(id: string, updates: Partial<Omit<Level2Product, 'id'>>): Promise<Level2Product | null> {
     const index = this.level2Products.findIndex(product => product.id === id);
     if (index !== -1) {
+      const oldParent = this.level2Products[index].parentProductId;
       this.level2Products[index] = { ...this.level2Products[index], ...updates };
       this.saveData();
+
+      try {
+        await supabase.from('products')
+          .update({
+            name: this.level2Products[index].name,
+            description: this.level2Products[index].description,
+            subcategory: this.level2Products[index].type,
+            price: this.level2Products[index].price,
+            cost: this.level2Products[index].cost ?? null,
+            is_active: this.level2Products[index].enabled
+          })
+          .eq('id', id);
+
+        if (updates.parentProductId && updates.parentProductId !== oldParent) {
+          await supabase.from('level1_level2_relationships')
+            .delete()
+            .eq('level2_product_id', id);
+          await supabase.from('level1_level2_relationships').insert({
+            level1_product_id: updates.parentProductId,
+            level2_product_id: id
+          });
+        }
+      } catch (error) {
+        console.error('Failed to update level2 product', error);
+      }
+
       return this.level2Products[index];
     }
     return null;
   }
 
-  deleteLevel2Product(id: string): void {
+  async deleteLevel2Product(id: string): Promise<void> {
     this.level2Products = this.level2Products.filter(product => product.id !== id);
     this.saveData();
+
+    try {
+      await supabase.from('level1_level2_relationships').delete().eq('level2_product_id', id);
+      await supabase.from('products').delete().eq('id', id);
+    } catch (error) {
+      console.error('Failed to delete level2 product', error);
+    }
   }
 
   // Level 3 Products methods
@@ -142,29 +235,83 @@ class ProductDataService {
     return this.level3Products.filter(product => product.parentProductId === level2ProductId);
   }
 
-  createLevel3Product(product: Omit<Level3Product, 'id'>): Level3Product {
+  async createLevel3Product(product: Omit<Level3Product, 'id'>): Promise<Level3Product> {
     const newProduct: Level3Product = {
       ...product,
       id: `level3-${Date.now()}`
     };
     this.level3Products.push(newProduct);
     this.saveData();
+
+    try {
+      await supabase.from('products').insert({
+        id: newProduct.id,
+        name: newProduct.name,
+        description: newProduct.description,
+        category: 'level3',
+        subcategory: newProduct.type,
+        price: newProduct.price,
+        cost: newProduct.cost ?? null,
+        is_active: newProduct.enabled ?? true
+      });
+      await supabase.from('level2_level3_relationships').insert({
+        level2_product_id: newProduct.parentProductId,
+        level3_product_id: newProduct.id
+      });
+    } catch (error) {
+      console.error('Failed to persist level3 product', error);
+    }
+
     return newProduct;
   }
 
-  updateLevel3Product(id: string, updates: Partial<Omit<Level3Product, 'id'>>): Level3Product | null {
+  async updateLevel3Product(id: string, updates: Partial<Omit<Level3Product, 'id'>>): Promise<Level3Product | null> {
     const index = this.level3Products.findIndex(product => product.id === id);
     if (index !== -1) {
+      const oldParent = this.level3Products[index].parentProductId;
       this.level3Products[index] = { ...this.level3Products[index], ...updates };
       this.saveData();
+
+      try {
+        await supabase.from('products')
+          .update({
+            name: this.level3Products[index].name,
+            description: this.level3Products[index].description,
+            subcategory: this.level3Products[index].type,
+            price: this.level3Products[index].price,
+            cost: this.level3Products[index].cost ?? null,
+            is_active: this.level3Products[index].enabled ?? true
+          })
+          .eq('id', id);
+
+        if (updates.parentProductId && updates.parentProductId !== oldParent) {
+          await supabase.from('level2_level3_relationships')
+            .delete()
+            .eq('level3_product_id', id);
+          await supabase.from('level2_level3_relationships').insert({
+            level2_product_id: updates.parentProductId,
+            level3_product_id: id
+          });
+        }
+      } catch (error) {
+        console.error('Failed to update level3 product', error);
+      }
+
       return this.level3Products[index];
     }
     return null;
   }
 
-  deleteLevel3Product(id: string): void {
+  async deleteLevel3Product(id: string): Promise<void> {
     this.level3Products = this.level3Products.filter(product => product.id !== id);
     this.saveData();
+
+    try {
+      await supabase.from('level2_level3_relationships').delete().eq('level3_product_id', id);
+      await supabase.from('products').delete().eq('id', id);
+    } catch (error) {
+      console.error('Failed to delete level3 product', error);
+    }
   }
 
   isLevel3AvailableForLevel2(level3: Level3Product, level2: Level2Product): boolean {
