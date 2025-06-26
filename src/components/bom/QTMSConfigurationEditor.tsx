@@ -116,7 +116,7 @@ const QTMSConfigurationEditor = ({
         
         // Clear existing bushing cards
         if (placement.shouldClearExisting) {
-          placement.existingSlotsTolear.forEach(slotToClear => {
+          placement.existingSlotsToClear.forEach(slotToClear => {
             delete updated[slotToClear];
           });
         }
