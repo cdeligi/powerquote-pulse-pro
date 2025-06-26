@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { RefreshCw, Database, AlertCircle, CheckCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/use-toast";
+import { productDataService } from "@/services/productDataService";
 
 interface ProductSyncStats {
   level1Count: number;
@@ -41,6 +42,13 @@ const ProductSyncManager = () => {
       if (level1Result.error) throw level1Result.error;
       if (level2Result.error) throw level2Result.error;
       if (level3Result.error) throw level3Result.error;
+
+      // Persist fetched products to local storage
+      productDataService.replaceAllProducts(
+        level1Result.data || [],
+        level2Result.data || [],
+        level3Result.data || []
+      );
 
       // Update local state with fresh data
       setSyncStats({
