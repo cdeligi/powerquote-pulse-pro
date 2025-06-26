@@ -35,14 +35,15 @@ const QuoteDetails = ({
     (quote.bom_items || []).map(item => ({
       ...item,
       id: item.id || Math.random().toString(),
-      name: item.name || 'Unknown Item',
-      description: item.description || '',
-      part_number: item.part_number || '',
-      unit_price: item.unit_price || 0,
-      unit_cost: item.unit_cost || 0,
-      total_price: item.total_price || 0,
+      name: item.name || item.product?.name || 'Unknown Item',
+      description: item.description || item.product?.description || '',
+      part_number: item.part_number || item.partNumber || '',
+      unit_price: item.unit_price || item.product?.price || 0,
+      unit_cost: item.unit_cost || item.product?.cost || 0,
+      total_price: item.total_price || (item.product?.price || 0) * item.quantity,
       margin: item.margin || 0,
-      quantity: item.quantity || 1
+      quantity: item.quantity || 1,
+      product: item.product
     }))
   );
 

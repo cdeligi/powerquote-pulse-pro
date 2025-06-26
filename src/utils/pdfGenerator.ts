@@ -46,21 +46,21 @@ export const generateQuotePDF = (
       <div class="quote-info">
         <div class="info-section">
           <div class="info-title">Customer Information</div>
-          <p><strong>Customer Name:</strong> ${quoteInfo.customerName || 'Not specified'}</p>
-          <p><strong>Oracle Customer ID:</strong> ${quoteInfo.oracleCustomerId || 'Not specified'}</p>
+          <p><strong>Customer Name:</strong> ${quoteInfo.customer_name || 'Not specified'}</p>
+          <p><strong>Oracle Customer ID:</strong> ${quoteInfo.oracle_customer_id || 'Not specified'}</p>
         </div>
         <div class="info-section">
           <div class="info-title">Quote Details</div>
           <p><strong>Priority:</strong> ${quoteInfo.priority || 'Medium'}</p>
-          <p><strong>Rep Involved:</strong> ${quoteInfo.isRepInvolved ? 'Yes' : 'No'}</p>
-          <p><strong>Currency:</strong> ${quoteInfo.quoteCurrency || 'USD'}</p>
+          <p><strong>Rep Involved:</strong> ${quoteInfo.is_rep_involved ? 'Yes' : 'No'}</p>
+          <p><strong>Currency:</strong> ${quoteInfo.currency || 'USD'}</p>
         </div>
       </div>
 
       <div class="info-section">
         <div class="info-title">Terms & Conditions</div>
-        <p><strong>Shipping Terms:</strong> ${quoteInfo.shippingTerms || 'Not specified'}</p>
-        <p><strong>Payment Terms:</strong> ${quoteInfo.paymentTerms || 'Not specified'}</p>
+        <p><strong>Shipping Terms:</strong> ${quoteInfo.shipping_terms || 'Not specified'}</p>
+        <p><strong>Payment Terms:</strong> ${quoteInfo.payment_terms || 'Not specified'}</p>
       </div>
 
       <h2>Bill of Materials</h2>

@@ -1,4 +1,3 @@
-
 /**
  * © 2025 Qualitrol Corp. All rights reserved.
  */
@@ -158,13 +157,24 @@ export interface Level3Customization {
 }
 
 export interface BOMItem {
-  id: string;
-  product: Level1Product | Level2Product | Level3Product;
+  id?: string;
+  product: Product;
   quantity: number;
-  slot?: number;
-  configuration?: Record<string, any>;
   enabled: boolean;
-  level2Options?: Level2Product[];
-  level3Customizations?: Level3Customization[];
+  slot?: number;
   partNumber?: string;
+  
+  // Additional properties for admin quote management
+  name?: string;
+  description?: string;
+  part_number?: string;
+  unit_price?: number;
+  unit_cost?: number;
+  total_price?: number;
+  margin?: number;
+  original_unit_price?: number;
+  approved_unit_price?: number;
+  price_adjustment_history?: any[];
 }
+
+export type Product = Level1Product | Level2Product | Level3Product;
