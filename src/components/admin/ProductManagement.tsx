@@ -227,7 +227,7 @@ const ProductManagement = ({ user }: ProductManagementProps) => {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-3 bg-gray-800">
+        <TabsList className="grid w-full grid-cols-4 bg-gray-800">
           <TabsTrigger 
             value="level1" 
             className="text-white data-[state=active]:bg-red-600 data-[state=active]:text-white"
@@ -242,12 +242,19 @@ const ProductManagement = ({ user }: ProductManagementProps) => {
             <Layers className="h-4 w-4 mr-2" />
             Level 2: Variants ({level2Products.length})
           </TabsTrigger>
-          <TabsTrigger 
-            value="level3" 
+          <TabsTrigger
+            value="level3"
             className="text-white data-[state=active]:bg-red-600 data-[state=active]:text-white"
           >
             <Settings className="h-4 w-4 mr-2" />
             Level 3: Components ({level3Products.length})
+          </TabsTrigger>
+          <TabsTrigger
+            value="sensor-config"
+            className="text-white data-[state=active]:bg-red-600 data-[state=active]:text-white"
+          >
+            <Settings className="h-4 w-4 mr-2" />
+            Sensor Config
           </TabsTrigger>
         </TabsList>
 
@@ -364,7 +371,6 @@ const ProductManagement = ({ user }: ProductManagementProps) => {
               );
             })}
           </div>
-          <SensorConfigManagement />
         </TabsContent>
 
         {/* Level 2 Products */}
@@ -593,6 +599,10 @@ const ProductManagement = ({ user }: ProductManagementProps) => {
               );
             })}
           </div>
+        </TabsContent>
+
+        <TabsContent value="sensor-config" className="space-y-6">
+          <SensorConfigManagement />
         </TabsContent>
       </Tabs>
 
