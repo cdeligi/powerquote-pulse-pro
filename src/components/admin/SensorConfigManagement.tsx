@@ -37,6 +37,15 @@ const SensorConfigManagement = () => {
     refresh();
   };
 
+  const handleDeleteAnalog = async (id: string) => {
+    await productDataService.deleteAnalogSensorType(id);
+    if (editingAnalogId === id) {
+      setAnalogForm({ name: "", description: "" });
+      setEditingAnalogId(null);
+    }
+    refresh();
+  };
+
   const handleEditAnalog = (id: string) => {
     const item = analogTypes.find(a => a.id === id);
     if (item) {
@@ -52,6 +61,15 @@ const SensorConfigManagement = () => {
       await productDataService.createBushingTapModel(bushingForm);
     }
     resetForms();
+    refresh();
+  };
+
+  const handleDeleteBushing = async (id: string) => {
+    await productDataService.deleteBushingTapModel(id);
+    if (editingBushingId === id) {
+      setBushingForm({ name: "" });
+      setEditingBushingId(null);
+    }
     refresh();
   };
 
@@ -85,6 +103,9 @@ const SensorConfigManagement = () => {
               <Button variant="ghost" size="sm" onClick={() => handleEditAnalog(type.id)} className="text-blue-400">
                 Edit
               </Button>
+              <Button variant="ghost" size="sm" onClick={() => handleDeleteAnalog(type.id)} className="text-red-400">
+                Delete
+              </Button>
             </div>
           ))}
           <div className="grid grid-cols-2 gap-2">
@@ -114,6 +135,9 @@ const SensorConfigManagement = () => {
               <span className="flex-1 text-white text-sm">{model.name}</span>
               <Button variant="ghost" size="sm" onClick={() => handleEditBushing(model.id)} className="text-blue-400">
                 Edit
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => handleDeleteBushing(model.id)} className="text-red-400">
+                Delete
               </Button>
             </div>
           ))}
