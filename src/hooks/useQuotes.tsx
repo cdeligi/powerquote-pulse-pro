@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -13,7 +12,7 @@ export interface Quote {
   submitted_by_email: string;
   created_at: string;
   updated_at: string;
-  status: 'pending' | 'approved' | 'rejected' | 'under-review';
+  status: 'pending_approval' | 'approved' | 'rejected' | 'under-review';
   original_quote_value: number;
   discounted_value: number;
   requested_discount: number;
@@ -32,7 +31,7 @@ export interface Quote {
   counter_offers?: Array<{
     discountOffered: number;
     offeredAt: string;
-    status: 'pending' | 'accepted' | 'rejected';
+    status: 'pending_approval' | 'accepted' | 'rejected';
   }>;
   approval_notes?: string;
   rejection_reason?: string;

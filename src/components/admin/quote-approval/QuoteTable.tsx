@@ -34,7 +34,7 @@ const QuoteTable = ({ quotes, loading, onQuoteSelect }: QuoteTableProps) => {
 
   const getStatusColor = (status: Quote['status']) => {
     switch (status) {
-      case 'pending':
+      case 'pending_approval':
         return 'bg-yellow-600 text-white';
       case 'approved':
         return 'bg-green-600 text-white';

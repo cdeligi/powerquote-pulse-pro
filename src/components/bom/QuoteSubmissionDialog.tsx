@@ -75,7 +75,7 @@ const QuoteSubmissionDialog = ({
       const grossProfit = discountedValue - totalCost;
       const discountedMargin = discountedValue > 0 ? (grossProfit / discountedValue) * 100 : 0;
 
-      // Create quote in database with pending status
+      // Create quote in database with pending_approval status
       const { error: quoteError } = await supabase
         .from('quotes')
         .insert({
@@ -83,7 +83,7 @@ const QuoteSubmissionDialog = ({
           customer_name: formData.customerName,
           oracle_customer_id: formData.oracleCustomerId,
           sfdc_opportunity: formData.sfdcOpportunity,
-          status: 'pending',
+          status: 'pending_approval',
           user_id: user.id,
           submitted_by_name: user.name,
           submitted_by_email: user.email,
@@ -108,7 +108,16 @@ const QuoteSubmissionDialog = ({
           shipping_terms: 'FOB Origin'
         });
 
-      if (quoteError) throw quoteError;
+      if (quoteError) {
+        console.error('SUPABASE ERROR:', quoteError);
+        toast({
+          title: "Submission Failed",
+          description: quoteError.message || "Unknown error. Check console for more info.",
+          variant: "destructive",
+        });
+        setIsSubmitting(false);
+        return;
+      }
 
       // Create BOM items
       for (const item of bomItems) {
@@ -132,7 +141,15 @@ const QuoteSubmissionDialog = ({
             product_type: item.product.type || 'standard'
           });
 
-        if (bomError) throw bomError;
+        if (bomError) {
+          console.error('SUPABASE BOM ERROR:', bomError);
+          toast({
+            title: "BOM Item Error",
+            description: bomError.message || "Failed to create BOM item",
+            variant: "destructive",
+          });
+          throw bomError;
+        }
       }
 
       // Send notification to admins
