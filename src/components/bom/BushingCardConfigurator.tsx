@@ -26,10 +26,10 @@ const BUSHING_TAP_MODELS = [
 ];
 
 const BushingCardConfigurator = ({ bomItem, onSave, onClose }: BushingCardConfiguratorProps) => {
-  const [numberOfBushings, setNumberOfBushings] = useState<number>(1);
-  const [bushingConfigurations, setBushingConfigurations] = useState<Record<number, string>>({
-    1: 'Standard'
-  });
+  const stored = localStorage.getItem(`bushingDefaults_${bomItem.product.id}`);
+  const parsed = stored ? JSON.parse(stored) as {numberOfBushings: number; configs: Record<number, string>} : null;
+  const [numberOfBushings, setNumberOfBushings] = useState<number>(parsed?.numberOfBushings || 1);
+  const [bushingConfigurations, setBushingConfigurations] = useState<Record<number, string>>(() => parsed?.configs || { 1: 'Standard' });
 
   const handleNumberOfBushingsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = parseInt(e.target.value, 10);

@@ -21,24 +21,27 @@ interface AnalogCardConfiguratorProps {
 
 const AnalogCardConfigurator = ({ bomItem, onSave, onClose }: AnalogCardConfiguratorProps) => {
   const [channelConfigs, setChannelConfigs] = useState<Record<number, AnalogSensorType>>(() => {
-    // Initialize with existing configurations or default to first sensor type
     const configs: Record<number, AnalogSensorType> = {};
-    
+
     if (bomItem.level3Customizations) {
       bomItem.level3Customizations.forEach((config, index) => {
         if (config.name && ANALOG_SENSOR_TYPES.includes(config.name as AnalogSensorType)) {
           configs[index + 1] = config.name as AnalogSensorType;
         }
       });
+    } else {
+      const stored = localStorage.getItem(`analogDefaults_${bomItem.product.id}`);
+      if (stored) {
+        Object.assign(configs, JSON.parse(stored));
+      }
     }
-    
-    // Fill in any missing channels with default
+
     for (let i = 1; i <= 8; i++) {
       if (!configs[i]) {
         configs[i] = 'Pt100/RTD';
       }
     }
-    
+
     return configs;
   });
 
