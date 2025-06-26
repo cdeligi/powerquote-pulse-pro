@@ -214,33 +214,49 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
         </Button>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Quote List */}
-        <div className="lg:col-span-1">
-          <QuoteTable
-            quotes={filteredQuotes}
-            loading={loading}
-            onQuoteSelect={handleQuoteSelect}
-          />
-        </div>
-
-        {/* Quote Details and Actions */}
-        <div className="lg:col-span-1">
-          {selectedQuote ? (
-            <QuoteDetails
-              quote={selectedQuote}
-              onApprove={(notes, updatedBOMItems) => handleQuoteAction(selectedQuote.id, 'approve', notes, updatedBOMItems)}
-              onReject={notes => handleQuoteAction(selectedQuote.id, 'reject', notes)}
-              onCounterOffer={notes => handleQuoteAction(selectedQuote.id, 'counter_offer', notes)}
-              isLoading={actionLoading[selectedQuote.id] || false}
-              user={user}
-            />
-          ) : (
-            <div className="bg-gray-900 border-gray-800 rounded-md p-4 text-gray-400 text-center">
-              Select a quote to view details and take action.
+      <div className={`grid grid-cols-1 gap-6 ${selectedQuote ? 'lg:grid-cols-1' : 'lg:grid-cols-2'}`}>
+        {selectedQuote ? (
+          <>
+            {/* Quote Details and Actions */}
+            <div className="lg:col-span-1">
+              <QuoteDetails
+                quote={selectedQuote}
+                onApprove={(notes, updatedBOMItems) => handleQuoteAction(selectedQuote.id, 'approve', notes, updatedBOMItems)}
+                onReject={notes => handleQuoteAction(selectedQuote.id, 'reject', notes)}
+                onCounterOffer={notes => handleQuoteAction(selectedQuote.id, 'counter_offer', notes)}
+                isLoading={actionLoading[selectedQuote.id] || false}
+                user={user}
+              />
             </div>
-          )}
-        </div>
+
+            {/* Quote List placed below when a quote is selected */}
+            <div className="lg:col-span-1">
+              <QuoteTable
+                quotes={filteredQuotes}
+                loading={loading}
+                onQuoteSelect={handleQuoteSelect}
+              />
+            </div>
+          </>
+        ) : (
+          <>
+            {/* Quote List */}
+            <div className="lg:col-span-1">
+              <QuoteTable
+                quotes={filteredQuotes}
+                loading={loading}
+                onQuoteSelect={handleQuoteSelect}
+              />
+            </div>
+
+            {/* Prompt to select a quote */}
+            <div className="lg:col-span-1">
+              <div className="bg-gray-900 border-gray-800 rounded-md p-4 text-gray-400 text-center">
+                Select a quote to view details and take action.
+              </div>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
