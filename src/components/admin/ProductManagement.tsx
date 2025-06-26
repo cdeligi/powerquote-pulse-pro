@@ -252,11 +252,19 @@ const ProductManagement = ({ user }: ProductManagementProps) => {
             Level 3: Components ({level3Products.length})
           </TabsTrigger>
           <TabsTrigger
+          codex/add-tab-for-product-customization-defaults
             value="defaults"
             className="text-white data-[state=active]:bg-red-600 data-[state=active]:text-white"
           >
             <SlidersHorizontal className="h-4 w-4 mr-2" />
             Defaults
+
+            value="sensor-config"
+            className="text-white data-[state=active]:bg-red-600 data-[state=active]:text-white"
+          >
+            <Settings className="h-4 w-4 mr-2" />
+            Sensor Config
+        main
           </TabsTrigger>
         </TabsList>
 
@@ -373,7 +381,6 @@ const ProductManagement = ({ user }: ProductManagementProps) => {
               );
             })}
           </div>
-          <SensorConfigManagement />
         </TabsContent>
 
         {/* Level 2 Products */}
@@ -603,6 +610,7 @@ const ProductManagement = ({ user }: ProductManagementProps) => {
             })}
           </div>
         </TabsContent>
+       codex/add-tab-for-product-customization-defaults
         <TabsContent value="defaults" className="space-y-6">
           {settingsProduct && settingsType === 'analog' && (
             <AnalogDefaultsDialog
@@ -625,6 +633,11 @@ const ProductManagement = ({ user }: ProductManagementProps) => {
           {!settingsProduct && (
             <p className="text-gray-400">Select a component from the Components tab to configure defaults.</p>
           )}
+
+
+        <TabsContent value="sensor-config" className="space-y-6">
+          <SensorConfigManagement />
+      main
         </TabsContent>
       </Tabs>
 

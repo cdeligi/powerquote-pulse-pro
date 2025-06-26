@@ -37,6 +37,15 @@ const SensorConfigManagement = () => {
     refresh();
   };
 
+  const handleDeleteAnalog = async (id: string) => {
+    await productDataService.deleteAnalogSensorType(id);
+    if (editingAnalogId === id) {
+      setAnalogForm({ name: "", description: "" });
+      setEditingAnalogId(null);
+    }
+    refresh();
+  };
+
   const handleEditAnalog = (id: string) => {
     const item = analogTypes.find(a => a.id === id);
     if (item) {
@@ -55,12 +64,26 @@ const SensorConfigManagement = () => {
     refresh();
   };
 
+  const handleDeleteBushing = async (id: string) => {
+    await productDataService.deleteBushingTapModel(id);
+    if (editingBushingId === id) {
+      setBushingForm({ name: "" });
+      setEditingBushingId(null);
+    }
+    refresh();
+  };
+
   const handleEditBushing = (id: string) => {
     const item = bushingModels.find(b => b.id === id);
     if (item) {
       setBushingForm({ name: item.name });
       setEditingBushingId(id);
     }
+  };
+
+  const handleCancelBushing = () => {
+    setBushingForm({ name: "" });
+    setEditingBushingId(null);
   };
 
   return (
@@ -79,6 +102,9 @@ const SensorConfigManagement = () => {
               </div>
               <Button variant="ghost" size="sm" onClick={() => handleEditAnalog(type.id)} className="text-blue-400">
                 Edit
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => handleDeleteAnalog(type.id)} className="text-red-400">
+                Delete
               </Button>
             </div>
           ))}
@@ -110,15 +136,34 @@ const SensorConfigManagement = () => {
               <Button variant="ghost" size="sm" onClick={() => handleEditBushing(model.id)} className="text-blue-400">
                 Edit
               </Button>
+              <Button variant="ghost" size="sm" onClick={() => handleDeleteBushing(model.id)} className="text-red-400">
+                Delete
+              </Button>
             </div>
           ))}
           <div>
             <Label htmlFor="bushing-name" className="text-white text-sm">Name</Label>
-            <Input id="bushing-name" value={bushingForm.name} onChange={e => setBushingForm({ name: e.target.value })} className="bg-gray-800 border-gray-700 text-white" />
+            <Input
+              id="bushing-name"
+              value={bushingForm.name}
+              onChange={e => setBushingForm({ name: e.target.value })}
+              className="bg-gray-800 border-gray-700 text-white"
+            />
           </div>
-          <Button className="bg-red-600 hover:bg-red-700" onClick={handleSaveBushing} disabled={!bushingForm.name}>
-            {editingBushingId ? "Update" : "Add"} Tap Model
-          </Button>
+          <div className="flex space-x-2">
+            <Button
+              className="bg-red-600 hover:bg-red-700"
+              onClick={handleSaveBushing}
+              disabled={!bushingForm.name}
+            >
+              {editingBushingId ? "Update" : "Add"} Tap Model
+            </Button>
+            {editingBushingId && (
+              <Button variant="outline" onClick={handleCancelBushing}>
+                Cancel
+              </Button>
+            )}
+          </div>
         </CardContent>
       </Card>
     </div>
