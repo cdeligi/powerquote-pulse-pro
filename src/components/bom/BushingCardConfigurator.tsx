@@ -4,6 +4,7 @@
 
 import { useState } from "react";
 import { BOMItem, Level3Customization } from "@/types/product/interfaces";
+import { productDataService } from "@/services/productDataService";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -18,17 +19,12 @@ interface BushingCardConfiguratorProps {
   onClose: () => void;
 }
 
-const BUSHING_TAP_MODELS = [
-  'Standard',
-  'High Accuracy',
-  'High Frequency',
-  'Custom'
-];
 
 const BushingCardConfigurator = ({ bomItem, onSave, onClose }: BushingCardConfiguratorProps) => {
+  const tapModels = productDataService.getBushingTapModels();
   const [numberOfBushings, setNumberOfBushings] = useState<number>(1);
   const [bushingConfigurations, setBushingConfigurations] = useState<Record<number, string>>({
-    1: 'Standard'
+    1: tapModels[0]?.name || 'Standard'
   });
 
   const handleNumberOfBushingsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -42,7 +38,7 @@ const BushingCardConfigurator = ({ bomItem, onSave, onClose }: BushingCardConfig
       const updatedConfigs = { ...prev };
       for (let i = 1; i <= value; i++) {
         if (!updatedConfigs[i]) {
-          updatedConfigs[i] = 'Standard';
+          updatedConfigs[i] = tapModels[0]?.name || 'Standard';
         }
       }
       return updatedConfigs;
@@ -139,9 +135,9 @@ const BushingCardConfigurator = ({ bomItem, onSave, onClose }: BushingCardConfig
                       <SelectValue placeholder="Select tap model" />
                     </SelectTrigger>
                     <SelectContent className="bg-gray-700 border-gray-600">
-                      {BUSHING_TAP_MODELS.map((tapModel) => (
-                        <SelectItem key={tapModel} value={tapModel} className="text-white hover:bg-gray-600 focus:bg-gray-600">
-                          {tapModel}
+                      {tapModels.map((model) => (
+                        <SelectItem key={model.id} value={model.name} className="text-white hover:bg-gray-600 focus:bg-gray-600">
+                          {model.name}
                         </SelectItem>
                       ))}
                     </SelectContent>
