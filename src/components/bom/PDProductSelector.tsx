@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -8,6 +8,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Level1Product, Level2Product } from "@/types/product";
+import { productDataService } from "@/services/productDataService";
 import { ExternalLink, Plus, CheckCircle2 } from "lucide-react";
 
 interface PDProductSelectorProps {
@@ -20,71 +21,20 @@ const PDProductSelector = ({ onProductSelect, canSeePrices }: PDProductSelectorP
   const [standaloneLevel2Options, setStandaloneLevel2Options] = useState<Level2Product[]>([]);
   const [productConfigurations, setProductConfigurations] = useState<Record<string, Record<string, any>>>({});
 
-  const pdProducts: Level1Product[] = [
-    {
-      id: 'qpdm',
-      name: 'QPDM - Partial Discharge Monitor',
-      type: 'QPDM',
-      description: 'Advanced partial discharge monitoring system',
-      price: 18500,
-      enabled: true,
-      partNumber: 'QPDM-001',
-      productInfoUrl: 'https://qualitrol.com/qpdm'
-    }
-  ];
+  const [pdProducts, setPdProducts] = useState<Level1Product[]>([]);
+  const [level2Options, setLevel2Options] = useState<Level2Product[]>([]);
 
-  const level2Options: Level2Product[] = [
-    {
-      id: 'analysis-software',
-      name: 'Advanced Analysis Software',
-      parentProductId: '',
-      type: 'Standard',
-      description: 'Enhanced PD pattern analysis software',
-      price: 1200,
-      enabled: false,
-      partNumber: 'QPDM-SW'
-    },
-    {
-      id: 'pd-sensor',
-      name: 'PD Sensor Array',
-      parentProductId: '',
-      type: 'Standard',
-      description: 'External PD sensor for transformer monitoring',
-      price: 3200,
-      enabled: false,
-      partNumber: 'PDS-001'
-    },
-    {
-      id: 'uhf-sensor',
-      name: 'UHF PD Sensor',
-      parentProductId: '',
-      type: 'Standard',
-      description: 'Ultra-high frequency PD detection sensor',
-      price: 4800,
-      enabled: false,
-      partNumber: 'UHF-001'
-    },
-    {
-      id: 'calibrator',
-      name: 'PD Calibrator',
-      parentProductId: '',
-      type: 'Standard',
-      description: 'Portable PD calibration source',
-      price: 850,
-      enabled: false,
-      partNumber: 'PDC-001'
-    },
-    {
-      id: 'uhf-amplifier',
-      name: 'UHF Signal Amplifier',
-      parentProductId: '',
-      type: 'Standard',
-      description: 'Low-noise UHF signal amplifier',
-      price: 680,
-      enabled: false,
-      partNumber: 'UHFA-001'
-    }
-  ];
+  useEffect(() => {
+    const l1 = productDataService
+      .getLevel1Products()
+      .filter((p) => p.type === 'QPDM' && p.enabled);
+    setPdProducts(l1);
+
+    const l2 = productDataService
+      .getLevel2Products()
+      .filter((p) => p.enabled && p.parentProductId === 'qpdm');
+    setLevel2Options(l2);
+  }, []);
 
   const handleProductToggle = (productId: string) => {
     const newSelected = new Set(selectedProducts);
