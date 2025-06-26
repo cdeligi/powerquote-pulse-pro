@@ -21,6 +21,7 @@ import Level2OptionForm from "./product-forms/Level2OptionForm";
 import CardForm from "./product-forms/CardForm";
 import { useToast } from "@/hooks/use-toast";
 import { productDataService } from "@/services/productDataService";
+import SensorConfigManagement from "./SensorConfigManagement";
 
 interface ProductManagementProps {
   user: User;
@@ -347,6 +348,7 @@ const ProductManagement = ({ user }: ProductManagementProps) => {
               );
             })}
           </div>
+          <SensorConfigManagement />
         </TabsContent>
 
         {/* Level 2 Products */}

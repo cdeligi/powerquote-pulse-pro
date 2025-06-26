@@ -4,7 +4,8 @@
  */
 
 import { useState } from "react";
-import { BOMItem, Level3Customization, ANALOG_SENSOR_TYPES, AnalogSensorType, ANALOG_SENSOR_DESCRIPTIONS } from "@/types/product/interfaces";
+import { BOMItem, Level3Customization } from "@/types/product/interfaces";
+import { productDataService } from "@/services/productDataService";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -20,29 +21,30 @@ interface AnalogCardConfiguratorProps {
 }
 
 const AnalogCardConfigurator = ({ bomItem, onSave, onClose }: AnalogCardConfiguratorProps) => {
-  const [channelConfigs, setChannelConfigs] = useState<Record<number, AnalogSensorType>>(() => {
+  const sensorOptions = productDataService.getAnalogSensorTypes();
+  const [channelConfigs, setChannelConfigs] = useState<Record<number, string>>(() => {
     // Initialize with existing configurations or default to first sensor type
-    const configs: Record<number, AnalogSensorType> = {};
+    const configs: Record<number, string> = {};
     
     if (bomItem.level3Customizations) {
       bomItem.level3Customizations.forEach((config, index) => {
-        if (config.name && ANALOG_SENSOR_TYPES.includes(config.name as AnalogSensorType)) {
-          configs[index + 1] = config.name as AnalogSensorType;
+        if (config.name && sensorOptions.some(s => s.name === config.name)) {
+          configs[index + 1] = config.name;
         }
       });
     }
-    
+
     // Fill in any missing channels with default
     for (let i = 1; i <= 8; i++) {
       if (!configs[i]) {
-        configs[i] = 'Pt100/RTD';
+        configs[i] = sensorOptions[0]?.name || '';
       }
     }
     
     return configs;
   });
 
-  const handleChannelChange = (channel: number, sensorType: AnalogSensorType) => {
+  const handleChannelChange = (channel: number, sensorType: string) => {
     setChannelConfigs(prev => ({
       ...prev,
       [channel]: sensorType
@@ -107,31 +109,31 @@ const AnalogCardConfigurator = ({ bomItem, onSave, onClose }: AnalogCardConfigur
                           <TooltipTrigger>
                             <Info className="h-4 w-4 text-gray-400 hover:text-white" />
                           </TooltipTrigger>
-                          <TooltipContent className="bg-gray-800 border-gray-600 text-white max-w-xs">
-                            <p>{ANALOG_SENSOR_DESCRIPTIONS[channelConfigs[channel]]}</p>
+                      <TooltipContent className="bg-gray-800 border-gray-600 text-white max-w-xs">
+                            <p>{sensorOptions.find(s => s.name === channelConfigs[channel])?.description}</p>
                           </TooltipContent>
                         </Tooltip>
                       </div>
                       <Select
                         value={channelConfigs[channel]}
-                        onValueChange={(value: AnalogSensorType) => handleChannelChange(channel, value)}
+                        onValueChange={(value: string) => handleChannelChange(channel, value)}
                       >
                         <SelectTrigger className="bg-gray-700 border-gray-600 text-white">
                           <SelectValue placeholder="Select sensor type" />
                         </SelectTrigger>
                         <SelectContent className="bg-gray-700 border-gray-600 max-h-60">
-                          {ANALOG_SENSOR_TYPES.map((sensorType) => (
-                            <Tooltip key={sensorType}>
+                          {sensorOptions.map((sensor) => (
+                            <Tooltip key={sensor.id}>
                               <TooltipTrigger asChild>
-                                <SelectItem 
-                                  value={sensorType}
+                                <SelectItem
+                                  value={sensor.name}
                                   className="text-white hover:bg-gray-600 focus:bg-gray-600"
                                 >
-                                  {sensorType}
+                                  {sensor.name}
                                 </SelectItem>
                               </TooltipTrigger>
                               <TooltipContent className="bg-gray-800 border-gray-600 text-white max-w-xs">
-                                <p>{ANALOG_SENSOR_DESCRIPTIONS[sensorType]}</p>
+                                <p>{sensor.description}</p>
                               </TooltipContent>
                             </Tooltip>
                           ))}
