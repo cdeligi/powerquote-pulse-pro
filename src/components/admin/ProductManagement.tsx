@@ -4,15 +4,16 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { 
-  Plus, 
-  Edit2, 
-  Trash2, 
-  Package, 
-  Layers, 
+import {
+  Plus,
+  Edit2,
+  Trash2,
+  Package,
+  Layers,
   Settings,
   ExternalLink,
-  ChevronRight
+  ChevronRight,
+  SlidersHorizontal
 } from "lucide-react";
 import { User } from "@/types/auth";
 import { Level1Product, Level2Product, Level3Product } from "@/types/product";
@@ -212,6 +213,7 @@ const ProductManagement = ({ user }: ProductManagementProps) => {
       setSettingsType('bushing');
       setSettingsProduct(product);
     }
+    setActiveTab('defaults');
   };
 
   return (
@@ -250,11 +252,19 @@ const ProductManagement = ({ user }: ProductManagementProps) => {
             Level 3: Components ({level3Products.length})
           </TabsTrigger>
           <TabsTrigger
+          codex/add-tab-for-product-customization-defaults
+            value="defaults"
+            className="text-white data-[state=active]:bg-red-600 data-[state=active]:text-white"
+          >
+            <SlidersHorizontal className="h-4 w-4 mr-2" />
+            Defaults
+
             value="sensor-config"
             className="text-white data-[state=active]:bg-red-600 data-[state=active]:text-white"
           >
             <Settings className="h-4 w-4 mr-2" />
             Sensor Config
+        main
           </TabsTrigger>
         </TabsList>
 
@@ -600,9 +610,34 @@ const ProductManagement = ({ user }: ProductManagementProps) => {
             })}
           </div>
         </TabsContent>
+       codex/add-tab-for-product-customization-defaults
+        <TabsContent value="defaults" className="space-y-6">
+          {settingsProduct && settingsType === 'analog' && (
+            <AnalogDefaultsDialog
+              product={settingsProduct}
+              onClose={() => {
+                setSettingsProduct(null);
+                setSettingsType(null);
+              }}
+            />
+          )}
+          {settingsProduct && settingsType === 'bushing' && (
+            <BushingDefaultsDialog
+              product={settingsProduct}
+              onClose={() => {
+                setSettingsProduct(null);
+                setSettingsType(null);
+              }}
+            />
+          )}
+          {!settingsProduct && (
+            <p className="text-gray-400">Select a component from the Components tab to configure defaults.</p>
+          )}
+
 
         <TabsContent value="sensor-config" className="space-y-6">
           <SensorConfigManagement />
+      main
         </TabsContent>
       </Tabs>
 
@@ -644,25 +679,6 @@ const ProductManagement = ({ user }: ProductManagementProps) => {
         </DialogContent>
       </Dialog>
 
-      {settingsProduct && settingsType === 'analog' && (
-        <AnalogDefaultsDialog
-          product={settingsProduct}
-          onClose={() => {
-            setSettingsProduct(null);
-            setSettingsType(null);
-          }}
-        />
-      )}
-
-      {settingsProduct && settingsType === 'bushing' && (
-        <BushingDefaultsDialog
-          product={settingsProduct}
-          onClose={() => {
-            setSettingsProduct(null);
-            setSettingsType(null);
-          }}
-        />
-      )}
     </div>
   );
 };
