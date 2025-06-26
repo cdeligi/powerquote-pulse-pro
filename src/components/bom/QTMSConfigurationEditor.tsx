@@ -17,13 +17,15 @@ interface QTMSConfigurationEditorProps {
   onSave: (updatedQTMS: ConsolidatedQTMS) => void;
   onClose: () => void;
   canSeePrices: boolean;
+  readOnly?: boolean;
 }
 
-const QTMSConfigurationEditor = ({ 
-  consolidatedQTMS, 
-  onSave, 
-  onClose, 
-  canSeePrices 
+const QTMSConfigurationEditor = ({
+  consolidatedQTMS,
+  onSave,
+  onClose,
+  canSeePrices,
+  readOnly = false
 }: QTMSConfigurationEditorProps) => {
   const [editedSlotAssignments, setEditedSlotAssignments] = useState<Record<number, Level3Product>>(
     consolidatedQTMS.configuration.slotAssignments
@@ -60,10 +62,12 @@ const QTMSConfigurationEditor = ({
   };
 
   const handleSlotClick = (slot: number) => {
+    if (readOnly) return;
     setSelectedSlot(slot);
   };
 
   const handleSlotClear = (slot: number) => {
+    if (readOnly) return;
     setEditedSlotAssignments(prev => {
       const updated = { ...prev };
       const card = updated[slot];
@@ -98,6 +102,7 @@ const QTMSConfigurationEditor = ({
   };
 
   const handleCardSelect = (card: Level3Product, slot?: number) => {
+    if (readOnly) return;
     // Special handling for bushing cards
     if (isBushingCard(card)) {
       const placement = findOptimalBushingPlacement(
@@ -173,7 +178,7 @@ const QTMSConfigurationEditor = ({
   };
 
   const handleCardConfiguration = (customizations: Level3Customization[]) => {
-    if (!configuringCard) return;
+    if (readOnly || !configuringCard) return;
 
     // Store the configuration
     const cardKey = `slot-${configuringCard.slot}`;
@@ -195,10 +200,12 @@ const QTMSConfigurationEditor = ({
   };
 
   const handleRemoteDisplayToggle = (enabled: boolean) => {
+    if (readOnly) return;
     setEditedHasRemoteDisplay(enabled);
   };
 
   const handleSave = () => {
+    if (readOnly) return;
     // Recalculate price and components based on new configuration
     const chassisItem = consolidatedQTMS.components.find(c => c.product.id === consolidatedQTMS.configuration.chassis.id);
     const cardItems = Object.entries(editedSlotAssignments).map(([slot, card]) => {
@@ -403,14 +410,16 @@ const QTMSConfigurationEditor = ({
               onClick={onClose}
               className="border-gray-600 text-white hover:bg-gray-800"
             >
-              Cancel
+              {readOnly ? 'Close' : 'Cancel'}
             </Button>
-            <Button
-              onClick={handleSave}
-              className="bg-red-600 hover:bg-red-700 text-white"
-            >
-              Save Configuration
-            </Button>
+            {!readOnly && (
+              <Button
+                onClick={handleSave}
+                className="bg-red-600 hover:bg-red-700 text-white"
+              >
+                Save Configuration
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
