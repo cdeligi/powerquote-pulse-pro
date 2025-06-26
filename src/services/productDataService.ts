@@ -765,6 +765,21 @@ class ProductDataService {
     return level3.parentProductId === level2.id;
   }
 
+  /**
+   * Replace all existing product lists with freshly fetched data.
+   * This is useful when synchronizing from a remote source.
+   */
+  replaceAllProducts(
+    level1: Level1Product[],
+    level2: Level2Product[],
+    level3: Level3Product[]
+  ) {
+    this.level1Products = [...level1];
+    this.level2Products = [...level2];
+    this.level3Products = [...level3];
+    this.saveData();
+  }
+
   private initializeDefaultData() {
     // Initialize asset types if empty
     if (this.assetTypes.length === 0) {
