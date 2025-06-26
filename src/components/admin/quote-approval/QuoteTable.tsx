@@ -9,9 +9,14 @@ interface QuoteTableProps {
   quotes: Quote[];
   loading: boolean;
   onQuoteSelect: (quote: Quote) => void;
+  /**
+   * When true, show pricing metrics that should only be
+   * visible to admin users, like total cost and gross margin.
+   */
+  isAdmin?: boolean;
 }
 
-const QuoteTable = ({ quotes, loading, onQuoteSelect }: QuoteTableProps) => {
+const QuoteTable = ({ quotes, loading, onQuoteSelect, isAdmin = false }: QuoteTableProps) => {
   if (loading) {
     return (
       <Card className="bg-gray-900 border-gray-800">
@@ -92,7 +97,7 @@ const QuoteTable = ({ quotes, loading, onQuoteSelect }: QuoteTableProps) => {
               </div>
             </div>
             
-            <div className="grid grid-cols-2 gap-4 text-sm mb-3">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm mb-3">
               <div>
                 <span className="text-gray-400">Original Value:</span>
                 <span className="text-white ml-2">{quote.currency} {quote.original_quote_value.toLocaleString()}</span>
@@ -101,10 +106,18 @@ const QuoteTable = ({ quotes, loading, onQuoteSelect }: QuoteTableProps) => {
                 <span className="text-gray-400">After Discount:</span>
                 <span className="text-white ml-2">{quote.currency} {quote.discounted_value.toLocaleString()}</span>
               </div>
-              <div>
-                <span className="text-gray-400">Margin:</span>
-                <span className="text-white ml-2">{quote.discounted_margin.toFixed(1)}%</span>
-              </div>
+              {isAdmin && (
+                <>
+                  <div>
+                    <span className="text-gray-400">Total Cost:</span>
+                    <span className="text-white ml-2">{quote.currency} {quote.total_cost.toLocaleString()}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-400">Gross Margin:</span>
+                    <span className="text-white ml-2">{quote.discounted_margin.toFixed(1)}%</span>
+                  </div>
+                </>
+              )}
               <div>
                 <span className="text-gray-400">BOM Items:</span>
                 <span className="text-white ml-2">{quote.bom_items?.length || 0}</span>
