@@ -5,7 +5,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-const SensorConfigManagement = () => {
+interface SensorConfigManagementProps {
+  showAnalog?: boolean;
+  showBushing?: boolean;
+}
+
+const SensorConfigManagement = ({ showAnalog = true, showBushing = true }: SensorConfigManagementProps) => {
   const [analogTypes, setAnalogTypes] = useState(productDataService.getAnalogSensorTypes());
   const [bushingModels, setBushingModels] = useState(productDataService.getBushingTapModels());
 
@@ -88,84 +93,88 @@ const SensorConfigManagement = () => {
 
   return (
     <div className="space-y-6">
-      <Card className="bg-gray-900 border-gray-800">
-        <CardHeader>
-          <CardTitle className="text-white">Analog Sensor Types</CardTitle>
-          <CardDescription className="text-gray-400">Manage available analog sensors</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {analogTypes.map(type => (
-            <div key={type.id} className="flex items-center space-x-2">
-              <div className="flex-1">
-                <p className="text-white text-sm font-medium">{type.name}</p>
-                <p className="text-gray-400 text-xs">{type.description}</p>
+      {showAnalog && (
+        <Card className="bg-gray-900 border-gray-800">
+          <CardHeader>
+            <CardTitle className="text-white">Analog Sensor Types</CardTitle>
+            <CardDescription className="text-gray-400">Manage available analog sensors</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {analogTypes.map(type => (
+              <div key={type.id} className="flex items-center space-x-2">
+                <div className="flex-1">
+                  <p className="text-white text-sm font-medium">{type.name}</p>
+                  <p className="text-gray-400 text-xs">{type.description}</p>
+                </div>
+                <Button variant="ghost" size="sm" onClick={() => handleEditAnalog(type.id)} className="text-blue-400">
+                  Edit
+                </Button>
+                <Button variant="ghost" size="sm" onClick={() => handleDeleteAnalog(type.id)} className="text-red-400">
+                  Delete
+                </Button>
               </div>
-              <Button variant="ghost" size="sm" onClick={() => handleEditAnalog(type.id)} className="text-blue-400">
-                Edit
-              </Button>
-              <Button variant="ghost" size="sm" onClick={() => handleDeleteAnalog(type.id)} className="text-red-400">
-                Delete
-              </Button>
+            ))}
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <Label htmlFor="analog-name" className="text-white text-sm">Name</Label>
+                <Input id="analog-name" value={analogForm.name} onChange={e => setAnalogForm({ ...analogForm, name: e.target.value })} className="bg-gray-800 border-gray-700 text-white" />
+              </div>
+              <div>
+                <Label htmlFor="analog-desc" className="text-white text-sm">Description</Label>
+                <Input id="analog-desc" value={analogForm.description} onChange={e => setAnalogForm({ ...analogForm, description: e.target.value })} className="bg-gray-800 border-gray-700 text-white" />
+              </div>
             </div>
-          ))}
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <Label htmlFor="analog-name" className="text-white text-sm">Name</Label>
-              <Input id="analog-name" value={analogForm.name} onChange={e => setAnalogForm({ ...analogForm, name: e.target.value })} className="bg-gray-800 border-gray-700 text-white" />
-            </div>
-            <div>
-              <Label htmlFor="analog-desc" className="text-white text-sm">Description</Label>
-              <Input id="analog-desc" value={analogForm.description} onChange={e => setAnalogForm({ ...analogForm, description: e.target.value })} className="bg-gray-800 border-gray-700 text-white" />
-            </div>
-          </div>
-          <Button className="bg-red-600 hover:bg-red-700" onClick={handleSaveAnalog} disabled={!analogForm.name}>
-            {editingAnalogId ? "Update" : "Add"} Sensor Type
-          </Button>
-        </CardContent>
-      </Card>
-
-      <Card className="bg-gray-900 border-gray-800">
-        <CardHeader>
-          <CardTitle className="text-white">Bushing Tap Models</CardTitle>
-          <CardDescription className="text-gray-400">Manage available tap models</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {bushingModels.map(model => (
-            <div key={model.id} className="flex items-center space-x-2">
-              <span className="flex-1 text-white text-sm">{model.name}</span>
-              <Button variant="ghost" size="sm" onClick={() => handleEditBushing(model.id)} className="text-blue-400">
-                Edit
-              </Button>
-              <Button variant="ghost" size="sm" onClick={() => handleDeleteBushing(model.id)} className="text-red-400">
-                Delete
-              </Button>
-            </div>
-          ))}
-          <div>
-            <Label htmlFor="bushing-name" className="text-white text-sm">Name</Label>
-            <Input
-              id="bushing-name"
-              value={bushingForm.name}
-              onChange={e => setBushingForm({ name: e.target.value })}
-              className="bg-gray-800 border-gray-700 text-white"
-            />
-          </div>
-          <div className="flex space-x-2">
-            <Button
-              className="bg-red-600 hover:bg-red-700"
-              onClick={handleSaveBushing}
-              disabled={!bushingForm.name}
-            >
-              {editingBushingId ? "Update" : "Add"} Tap Model
+            <Button className="bg-red-600 hover:bg-red-700" onClick={handleSaveAnalog} disabled={!analogForm.name}>
+              {editingAnalogId ? "Update" : "Add"} Sensor Type
             </Button>
-            {editingBushingId && (
-              <Button variant="outline" onClick={handleCancelBushing}>
-                Cancel
+          </CardContent>
+        </Card>
+      )}
+
+      {showBushing && (
+        <Card className="bg-gray-900 border-gray-800">
+          <CardHeader>
+            <CardTitle className="text-white">Bushing Tap Models</CardTitle>
+            <CardDescription className="text-gray-400">Manage available tap models</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {bushingModels.map(model => (
+              <div key={model.id} className="flex items-center space-x-2">
+                <span className="flex-1 text-white text-sm">{model.name}</span>
+                <Button variant="ghost" size="sm" onClick={() => handleEditBushing(model.id)} className="text-blue-400">
+                  Edit
+                </Button>
+                <Button variant="ghost" size="sm" onClick={() => handleDeleteBushing(model.id)} className="text-red-400">
+                  Delete
+                </Button>
+              </div>
+            ))}
+            <div>
+              <Label htmlFor="bushing-name" className="text-white text-sm">Name</Label>
+              <Input
+                id="bushing-name"
+                value={bushingForm.name}
+                onChange={e => setBushingForm({ name: e.target.value })}
+                className="bg-gray-800 border-gray-700 text-white"
+              />
+            </div>
+            <div className="flex space-x-2">
+              <Button
+                className="bg-red-600 hover:bg-red-700"
+                onClick={handleSaveBushing}
+                disabled={!bushingForm.name}
+              >
+                {editingBushingId ? "Update" : "Add"} Tap Model
               </Button>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+              {editingBushingId && (
+                <Button variant="outline" onClick={handleCancelBushing}>
+                  Cancel
+                </Button>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 };

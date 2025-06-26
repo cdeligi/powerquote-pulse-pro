@@ -6,6 +6,7 @@ import { User } from '@/types/auth';
 import { toast } from "@/hooks/use-toast"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import QuoteTable from './quote-approval/QuoteTable';
 import QuoteDetails from './quote-approval/QuoteDetails';
 import { RefreshCw } from 'lucide-react';
@@ -20,6 +21,8 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<{ [quoteId: string]: boolean }>({});
   const [activeTab, setActiveTab] = useState("pending_approval");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | Quote['status']>("all");
 
   const fetchData = async () => {
     console.log('Fetching quotes for approval dashboard...');
@@ -84,11 +87,24 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
   }, []);
 
   const filteredQuotes = quotes.filter(quote => {
-    if (activeTab === "pending_approval") {
-      return quote.status === 'pending_approval';
-    } else {
-      return quote.status !== 'pending_approval';
-    }
+    const inTab =
+      activeTab === "pending_approval"
+        ? quote.status === "pending_approval"
+        : quote.status !== "pending_approval";
+
+    const matchesStatus =
+      statusFilter === "all" ? true : quote.status === statusFilter;
+
+    const monthString = new Date(quote.created_at)
+      .toLocaleString("default", { month: "long", year: "numeric" })
+      .toLowerCase();
+    const q = searchQuery.toLowerCase();
+    const matchesSearch =
+      quote.id.toLowerCase().includes(q) ||
+      quote.customer_name.toLowerCase().includes(q) ||
+      monthString.includes(q);
+
+    return inTab && matchesStatus && matchesSearch;
   });
 
   const handleQuoteSelect = (quote: Quote) => {
@@ -212,6 +228,27 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
           <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
           {loading ? "Loading..." : "Refresh"}
         </Button>
+      </div>
+
+      <div className="mb-6 flex space-x-4">
+        <Input
+          placeholder="Search by ID, customer or month..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="flex-1 bg-gray-800 border-gray-700 text-white"
+        />
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value as any)}
+          className="bg-gray-800 border border-gray-700 text-white rounded-md px-3 py-2"
+        >
+          <option value="all">All Statuses</option>
+          <option value="pending_approval">Pending Approval</option>
+          <option value="approved">Approved</option>
+          <option value="rejected">Rejected</option>
+          <option value="counter_offered">Counter Offered</option>
+          <option value="draft">Draft</option>
+        </select>
       </div>
 
       <div className={`grid grid-cols-1 gap-6 ${selectedQuote ? 'lg:grid-cols-1' : 'lg:grid-cols-2'}`}>
