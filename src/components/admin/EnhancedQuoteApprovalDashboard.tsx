@@ -67,9 +67,9 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
 
   const filteredQuotes = quotes.filter(quote => {
     if (activeTab === "pending_approval") {
-      return quote.status === 'pending';
+      return quote.status === 'pending_approval';
     } else {
-      return quote.status !== 'pending';
+      return quote.status !== 'pending_approval';
     }
   });
 
