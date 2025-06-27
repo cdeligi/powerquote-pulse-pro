@@ -7,12 +7,17 @@ import { toast } from "@/hooks/use-toast"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import QuoteTable from './quote-approval/QuoteTable';
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
 import QuoteDetails from './quote-approval/QuoteDetails';
-import { RefreshCw } from 'lucide-react';
+import { RefreshCw, ChevronDown, ChevronRight, Clock, User as UserIcon, Calendar, AlertCircle } from 'lucide-react';
 
 interface EnhancedQuoteApprovalDashboardProps {
   user: User | null;
+}
+
+interface ExpandedQuoteState {
+  [quoteId: string]: boolean;
 }
 
 const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboardProps) => {
@@ -23,6 +28,7 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
   const [activeTab, setActiveTab] = useState("pending_approval");
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | Quote['status']>("all");
+  const [expandedQuotes, setExpandedQuotes] = useState<ExpandedQuoteState>({});
 
   const fetchData = async () => {
     console.log('Fetching quotes for approval dashboard...');
@@ -107,9 +113,18 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
     return inTab && matchesStatus && matchesSearch;
   });
 
-  const handleQuoteSelect = (quote: Quote) => {
-    console.log('Selected quote:', quote);
-    setSelectedQuote(quote);
+  const handleQuoteToggle = (quoteId: string) => {
+    setExpandedQuotes(prev => ({
+      ...prev,
+      [quoteId]: !prev[quoteId]
+    }));
+    
+    const quote = quotes.find(q => q.id === quoteId);
+    if (quote && !expandedQuotes[quoteId]) {
+      setSelectedQuote(quote);
+    } else if (expandedQuotes[quoteId]) {
+      setSelectedQuote(null);
+    }
   };
 
   const handleQuoteAction = async (
@@ -135,7 +150,6 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
         updates.rejection_reason = notes || '';
       } else if (action === 'counter_offer') {
         updates.approval_notes = notes || '';
-        // Add counter offer to the counter_offers array
         const existingCounterOffers = quotes.find(q => q.id === quoteId)?.counter_offers || [];
         updates.counter_offers = [
           ...existingCounterOffers,
@@ -148,9 +162,7 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
         ];
       }
 
-      // Update BOM items if provided
       if (updatedBOMItems && updatedBOMItems.length > 0) {
-        // First update the quote
         const { error: quoteError } = await supabase
           .from('quotes')
           .update(updates)
@@ -158,7 +170,6 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
 
         if (quoteError) throw quoteError;
 
-        // Then update BOM items
         for (const item of updatedBOMItems) {
           const { error: bomError } = await supabase
             .from('bom_items')
@@ -172,7 +183,6 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
           if (bomError) throw bomError;
         }
       } else {
-        // Just update the quote
         const { error } = await supabase
           .from('quotes')
           .update(updates)
@@ -181,13 +191,11 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
         if (error) throw error;
       }
 
-      // Show success message
       toast({
         title: "Success",
         description: `Quote ${action === 'approve' ? 'approved' : action === 'reject' ? 'rejected' : 'counter offered'} successfully`,
       });
 
-      // Refresh quotes to show updated status
       await refetch();
       
     } catch (error) {
@@ -202,101 +210,256 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
     }
   };
 
+  const getAgingDays = (createdAt: string) => {
+    const created = new Date(createdAt);
+    const now = new Date();
+    const diffTime = Math.abs(now.getTime() - created.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays;
+  };
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'approved':
+        return <Badge className="bg-green-600 text-white">Approved</Badge>;
+      case 'rejected':
+        return <Badge className="bg-red-600 text-white">Rejected</Badge>;
+      case 'pending_approval':
+        return <Badge className="bg-yellow-600 text-white">Pending Approval</Badge>;
+      case 'counter_offered':
+        return <Badge className="bg-orange-600 text-white">Counter Offered</Badge>;
+      default:
+        return <Badge className="bg-gray-600 text-white">Unknown</Badge>;
+    }
+  };
+
+  const getPriorityColor = (priority: string) => {
+    switch (priority.toLowerCase()) {
+      case 'urgent':
+        return 'text-red-400';
+      case 'high':
+        return 'text-orange-400';
+      case 'medium':
+        return 'text-yellow-400';
+      default:
+        return 'text-green-400';
+    }
+  };
+
   console.log('Current quotes state:', quotes);
   console.log('Filtered quotes for tab:', activeTab, filteredQuotes);
 
   return (
-    <div className="container mx-auto p-6">
-      <h1 className="text-3xl font-semibold text-white mb-6">Quote Approval Dashboard</h1>
-
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-4">
-        <TabsList>
-          <TabsTrigger value="pending_approval">
-            Pending Quotes ({quotes.filter(q => q.status === 'pending_approval').length})
-          </TabsTrigger>
-          <TabsTrigger value="reviewed">
-            Reviewed Quotes ({quotes.filter(q => q.status !== 'pending_approval').length})
-          </TabsTrigger>
-        </TabsList>
-      </Tabs>
-
-      <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-2xl text-gray-300">
-          {activeTab === "pending_approval" ? "Pending Quotes" : "Reviewed Quotes"}
-        </h2>
+    <div className="w-full max-w-none p-6 space-y-6">
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-3xl font-semibold text-white mb-2">Quote Approval Dashboard</h1>
+          <p className="text-gray-400">Manage and review quote requests with enhanced workflow</p>
+        </div>
         <Button variant="outline" disabled={loading} onClick={refetch}>
           <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
           {loading ? "Loading..." : "Refresh"}
         </Button>
       </div>
 
-      <div className="mb-6 flex space-x-4">
-        <Input
-          placeholder="Search by ID, customer or month..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="flex-1 bg-gray-800 border-gray-700 text-white"
-        />
-        <select
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value as any)}
-          className="bg-gray-800 border border-gray-700 text-white rounded-md px-3 py-2"
-        >
-          <option value="all">All Statuses</option>
-          <option value="pending_approval">Pending Approval</option>
-          <option value="approved">Approved</option>
-          <option value="rejected">Rejected</option>
-          <option value="counter_offered">Counter Offered</option>
-          <option value="draft">Draft</option>
-        </select>
-      </div>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="w-full justify-start bg-gray-800">
+          <TabsTrigger value="pending_approval" className="text-white data-[state=active]:bg-red-600">
+            Pending Queue ({quotes.filter(q => q.status === 'pending_approval').length})
+          </TabsTrigger>
+          <TabsTrigger value="reviewed" className="text-white data-[state=active]:bg-red-600">
+            History ({quotes.filter(q => q.status !== 'pending_approval').length})
+          </TabsTrigger>
+        </TabsList>
 
-      <div className={`grid grid-cols-1 gap-6 ${selectedQuote ? 'lg:grid-cols-1' : 'lg:grid-cols-2'}`}>
-        {selectedQuote ? (
-          <>
-            {/* Quote Details and Actions */}
-            <div className="lg:col-span-1">
-              <QuoteDetails
-                quote={selectedQuote}
-                onApprove={(notes, updatedBOMItems) => handleQuoteAction(selectedQuote.id, 'approve', notes, updatedBOMItems)}
-                onReject={notes => handleQuoteAction(selectedQuote.id, 'reject', notes)}
-                onCounterOffer={notes => handleQuoteAction(selectedQuote.id, 'counter_offer', notes)}
-                isLoading={actionLoading[selectedQuote.id] || false}
-                user={user}
-              />
-            </div>
+        <div className="flex space-x-4 my-4">
+          <Input
+            placeholder="Search by ID, customer, or month..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="flex-1 bg-gray-800 border-gray-700 text-white"
+          />
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value as any)}
+            className="bg-gray-800 border border-gray-700 text-white rounded-md px-3 py-2"
+          >
+            <option value="all">All Statuses</option>
+            <option value="pending_approval">Pending Approval</option>
+            <option value="approved">Approved</option>
+            <option value="rejected">Rejected</option>
+            <option value="counter_offered">Counter Offered</option>
+          </select>
+        </div>
 
-            {/* Quote List placed below when a quote is selected */}
-            <div className="lg:col-span-1">
-              <QuoteTable
-                quotes={filteredQuotes}
-                loading={loading}
-                onQuoteSelect={handleQuoteSelect}
-                isAdmin={user?.role === 'admin'}
-              />
+        <TabsContent value="pending_approval" className="space-y-4">
+          {loading ? (
+            <div className="flex items-center justify-center h-64">
+              <div className="text-white">Loading quotes...</div>
             </div>
-          </>
-        ) : (
-          <>
-            {/* Quote List */}
-            <div className="lg:col-span-1">
-              <QuoteTable
-                quotes={filteredQuotes}
-                loading={loading}
-                onQuoteSelect={handleQuoteSelect}
-                isAdmin={user?.role === 'admin'}
-              />
+          ) : filteredQuotes.length === 0 ? (
+            <Card className="bg-gray-900 border-gray-800">
+              <CardContent className="p-8 text-center">
+                <div className="text-gray-400">No pending quotes found</div>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="space-y-3">
+              {filteredQuotes.map((quote) => (
+                <div key={quote.id} className="space-y-0">
+                  {/* Quote Header Row */}
+                  <Card className="bg-gray-900 border-gray-800 hover:border-gray-700 transition-colors">
+                    <CardContent className="p-4">
+                      <div 
+                        className="flex items-center justify-between cursor-pointer"
+                        onClick={() => handleQuoteToggle(quote.id)}
+                      >
+                        <div className="flex items-center space-x-4 flex-1">
+                          <div className="flex items-center space-x-2">
+                            {expandedQuotes[quote.id] ? (
+                              <ChevronDown className="h-4 w-4 text-gray-400" />
+                            ) : (
+                              <ChevronRight className="h-4 w-4 text-gray-400" />
+                            )}
+                            <div className="font-mono text-white font-medium">
+                              {quote.id}
+                            </div>
+                          </div>
+                          
+                          <div className="flex-1 min-w-0">
+                            <div className="text-white font-medium truncate">
+                              {quote.customer_name}
+                            </div>
+                            <div className="text-gray-400 text-sm">
+                              {quote.sfdc_opportunity}
+                            </div>
+                          </div>
+                          
+                          <div className="flex items-center space-x-2 text-sm text-gray-400">
+                            <UserIcon className="h-4 w-4" />
+                            <span>{quote.submitted_by_name}</span>
+                          </div>
+                          
+                          <div className="flex items-center space-x-2 text-sm text-gray-400">
+                            <Clock className="h-4 w-4" />
+                            <span>{getAgingDays(quote.created_at)} days</span>
+                          </div>
+                          
+                          <div className="flex items-center space-x-2">
+                            {getStatusBadge(quote.status)}
+                            <Badge className={`${getPriorityColor(quote.priority)} border-current`} variant="outline">
+                              {quote.priority}
+                            </Badge>
+                          </div>
+                          
+                          <div className="text-white font-bold">
+                            ${quote.discounted_value.toLocaleString()}
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  
+                  {/* Expanded Quote Details */}
+                  {expandedQuotes[quote.id] && selectedQuote?.id === quote.id && (
+                    <Card className="bg-gray-800 border-gray-700 ml-6">
+                      <CardContent className="p-6">
+                        <QuoteDetails
+                          quote={selectedQuote}
+                          onApprove={(notes, updatedBOMItems) => handleQuoteAction(quote.id, 'approve', notes, updatedBOMItems)}
+                          onReject={notes => handleQuoteAction(quote.id, 'reject', notes)}
+                          onCounterOffer={notes => handleQuoteAction(quote.id, 'counter_offer', notes)}
+                          isLoading={actionLoading[quote.id] || false}
+                          user={user}
+                        />
+                      </CardContent>
+                    </Card>
+                  )}
+                </div>
+              ))}
             </div>
+          )}
+        </TabsContent>
 
-            {/* Prompt to select a quote */}
-            <div className="lg:col-span-1">
-              <div className="bg-gray-900 border-gray-800 rounded-md p-4 text-gray-400 text-center">
-                Select a quote to view details and take action.
-              </div>
+        <TabsContent value="reviewed" className="space-y-4">
+          {loading ? (
+            <div className="flex items-center justify-center h-64">
+              <div className="text-white">Loading quotes...</div>
             </div>
-          </>
-        )}
-      </div>
+          ) : filteredQuotes.length === 0 ? (
+            <Card className="bg-gray-900 border-gray-800">
+              <CardContent className="p-8 text-center">
+                <div className="text-gray-400">No reviewed quotes found</div>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="space-y-3">
+              {filteredQuotes.map((quote) => (
+                <div key={quote.id} className="space-y-0">
+                  <Card className="bg-gray-900 border-gray-800 hover:border-gray-700 transition-colors">
+                    <CardContent className="p-4">
+                      <div 
+                        className="flex items-center justify-between cursor-pointer"
+                        onClick={() => handleQuoteToggle(quote.id)}
+                      >
+                        <div className="flex items-center space-x-4 flex-1">
+                          <div className="flex items-center space-x-2">
+                            {expandedQuotes[quote.id] ? (
+                              <ChevronDown className="h-4 w-4 text-gray-400" />
+                            ) : (
+                              <ChevronRight className="h-4 w-4 text-gray-400" />
+                            )}
+                            <div className="font-mono text-white font-medium">
+                              {quote.id}
+                            </div>
+                          </div>
+                          
+                          <div className="flex-1 min-w-0">
+                            <div className="text-white font-medium truncate">
+                              {quote.customer_name}
+                            </div>
+                            <div className="text-gray-400 text-sm">
+                              {quote.sfdc_opportunity}
+                            </div>
+                          </div>
+                          
+                          <div className="flex items-center space-x-2 text-sm text-gray-400">
+                            <Calendar className="h-4 w-4" />
+                            <span>{new Date(quote.reviewed_at || quote.updated_at).toLocaleDateString()}</span>
+                          </div>
+                          
+                          <div className="flex items-center space-x-2">
+                            {getStatusBadge(quote.status)}
+                          </div>
+                          
+                          <div className="text-white font-bold">
+                            ${quote.discounted_value.toLocaleString()}
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  
+                  {expandedQuotes[quote.id] && selectedQuote?.id === quote.id && (
+                    <Card className="bg-gray-800 border-gray-700 ml-6">
+                      <CardContent className="p-6">
+                        <QuoteDetails
+                          quote={selectedQuote}
+                          onApprove={(notes, updatedBOMItems) => handleQuoteAction(quote.id, 'approve', notes, updatedBOMItems)}
+                          onReject={notes => handleQuoteAction(quote.id, 'reject', notes)}
+                          onCounterOffer={notes => handleQuoteAction(quote.id, 'counter_offer', notes)}
+                          isLoading={actionLoading[quote.id] || false}
+                          user={user}
+                        />
+                      </CardContent>
+                    </Card>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };

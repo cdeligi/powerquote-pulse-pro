@@ -23,7 +23,7 @@ describe('Quote Approval Flow E2E Test', () => {
     cy.contains('BOM Builder').should('be.visible');
     
     // Navigate to BOM Builder and create a quote
-    cy.get('[data-cy="qtms-tab"]').click();
+    cy.contains('QTMS').click(); // Use text content instead of data-cy
     
     // Select a chassis
     cy.get('[data-cy="chassis-card"]').first().click();
@@ -33,12 +33,12 @@ describe('Quote Approval Flow E2E Test', () => {
     cy.get('[data-cy="card-selector"]').first().click();
     
     // Add chassis and cards to BOM
-    cy.get('[data-cy="add-to-bom"]').click();
+    cy.contains('Add Chassis & Cards to BOM').click();
     
     // Fill quote fields
-    cy.get('[data-cy="customer-name"]').type('Test Customer Corp');
-    cy.get('[data-cy="oracle-id"]').type('CUST-12345');
-    cy.get('[data-cy="sfdc-opportunity"]').type('OPP-67890');
+    cy.get('input[placeholder*="Customer"]').type('Test Customer Corp');
+    cy.get('input[placeholder*="Oracle"]').type('CUST-12345');
+    cy.get('input[placeholder*="SFDC"]').type('OPP-67890');
     
     // Submit quote
     cy.get('[data-cy="submit-quote"]').click();
@@ -59,16 +59,15 @@ describe('Quote Approval Flow E2E Test', () => {
     cy.get('[data-cy="submit-login"]').click();
     
     // Navigate to admin panel
-    cy.get('[data-cy="admin-panel"]').click();
-    cy.get('[data-cy="quote-approval"]').click();
+    cy.contains('Admin Panel').click();
+    cy.contains('Quote Approval').click();
     
     // Verify quote appears in pending approval list
     cy.contains('Test Customer Corp').should('be.visible');
-    cy.contains('pending_approval').should('be.visible');
+    cy.contains('Pending Approval').should('be.visible');
     
     // Step 3: Test user removal functionality
-    cy.get('[data-cy="user-management"]').click();
-    cy.get('[data-cy="users-tab"]').click();
+    cy.contains('Users').click();
     
     // Find a non-admin user and remove them
     cy.get('[data-cy="user-row"]')
@@ -97,7 +96,7 @@ describe('Quote Approval Flow E2E Test', () => {
     cy.contains('Invalid login credentials').should('be.visible');
   });
 
-  it('should handle quote approval process', () => {
+  it('should handle quote approval process with enhanced UI', () => {
     // Login as admin
     cy.get('[data-cy="login-button"]').click();
     cy.get('[data-cy="email-input"]').type('admin@qualitrolcorp.com');
@@ -105,22 +104,54 @@ describe('Quote Approval Flow E2E Test', () => {
     cy.get('[data-cy="submit-login"]').click();
     
     // Navigate to quote approval
-    cy.get('[data-cy="admin-panel"]').click();
-    cy.get('[data-cy="quote-approval"]').click();
+    cy.contains('Admin Panel').click();
+    cy.contains('Quote Approval').click();
     
-    // Select first pending quote
+    // Verify enhanced UI elements
+    cy.contains('Quote Approval Dashboard').should('be.visible');
+    cy.contains('Pending Queue').should('be.visible');
+    cy.contains('History').should('be.visible');
+    
+    // Test expandable quote functionality
     cy.get('[data-cy="quote-row"]').first().click();
     
-    // Approve the quote
-    cy.get('[data-cy="approve-quote"]').click();
-    cy.get('[data-cy="approval-notes"]').type('Quote approved for standard pricing');
-    cy.get('[data-cy="confirm-approval"]').click();
+    // Verify quote details are expanded
+    cy.contains('Quote Details').should('be.visible');
+    
+    // Test approval workflow
+    cy.contains('Approve Quote').click();
+    cy.get('textarea[placeholder*="approval"]').type('Quote approved for standard pricing');
+    cy.contains('Confirm Approval').click();
     
     // Verify approval success
-    cy.contains('Quote approved successfully').should('be.visible');
+    cy.contains('approved successfully').should('be.visible');
     
-    // Check that quote moved to reviewed tab
-    cy.get('[data-cy="reviewed-tab"]').click();
-    cy.contains('approved').should('be.visible');
+    // Check that quote moved to history tab
+    cy.contains('History').click();
+    cy.contains('Approved').should('be.visible');
+  });
+
+  it('should test enhanced quote filtering and search', () => {
+    // Login as admin
+    cy.get('[data-cy="login-button"]').click();
+    cy.get('[data-cy="email-input"]').type('admin@qualitrolcorp.com');
+    cy.get('[data-cy="password-input"]').type('admin123');
+    cy.get('[data-cy="submit-login"]').click();
+    
+    // Navigate to quote approval
+    cy.contains('Admin Panel').click();
+    cy.contains('Quote Approval').click();
+    
+    // Test search functionality
+    cy.get('input[placeholder*="Search"]').type('Test Customer');
+    cy.contains('Test Customer').should('be.visible');
+    
+    // Test status filtering
+    cy.get('select').select('approved');
+    cy.contains('Approved').should('be.visible');
+    
+    // Test refresh functionality
+    cy.contains('Refresh').click();
+    cy.contains('Loading').should('be.visible');
   });
 });

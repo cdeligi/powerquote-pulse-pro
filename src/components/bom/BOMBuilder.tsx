@@ -13,6 +13,7 @@ import PDProductSelector from './PDProductSelector';
 import BOMDisplay from './BOMDisplay';
 import AnalogCardConfigurator from './AnalogCardConfigurator';
 import BushingCardConfigurator from './BushingCardConfigurator';
+import AdditionalConfigTab from './AdditionalConfigTab';
 import { productDataService } from '@/services/productDataService';
 import QuoteFieldsSection from './QuoteFieldsSection';
 import DiscountSection from './DiscountSection';
@@ -22,6 +23,7 @@ import QTMSConfigurationEditor from './QTMSConfigurationEditor';
 import { consolidateQTMSConfiguration, createQTMSBOMItem, ConsolidatedQTMS, QTMSConfiguration } from '@/utils/qtmsConsolidation';
 import { findOptimalBushingPlacement, findExistingBushingSlots, isBushingCard } from '@/utils/bushingValidation';
 import { useAuth } from '@/hooks/useAuth';
+import { useQuoteValidation } from './QuoteFieldValidation';
 
 interface BOMBuilderProps {
   onBOMUpdate: (items: BOMItem[]) => void;
@@ -48,12 +50,37 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [editingQTMS, setEditingQTMS] = useState<ConsolidatedQTMS | null>(null);
 
+  // Get available quote fields for validation
+  const [availableQuoteFields, setAvailableQuoteFields] = useState<any[]>([]);
+  
+  useEffect(() => {
+    const fetchQuoteFields = async () => {
+      try {
+        const { data: fields, error } = await supabase
+          .from('quote_fields')
+          .select('*')
+          .eq('enabled', true)
+          .order('display_order');
+        
+        if (error) throw error;
+        setAvailableQuoteFields(fields || []);
+      } catch (error) {
+        console.error('Error fetching quote fields:', error);
+      }
+    };
+
+    fetchQuoteFields();
+  }, []);
+
+  // Use quote validation hook
+  const { validation, validateFields } = useQuoteValidation(quoteFields, availableQuoteFields);
+
   // Fixed field change handler to match expected signature
   const handleQuoteFieldChange = (fieldId: string, value: any) => {
     setQuoteFields(prev => ({ ...prev, [fieldId]: value }));
   };
 
-  // Get all Level 1 products for dynamic tabs
+  // Get all Level 1 products for dynamic tabs (excluding analog and bushing cards)
   const level1Products = productDataService.getLevel1Products().filter(p => p.enabled);
 
   // Set default active tab when products are loaded
@@ -65,7 +92,7 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
 
   // Update selected product when tab changes
   useEffect(() => {
-    if (activeTab) {
+    if (activeTab && activeTab !== 'additional-config') {
       const product = level1Products.find(p => p.id === activeTab);
       if (product && selectedLevel1Product?.id !== activeTab) {
         setSelectedLevel1Product(product);
@@ -332,6 +359,27 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
   const submitQuoteRequest = async () => {
     if (isSubmitting) return;
 
+    // Validate required fields before submission
+    const { isValid, missingFields } = validateFields();
+    
+    if (!isValid) {
+      toast({
+        title: 'Missing Required Fields',
+        description: `Please fill in the following required fields: ${missingFields.join(', ')}`,
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (bomItems.length === 0) {
+      toast({
+        title: 'No Items in BOM',
+        description: 'Please add at least one item to the Bill of Materials before submitting.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
@@ -464,6 +512,15 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
 
   // Render product content based on selected tab
   const renderProductContent = (productId: string) => {
+    if (productId === 'additional-config') {
+      return (
+        <AdditionalConfigTab
+          onCardSelect={handleCardSelect}
+          canSeePrices={canSeePrices}
+        />
+      );
+    }
+
     const product = level1Products.find(p => p.id === productId);
     if (!product) return null;
 
@@ -591,7 +648,7 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
           </Card>
 
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full bg-gray-800" style={{ gridTemplateColumns: `repeat(${level1Products.length}, 1fr)` }}>
+            <TabsList className="grid w-full bg-gray-800" style={{ gridTemplateColumns: `repeat(${level1Products.length + 1}, 1fr)` }}>
               {level1Products.map((product) => (
                 <TabsTrigger 
                   key={product.id}
@@ -606,6 +663,15 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
                   )}
                 </TabsTrigger>
               ))}
+              <TabsTrigger 
+                value="additional-config" 
+                className="text-white data-[state=active]:bg-red-600 data-[state=active]:text-white"
+              >
+                Additional Config
+                <Badge variant="outline" className="ml-2 text-xs">
+                  Cards
+                </Badge>
+              </TabsTrigger>
             </TabsList>
             
             {level1Products.map((product) => (
@@ -613,6 +679,10 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
                 {renderProductContent(product.id)}
               </TabsContent>
             ))}
+            
+            <TabsContent value="additional-config" className="mt-6">
+              {renderProductContent('additional-config')}
+            </TabsContent>
           </Tabs>
         </div>
 
@@ -647,6 +717,11 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
                 >
                   {isSubmitting ? 'Submitting...' : `Submit Quote Request (${bomItems.length} items)`}
                 </Button>
+                {!validation.isValid && (
+                  <div className="mt-2 text-sm text-red-400">
+                    Missing required fields: {validation.missingFields.join(', ')}
+                  </div>
+                )}
               </CardContent>
             </Card>
           )}
