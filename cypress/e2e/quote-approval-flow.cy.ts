@@ -43,12 +43,6 @@ describe('Quote Approval Flow E2E Test', () => {
     // Submit quote
     cy.get('[data-cy="submit-quote"]').click();
     
-    // Fill submission form
-    cy.get('[data-cy="quote-customer-name"]').clear().type('Test Customer Corp');
-    cy.get('[data-cy="quote-oracle-id"]').clear().type('CUST-12345');
-    cy.get('[data-cy="quote-sfdc-opp"]').clear().type('OPP-67890');
-    cy.get('[data-cy="submit-quote-final"]').click();
-    
     // Verify quote submission success
     cy.contains('Quote Submitted Successfully').should('be.visible');
     
