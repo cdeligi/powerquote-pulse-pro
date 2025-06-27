@@ -39,33 +39,33 @@ const QuoteTable = ({ quotes, loading, onQuoteSelect, isAdmin = false }: QuoteTa
     );
   }
 
-  const getStatusColor = (status: Quote['status']) => {
+  const getStatusColor = (status: Quote["status"]) => {
     switch (status) {
-      case 'pending_approval':
-        return 'bg-yellow-600 text-white';
-      case 'approved':
-        return 'bg-green-600 text-white';
-      case 'rejected':
-        return 'bg-red-600 text-white';
-      case 'draft':
-        return 'bg-gray-600 text-white';
+      case "pending_approval":
+        return "bg-yellow-600 text-white";
+      case "approved":
+        return "bg-green-600 text-white";
+      case "rejected":
+        return "bg-red-600 text-white";
+      case "draft":
+        return "bg-gray-600 text-white";
       default:
-        return 'bg-gray-600 text-white';
+        return "bg-gray-600 text-white";
     }
   };
 
-  const getPriorityColor = (priority: Quote['priority']) => {
+  const getPriorityColor = (priority: Quote["priority"]) => {
     switch (priority) {
-      case 'Urgent':
-        return 'bg-red-500 text-white';
-      case 'High':
-        return 'bg-orange-500 text-white';
-      case 'Medium':
-        return 'bg-yellow-500 text-white';
-      case 'Low':
-        return 'bg-green-500 text-white';
+      case "Urgent":
+        return "bg-red-500 text-white";
+      case "High":
+        return "bg-orange-500 text-white";
+      case "Medium":
+        return "bg-yellow-500 text-white";
+      case "Low":
+        return "bg-green-500 text-white";
       default:
-        return 'bg-gray-500 text-white';
+        return "bg-gray-500 text-white";
     }
   };
 
@@ -86,11 +86,29 @@ const QuoteTable = ({ quotes, loading, onQuoteSelect, isAdmin = false }: QuoteTa
                 <div>
                   <h4 className="text-white font-medium">{quote.id}</h4>
                   <p className="text-gray-400 text-sm">{quote.customer_name}</p>
+      codex/remove-duplicate-declarations-and-stray-text
                 </div>
                 <div className="flex items-center space-x-2">
                   <p className="text-white font-medium">
                     {quote.currency} {quote.discounted_value.toLocaleString()}
                   </p>
+
+                  {isAdmin && (
+                    <p className="text-gray-500 text-xs">
+                      Cost: {quote.currency} {quote.total_cost.toLocaleString()}
+                    </p>
+                  )}
+                </div>
+                <div className="text-right">
+                  <p className="text-white font-medium">
+                    {quote.currency} {quote.discounted_value.toLocaleString()}
+                  </p>
+                  {isAdmin && (
+                    <p className="text-gray-400 text-xs">
+                      {quote.discounted_margin.toFixed(1)}% margin
+                    </p>
+                  )}
+                  main
                   <Button
                     variant="ghost"
                     size="icon"
@@ -109,7 +127,7 @@ const QuoteTable = ({ quotes, loading, onQuoteSelect, isAdmin = false }: QuoteTa
                 <>
                   <div className="flex items-center space-x-2 mb-3">
                     <Badge className={getStatusColor(quote.status)}>
-                      {quote.status.replace('_', ' ').toUpperCase()}
+                      {quote.status.replace("_", " ").toUpperCase()}
                     </Badge>
                     <Badge className={getPriorityColor(quote.priority)}>
                       {quote.priority}
@@ -127,9 +145,15 @@ const QuoteTable = ({ quotes, loading, onQuoteSelect, isAdmin = false }: QuoteTa
                       </span>
                     </div>
                     <div>
+                  codex/remove-duplicate-declarations-and-stray-text
                       <span className="text-gray-400">After Discount:</span>
                       <span className="text-white ml-2">
                         {quote.currency} {quote.discounted_value.toLocaleString()}
+
+                      <span className="text-gray-400">Original Value:</span>
+                      <span className="text-white ml-2">
+                        {quote.currency} {quote.original_quote_value.toLocaleString()}
+                    main
                       </span>
                     </div>
                     {isAdmin && (
@@ -149,9 +173,32 @@ const QuoteTable = ({ quotes, loading, onQuoteSelect, isAdmin = false }: QuoteTa
                       </>
                     )}
                     <div>
+                   codex/remove-duplicate-declarations-and-stray-text
                       <span className="text-gray-400">BOM Items:</span>
                       <span className="text-white ml-2">{quote.bom_items?.length || 0}</span>
+
+                      <span className="text-gray-400">After Discount:</span>
+                      <span className="text-white ml-2">
+                        {quote.currency} {quote.discounted_value.toLocaleString()}
+                      </span>
+                   main
                     </div>
+                    {isAdmin && (
+                      <>
+                        <div>
+                          <span className="text-gray-400">Total Cost:</span>
+                          <span className="text-white ml-2">
+                            {quote.currency} {quote.total_cost.toLocaleString()}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-gray-400">Gross Margin:</span>
+                          <span className="text-white ml-2">
+                            {quote.discounted_margin.toFixed(1)}%
+                          </span>
+                        </div>
+                      </>
+                    )}
                   </div>
 
                   {quote.discount_justification && (
