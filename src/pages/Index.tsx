@@ -9,13 +9,20 @@ const Index = () => {
   
   const { user, loading, signOut } = useAuth();
   
-  console.log('Auth state:', { user: user?.email, loading });
+  console.log('Auth state in Index:', { 
+    user: user?.email || 'no user', 
+    loading,
+    timestamp: new Date().toISOString()
+  });
 
   const handleLogout = async () => {
+    console.log('Logout initiated...');
     try {
       const { error } = await signOut();
       if (error) {
         console.error('Logout error:', error);
+      } else {
+        console.log('Logout successful');
       }
     } catch (err) {
       console.error('Unexpected logout error:', err);
@@ -28,14 +35,14 @@ const Index = () => {
       <div className="min-h-screen bg-black flex items-center justify-center">
         <div className="flex items-center space-x-2 text-white">
           <Loader2 className="h-6 w-6 animate-spin" />
-          <span>Loading...</span>
+          <span>Loading application...</span>
         </div>
       </div>
     );
   }
 
   if (!user) {
-    console.log('No user, showing login form...');
+    console.log('No authenticated user, showing login form...');
     return (
       <div className="min-h-screen bg-black flex items-center justify-center">
         <LoginForm onLogin={() => {
@@ -45,7 +52,7 @@ const Index = () => {
     );
   }
 
-  console.log('User authenticated, showing dashboard...');
+  console.log('User authenticated, rendering dashboard for:', user.email);
   return <Dashboard user={user} onLogout={handleLogout} />;
 };
 
