@@ -79,13 +79,21 @@ function useProvideAuth(): AuthContextType {
   };
 
   useEffect(() => {
+    console.log('[useAuth] Setting up auth state...');
+    
     // Reset the flag on each effect run
     profileFetched = false;
 
     // 1) Session check  
     supabase.auth
       .getSession()
-      .then(({ data: { session } }) => {
+      .then(({ data: { session }, error }) => {
+        if (error) {
+          console.error('[useAuth] getSession error:', error);
+          setLoading(false);
+          return;
+        }
+        
         console.debug('[useAuth] getSession result:', session?.user?.email);
         setSession(session);
         if (session?.user) {
@@ -118,21 +126,34 @@ function useProvideAuth(): AuthContextType {
     );
 
     return () => {
+      console.log('[useAuth] Cleaning up auth listener...');
       listener.subscription.unsubscribe();
     };
   }, []);
 
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password
-    });
-    return { error };
+    console.log('[useAuth] Signing in user:', email);
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password
+      });
+      return { error };
+    } catch (err) {
+      console.error('[useAuth] Sign in error:', err);
+      return { error: err };
+    }
   };
 
   const signOut = async () => {
-    const { error } = await supabase.auth.signOut();
-    return { error };
+    console.log('[useAuth] Signing out user...');
+    try {
+      const { error } = await supabase.auth.signOut();
+      return { error };
+    } catch (err) {
+      console.error('[useAuth] Sign out error:', err);
+      return { error: err };
+    }
   };
 
   return {

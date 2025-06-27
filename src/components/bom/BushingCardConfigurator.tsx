@@ -1,8 +1,9 @@
+
 /**
  * © 2025 Qualitrol Corp. All rights reserved.
  */
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { BOMItem, Level3Customization } from "@/types/product/interfaces";
 import { productDataService } from "@/services/productDataService";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -19,16 +20,39 @@ interface BushingCardConfiguratorProps {
   onClose: () => void;
 }
 
-
 const BushingCardConfigurator = ({ bomItem, onSave, onClose }: BushingCardConfiguratorProps) => {
-  const stored = localStorage.getItem(`bushingDefaults_${bomItem.product.id}`);
-  const parsed = stored ? (JSON.parse(stored) as { numberOfBushings: number; configs: Record<number, string> }) : null;
+  console.log('BushingCardConfigurator rendering for item:', bomItem.product.name);
+  
+  const [tapModels, setTapModels] = useState<Array<{id: string, name: string}>>([]);
+  const [numberOfBushings, setNumberOfBushings] = useState<number>(1);
+  const [bushingConfigurations, setBushingConfigurations] = useState<Record<number, string>>({});
+  const [loading, setLoading] = useState(true);
 
-  const tapModels = productDataService.getBushingTapModels();
-  const [numberOfBushings, setNumberOfBushings] = useState<number>(parsed?.numberOfBushings || 1);
-  const [bushingConfigurations, setBushingConfigurations] = useState<Record<number, string>>(
-    () => parsed?.configs || { 1: tapModels[0]?.name || 'Standard' }
-  );
+  useEffect(() => {
+    try {
+      const models = productDataService.getBushingTapModels();
+      console.log('Loaded bushing tap models:', models);
+      setTapModels(models || []);
+      
+      // Load stored defaults
+      const stored = localStorage.getItem(`bushingDefaults_${bomItem.product.id}`);
+      const parsed = stored ? JSON.parse(stored) : null;
+      
+      const defaultNumberOfBushings = parsed?.numberOfBushings || 1;
+      const defaultModel = models?.[0]?.name || 'Standard';
+      
+      setNumberOfBushings(defaultNumberOfBushings);
+      setBushingConfigurations(parsed?.configs || { 1: defaultModel });
+      
+      setLoading(false);
+    } catch (error) {
+      console.error('Error initializing BushingCardConfigurator:', error);
+      setTapModels([{ id: 'standard', name: 'Standard' }]);
+      setNumberOfBushings(1);
+      setBushingConfigurations({ 1: 'Standard' });
+      setLoading(false);
+    }
+  }, [bomItem.product.id]);
 
   const handleNumberOfBushingsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = parseInt(e.target.value, 10);
@@ -39,9 +63,11 @@ const BushingCardConfigurator = ({ bomItem, onSave, onClose }: BushingCardConfig
     // Ensure configurations exist for each bushing
     setBushingConfigurations(prev => {
       const updatedConfigs = { ...prev };
+      const defaultModel = tapModels[0]?.name || 'Standard';
+      
       for (let i = 1; i <= value; i++) {
         if (!updatedConfigs[i]) {
-          updatedConfigs[i] = tapModels[0]?.name || 'Standard';
+          updatedConfigs[i] = defaultModel;
         }
       }
       return updatedConfigs;
@@ -56,23 +82,38 @@ const BushingCardConfigurator = ({ bomItem, onSave, onClose }: BushingCardConfig
   };
 
   const handleSave = () => {
-    const customizations: Level3Customization[] = [];
-    
-    for (let i = 1; i <= numberOfBushings; i++) {
-      customizations.push({
-        id: `bushing-${i}-${bomItem.id}`,
-        parentOptionId: bomItem.id,
-        type: 'bushing_config',
-        name: `Bushing ${i}: ${bushingConfigurations[i]}`,
-        description: `Bushing ${i} tap model configuration`,
-        options: [bushingConfigurations[i]],
-        price: 0,
-        enabled: true
-      });
+    try {
+      const customizations: Level3Customization[] = [];
+      
+      for (let i = 1; i <= numberOfBushings; i++) {
+        customizations.push({
+          id: `bushing-${i}-${bomItem.id}`,
+          parentOptionId: bomItem.id || `${Date.now()}-${i}`,
+          type: 'bushing_config',
+          name: `Bushing ${i}: ${bushingConfigurations[i]}`,
+          description: `Bushing ${i} tap model configuration`,
+          options: [bushingConfigurations[i]],
+          price: 0,
+          enabled: true
+        });
+      }
+      
+      console.log('Saving bushing customizations:', customizations);
+      onSave(customizations);
+    } catch (error) {
+      console.error('Error saving bushing configuration:', error);
     }
-    
-    onSave(customizations);
   };
+
+  if (loading) {
+    return (
+      <Dialog open={true} onOpenChange={onClose}>
+        <DialogContent className="bg-gray-900 border-gray-800">
+          <div className="text-white text-center p-4">Loading...</div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
 
   return (
     <Dialog open={true} onOpenChange={onClose}>
@@ -131,7 +172,7 @@ const BushingCardConfigurator = ({ bomItem, onSave, onClose }: BushingCardConfig
                     Tap Model
                   </Label>
                   <Select
-                    value={bushingConfigurations[index + 1]}
+                    value={bushingConfigurations[index + 1] || tapModels[0]?.name || 'Standard'}
                     onValueChange={(value) => handleBushingConfigurationChange(index + 1, value)}
                   >
                     <SelectTrigger className="bg-gray-700 border-gray-600 text-white">
