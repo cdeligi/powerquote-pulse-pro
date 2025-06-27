@@ -265,7 +265,6 @@ const ProductManagement = ({ user }: ProductManagementProps) => {
           >
             <Settings className="h-4 w-4 mr-2" />
             Sensor Config
-          codex/add-tabs-for-analog-and-bushing-config
           </TabsTrigger>
           <TabsTrigger
             value="analog-config"
@@ -281,7 +280,6 @@ const ProductManagement = ({ user }: ProductManagementProps) => {
             <SlidersHorizontal className="h-4 w-4 mr-2" />
             Bushing Config
 
-        main
           </TabsTrigger>
         </TabsList>
 
@@ -627,10 +625,7 @@ const ProductManagement = ({ user }: ProductManagementProps) => {
             })}
           </div>
         </TabsContent>
-        codex/add-tabs-for-analog-and-bushing-config
-
-
-        main
+        
         <TabsContent value="defaults" className="space-y-6">
           {settingsProduct && settingsType === 'analog' && (
             <AnalogDefaultsDialog
