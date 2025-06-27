@@ -643,6 +643,7 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
                   className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3"
                   size="lg"
                   disabled={isSubmitting}
+                  data-cy="submit-quote"
                 >
                   {isSubmitting ? 'Submitting...' : `Submit Quote Request (${bomItems.length} items)`}
                 </Button>
