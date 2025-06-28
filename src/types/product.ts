@@ -6,12 +6,14 @@ export * from './product/quote-types';
 export * from './product/type-guards';
 export * from './product/part-number-utils';
 
-// Explicit re-exports for commonly used types
+// Explicit re-exports for commonly used types including Level 4
 export type { 
   AnalogSensorType, 
   AnalogSensorOption, 
-  BushingTapModelOption 
-} from './product/sensor-config';
+  BushingTapModelOption,
+  Level4Product,
+  Level4ConfigurationOption
+} from './product/interfaces';
 
 export { 
   ANALOG_SENSOR_TYPES, 

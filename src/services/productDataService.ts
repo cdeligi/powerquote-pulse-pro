@@ -2,6 +2,8 @@ import {
   Level1Product,
   Level2Product,
   Level3Product,
+  Level4Product,
+  Level4ConfigurationOption,
   AssetType,
   AnalogSensorOption,
   BushingTapModelOption,
@@ -20,6 +22,7 @@ class ProductDataService {
   private level1Products: Level1Product[] = [];
   private level2Products: Level2Product[] = [];
   private level3Products: Level3Product[] = [];
+  private level4Products: Level4Product[] = [];
   private assetTypes: AssetType[] = [];
   private analogSensorTypes: AnalogSensorOption[] = [];
   private bushingTapModels: BushingTapModelOption[] = [];
@@ -47,6 +50,9 @@ class ProductDataService {
     const storedLevel3Products = localStorage.getItem('level3Products');
     this.level3Products = storedLevel3Products ? JSON.parse(storedLevel3Products) : [];
 
+    const storedLevel4Products = localStorage.getItem('level4Products');
+    this.level4Products = storedLevel4Products ? JSON.parse(storedLevel4Products) : [];
+
     this.initializeDefaultData();
   }
 
@@ -57,6 +63,7 @@ class ProductDataService {
     localStorage.setItem('level1Products', JSON.stringify(this.level1Products));
     localStorage.setItem('level2Products', JSON.stringify(this.level2Products));
     localStorage.setItem('level3Products', JSON.stringify(this.level3Products));
+    localStorage.setItem('level4Products', JSON.stringify(this.level4Products));
   }
 
   // Asset Types (Level 0) methods
@@ -421,6 +428,138 @@ class ProductDataService {
     return level3.parentProductId === level2.id;
   }
 
+  // Level 4 Products methods
+  getLevel4Products(): Level4Product[] {
+    return this.level4Products;
+  }
+
+  getLevel4ProductsForLevel3(level3ProductId: string): Level4Product[] {
+    return this.level4Products.filter(product => product.parentProductId === level3ProductId);
+  }
+
+  async createLevel4Product(product: Omit<Level4Product, 'id'>): Promise<Level4Product> {
+    const newProduct: Level4Product = {
+      ...product,
+      id: `level4-${Date.now()}`
+    };
+    this.level4Products.push(newProduct);
+    this.saveData();
+
+    try {
+      // Insert main product record
+      await supabase.from('level4_products').insert({
+        id: newProduct.id,
+        name: newProduct.name,
+        parent_product_id: newProduct.parentProductId,
+        description: newProduct.description,
+        configuration_type: newProduct.configurationType,
+        price: newProduct.price,
+        cost: newProduct.cost ?? null,
+        enabled: newProduct.enabled
+      });
+
+      // Insert relationship record
+      await supabase.from('level3_level4_relationships').insert({
+        level3_product_id: newProduct.parentProductId,
+        level4_product_id: newProduct.id
+      });
+
+      // Insert configuration options
+      if (newProduct.options && newProduct.options.length > 0) {
+        const optionsToInsert = newProduct.options.map(option => ({
+          level4_product_id: newProduct.id,
+          option_key: option.optionKey,
+          option_value: option.optionValue,
+          display_order: option.displayOrder,
+          enabled: option.enabled
+        }));
+        await supabase.from('level4_configuration_options').insert(optionsToInsert);
+      }
+    } catch (error) {
+      console.error('Failed to persist level4 product', error);
+    }
+
+    return newProduct;
+  }
+
+  async updateLevel4Product(id: string, updates: Partial<Omit<Level4Product, 'id'>>): Promise<Level4Product | null> {
+    const index = this.level4Products.findIndex(product => product.id === id);
+    if (index !== -1) {
+      const oldParent = this.level4Products[index].parentProductId;
+      this.level4Products[index] = { ...this.level4Products[index], ...updates };
+      this.saveData();
+
+      try {
+        // Update main product record
+        await supabase.from('level4_products')
+          .update({
+            name: this.level4Products[index].name,
+            parent_product_id: this.level4Products[index].parentProductId,
+            description: this.level4Products[index].description,
+            configuration_type: this.level4Products[index].configurationType,
+            price: this.level4Products[index].price,
+            cost: this.level4Products[index].cost ?? null,
+            enabled: this.level4Products[index].enabled
+          })
+          .eq('id', id);
+
+        // Update relationship if parent changed
+        if (updates.parentProductId && updates.parentProductId !== oldParent) {
+          await supabase.from('level3_level4_relationships')
+            .delete()
+            .eq('level4_product_id', id);
+          await supabase.from('level3_level4_relationships').insert({
+            level3_product_id: updates.parentProductId,
+            level4_product_id: id
+          });
+        }
+
+        // Update options if provided
+        if (updates.options) {
+          await supabase.from('level4_configuration_options')
+            .delete()
+            .eq('level4_product_id', id);
+          
+          if (updates.options.length > 0) {
+            const optionsToInsert = updates.options.map(option => ({
+              level4_product_id: id,
+              option_key: option.optionKey,
+              option_value: option.optionValue,
+              display_order: option.displayOrder,
+              enabled: option.enabled
+            }));
+            await supabase.from('level4_configuration_options').insert(optionsToInsert);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to update level4 product', error);
+      }
+
+      return this.level4Products[index];
+    }
+    return null;
+  }
+
+  async deleteLevel4Product(id: string): Promise<void> {
+    this.level4Products = this.level4Products.filter(product => product.id !== id);
+    this.saveData();
+
+    try {
+      // Delete configuration options first
+      await supabase.from('level4_configuration_options').delete().eq('level4_product_id', id);
+      // Delete relationships
+      await supabase.from('level3_level4_relationships').delete().eq('level4_product_id', id);
+      // Delete main product record
+      await supabase.from('level4_products').delete().eq('id', id);
+    } catch (error) {
+      console.error('Failed to delete level4 product', error);
+    }
+  }
+
+  isLevel4AvailableForLevel3(level4: Level4Product, level3: Level3Product): boolean {
+    return level4.parentProductId === level3.id;
+  }
+
   /**
    * Replace all existing product lists with freshly fetched data.
    * This is useful when synchronizing from a remote source.
@@ -428,11 +567,13 @@ class ProductDataService {
   replaceAllProducts(
     level1: Level1Product[],
     level2: Level2Product[],
-    level3: Level3Product[]
+    level3: Level3Product[],
+    level4: Level4Product[]
   ) {
     this.level1Products = [...level1];
     this.level2Products = [...level2];
     this.level3Products = [...level3];
+    this.level4Products = [...level4];
     this.saveData();
   }
 
@@ -461,6 +602,8 @@ class ProductDataService {
     if (this.bushingTapModels.length === 0) {
       this.bushingTapModels = [...DEFAULT_BUSHING_TAP_MODELS];
     }
+
+    // Level 4 products start empty - they're created by admins
     this.saveData();
   }
 }

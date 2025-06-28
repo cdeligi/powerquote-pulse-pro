@@ -190,6 +190,127 @@ export type Database = {
         }
         Relationships: []
       }
+      level3_level4_relationships: {
+        Row: {
+          created_at: string
+          id: string
+          level3_product_id: string
+          level4_product_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          level3_product_id: string
+          level4_product_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          level3_product_id?: string
+          level4_product_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_level3_relationship"
+            columns: ["level3_product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_level4_relationship"
+            columns: ["level4_product_id"]
+            isOneToOne: false
+            referencedRelation: "level4_products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      level4_configuration_options: {
+        Row: {
+          created_at: string
+          display_order: number | null
+          enabled: boolean | null
+          id: string
+          level4_product_id: string
+          option_key: string
+          option_value: string
+        }
+        Insert: {
+          created_at?: string
+          display_order?: number | null
+          enabled?: boolean | null
+          id?: string
+          level4_product_id: string
+          option_key: string
+          option_value: string
+        }
+        Update: {
+          created_at?: string
+          display_order?: number | null
+          enabled?: boolean | null
+          id?: string
+          level4_product_id?: string
+          option_key?: string
+          option_value?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_level4_options_product"
+            columns: ["level4_product_id"]
+            isOneToOne: false
+            referencedRelation: "level4_products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      level4_products: {
+        Row: {
+          configuration_type: string
+          cost: number | null
+          created_at: string
+          description: string | null
+          enabled: boolean | null
+          id: string
+          name: string
+          parent_product_id: string
+          price: number | null
+          updated_at: string
+        }
+        Insert: {
+          configuration_type?: string
+          cost?: number | null
+          created_at?: string
+          description?: string | null
+          enabled?: boolean | null
+          id: string
+          name: string
+          parent_product_id: string
+          price?: number | null
+          updated_at?: string
+        }
+        Update: {
+          configuration_type?: string
+          cost?: number | null
+          created_at?: string
+          description?: string | null
+          enabled?: boolean | null
+          id?: string
+          name?: string
+          parent_product_id?: string
+          price?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_level4_parent_product"
+            columns: ["parent_product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       margin_thresholds: {
         Row: {
           created_at: string | null
