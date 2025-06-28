@@ -301,7 +301,7 @@ const QuoteDetails = ({
                       )}
                     </div>
                     <div className="flex space-x-1">
-                      {item.product.type === 'QTMS' && item.configuration && (
+                      {item.product?.type === 'QTMS' && item.configuration && (
                         <Button
                           size="sm"
                           variant="ghost"
