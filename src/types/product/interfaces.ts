@@ -77,12 +77,14 @@ export interface Level4Product {
   id: string;
   name: string;
   parentProductId: string; // Links to Level3Product
+  type?: string;
   description: string;
   configurationType: 'dropdown' | 'multiline';
   price: number;
   cost?: number;
   enabled: boolean;
   options: Level4ConfigurationOption[];
+  partNumber?: string;
 }
 
 export interface Level4ConfigurationOption {
