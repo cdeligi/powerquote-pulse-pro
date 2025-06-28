@@ -32,9 +32,9 @@ cd <YOUR_PROJECT_NAME>
 # Step 3: Install the necessary dependencies.
 npm i
 
-# Step 4: Copy `.env.example` and add your Supabase credentials.
+# Step 4: Create a `.env` file from the included template.
 cp .env.example .env
-# Edit the new `.env` file and set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`.
+# Edit the new `.env` file and set the variables listed below.
 
 # Step 5: Start the development server with auto-reloading and an instant preview.
 npm run dev
@@ -78,7 +78,9 @@ Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-trick
 
 ## Environment Variables
 
-Copy `.env.example` to `.env` in the project root and add your Supabase credentials. The `.env` file is ignored by Git, so you'll need to create it yourself whenever you clone the repo. These values are used by the application and the Supabase CLI:
+An `.env.example` file is checked into the repository. Copy it to `.env` and provide your Supabase credentials. The `.env` file is ignored by Git, so you'll need to recreate it whenever you clone the repo.
+
+Required variables:
 
 ```dotenv
 VITE_SUPABASE_URL=<your-supabase-url>
