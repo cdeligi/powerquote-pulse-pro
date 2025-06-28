@@ -2,10 +2,10 @@
 import React, { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Level1ProductForm } from "./product-forms/Level1ProductForm";
-import { ChassisForm } from "./product-forms/ChassisForm";
-import { CardForm } from "./product-forms/CardForm";
-import { Level2OptionForm } from "./product-forms/Level2OptionForm";
+import Level1ProductForm from "./product-forms/Level1ProductForm";
+import ChassisForm from "./product-forms/ChassisForm";
+import CardForm from "./product-forms/CardForm";
+import Level2OptionForm from "./product-forms/Level2OptionForm";
 import { Level4ConfigurationManager } from "./Level4ConfigurationManager";
 import { Level1Product, Level2Product, Level3Product, Level4Product } from "@/types/product";
 import { productDataService } from "@/services/productDataService";
