@@ -97,11 +97,15 @@ npm i
 
 ## Running the Development Server
 
-Launch the Vite dev server on <http://localhost:8080>:
+Launch the Vite dev server with:
 
 ```sh
 npm run dev
 ```
+
+By default, Vite listens on <http://localhost:5173>. This project overrides the
+port to `8080` in [`vite.config.ts`](vite.config.ts) under `server.port`. Adjust
+that value if you'd like to run the server on a different port.
 
 ## Running Supabase Migrations
 
