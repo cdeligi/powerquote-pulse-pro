@@ -3,7 +3,7 @@ import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { User } from "@/types/auth";
 import { BOMItem, Level1Product } from "@/types/product";
-import ProductManagement from "./ProductManagement";
+import { ProductManagement } from "./ProductManagement";
 import UserManagement from "./UserManagement";
 import QuoteFieldConfiguration from "./QuoteFieldConfiguration";
 import AdminSettings from "./AdminSettings";
