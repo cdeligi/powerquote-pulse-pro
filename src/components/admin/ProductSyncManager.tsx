@@ -16,6 +16,7 @@ interface ProductSyncStats {
   level1Count: number;
   level2Count: number;
   level3Count: number;
+  level4Count: number;
   lastSyncAt: string | null;
 }
 
@@ -25,6 +26,7 @@ const ProductSyncManager = () => {
     level1Count: 0,
     level2Count: 0,
     level3Count: 0,
+    level4Count: 0,
     lastSyncAt: null
   });
 
@@ -33,21 +35,24 @@ const ProductSyncManager = () => {
     
     try {
       // Fetch all product data from database
-      const [level1Result, level2Result, level3Result] = await Promise.all([
+      const [level1Result, level2Result, level3Result, level4Result] = await Promise.all([
         supabase.from('products').select('*').eq('category', 'level1'),
-        supabase.from('products').select('*').eq('category', 'level2'), 
-        supabase.from('products').select('*').eq('category', 'level3')
+        supabase.from('products').select('*').eq('category', 'level2'),
+        supabase.from('products').select('*').eq('category', 'level3'),
+        supabase.from('level4_products').select('*')
       ]);
 
       if (level1Result.error) throw level1Result.error;
       if (level2Result.error) throw level2Result.error;
       if (level3Result.error) throw level3Result.error;
+      if (level4Result.error) throw level4Result.error;
 
       // Persist fetched products to local storage
       productDataService.replaceAllProducts(
         level1Result.data || [],
         level2Result.data || [],
-        level3Result.data || []
+        level3Result.data || [],
+        level4Result.data || []
       );
 
       // Update local state with fresh data
@@ -55,12 +60,13 @@ const ProductSyncManager = () => {
         level1Count: level1Result.data?.length || 0,
         level2Count: level2Result.data?.length || 0,
         level3Count: level3Result.data?.length || 0,
+        level4Count: level4Result.data?.length || 0,
         lastSyncAt: new Date().toISOString()
       });
 
       toast({
         title: "Products Synced Successfully",
-        description: `Synchronized ${(level1Result.data?.length || 0) + (level2Result.data?.length || 0) + (level3Result.data?.length || 0)} products across all levels.`,
+        description: `Synchronized ${(level1Result.data?.length || 0) + (level2Result.data?.length || 0) + (level3Result.data?.length || 0) + (level4Result.data?.length || 0)} products across all levels.`,
       });
 
     } catch (error) {
@@ -92,7 +98,7 @@ const ProductSyncManager = () => {
         </Button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card className="bg-gray-900 border-gray-800">
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
@@ -134,6 +140,20 @@ const ProductSyncManager = () => {
             </div>
           </CardContent>
         </Card>
+
+        <Card className="bg-gray-900 border-gray-800">
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-400">Level 4 Products</p>
+                <p className="text-2xl font-bold text-purple-500">
+                  {syncStats.level4Count}
+                </p>
+              </div>
+              <Database className="h-8 w-8 text-purple-500" />
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       <Card className="bg-gray-900 border-gray-800">
@@ -160,7 +180,7 @@ const ProductSyncManager = () => {
           <div className="flex items-center justify-between">
             <span className="text-gray-300">Total Products:</span>
             <Badge variant="outline" className="text-white border-gray-600">
-              {syncStats.level1Count + syncStats.level2Count + syncStats.level3Count} items
+              {syncStats.level1Count + syncStats.level2Count + syncStats.level3Count + syncStats.level4Count} items
             </Badge>
           </div>
 
