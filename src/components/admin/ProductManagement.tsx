@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import Level1ProductForm from "./product-forms/Level1ProductForm";
@@ -13,6 +13,26 @@ import { useToast } from "@/hooks/use-toast";
 
 export const ProductManagement = () => {
   const { toast } = useToast();
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const initializeData = async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
+        // Ensure data is properly loaded
+        await new Promise(resolve => setTimeout(resolve, 100)); // Small delay to ensure initialization
+        setIsLoading(false);
+      } catch (err) {
+        console.error('Error initializing product data:', err);
+        setError('Failed to load product data');
+        setIsLoading(false);
+      }
+    };
+
+    initializeData();
+  }, []);
 
   const handleLevel1Save = async (productData: Omit<Level1Product, 'id'> | Level1Product) => {
     try {
@@ -24,6 +44,7 @@ export const ProductManagement = () => {
         toast({ title: "Success", description: "Level 1 product created successfully" });
       }
     } catch (error) {
+      console.error('Error saving Level 1 product:', error);
       toast({ 
         title: "Error", 
         description: "Failed to save Level 1 product", 
@@ -42,6 +63,7 @@ export const ProductManagement = () => {
         toast({ title: "Success", description: "Level 2 product created successfully" });
       }
     } catch (error) {
+      console.error('Error saving Level 2 product:', error);
       toast({ 
         title: "Error", 
         description: "Failed to save Level 2 product", 
@@ -60,6 +82,7 @@ export const ProductManagement = () => {
         toast({ title: "Success", description: "Level 3 product created successfully" });
       }
     } catch (error) {
+      console.error('Error saving Level 3 product:', error);
       toast({ 
         title: "Error", 
         description: "Failed to save Level 3 product", 
@@ -67,6 +90,28 @@ export const ProductManagement = () => {
       });
     }
   };
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h2 className="text-3xl font-bold tracking-tight">Product Management</h2>
+          <p className="text-muted-foreground">Loading product data...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h2 className="text-3xl font-bold tracking-tight">Product Management</h2>
+          <p className="text-red-600">{error}</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -94,7 +139,7 @@ export const ProductManagement = () => {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <Level1ProductForm onSave={handleLevel1Save} />
+              <Level1ProductForm onSubmit={handleLevel1Save} />
             </CardContent>
           </Card>
         </TabsContent>
@@ -108,7 +153,7 @@ export const ProductManagement = () => {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <ChassisForm onSave={handleLevel2Save} />
+              <ChassisForm onSubmit={handleLevel2Save} />
             </CardContent>
           </Card>
         </TabsContent>
@@ -125,11 +170,11 @@ export const ProductManagement = () => {
               <div className="grid gap-6">
                 <div>
                   <h4 className="text-lg font-semibold mb-4">Cards & Components</h4>
-                  <CardForm onSave={handleLevel3Save} />
+                  <CardForm onSubmit={handleLevel3Save} />
                 </div>
                 <div>
                   <h4 className="text-lg font-semibold mb-4">Product Options</h4>
-                  <Level2OptionForm onSave={handleLevel3Save} />
+                  <Level2OptionForm onSubmit={handleLevel3Save} />
                 </div>
               </div>
             </CardContent>

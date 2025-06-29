@@ -37,15 +37,35 @@ export const Level4ProductForm: React.FC<Level4ProductFormProps> = ({
 
   const [level3Products, setLevel3Products] = useState<Level3Product[]>([]);
   const [newOption, setNewOption] = useState({ optionKey: '', optionValue: '' });
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    setLevel3Products(productDataService.getLevel3Products());
+    const loadLevel3Products = () => {
+      try {
+        const products = productDataService.getLevel3Products();
+        console.log('Loaded Level 3 products:', products.length);
+        setLevel3Products(products);
+      } catch (error) {
+        console.error('Error loading Level 3 products:', error);
+        setLevel3Products([]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadLevel3Products();
   }, []);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (formData.name && formData.parentProductId) {
-      onSave(formData as Level4Product);
+    if (formData.name && formData.parentProductId && formData.configurationType) {
+      const productToSave = {
+        ...formData,
+        configurationType: formData.configurationType as 'dropdown' | 'multiline',
+        options: formData.options || []
+      } as Level4Product;
+      
+      onSave(productToSave);
     }
   };
 
@@ -78,6 +98,14 @@ export const Level4ProductForm: React.FC<Level4ProductFormProps> = ({
 
   const selectedLevel3 = level3Products.find(p => p.id === formData.parentProductId);
 
+  if (isLoading) {
+    return (
+      <div className="space-y-4">
+        <p>Loading Level 3 products...</p>
+      </div>
+    );
+  }
+
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -85,7 +113,7 @@ export const Level4ProductForm: React.FC<Level4ProductFormProps> = ({
           <Label htmlFor="name">Configuration Name</Label>
           <Input
             id="name"
-            value={formData.name}
+            value={formData.name || ''}
             onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
             required
           />
@@ -94,7 +122,7 @@ export const Level4ProductForm: React.FC<Level4ProductFormProps> = ({
         <div>
           <Label htmlFor="parentProduct">Parent Level 3 Product</Label>
           <Select
-            value={formData.parentProductId}
+            value={formData.parentProductId || ''}
             onValueChange={(value) => setFormData(prev => ({ ...prev, parentProductId: value }))}
           >
             <SelectTrigger>
@@ -108,12 +136,17 @@ export const Level4ProductForm: React.FC<Level4ProductFormProps> = ({
               ))}
             </SelectContent>
           </Select>
+          {level3Products.length === 0 && (
+            <p className="text-sm text-gray-500 mt-1">
+              No Level 3 products available. Create Level 3 products first.
+            </p>
+          )}
         </div>
 
         <div>
           <Label htmlFor="configurationType">Configuration Type</Label>
           <Select
-            value={formData.configurationType}
+            value={formData.configurationType || 'dropdown'}
             onValueChange={(value: 'dropdown' | 'multiline') => 
               setFormData(prev => ({ ...prev, configurationType: value }))
             }
@@ -131,7 +164,7 @@ export const Level4ProductForm: React.FC<Level4ProductFormProps> = ({
         <div className="flex items-center space-x-2">
           <Switch
             id="enabled"
-            checked={formData.enabled}
+            checked={formData.enabled || false}
             onCheckedChange={(checked) => setFormData(prev => ({ ...prev, enabled: checked }))}
           />
           <Label htmlFor="enabled">Enabled</Label>
@@ -142,7 +175,7 @@ export const Level4ProductForm: React.FC<Level4ProductFormProps> = ({
         <Label htmlFor="description">Description</Label>
         <Textarea
           id="description"
-          value={formData.description}
+          value={formData.description || ''}
           onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
           rows={3}
         />
@@ -155,7 +188,7 @@ export const Level4ProductForm: React.FC<Level4ProductFormProps> = ({
             id="price"
             type="number"
             step="0.01"
-            value={formData.price}
+            value={formData.price || 0}
             onChange={(e) => setFormData(prev => ({ ...prev, price: parseFloat(e.target.value) || 0 }))}
           />
         </div>
@@ -166,7 +199,7 @@ export const Level4ProductForm: React.FC<Level4ProductFormProps> = ({
             id="cost"
             type="number"
             step="0.01"
-            value={formData.cost}
+            value={formData.cost || 0}
             onChange={(e) => setFormData(prev => ({ ...prev, cost: parseFloat(e.target.value) || 0 }))}
           />
         </div>
