@@ -38,15 +38,26 @@ export const Level4ProductForm: React.FC<Level4ProductFormProps> = ({
   const [level3Products, setLevel3Products] = useState<Level3Product[]>([]);
   const [newOption, setNewOption] = useState({ optionKey: '', optionValue: '' });
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const loadLevel3Products = () => {
       try {
+        setIsLoading(true);
+        setError(null);
+        
+        console.log('Loading Level 3 products for Level 4 form...');
         const products = productDataService.getLevel3Products();
         console.log('Loaded Level 3 products:', products.length);
+        
         setLevel3Products(products);
+        
+        // If editing and no parentProductId is set, but we have products, don't auto-select
+        // Let user choose explicitly
+        
       } catch (error) {
         console.error('Error loading Level 3 products:', error);
+        setError('Failed to load Level 3 products');
         setLevel3Products([]);
       } finally {
         setIsLoading(false);
@@ -58,35 +69,56 @@ export const Level4ProductForm: React.FC<Level4ProductFormProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (formData.name && formData.parentProductId && formData.configurationType) {
-      const productToSave = {
-        ...formData,
-        configurationType: formData.configurationType as 'dropdown' | 'multiline',
-        options: formData.options || []
-      } as Level4Product;
-      
-      onSave(productToSave);
+    
+    if (!formData.name?.trim()) {
+      alert('Please enter a configuration name');
+      return;
     }
+    
+    if (!formData.parentProductId) {
+      alert('Please select a parent Level 3 product');
+      return;
+    }
+    
+    if (!formData.configurationType) {
+      alert('Please select a configuration type');
+      return;
+    }
+    
+    const productToSave = {
+      ...formData,
+      name: formData.name.trim(),
+      configurationType: formData.configurationType as 'dropdown' | 'multiline',
+      options: formData.options || [],
+      price: formData.price || 0,
+      cost: formData.cost || 0,
+      enabled: formData.enabled ?? true
+    } as Level4Product;
+    
+    onSave(productToSave);
   };
 
   const addOption = () => {
-    if (newOption.optionKey && newOption.optionValue) {
-      const option: Level4ConfigurationOption = {
-        id: `option-${Date.now()}`,
-        level4ProductId: formData.id || '',
-        optionKey: newOption.optionKey,
-        optionValue: newOption.optionValue,
-        displayOrder: (formData.options?.length || 0) + 1,
-        enabled: true
-      };
-      
-      setFormData(prev => ({
-        ...prev,
-        options: [...(prev.options || []), option]
-      }));
-      
-      setNewOption({ optionKey: '', optionValue: '' });
+    if (!newOption.optionKey?.trim() || !newOption.optionValue?.trim()) {
+      alert('Please enter both option key and value');
+      return;
     }
+    
+    const option: Level4ConfigurationOption = {
+      id: `option-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      level4ProductId: formData.id || '',
+      optionKey: newOption.optionKey.trim(),
+      optionValue: newOption.optionValue.trim(),
+      displayOrder: (formData.options?.length || 0) + 1,
+      enabled: true
+    };
+    
+    setFormData(prev => ({
+      ...prev,
+      options: [...(prev.options || []), option]
+    }));
+    
+    setNewOption({ optionKey: '', optionValue: '' });
   };
 
   const removeOption = (optionId: string) => {
@@ -101,7 +133,41 @@ export const Level4ProductForm: React.FC<Level4ProductFormProps> = ({
   if (isLoading) {
     return (
       <div className="space-y-4">
-        <p>Loading Level 3 products...</p>
+        <div className="text-center py-8">
+          <p className="text-gray-600">Loading Level 3 products...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-4">
+        <div className="text-center py-8 text-red-600">
+          <p>{error}</p>
+          <Button onClick={onCancel} variant="outline" className="mt-4">
+            Cancel
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (level3Products.length === 0) {
+    return (
+      <div className="space-y-4">
+        <div className="text-center py-8">
+          <h3 className="text-lg font-medium text-gray-900 mb-2">No Level 3 Products Available</h3>
+          <p className="text-gray-600 mb-4">
+            You need to create Level 3 products before you can add Level 4 configurations.
+          </p>
+          <p className="text-sm text-gray-500 mb-4">
+            Go to the Level 3 Products tab to create cards, components, or options first.
+          </p>
+          <Button onClick={onCancel} variant="outline">
+            Cancel
+          </Button>
+        </div>
       </div>
     );
   }
@@ -110,17 +176,18 @@ export const Level4ProductForm: React.FC<Level4ProductFormProps> = ({
     <form onSubmit={handleSubmit} className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <Label htmlFor="name">Configuration Name</Label>
+          <Label htmlFor="name">Configuration Name *</Label>
           <Input
             id="name"
             value={formData.name || ''}
             onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+            placeholder="Enter configuration name"
             required
           />
         </div>
 
         <div>
-          <Label htmlFor="parentProduct">Parent Level 3 Product</Label>
+          <Label htmlFor="parentProduct">Parent Level 3 Product *</Label>
           <Select
             value={formData.parentProductId || ''}
             onValueChange={(value) => setFormData(prev => ({ ...prev, parentProductId: value }))}
@@ -136,11 +203,6 @@ export const Level4ProductForm: React.FC<Level4ProductFormProps> = ({
               ))}
             </SelectContent>
           </Select>
-          {level3Products.length === 0 && (
-            <p className="text-sm text-gray-500 mt-1">
-              No Level 3 products available. Create Level 3 products first.
-            </p>
-          )}
         </div>
 
         <div>
@@ -177,6 +239,7 @@ export const Level4ProductForm: React.FC<Level4ProductFormProps> = ({
           id="description"
           value={formData.description || ''}
           onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+          placeholder="Enter configuration description"
           rows={3}
         />
       </div>
@@ -188,6 +251,7 @@ export const Level4ProductForm: React.FC<Level4ProductFormProps> = ({
             id="price"
             type="number"
             step="0.01"
+            min="0"
             value={formData.price || 0}
             onChange={(e) => setFormData(prev => ({ ...prev, price: parseFloat(e.target.value) || 0 }))}
           />
@@ -199,6 +263,7 @@ export const Level4ProductForm: React.FC<Level4ProductFormProps> = ({
             id="cost"
             type="number"
             step="0.01"
+            min="0"
             value={formData.cost || 0}
             onChange={(e) => setFormData(prev => ({ ...prev, cost: parseFloat(e.target.value) || 0 }))}
           />
@@ -247,31 +312,40 @@ export const Level4ProductForm: React.FC<Level4ProductFormProps> = ({
             </div>
           </div>
           
-          <Button type="button" onClick={addOption} className="w-full" variant="outline">
+          <Button 
+            type="button" 
+            onClick={addOption} 
+            className="w-full" 
+            variant="outline"
+            disabled={!newOption.optionKey.trim() || !newOption.optionValue.trim()}
+          >
             <Plus className="h-4 w-4 mr-2" />
             Add Option
           </Button>
 
-          <div className="space-y-2">
-            {formData.options?.map((option) => (
-              <div key={option.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                <div>
-                  <div className="flex items-center space-x-2">
-                    <Badge variant="secondary">{option.optionKey}</Badge>
-                    <span className="text-sm">{option.optionValue}</span>
+          {formData.options && formData.options.length > 0 && (
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Current Options:</Label>
+              {formData.options.map((option) => (
+                <div key={option.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                  <div>
+                    <div className="flex items-center space-x-2">
+                      <Badge variant="secondary">{option.optionKey}</Badge>
+                      <span className="text-sm">{option.optionValue}</span>
+                    </div>
                   </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => removeOption(option.id)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
                 </div>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => removeOption(option.id)}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
 
