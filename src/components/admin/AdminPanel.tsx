@@ -120,7 +120,7 @@ const AdminPanel = ({ user }: AdminPanelProps) => {
         </TabsList>
 
         <TabsContent value="products" className="mt-6">
-          <ProductManagement user={user} />
+          <ProductManagement />
         </TabsContent>
 
         <TabsContent value="quote-fields" className="mt-6">

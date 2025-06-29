@@ -15,14 +15,26 @@ export const ProductManagement = () => {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [level1Products, setLevel1Products] = useState<Level1Product[]>([]);
+  const [level2Products, setLevel2Products] = useState<Level2Product[]>([]);
 
   useEffect(() => {
     const initializeData = async () => {
       try {
         setIsLoading(true);
         setError(null);
+        
         // Ensure data is properly loaded
-        await new Promise(resolve => setTimeout(resolve, 100)); // Small delay to ensure initialization
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        // Load product data
+        const l1Products = productDataService.getLevel1Products();
+        const l2Products = productDataService.getLevel2Products();
+        
+        console.log('Loaded products:', { l1Count: l1Products.length, l2Count: l2Products.length });
+        
+        setLevel1Products(l1Products);
+        setLevel2Products(l2Products);
         setIsLoading(false);
       } catch (err) {
         console.error('Error initializing product data:', err);
@@ -34,6 +46,13 @@ export const ProductManagement = () => {
     initializeData();
   }, []);
 
+  const refreshProductData = () => {
+    const l1Products = productDataService.getLevel1Products();
+    const l2Products = productDataService.getLevel2Products();
+    setLevel1Products(l1Products);
+    setLevel2Products(l2Products);
+  };
+
   const handleLevel1Save = async (productData: Omit<Level1Product, 'id'> | Level1Product) => {
     try {
       if ('id' in productData) {
@@ -43,6 +62,7 @@ export const ProductManagement = () => {
         await productDataService.createLevel1Product(productData);
         toast({ title: "Success", description: "Level 1 product created successfully" });
       }
+      refreshProductData();
     } catch (error) {
       console.error('Error saving Level 1 product:', error);
       toast({ 
@@ -62,6 +82,7 @@ export const ProductManagement = () => {
         await productDataService.createLevel2Product(productData);
         toast({ title: "Success", description: "Level 2 product created successfully" });
       }
+      refreshProductData();
     } catch (error) {
       console.error('Error saving Level 2 product:', error);
       toast({ 
@@ -153,7 +174,10 @@ export const ProductManagement = () => {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <ChassisForm onSubmit={handleLevel2Save} />
+              <ChassisForm 
+                onSubmit={handleLevel2Save} 
+                level1Products={level1Products}
+              />
             </CardContent>
           </Card>
         </TabsContent>
@@ -170,11 +194,17 @@ export const ProductManagement = () => {
               <div className="grid gap-6">
                 <div>
                   <h4 className="text-lg font-semibold mb-4">Cards & Components</h4>
-                  <CardForm onSubmit={handleLevel3Save} />
+                  <CardForm 
+                    onSubmit={handleLevel3Save}
+                    level2Products={level2Products}
+                  />
                 </div>
                 <div>
                   <h4 className="text-lg font-semibold mb-4">Product Options</h4>
-                  <Level2OptionForm onSubmit={handleLevel3Save} />
+                  <Level2OptionForm 
+                    onSubmit={handleLevel3Save}
+                    level1Products={level1Products}
+                  />
                 </div>
               </div>
             </CardContent>
