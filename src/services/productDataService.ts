@@ -29,13 +29,15 @@ class ProductDataService {
   private initialized: boolean = false;
 
   constructor() {
-    this.initializeData();
+    this.initializeDataSync();
   }
 
-  private initializeData() {
+  private initializeDataSync() {
     if (this.initialized) return;
 
     try {
+      console.log('Initializing ProductDataService...');
+      
       // Load data from localStorage with fallbacks to defaults
       const storedAssetTypes = localStorage.getItem('assetTypes');
       this.assetTypes = storedAssetTypes ? JSON.parse(storedAssetTypes) : [...DEFAULT_ASSET_TYPES];
@@ -62,21 +64,21 @@ class ProductDataService {
       this.saveData();
       this.initialized = true;
 
-      console.log('ProductDataService initialized with:', {
+      console.log('ProductDataService initialized successfully with:', {
         level1Count: this.level1Products.length,
         level2Count: this.level2Products.length,
         level3Count: this.level3Products.length,
-        level4Count: this.level4Products.length
+        level4Count: this.level4Products.length,
+        assetTypesCount: this.assetTypes.length
       });
     } catch (error) {
       console.error('Error initializing product data:', error);
-      // Fallback to defaults if localStorage is corrupted
       this.resetToDefaults();
     }
   }
 
   private resetToDefaults() {
-    console.log('Resetting to default product data');
+    console.log('Resetting to default product data due to error');
     this.assetTypes = [...DEFAULT_ASSET_TYPES];
     this.analogSensorTypes = [...DEFAULT_ANALOG_SENSORS];
     this.bushingTapModels = [...DEFAULT_BUSHING_TAP_MODELS];
@@ -104,12 +106,12 @@ class ProductDataService {
 
   // Asset Types (Level 0) methods
   getAssetTypes() {
-    this.initializeData();
+    this.initializeDataSync();
     return [...this.assetTypes];
   }
 
   createAssetType(assetType: Omit<AssetType, 'id'>) {
-    this.initializeData();
+    this.initializeDataSync();
     const newAssetType: AssetType = {
       ...assetType,
       id: `asset-${Date.now()}`
@@ -120,7 +122,7 @@ class ProductDataService {
   }
 
   updateAssetType(id: string, updates: Partial<Omit<AssetType, 'id'>>) {
-    this.initializeData();
+    this.initializeDataSync();
     const index = this.assetTypes.findIndex(type => type.id === id);
     if (index !== -1) {
       this.assetTypes[index] = { ...this.assetTypes[index], ...updates };
@@ -131,19 +133,19 @@ class ProductDataService {
   }
 
   deleteAssetType(id: string) {
-    this.initializeData();
+    this.initializeDataSync();
     this.assetTypes = this.assetTypes.filter(type => type.id !== id);
     this.saveData();
   }
 
   // Analog Sensor Types
   getAnalogSensorTypes() {
-    this.initializeData();
+    this.initializeDataSync();
     return [...this.analogSensorTypes];
   }
 
   async createAnalogSensorType(sensor: Omit<AnalogSensorOption, 'id'>) {
-    this.initializeData();
+    this.initializeDataSync();
     const newSensor: AnalogSensorOption = { ...sensor, id: `sensor-${Date.now()}` };
     this.analogSensorTypes.push(newSensor);
     this.saveData();
@@ -156,7 +158,7 @@ class ProductDataService {
   }
 
   async updateAnalogSensorType(id: string, updates: Partial<Omit<AnalogSensorOption, 'id'>>) {
-    this.initializeData();
+    this.initializeDataSync();
     const index = this.analogSensorTypes.findIndex(t => t.id === id);
     if (index !== -1) {
       this.analogSensorTypes[index] = { ...this.analogSensorTypes[index], ...updates };
@@ -172,7 +174,7 @@ class ProductDataService {
   }
 
   async deleteAnalogSensorType(id: string) {
-    this.initializeData();
+    this.initializeDataSync();
     this.analogSensorTypes = this.analogSensorTypes.filter(t => t.id !== id);
     this.saveData();
     try {
@@ -184,12 +186,12 @@ class ProductDataService {
 
   // Bushing Tap Models
   getBushingTapModels() {
-    this.initializeData();
+    this.initializeDataSync();
     return [...this.bushingTapModels];
   }
 
   async createBushingTapModel(model: Omit<BushingTapModelOption, 'id'>) {
-    this.initializeData();
+    this.initializeDataSync();
     const newModel: BushingTapModelOption = { ...model, id: `bushing-${Date.now()}` };
     this.bushingTapModels.push(newModel);
     this.saveData();
@@ -202,7 +204,7 @@ class ProductDataService {
   }
 
   async updateBushingTapModel(id: string, updates: Partial<Omit<BushingTapModelOption, 'id'>>) {
-    this.initializeData();
+    this.initializeDataSync();
     const index = this.bushingTapModels.findIndex(b => b.id === id);
     if (index !== -1) {
       this.bushingTapModels[index] = { ...this.bushingTapModels[index], ...updates };
@@ -218,7 +220,7 @@ class ProductDataService {
   }
 
   async deleteBushingTapModel(id: string) {
-    this.initializeData();
+    this.initializeDataSync();
     this.bushingTapModels = this.bushingTapModels.filter(b => b.id !== id);
     this.saveData();
     try {
@@ -230,12 +232,12 @@ class ProductDataService {
 
   // Level 1 Products methods
   getLevel1Products(): Level1Product[] {
-    this.initializeData();
+    this.initializeDataSync();
     return [...this.level1Products];
   }
 
   async createLevel1Product(product: Omit<Level1Product, 'id'>): Promise<Level1Product> {
-    this.initializeData();
+    this.initializeDataSync();
     const newProduct: Level1Product = {
       ...product,
       id: `level1-${Date.now()}`
@@ -262,7 +264,7 @@ class ProductDataService {
   }
 
   async updateLevel1Product(id: string, updates: Partial<Omit<Level1Product, 'id'>>): Promise<Level1Product | null> {
-    this.initializeData();
+    this.initializeDataSync();
     const index = this.level1Products.findIndex(product => product.id === id);
     if (index !== -1) {
       this.level1Products[index] = { ...this.level1Products[index], ...updates };
@@ -289,7 +291,7 @@ class ProductDataService {
   }
 
   async deleteLevel1Product(id: string): Promise<void> {
-    this.initializeData();
+    this.initializeDataSync();
     this.level1Products = this.level1Products.filter(product => product.id !== id);
     this.saveData();
 
@@ -302,17 +304,17 @@ class ProductDataService {
 
   // Level 2 Products methods
   getLevel2Products(): Level2Product[] {
-    this.initializeData();
+    this.initializeDataSync();
     return [...this.level2Products];
   }
 
   getLevel2ProductsForLevel1(level1ProductId: string): Level2Product[] {
-    this.initializeData();
+    this.initializeDataSync();
     return this.level2Products.filter(product => product.parentProductId === level1ProductId);
   }
 
   async createLevel2Product(product: Omit<Level2Product, 'id'>): Promise<Level2Product> {
-    this.initializeData();
+    this.initializeDataSync();
     const newProduct: Level2Product = {
       ...product,
       id: `level2-${Date.now()}`
@@ -343,7 +345,7 @@ class ProductDataService {
   }
 
   async updateLevel2Product(id: string, updates: Partial<Omit<Level2Product, 'id'>>): Promise<Level2Product | null> {
-    this.initializeData();
+    this.initializeDataSync();
     const index = this.level2Products.findIndex(product => product.id === id);
     if (index !== -1) {
       const oldParent = this.level2Products[index].parentProductId;
@@ -381,7 +383,7 @@ class ProductDataService {
   }
 
   async deleteLevel2Product(id: string): Promise<void> {
-    this.initializeData();
+    this.initializeDataSync();
     this.level2Products = this.level2Products.filter(product => product.id !== id);
     this.saveData();
 
@@ -395,17 +397,17 @@ class ProductDataService {
 
   // Level 3 Products methods
   getLevel3Products(): Level3Product[] {
-    this.initializeData();
+    this.initializeDataSync();
     return [...this.level3Products];
   }
 
   getLevel3ProductsForLevel2(level2ProductId: string): Level3Product[] {
-    this.initializeData();
+    this.initializeDataSync();
     return this.level3Products.filter(product => product.parentProductId === level2ProductId);
   }
 
   async createLevel3Product(product: Omit<Level3Product, 'id'>): Promise<Level3Product> {
-    this.initializeData();
+    this.initializeDataSync();
     const newProduct: Level3Product = {
       ...product,
       id: `level3-${Date.now()}`
@@ -436,7 +438,7 @@ class ProductDataService {
   }
 
   async updateLevel3Product(id: string, updates: Partial<Omit<Level3Product, 'id'>>): Promise<Level3Product | null> {
-    this.initializeData();
+    this.initializeDataSync();
     const index = this.level3Products.findIndex(product => product.id === id);
     if (index !== -1) {
       const oldParent = this.level3Products[index].parentProductId;
@@ -474,7 +476,7 @@ class ProductDataService {
   }
 
   async deleteLevel3Product(id: string): Promise<void> {
-    this.initializeData();
+    this.initializeDataSync();
     this.level3Products = this.level3Products.filter(product => product.id !== id);
     this.saveData();
 
@@ -492,17 +494,17 @@ class ProductDataService {
 
   // Level 4 Products methods
   getLevel4Products(): Level4Product[] {
-    this.initializeData();
+    this.initializeDataSync();
     return [...this.level4Products];
   }
 
   getLevel4ProductsForLevel3(level3ProductId: string): Level4Product[] {
-    this.initializeData();
+    this.initializeDataSync();
     return this.level4Products.filter(product => product.parentProductId === level3ProductId);
   }
 
   async createLevel4Product(product: Omit<Level4Product, 'id'>): Promise<Level4Product> {
-    this.initializeData();
+    this.initializeDataSync();
     const newProduct: Level4Product = {
       ...product,
       id: `level4-${Date.now()}`
@@ -548,7 +550,7 @@ class ProductDataService {
   }
 
   async updateLevel4Product(id: string, updates: Partial<Omit<Level4Product, 'id'>>): Promise<Level4Product | null> {
-    this.initializeData();
+    this.initializeDataSync();
     const index = this.level4Products.findIndex(product => product.id === id);
     if (index !== -1) {
       const oldParent = this.level4Products[index].parentProductId;
@@ -607,7 +609,7 @@ class ProductDataService {
   }
 
   async deleteLevel4Product(id: string): Promise<void> {
-    this.initializeData();
+    this.initializeDataSync();
     this.level4Products = this.level4Products.filter(product => product.id !== id);
     this.saveData();
 
