@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -18,23 +17,42 @@ interface DGAProductSelectorProps {
 const DGAProductSelector = ({ onProductSelect, canSeePrices }: DGAProductSelectorProps) => {
   const [selectedProducts, setSelectedProducts] = useState<Set<string>>(new Set());
   const [selectedLevel2Options, setSelectedLevel2Options] = useState<Record<string, Level2Product[]>>({});
-
   const [dgaProducts, setDgaProducts] = useState<Level1Product[]>([]);
   const [level2Options, setLevel2Options] = useState<Level2Product[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const l1 = productDataService
-      .getLevel1Products()
-      .filter(
-        (p) =>
-          ['TM8', 'TM3', 'TM1'].includes(p.type) && p.enabled
-      );
-    setDgaProducts(l1);
+    const loadProducts = async () => {
+      try {
+        const l1Products = await productDataService.getLevel1Products();
+        const l1Filtered = l1Products.filter(
+          (p) => ['TM8', 'TM3', 'TM1'].includes(p.type) && p.enabled
+        );
+        setDgaProducts(l1Filtered);
 
-    const l2 = productDataService
-      .getLevel2Products()
-      .filter((p) => p.enabled && ['CalGas', 'Standard', 'Moisture'].includes(p.type));
-    setLevel2Options(l2);
+        const l2Products = await productDataService.getLevel2Products();
+        const l2Filtered = l2Products.filter(
+          (p) => p.enabled && ['CalGas', 'Standard', 'Moisture'].includes(p.type)
+        );
+        setLevel2Options(l2Filtered);
+      } catch (error) {
+        console.error('Error loading DGA products:', error);
+        // Fallback to sync methods
+        const l1Sync = productDataService.getLevel1ProductsSync();
+        setDgaProducts(l1Sync.filter(
+          (p) => ['TM8', 'TM3', 'TM1'].includes(p.type) && p.enabled
+        ));
+        
+        const l2Sync = productDataService.getLevel2ProductsSync();
+        setLevel2Options(l2Sync.filter(
+          (p) => p.enabled && ['CalGas', 'Standard', 'Moisture'].includes(p.type)
+        ));
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadProducts();
   }, []);
 
   const handleProductToggle = (productId: string) => {
@@ -110,6 +128,10 @@ const DGAProductSelector = ({ onProductSelect, canSeePrices }: DGAProductSelecto
   };
 
   const hasSelections = selectedProducts.size > 0;
+
+  if (loading) {
+    return <div className="text-white">Loading DGA products...</div>;
+  }
 
   return (
     <div className="space-y-8 max-w-6xl mx-auto">
