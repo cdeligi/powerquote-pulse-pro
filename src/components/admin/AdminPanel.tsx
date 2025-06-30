@@ -46,9 +46,9 @@ const AdminPanel = ({ user }: AdminPanelProps) => {
     }
   };
 
-  // Get mock BOM items from actual product data
+  // Get mock BOM items from actual product data - use sync method for mock data
   const getMockBomItems = (): BOMItem[] => {
-    const level1Products = productDataService.getLevel1Products();
+    const level1Products = productDataService.getLevel1ProductsSync();
     return level1Products.slice(0, 2).map((product, index) => ({
       id: `${index + 1}`,
       product,
