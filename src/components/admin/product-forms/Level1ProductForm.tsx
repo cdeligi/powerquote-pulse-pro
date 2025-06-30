@@ -1,12 +1,12 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Level1Product } from "@/types/product";
+import { Level1Product, AssetType } from "@/types/product";
 import { productDataService } from "@/services/productDataService";
 
 interface Level1ProductFormProps {
@@ -28,13 +28,35 @@ const Level1ProductForm = ({ onSubmit, initialData }: Level1ProductFormProps) =>
     image: initialData?.image || ''
   });
 
-  // Get asset types from service
-  const assetTypes = productDataService.getAssetTypes();
+  const [assetTypes, setAssetTypes] = useState<AssetType[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const loadAssetTypes = async () => {
+      try {
+        const types = await productDataService.getAssetTypes();
+        setAssetTypes(types.filter(type => type.enabled));
+      } catch (error) {
+        console.error('Error loading asset types:', error);
+        // Fallback to sync method
+        const syncTypes = productDataService.getAssetTypesSync();
+        setAssetTypes(syncTypes.filter(type => type.enabled));
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadAssetTypes();
+  }, []);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     onSubmit(formData);
   };
+
+  if (loading) {
+    return <div className="text-white">Loading asset types...</div>;
+  }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
@@ -60,7 +82,7 @@ const Level1ProductForm = ({ onSubmit, initialData }: Level1ProductFormProps) =>
               <SelectValue placeholder="Select asset type" />
             </SelectTrigger>
             <SelectContent className="bg-gray-800 border-gray-700">
-              {assetTypes.filter(type => type.enabled).map((type) => (
+              {assetTypes.map((type) => (
                 <SelectItem key={type.id} value={type.name} className="text-white">
                   {type.name}
                 </SelectItem>
