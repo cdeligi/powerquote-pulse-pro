@@ -41,24 +41,29 @@ export const Level4ProductForm: React.FC<Level4ProductFormProps> = ({
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const loadLevel3Products = () => {
+    const loadLevel3Products = async () => {
       try {
         setIsLoading(true);
         setError(null);
         
         console.log('Loading Level 3 products for Level 4 form...');
-        const products = productDataService.getLevel3Products();
+        const products = await productDataService.getLevel3Products();
         console.log('Loaded Level 3 products:', products.length);
         
         setLevel3Products(products);
         
-        // If editing and no parentProductId is set, but we have products, don't auto-select
-        // Let user choose explicitly
-        
       } catch (error) {
         console.error('Error loading Level 3 products:', error);
         setError('Failed to load Level 3 products');
-        setLevel3Products([]);
+        // Fallback to sync method
+        try {
+          const syncProducts = productDataService.getLevel3ProductsSync();
+          setLevel3Products(syncProducts);
+          setError(null);
+        } catch (syncError) {
+          console.error('Sync fallback also failed:', syncError);
+          setLevel3Products([]);
+        }
       } finally {
         setIsLoading(false);
       }

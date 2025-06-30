@@ -13,15 +13,40 @@ interface Level2OptionsSelectorProps {
 
 const Level2OptionsSelector = ({ level1Product, selectedOptions, onOptionToggle }: Level2OptionsSelectorProps) => {
   const [availableOptions, setAvailableOptions] = useState<Level2Product[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const options = productDataService.getLevel2ProductsForLevel1(level1Product.id).filter(p => p.enabled);
-    setAvailableOptions(options);
+    const loadOptions = async () => {
+      try {
+        setLoading(true);
+        // Use the relationship method to get Level 2 products for the selected Level 1
+        const options = productDataService.getLevel2ProductsForLevel1(level1Product.id).filter(p => p.enabled);
+        setAvailableOptions(options);
+      } catch (error) {
+        console.error('Error loading Level 2 options:', error);
+        setAvailableOptions([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadOptions();
   }, [level1Product.id]);
 
   const isSelected = (option: Level2Product) => {
     return selectedOptions.some(selected => selected.id === option.id);
   };
+
+  if (loading) {
+    return (
+      <div className="space-y-4">
+        <h3 className="text-xl font-medium text-white">Select {level1Product.name} Options</h3>
+        <div className="text-center py-8">
+          <p className="text-gray-400">Loading options...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">

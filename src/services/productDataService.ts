@@ -1,3 +1,4 @@
+
 import {
   Level1Product,
   Level2Product,
@@ -231,7 +232,7 @@ class ProductDataService {
     }));
   }
 
-  // Public methods that ensure initialization
+  // Public async methods
   async getLevel1Products(): Promise<Level1Product[]> {
     await this.initialize();
     return [...this.level1Products];
@@ -257,7 +258,7 @@ class ProductDataService {
     return [...this.assetTypes];
   }
 
-  // Synchronous methods for backward compatibility (these should be phased out)
+  // Synchronous methods for backward compatibility
   getLevel1ProductsSync(): Level1Product[] {
     if (!this.initialized) {
       console.warn('ProductDataService: Accessing data before initialization');
@@ -292,6 +293,117 @@ class ProductDataService {
       this.initialized = true;
     }
     return [...this.level4Products];
+  }
+
+  getAssetTypesSync(): AssetType[] {
+    if (!this.initialized) {
+      console.warn('ProductDataService: Accessing data before initialization');
+      this.loadDefaults();
+      this.initialized = true;
+    }
+    return [...this.assetTypes];
+  }
+
+  // Relationship methods
+  getLevel2ProductsForLevel1(level1Id: string): Level2Product[] {
+    if (!this.initialized) {
+      this.loadDefaults();
+      this.initialized = true;
+    }
+    return this.level2Products.filter(l2 => l2.parentProductId === level1Id);
+  }
+
+  getLevel3ProductsForLevel2(level2Id: string): Level3Product[] {
+    if (!this.initialized) {
+      this.loadDefaults();
+      this.initialized = true;
+    }
+    return this.level3Products.filter(l3 => l3.parentProductId === level2Id);
+  }
+
+  // Sensor and bushing methods
+  getAnalogSensorTypes(): AnalogSensorOption[] {
+    if (!this.initialized) {
+      this.loadDefaults();
+      this.initialized = true;
+    }
+    return [...this.analogSensorTypes];
+  }
+
+  getBushingTapModels(): BushingTapModelOption[] {
+    if (!this.initialized) {
+      this.loadDefaults();
+      this.initialized = true;
+    }
+    return [...this.bushingTapModels];
+  }
+
+  // CRUD methods for analog sensor types
+  async createAnalogSensorType(data: Omit<AnalogSensorOption, 'id'>): Promise<AnalogSensorOption> {
+    await this.initialize();
+    const newItem: AnalogSensorOption = {
+      ...data,
+      id: `analog-${Date.now()}`
+    };
+    this.analogSensorTypes.push(newItem);
+    this.saveToLocalStorage();
+    return newItem;
+  }
+
+  async updateAnalogSensorType(id: string, data: Partial<Omit<AnalogSensorOption, 'id'>>): Promise<AnalogSensorOption | null> {
+    await this.initialize();
+    const index = this.analogSensorTypes.findIndex(item => item.id === id);
+    if (index !== -1) {
+      this.analogSensorTypes[index] = { ...this.analogSensorTypes[index], ...data };
+      this.saveToLocalStorage();
+      return this.analogSensorTypes[index];
+    }
+    return null;
+  }
+
+  async deleteAnalogSensorType(id: string): Promise<void> {
+    await this.initialize();
+    this.analogSensorTypes = this.analogSensorTypes.filter(item => item.id !== id);
+    this.saveToLocalStorage();
+  }
+
+  // CRUD methods for bushing tap models
+  async createBushingTapModel(data: Omit<BushingTapModelOption, 'id'>): Promise<BushingTapModelOption> {
+    await this.initialize();
+    const newItem: BushingTapModelOption = {
+      ...data,
+      id: `bushing-${Date.now()}`
+    };
+    this.bushingTapModels.push(newItem);
+    this.saveToLocalStorage();
+    return newItem;
+  }
+
+  async updateBushingTapModel(id: string, data: Partial<Omit<BushingTapModelOption, 'id'>>): Promise<BushingTapModelOption | null> {
+    await this.initialize();
+    const index = this.bushingTapModels.findIndex(item => item.id === id);
+    if (index !== -1) {
+      this.bushingTapModels[index] = { ...this.bushingTapModels[index], ...data };
+      this.saveToLocalStorage();
+      return this.bushingTapModels[index];
+    }
+    return null;
+  }
+
+  async deleteBushingTapModel(id: string): Promise<void> {
+    await this.initialize();
+    this.bushingTapModels = this.bushingTapModels.filter(item => item.id !== id);
+    this.saveToLocalStorage();
+  }
+
+  // Replace all products method for sync functionality
+  replaceAllProducts(level1Data: any[], level2Data: any[], level3Data: any[], level4Data: any[]): void {
+    this.level1Products = this.transformDbToLevel1(level1Data);
+    this.level2Products = this.transformDbToLevel2(level2Data);
+    this.level3Products = this.transformDbToLevel3(level3Data);
+    this.level4Products = level4Data;
+    this.saveToLocalStorage();
+    this.initialized = true;
   }
 
   // Level 1 Products methods
