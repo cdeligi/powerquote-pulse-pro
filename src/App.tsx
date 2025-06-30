@@ -28,9 +28,29 @@ const App = () => {
           <AuthProvider>
             <ErrorBoundary fallback={
               <div className="min-h-screen bg-black flex items-center justify-center">
-                <div className="text-white text-center">
-                  <h2 className="text-xl mb-4">Authentication Error</h2>
-                  <p className="text-gray-400">Please refresh the page</p>
+                <div className="text-white text-center max-w-md">
+                  <h2 className="text-xl mb-4">Application Loading Error</h2>
+                  <p className="text-gray-400 mb-6">The application encountered an issue while loading.</p>
+                  <div className="space-y-2">
+                    <button 
+                      onClick={() => window.location.reload()} 
+                      className="w-full px-6 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
+                    >
+                      Reload Application
+                    </button>
+                    <button 
+                      onClick={() => {
+                        localStorage.clear();
+                        window.location.reload();
+                      }} 
+                      className="w-full px-6 py-3 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
+                    >
+                      Clear Data & Reload
+                    </button>
+                  </div>
+                  <div className="mt-4 text-xs text-gray-500">
+                    Press F12 and check the Console tab for detailed error information
+                  </div>
                 </div>
               </div>
             }>
