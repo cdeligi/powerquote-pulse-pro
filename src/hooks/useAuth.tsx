@@ -32,23 +32,46 @@ function useProvideAuth(): AuthContextType {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const fetchProfile = async (uid: string): Promise<void> => {
+  const fetchProfile = async (uid: string, timeoutMs: number = 3000): Promise<void> => {
     console.log('[useAuth] fetchProfile start for:', uid);
     
+    // Create a timeout promise
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => reject(new Error('Profile fetch timeout')), timeoutMs);
+    });
+    
     try {
-      const { data, error } = await supabase
+      const profilePromise = supabase
         .from('profiles')
         .select('*')
         .eq('id', uid)
         .single();
 
+      const { data, error } = await Promise.race([profilePromise, timeoutPromise]);
+
       if (error) {
         if (error.code === 'PGRST116') {
           console.warn('[useAuth] No profile found for user:', uid);
-          setUser(null);
+          // Create a default user profile if none exists
+          const defaultUser: AppUser = {
+            id: uid,
+            name: 'User',
+            email: session?.user?.email || 'unknown@example.com',
+            role: 'level1',
+            department: undefined
+          };
+          setUser(defaultUser);
         } else {
           console.error('[useAuth] Profile fetch error:', error);
-          setUser(null);
+          // Create fallback user even on error
+          const fallbackUser: AppUser = {
+            id: uid,
+            name: 'User',
+            email: session?.user?.email || 'unknown@example.com',
+            role: 'level1',
+            department: undefined
+          };
+          setUser(fallbackUser);
         }
         return;
       }
@@ -65,38 +88,62 @@ function useProvideAuth(): AuthContextType {
         setUser(appUser);
       } else {
         console.warn('[useAuth] Profile data is null for user:', uid);
-        setUser(null);
+        // Create fallback user
+        const fallbackUser: AppUser = {
+          id: uid,
+          name: 'User',
+          email: session?.user?.email || 'unknown@example.com',
+          role: 'level1',
+          department: undefined
+        };
+        setUser(fallbackUser);
       }
     } catch (err) {
-      console.error('[useAuth] Unexpected profile fetch error:', err);
-      setUser(null);
+      console.error('[useAuth] Profile fetch timeout or error:', err);
+      // Always create a fallback user to prevent loading hang
+      const fallbackUser: AppUser = {
+        id: uid,
+        name: 'User',
+        email: session?.user?.email || 'unknown@example.com',
+        role: 'level1',
+        department: undefined
+      };
+      setUser(fallbackUser);
     }
   };
 
   useEffect(() => {
     console.log('[useAuth] Initializing auth state...');
     
-    // Set loading timeout to prevent infinite loading
-    const loadingTimeout = setTimeout(() => {
-      console.warn('[useAuth] Loading timeout reached, forcing loading to false');
+    // Force loading to false after maximum timeout
+    const maxLoadingTimeout = setTimeout(() => {
+      console.warn('[useAuth] Maximum loading timeout reached, forcing loading to false');
       setLoading(false);
-    }, 10000); // 10 second timeout
+    }, 8000);
 
     // Setup auth state listener first
     const { data: listener } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         console.log('[useAuth] Auth state change:', event, session?.user?.email || 'no user');
         
-        clearTimeout(loadingTimeout);
+        clearTimeout(maxLoadingTimeout);
         setSession(session);
         
         if (session?.user) {
           console.log('[useAuth] User session found, fetching profile...');
           try {
-            await fetchProfile(session.user.id);
+            await fetchProfile(session.user.id, 3000);
           } catch (error) {
             console.error('[useAuth] Error fetching profile in auth state change:', error);
-            setUser(null);
+            // Create fallback user
+            const fallbackUser: AppUser = {
+              id: session.user.id,
+              name: 'User',
+              email: session.user.email || 'unknown@example.com',
+              role: 'level1',
+              department: undefined
+            };
+            setUser(fallbackUser);
           } finally {
             setLoading(false);
           }
@@ -108,12 +155,19 @@ function useProvideAuth(): AuthContextType {
       }
     );
 
-    // Get initial session
-    supabase.auth.getSession()
-      .then(({ data: { session }, error }) => {
+    // Get initial session with timeout
+    const getInitialSession = async () => {
+      try {
+        const sessionPromise = supabase.auth.getSession();
+        const timeoutPromise = new Promise<never>((_, reject) => {
+          setTimeout(() => reject(new Error('Session fetch timeout')), 5000);
+        });
+
+        const { data: { session }, error } = await Promise.race([sessionPromise, timeoutPromise]);
+        
         if (error) {
           console.error('[useAuth] getSession error:', error);
-          clearTimeout(loadingTimeout);
+          clearTimeout(maxLoadingTimeout);
           setLoading(false);
           return;
         }
@@ -122,25 +176,21 @@ function useProvideAuth(): AuthContextType {
         setSession(session);
         
         if (session?.user) {
-          fetchProfile(session.user.id)
-            .finally(() => {
-              clearTimeout(loadingTimeout);
-              setLoading(false);
-            });
-        } else {
-          clearTimeout(loadingTimeout);
-          setLoading(false);
+          await fetchProfile(session.user.id, 3000);
         }
-      })
-      .catch((err) => {
-        console.error('[useAuth] getSession unexpected error:', err);
-        clearTimeout(loadingTimeout);
+      } catch (err) {
+        console.error('[useAuth] getSession timeout or error:', err);
+      } finally {
+        clearTimeout(maxLoadingTimeout);
         setLoading(false);
-      });
+      }
+    };
+
+    getInitialSession();
 
     return () => {
       console.log('[useAuth] Cleaning up auth listener...');
-      clearTimeout(loadingTimeout);
+      clearTimeout(maxLoadingTimeout);
       listener.subscription.unsubscribe();
     };
   }, []);

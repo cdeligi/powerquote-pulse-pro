@@ -32,11 +32,15 @@ class ProductDataService {
   private initializationPromise: Promise<void> | null = null;
 
   constructor() {
-    // Don't initialize in constructor - let components trigger initialization
+    // Load defaults immediately to prevent blocking
+    this.loadDefaults();
+    this.initialized = true;
   }
 
   async initialize(): Promise<void> {
-    if (this.initialized) return;
+    if (this.initialized && this.level1Products.length > 0) {
+      return;
+    }
     
     if (this.initializationPromise) {
       return this.initializationPromise;
@@ -50,6 +54,13 @@ class ProductDataService {
     try {
       console.log('ProductDataService: Starting initialization...');
       
+      // Set a timeout to prevent infinite loading
+      const initTimeout = setTimeout(() => {
+        console.warn('ProductDataService: Initialization timeout, using defaults');
+        this.loadDefaults();
+        this.initialized = true;
+      }, 5000);
+
       // Step 1: Try to load from database first
       const dbSuccess = await this.loadFromDatabase();
       
@@ -64,6 +75,9 @@ class ProductDataService {
           this.loadDefaults();
         }
       }
+
+      // Clear the timeout since we completed successfully
+      clearTimeout(initTimeout);
 
       // Validate data relationships
       dataDebugUtils.validateProductRelationships(
@@ -96,17 +110,24 @@ class ProductDataService {
     try {
       console.log('ProductDataService: Loading from database...');
       
-      const [
-        { data: level1Data, error: l1Error },
-        { data: level2Data, error: l2Error },
-        { data: level3Data, error: l3Error },
-        { data: level4Data, error: l4Error }
-      ] = await Promise.all([
+      // Set a timeout for database operations
+      const dbTimeout = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error('Database timeout')), 3000);
+      });
+
+      const dbOperations = Promise.all([
         supabase.from('products').select('*').eq('category', 'level1'),
         supabase.from('products').select('*').eq('category', 'level2'),
         supabase.from('products').select('*').eq('category', 'level3'),
         supabase.from('level4_products').select('*')
       ]);
+
+      const [
+        { data: level1Data, error: l1Error },
+        { data: level2Data, error: l2Error },
+        { data: level3Data, error: l3Error },
+        { data: level4Data, error: l4Error }
+      ] = await Promise.race([dbOperations, dbTimeout]);
 
       if (l1Error || l2Error || l3Error || l4Error) {
         console.warn('ProductDataService: Database errors:', { l1Error, l2Error, l3Error, l4Error });
@@ -234,113 +255,82 @@ class ProductDataService {
 
   // Public async methods
   async getLevel1Products(): Promise<Level1Product[]> {
-    await this.initialize();
+    // Always return immediately with current data, optionally trigger background update
+    if (!this.initialized || this.level1Products.length === 0) {
+      this.initialize().catch(console.error);
+    }
     return [...this.level1Products];
   }
 
   async getLevel2Products(): Promise<Level2Product[]> {
-    await this.initialize();
+    if (!this.initialized || this.level2Products.length === 0) {
+      this.initialize().catch(console.error);
+    }
     return [...this.level2Products];
   }
 
   async getLevel3Products(): Promise<Level3Product[]> {
-    await this.initialize();
+    if (!this.initialized || this.level3Products.length === 0) {
+      this.initialize().catch(console.error);
+    }
     return [...this.level3Products];
   }
 
   async getLevel4Products(): Promise<Level4Product[]> {
-    await this.initialize();
+    if (!this.initialized) {
+      this.initialize().catch(console.error);
+    }
     return [...this.level4Products];
   }
 
   async getAssetTypes(): Promise<AssetType[]> {
-    await this.initialize();
+    if (!this.initialized || this.assetTypes.length === 0) {
+      this.initialize().catch(console.error);
+    }
     return [...this.assetTypes];
   }
 
   // Synchronous methods for backward compatibility
   getLevel1ProductsSync(): Level1Product[] {
-    if (!this.initialized) {
-      console.warn('ProductDataService: Accessing data before initialization');
-      this.loadDefaults();
-      this.initialized = true;
-    }
     return [...this.level1Products];
   }
 
   getLevel2ProductsSync(): Level2Product[] {
-    if (!this.initialized) {
-      console.warn('ProductDataService: Accessing data before initialization');
-      this.loadDefaults();
-      this.initialized = true;
-    }
     return [...this.level2Products];
   }
 
   getLevel3ProductsSync(): Level3Product[] {
-    if (!this.initialized) {
-      console.warn('ProductDataService: Accessing data before initialization');
-      this.loadDefaults();
-      this.initialized = true;
-    }
     return [...this.level3Products];
   }
 
   getLevel4ProductsSync(): Level4Product[] {
-    if (!this.initialized) {
-      console.warn('ProductDataService: Accessing data before initialization');
-      this.loadDefaults();
-      this.initialized = true;
-    }
     return [...this.level4Products];
   }
 
   getAssetTypesSync(): AssetType[] {
-    if (!this.initialized) {
-      console.warn('ProductDataService: Accessing data before initialization');
-      this.loadDefaults();
-      this.initialized = true;
-    }
     return [...this.assetTypes];
   }
 
   // Relationship methods
   getLevel2ProductsForLevel1(level1Id: string): Level2Product[] {
-    if (!this.initialized) {
-      this.loadDefaults();
-      this.initialized = true;
-    }
     return this.level2Products.filter(l2 => l2.parentProductId === level1Id);
   }
 
   getLevel3ProductsForLevel2(level2Id: string): Level3Product[] {
-    if (!this.initialized) {
-      this.loadDefaults();
-      this.initialized = true;
-    }
     return this.level3Products.filter(l3 => l3.parentProductId === level2Id);
   }
 
   // Sensor and bushing methods
   getAnalogSensorTypes(): AnalogSensorOption[] {
-    if (!this.initialized) {
-      this.loadDefaults();
-      this.initialized = true;
-    }
     return [...this.analogSensorTypes];
   }
 
   getBushingTapModels(): BushingTapModelOption[] {
-    if (!this.initialized) {
-      this.loadDefaults();
-      this.initialized = true;
-    }
     return [...this.bushingTapModels];
   }
 
   // CRUD methods for analog sensor types
   async createAnalogSensorType(data: Omit<AnalogSensorOption, 'id'>): Promise<AnalogSensorOption> {
-    await this.initialize();
     const newItem: AnalogSensorOption = {
       ...data,
       id: `analog-${Date.now()}`
@@ -351,7 +341,6 @@ class ProductDataService {
   }
 
   async updateAnalogSensorType(id: string, data: Partial<Omit<AnalogSensorOption, 'id'>>): Promise<AnalogSensorOption | null> {
-    await this.initialize();
     const index = this.analogSensorTypes.findIndex(item => item.id === id);
     if (index !== -1) {
       this.analogSensorTypes[index] = { ...this.analogSensorTypes[index], ...data };
@@ -362,14 +351,12 @@ class ProductDataService {
   }
 
   async deleteAnalogSensorType(id: string): Promise<void> {
-    await this.initialize();
     this.analogSensorTypes = this.analogSensorTypes.filter(item => item.id !== id);
     this.saveToLocalStorage();
   }
 
   // CRUD methods for bushing tap models
   async createBushingTapModel(data: Omit<BushingTapModelOption, 'id'>): Promise<BushingTapModelOption> {
-    await this.initialize();
     const newItem: BushingTapModelOption = {
       ...data,
       id: `bushing-${Date.now()}`
@@ -380,7 +367,6 @@ class ProductDataService {
   }
 
   async updateBushingTapModel(id: string, data: Partial<Omit<BushingTapModelOption, 'id'>>): Promise<BushingTapModelOption | null> {
-    await this.initialize();
     const index = this.bushingTapModels.findIndex(item => item.id === id);
     if (index !== -1) {
       this.bushingTapModels[index] = { ...this.bushingTapModels[index], ...data };
@@ -391,7 +377,6 @@ class ProductDataService {
   }
 
   async deleteBushingTapModel(id: string): Promise<void> {
-    await this.initialize();
     this.bushingTapModels = this.bushingTapModels.filter(item => item.id !== id);
     this.saveToLocalStorage();
   }
@@ -562,7 +547,30 @@ class ProductDataService {
     dataDebugUtils.clearLocalStorage();
     this.initialized = false;
     this.initializationPromise = null;
+    this.loadDefaults();
+    this.initialized = true;
     await this.initialize();
+  }
+
+  // Debug methods
+  clearCorruptedData(): void {
+    console.log('ProductDataService: Clearing potentially corrupted data...');
+    dataDebugUtils.clearLocalStorage();
+    this.loadDefaults();
+    this.saveToLocalStorage();
+  }
+
+  getDebugInfo(): any {
+    return {
+      initialized: this.initialized,
+      level1Count: this.level1Products.length,
+      level2Count: this.level2Products.length,
+      level3Count: this.level3Products.length,
+      level4Count: this.level4Products.length,
+      assetTypesCount: this.assetTypes.length,
+      analogSensorTypesCount: this.analogSensorTypes.length,
+      bushingTapModelsCount: this.bushingTapModels.length
+    };
   }
 }
 
@@ -571,4 +579,6 @@ export const productDataService = new ProductDataService();
 // Expose for debugging
 if (typeof window !== 'undefined') {
   (window as any).productDataService = productDataService;
+  (window as any).clearProductData = () => productDataService.clearCorruptedData();
+  (window as any).getProductDebugInfo = () => productDataService.getDebugInfo();
 }
