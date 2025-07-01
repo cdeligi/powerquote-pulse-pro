@@ -29,16 +29,16 @@ class ProductDataService {
   private analogSensorTypes: AnalogSensorOption[] = [];
   private bushingTapModels: BushingTapModelOption[] = [];
   private initialized: boolean = false;
+  private defaultsLoaded: boolean = false;
   private initializationPromise: Promise<void> | null = null;
 
   constructor() {
     // Load defaults immediately to prevent blocking
     this.loadDefaults();
-    this.initialized = true;
   }
 
   async initialize(): Promise<void> {
-    if (this.initialized && this.level1Products.length > 0) {
+    if (this.initialized) {
       return;
     }
     
@@ -58,18 +58,23 @@ class ProductDataService {
       const initTimeout = setTimeout(() => {
         console.warn('ProductDataService: Initialization timeout, using defaults');
         this.loadDefaults();
+        this.defaultsLoaded = true;
         this.initialized = true;
       }, 5000);
 
       // Step 1: Try to load from database first
       const dbSuccess = await this.loadFromDatabase();
-      
-      if (!dbSuccess) {
+
+      if (dbSuccess) {
+        this.defaultsLoaded = false;
+      } else {
         console.log('ProductDataService: Database load failed, trying localStorage...');
         // Step 2: Fallback to localStorage
         const localSuccess = this.loadFromLocalStorage();
-        
-        if (!localSuccess) {
+
+        if (localSuccess) {
+          this.defaultsLoaded = false;
+        } else {
           console.log('ProductDataService: localStorage load failed, using defaults...');
           // Step 3: Final fallback to defaults
           this.loadDefaults();
@@ -102,6 +107,7 @@ class ProductDataService {
       console.error('ProductDataService: Initialization failed:', error);
       // Emergency fallback to defaults
       this.loadDefaults();
+      this.defaultsLoaded = true;
       this.initialized = true;
     }
   }
@@ -203,7 +209,7 @@ class ProductDataService {
 
   private loadDefaults(): void {
     console.log('ProductDataService: Loading default data...');
-    
+
     this.level1Products = [...DEFAULT_LEVEL1_PRODUCTS];
     this.level2Products = [...DEFAULT_LEVEL2_PRODUCTS];
     this.level3Products = [...DEFAULT_LEVEL3_PRODUCTS];
@@ -211,6 +217,7 @@ class ProductDataService {
     this.assetTypes = [...DEFAULT_ASSET_TYPES];
     this.analogSensorTypes = [...DEFAULT_ANALOG_SENSORS];
     this.bushingTapModels = [...DEFAULT_BUSHING_TAP_MODELS];
+    this.defaultsLoaded = true;
   }
 
   private saveToLocalStorage(): void {
@@ -450,6 +457,7 @@ class ProductDataService {
     this.level3Products = this.transformDbToLevel3(level3Data, []); // Pass empty array for relationships
     this.level4Products = level4Data;
     this.saveToLocalStorage();
+    this.defaultsLoaded = false;
     this.initialized = true;
   }
 
@@ -610,7 +618,6 @@ class ProductDataService {
     this.initialized = false;
     this.initializationPromise = null;
     this.loadDefaults();
-    this.initialized = true;
     await this.initialize();
   }
 
@@ -625,6 +632,7 @@ class ProductDataService {
   getDebugInfo(): any {
     return {
       initialized: this.initialized,
+      defaultsLoaded: this.defaultsLoaded,
       level1Count: this.level1Products.length,
       level2Count: this.level2Products.length,
       level3Count: this.level3Products.length,
