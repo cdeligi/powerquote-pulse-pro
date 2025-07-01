@@ -1,4 +1,3 @@
-
 import {
   Level1Product,
   Level2Product,
@@ -116,28 +115,32 @@ class ProductDataService {
       });
 
       const dbOperations = Promise.all([
-        supabase.from('products').select('*').eq('category', 'level1'),
-        supabase.from('products').select('*').eq('category', 'level2'),
-        supabase.from('products').select('*').eq('category', 'level3'),
-        supabase.from('level4_products').select('*')
+        supabase.from('products').select('*').eq('category', 'level1').eq('is_active', true),
+        supabase.from('products').select('*').eq('category', 'level2').eq('is_active', true),
+        supabase.from('products').select('*').eq('category', 'level3').eq('is_active', true),
+        supabase.from('level4_products').select('*').eq('enabled', true),
+        supabase.from('level1_level2_relationships').select('*'),
+        supabase.from('level2_level3_relationships').select('*')
       ]);
 
       const [
         { data: level1Data, error: l1Error },
         { data: level2Data, error: l2Error },
         { data: level3Data, error: l3Error },
-        { data: level4Data, error: l4Error }
+        { data: level4Data, error: l4Error },
+        { data: l1l2Relations, error: l1l2Error },
+        { data: l2l3Relations, error: l2l3Error }
       ] = await Promise.race([dbOperations, dbTimeout]);
 
-      if (l1Error || l2Error || l3Error || l4Error) {
-        console.warn('ProductDataService: Database errors:', { l1Error, l2Error, l3Error, l4Error });
+      if (l1Error || l2Error || l3Error || l4Error || l1l2Error || l2l3Error) {
+        console.warn('ProductDataService: Database errors:', { l1Error, l2Error, l3Error, l4Error, l1l2Error, l2l3Error });
         return false;
       }
 
-      // Transform database format to our format
+      // Transform database format to our format with proper relationships
       this.level1Products = this.transformDbToLevel1(level1Data || []);
-      this.level2Products = this.transformDbToLevel2(level2Data || []);
-      this.level3Products = this.transformDbToLevel3(level3Data || []);
+      this.level2Products = this.transformDbToLevel2(level2Data || [], l1l2Relations || []);
+      this.level3Products = this.transformDbToLevel3(level3Data || [], l2l3Relations || []);
       this.level4Products = level4Data || [];
 
       // Load other data types (use defaults for now since they're not in DB)
@@ -145,8 +148,18 @@ class ProductDataService {
       this.analogSensorTypes = [...DEFAULT_ANALOG_SENSORS];
       this.bushingTapModels = [...DEFAULT_BUSHING_TAP_MODELS];
 
-      console.log('ProductDataService: Database load successful');
-      return true;
+      // Validate we have some data
+      const hasData = this.level1Products.length > 0;
+      
+      console.log('ProductDataService: Database load successful', {
+        level1Count: this.level1Products.length,
+        level2Count: this.level2Products.length,
+        level3Count: this.level3Products.length,
+        relationshipsL1L2: l1l2Relations?.length || 0,
+        relationshipsL2L3: l2l3Relations?.length || 0
+      });
+      
+      return hasData;
     } catch (error) {
       console.error('ProductDataService: Database load failed:', error);
       return false;
@@ -213,7 +226,7 @@ class ProductDataService {
     }
   }
 
-  // Transform database format to our format
+  // Transform database format to our format with proper relationships
   private transformDbToLevel1(dbData: any[]): Level1Product[] {
     return dbData.map(item => ({
       id: item.id,
@@ -227,30 +240,78 @@ class ProductDataService {
     }));
   }
 
-  private transformDbToLevel2(dbData: any[]): Level2Product[] {
-    return dbData.map(item => ({
-      id: item.id,
-      name: item.name,
-      parentProductId: '', // We'll need to get this from relationships table
-      type: item.subcategory || 'LTX',
-      description: item.description || '',
-      price: parseFloat(item.price) || 0,
-      cost: parseFloat(item.cost) || 0,
-      enabled: item.is_active !== false
-    }));
+  private transformDbToLevel2(dbData: any[], relationships: any[]): Level2Product[] {
+    return dbData.map(item => {
+      // Find parent relationship
+      const parentRelation = relationships.find(rel => rel.level2_product_id === item.id);
+      
+      return {
+        id: item.id,
+        name: item.name,
+        parentProductId: parentRelation?.level1_product_id || '',
+        type: item.subcategory || 'LTX',
+        description: item.description || '',
+        price: parseFloat(item.price) || 0,
+        cost: parseFloat(item.cost) || 0,
+        enabled: item.is_active !== false,
+        specifications: this.parseSpecifications(item.subcategory)
+      };
+    });
   }
 
-  private transformDbToLevel3(dbData: any[]): Level3Product[] {
-    return dbData.map(item => ({
-      id: item.id,
-      name: item.name,
-      parentProductId: '', // We'll need to get this from relationships table
-      type: item.subcategory || 'card',
-      description: item.description || '',
-      price: parseFloat(item.price) || 0,
-      cost: parseFloat(item.cost) || 0,
-      enabled: item.is_active !== false
-    }));
+  private transformDbToLevel3(dbData: any[], relationships: any[]): Level3Product[] {
+    return dbData.map(item => {
+      // Find parent relationship
+      const parentRelation = relationships.find(rel => rel.level3_product_id === item.id);
+      
+      return {
+        id: item.id,
+        name: item.name,
+        parentProductId: parentRelation?.level2_product_id || '',
+        type: item.subcategory || 'card',
+        description: item.description || '',
+        price: parseFloat(item.price) || 0,
+        cost: parseFloat(item.cost) || 0,
+        enabled: item.is_active !== false,
+        specifications: this.parseLevel3Specifications(item.subcategory, item.name)
+      };
+    });
+  }
+
+  private parseSpecifications(subcategory: string): any {
+    switch (subcategory) {
+      case 'LTX':
+        return { height: '7U', slots: 19, capacity: 'Large' };
+      case 'MTX':
+        return { height: '5U', slots: 12, capacity: 'Medium' };
+      case 'STX':
+        return { height: '3U', slots: 6, capacity: 'Small' };
+      default:
+        return {};
+    }
+  }
+
+  private parseLevel3Specifications(subcategory: string, name: string): any {
+    const specs: any = {};
+    
+    if (subcategory === 'card') {
+      specs.slotRequirement = 1;
+      
+      if (name.toLowerCase().includes('analog')) {
+        specs.inputs = 8;
+        specs.channels = 8;
+        specs.inputTypes = ['4-20mA', '0-10V', 'RTD', 'Thermocouple'];
+      } else if (name.toLowerCase().includes('digital')) {
+        specs.inputs = 16;
+        specs.outputs = ['Relay', 'Digital'];
+        specs.channels = 16;
+      } else if (name.toLowerCase().includes('communication')) {
+        specs.protocols = ['Modbus', 'DNP3', 'IEC 61850'];
+        specs.outputs = ['Ethernet', 'Serial'];
+      }
+    }
+    
+    return specs;
   }
 
   // Public async methods
@@ -311,7 +372,7 @@ class ProductDataService {
     return [...this.assetTypes];
   }
 
-  // Relationship methods
+  // Relationship methods with proper database-driven relationships
   getLevel2ProductsForLevel1(level1Id: string): Level2Product[] {
     return this.level2Products.filter(l2 => l2.parentProductId === level1Id);
   }
