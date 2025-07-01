@@ -1,3 +1,4 @@
+
 import {
   Level1Product,
   Level2Product,
@@ -445,8 +446,8 @@ class ProductDataService {
   // Replace all products method for sync functionality
   replaceAllProducts(level1Data: any[], level2Data: any[], level3Data: any[], level4Data: any[]): void {
     this.level1Products = this.transformDbToLevel1(level1Data);
-    this.level2Products = this.transformDbToLevel2(level2Data);
-    this.level3Products = this.transformDbToLevel3(level3Data);
+    this.level2Products = this.transformDbToLevel2(level2Data, []); // Pass empty array for relationships
+    this.level3Products = this.transformDbToLevel3(level3Data, []); // Pass empty array for relationships
     this.level4Products = level4Data;
     this.saveToLocalStorage();
     this.initialized = true;
