@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Level2Product } from "@/types/product";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -14,10 +14,67 @@ interface ChassisSelectorProps {
 }
 
 const ChassisSelector = ({ onChassisSelect, selectedChassis, canSeePrices }: ChassisSelectorProps) => {
-  // Get chassis options from productDataService
-  const chassisOptions: Level2Product[] = productDataService
-    .getLevel2ProductsForLevel1('qtms')
-    .filter(chassis => ['LTX', 'MTX', 'STX'].includes(chassis.type) && chassis.enabled);
+  const [chassisOptions, setChassisOptions] = useState<Level2Product[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const loadChassis = async () => {
+      try {
+        setLoading(true);
+        
+        // Initialize the service first
+        await productDataService.initialize();
+        
+        // Get chassis options from productDataService using the proper relationship
+        const qtmsLevel2Products = productDataService.getLevel2ProductsForLevel1('qtms');
+        const validChassis = qtmsLevel2Products.filter(chassis => 
+          ['LTX', 'MTX', 'STX'].includes(chassis.type) && chassis.enabled
+        );
+        
+        console.log('ChassisSelector: Loaded chassis:', validChassis);
+        setChassisOptions(validChassis);
+      } catch (error) {
+        console.error('Error loading chassis:', error);
+        // Fallback to sync method
+        try {
+          const syncChassis = productDataService.getLevel2ProductsForLevel1('qtms')
+            .filter(chassis => ['LTX', 'MTX', 'STX'].includes(chassis.type) && chassis.enabled);
+          setChassisOptions(syncChassis);
+        } catch (syncError) {
+          console.error('Sync fallback failed:', syncError);
+          setChassisOptions([]);
+        }
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadChassis();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="space-y-4">
+        <h3 className="text-xl font-bold text-white mb-4">Select QTMS Chassis</h3>
+        <div className="text-center py-8">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-600 mx-auto mb-4"></div>
+          <p className="text-gray-400">Loading chassis options...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (chassisOptions.length === 0) {
+    return (
+      <div className="space-y-4">
+        <h3 className="text-xl font-bold text-white mb-4">Select QTMS Chassis</h3>
+        <div className="text-center py-8">
+          <p className="text-gray-400 mb-4">No QTMS chassis available.</p>
+          <p className="text-gray-500 text-sm">Please create Level 2 products (LTX, MTX, STX) for QTMS in the Admin Panel.</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
@@ -36,7 +93,7 @@ const ChassisSelector = ({ onChassisSelect, selectedChassis, canSeePrices }: Cha
                 {chassis.description}
               </CardDescription>
               <Badge variant="outline" className="w-fit text-white border-gray-500">
-                {chassis.specifications?.height} • {chassis.specifications?.slots} slots
+                {chassis.specifications?.height || '3U'} • {chassis.specifications?.slots || 6} slots
               </Badge>
             </CardHeader>
             <CardContent className="flex-1 flex flex-col">
