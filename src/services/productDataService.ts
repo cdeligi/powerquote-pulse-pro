@@ -29,16 +29,16 @@ class ProductDataService {
   private analogSensorTypes: AnalogSensorOption[] = [];
   private bushingTapModels: BushingTapModelOption[] = [];
   private initialized: boolean = false;
-  private defaultsLoaded: boolean = false;
   private initializationPromise: Promise<void> | null = null;
 
   constructor() {
     // Load defaults immediately to prevent blocking
     this.loadDefaults();
+    this.initialized = true;
   }
 
   async initialize(): Promise<void> {
-    if (this.initialized) {
+    if (this.initialized && this.level1Products.length > 0) {
       return;
     }
     
@@ -58,23 +58,18 @@ class ProductDataService {
       const initTimeout = setTimeout(() => {
         console.warn('ProductDataService: Initialization timeout, using defaults');
         this.loadDefaults();
-        this.defaultsLoaded = true;
         this.initialized = true;
       }, 5000);
 
       // Step 1: Try to load from database first
       const dbSuccess = await this.loadFromDatabase();
-
-      if (dbSuccess) {
-        this.defaultsLoaded = false;
-      } else {
+      
+      if (!dbSuccess) {
         console.log('ProductDataService: Database load failed, trying localStorage...');
         // Step 2: Fallback to localStorage
         const localSuccess = this.loadFromLocalStorage();
-
-        if (localSuccess) {
-          this.defaultsLoaded = false;
-        } else {
+        
+        if (!localSuccess) {
           console.log('ProductDataService: localStorage load failed, using defaults...');
           // Step 3: Final fallback to defaults
           this.loadDefaults();
@@ -107,7 +102,6 @@ class ProductDataService {
       console.error('ProductDataService: Initialization failed:', error);
       // Emergency fallback to defaults
       this.loadDefaults();
-      this.defaultsLoaded = true;
       this.initialized = true;
     }
   }
@@ -209,7 +203,7 @@ class ProductDataService {
 
   private loadDefaults(): void {
     console.log('ProductDataService: Loading default data...');
-
+    
     this.level1Products = [...DEFAULT_LEVEL1_PRODUCTS];
     this.level2Products = [...DEFAULT_LEVEL2_PRODUCTS];
     this.level3Products = [...DEFAULT_LEVEL3_PRODUCTS];
@@ -217,7 +211,6 @@ class ProductDataService {
     this.assetTypes = [...DEFAULT_ASSET_TYPES];
     this.analogSensorTypes = [...DEFAULT_ANALOG_SENSORS];
     this.bushingTapModels = [...DEFAULT_BUSHING_TAP_MODELS];
-    this.defaultsLoaded = true;
   }
 
   private saveToLocalStorage(): void {
@@ -457,7 +450,6 @@ class ProductDataService {
     this.level3Products = this.transformDbToLevel3(level3Data, []); // Pass empty array for relationships
     this.level4Products = level4Data;
     this.saveToLocalStorage();
-    this.defaultsLoaded = false;
     this.initialized = true;
   }
 
@@ -556,45 +548,6 @@ class ProductDataService {
     return newProduct;
   }
 
-  async updateLevel2Product(id: string, updates: Partial<Omit<Level2Product, 'id'>>): Promise<Level2Product | null> {
-    await this.initialize();
-    const index = this.level2Products.findIndex(product => product.id === id);
-    if (index !== -1) {
-      this.level2Products[index] = { ...this.level2Products[index], ...updates };
-      this.saveToLocalStorage();
-
-      try {
-        await supabase.from('products')
-          .update({
-            name: this.level2Products[index].name,
-            description: this.level2Products[index].description,
-            subcategory: this.level2Products[index].type,
-            price: this.level2Products[index].price,
-            cost: this.level2Products[index].cost ?? null,
-            is_active: this.level2Products[index].enabled
-          })
-          .eq('id', id);
-      } catch (error) {
-        console.error('Failed to update level2 product', error);
-      }
-
-      return this.level2Products[index];
-    }
-    return null;
-  }
-
-  async deleteLevel2Product(id: string): Promise<void> {
-    await this.initialize();
-    this.level2Products = this.level2Products.filter(product => product.id !== id);
-    this.saveToLocalStorage();
-
-    try {
-      await supabase.from('products').delete().eq('id', id);
-    } catch (error) {
-      console.error('Failed to delete level2 product', error);
-    }
-  }
-
   // Level 3 and Level 4 methods
   async createLevel3Product(product: Omit<Level3Product, 'id'>): Promise<Level3Product> {
     await this.initialize();
@@ -621,45 +574,6 @@ class ProductDataService {
     }
 
     return newProduct;
-  }
-
-  async updateLevel3Product(id: string, updates: Partial<Omit<Level3Product, 'id'>>): Promise<Level3Product | null> {
-    await this.initialize();
-    const index = this.level3Products.findIndex(product => product.id === id);
-    if (index !== -1) {
-      this.level3Products[index] = { ...this.level3Products[index], ...updates };
-      this.saveToLocalStorage();
-
-      try {
-        await supabase.from('products')
-          .update({
-            name: this.level3Products[index].name,
-            description: this.level3Products[index].description,
-            subcategory: this.level3Products[index].type,
-            price: this.level3Products[index].price,
-            cost: this.level3Products[index].cost ?? null,
-            is_active: this.level3Products[index].enabled ?? true
-          })
-          .eq('id', id);
-      } catch (error) {
-        console.error('Failed to update level3 product', error);
-      }
-
-      return this.level3Products[index];
-    }
-    return null;
-  }
-
-  async deleteLevel3Product(id: string): Promise<void> {
-    await this.initialize();
-    this.level3Products = this.level3Products.filter(product => product.id !== id);
-    this.saveToLocalStorage();
-
-    try {
-      await supabase.from('products').delete().eq('id', id);
-    } catch (error) {
-      console.error('Failed to delete level3 product', error);
-    }
   }
 
   async createLevel4Product(product: Omit<Level4Product, 'id'>): Promise<Level4Product> {
@@ -696,6 +610,7 @@ class ProductDataService {
     this.initialized = false;
     this.initializationPromise = null;
     this.loadDefaults();
+    this.initialized = true;
     await this.initialize();
   }
 
@@ -710,7 +625,6 @@ class ProductDataService {
   getDebugInfo(): any {
     return {
       initialized: this.initialized,
-      defaultsLoaded: this.defaultsLoaded,
       level1Count: this.level1Products.length,
       level2Count: this.level2Products.length,
       level3Count: this.level3Products.length,
@@ -724,8 +638,8 @@ class ProductDataService {
 
 export const productDataService = new ProductDataService();
 
-// Expose for debugging in development only
-if (process.env.NODE_ENV !== 'production' && typeof window !== 'undefined') {
+// Expose for debugging
+if (typeof window !== 'undefined') {
   (window as any).productDataService = productDataService;
   (window as any).clearProductData = () => productDataService.clearCorruptedData();
   (window as any).getProductDebugInfo = () => productDataService.getDebugInfo();

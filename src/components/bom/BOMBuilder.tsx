@@ -87,17 +87,7 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
   useEffect(() => {
     const loadLevel1Products = async () => {
       try {
-        // Ensure the product data service is fully initialized before
-        // attempting to retrieve products. This guarantees that any
-        // database values are loaded instead of stale defaults.
-        await productDataService.initialize();
-
-        let products = await productDataService.getLevel1Products();
-        setLevel1Products(products.filter(p => p.enabled));
-
-        // Refresh once more after initialization to ensure the latest
-        // database values are reflected in state.
-        products = await productDataService.getLevel1Products();
+        const products = await productDataService.getLevel1Products();
         setLevel1Products(products.filter(p => p.enabled));
       } catch (error) {
         console.error('Error loading Level 1 products:', error);
