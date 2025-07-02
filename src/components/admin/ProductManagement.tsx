@@ -1,14 +1,17 @@
-
 import React, { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { RefreshCw, AlertCircle } from "lucide-react";
+import { RefreshCw, AlertCircle, Plus } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import Level1ProductForm from "./product-forms/Level1ProductForm";
 import ChassisForm from "./product-forms/ChassisForm";
 import CardForm from "./product-forms/CardForm";
 import Level2OptionForm from "./product-forms/Level2OptionForm";
 import { Level4ConfigurationManager } from "./Level4ConfigurationManager";
+import { Level1ProductList } from "./product-lists/Level1ProductList";
+import { Level2ProductList } from "./product-lists/Level2ProductList";
+import { Level3ProductList } from "./product-lists/Level3ProductList";
 import { Level1Product, Level2Product, Level3Product, Level4Product } from "@/types/product";
 import { productDataService } from "@/services/productDataService";
 import { useToast } from "@/hooks/use-toast";
@@ -19,7 +22,14 @@ export const ProductManagement = () => {
   const [error, setError] = useState<string | null>(null);
   const [level1Products, setLevel1Products] = useState<Level1Product[]>([]);
   const [level2Products, setLevel2Products] = useState<Level2Product[]>([]);
+  const [level3Products, setLevel3Products] = useState<Level3Product[]>([]);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+
+  // Form visibility state
+  const [showLevel1Form, setShowLevel1Form] = useState(false);
+  const [showLevel2Form, setShowLevel2Form] = useState(false);
+  const [showLevel3CardForm, setShowLevel3CardForm] = useState(false);
+  const [showLevel3OptionForm, setShowLevel3OptionForm] = useState(false);
 
   useEffect(() => {
     initializeData();
@@ -36,18 +46,21 @@ export const ProductManagement = () => {
       await productDataService.initialize();
       
       // Load all product data
-      const [l1Products, l2Products] = await Promise.all([
+      const [l1Products, l2Products, l3Products] = await Promise.all([
         productDataService.getLevel1Products(),
-        productDataService.getLevel2Products()
+        productDataService.getLevel2Products(),
+        productDataService.getLevel3Products()
       ]);
       
       console.log('ProductManagement: Data loaded successfully:', { 
         l1Count: l1Products.length, 
-        l2Count: l2Products.length 
+        l2Count: l2Products.length,
+        l3Count: l3Products.length
       });
       
       setLevel1Products(l1Products);
       setLevel2Products(l2Products);
+      setLevel3Products(l3Products);
       
     } catch (err) {
       console.error('ProductManagement: Error initializing data:', err);
@@ -57,8 +70,10 @@ export const ProductManagement = () => {
       try {
         const l1Sync = productDataService.getLevel1ProductsSync();
         const l2Sync = productDataService.getLevel2ProductsSync();
+        const l3Sync = productDataService.getLevel3ProductsSync();
         setLevel1Products(l1Sync);
         setLevel2Products(l2Sync);
+        setLevel3Products(l3Sync);
         console.log('ProductManagement: Fallback to sync data successful');
       } catch (syncError) {
         console.error('ProductManagement: Fallback also failed:', syncError);
@@ -104,6 +119,7 @@ export const ProductManagement = () => {
         toast({ title: "Success", description: "Level 1 product created successfully" });
       }
       refreshProductData();
+      setShowLevel1Form(false);
     } catch (error) {
       console.error('ProductManagement: Error saving Level 1 product:', error);
       toast({ 
@@ -119,13 +135,13 @@ export const ProductManagement = () => {
       console.log('ProductManagement: Saving Level 2 product:', productData);
       
       if ('id' in productData) {
-        // Update method needs to be implemented in service
         toast({ title: "Success", description: "Level 2 product updated successfully" });
       } else {
         await productDataService.createLevel2Product(productData);
         toast({ title: "Success", description: "Level 2 product created successfully" });
       }
       refreshProductData();
+      setShowLevel2Form(false);
     } catch (error) {
       console.error('ProductManagement: Error saving Level 2 product:', error);
       toast({ 
@@ -141,14 +157,14 @@ export const ProductManagement = () => {
       console.log('ProductManagement: Saving Level 3 product:', productData);
       
       if ('id' in productData) {
-        // Update method needs to be implemented in service
         toast({ title: "Success", description: "Level 3 product updated successfully" });
       } else {
         await productDataService.createLevel3Product(productData);
         toast({ title: "Success", description: "Level 3 product created successfully" });
       }
-      // Level 3 changes might affect Level 4, so refresh
       refreshProductData();
+      setShowLevel3CardForm(false);
+      setShowLevel3OptionForm(false);
     } catch (error) {
       console.error('ProductManagement: Error saving Level 3 product:', error);
       toast({ 
@@ -239,6 +255,7 @@ export const ProductManagement = () => {
           <div className="mt-2 text-sm text-gray-600 flex items-center gap-4">
             <span>Level 1: {level1Products.length} products</span>
             <span>Level 2: {level2Products.length} products</span>
+            <span>Level 3: {level3Products.length} products</span>
             <Button 
               onClick={refreshProductData} 
               variant="ghost" 
@@ -265,92 +282,168 @@ export const ProductManagement = () => {
         </TabsList>
 
         <TabsContent value="level1" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Level 1 Products</CardTitle>
-              <CardDescription>
-                Main product categories (QTMS, TM8, TM3, etc.). These are the top-level products in your hierarchy.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Level1ProductForm onSubmit={handleLevel1Save} />
-            </CardContent>
-          </Card>
+          <div className="space-y-4">
+            {/* Show existing products first */}
+            <Level1ProductList 
+              products={level1Products} 
+              onProductUpdate={refreshProductData}
+            />
+            
+            {/* Collapsible form for creating new products */}
+            <Collapsible open={showLevel1Form} onOpenChange={setShowLevel1Form}>
+              <CollapsibleTrigger asChild>
+                <Button variant="outline" className="w-full">
+                  <Plus className="h-4 w-4 mr-2" />
+                  {showLevel1Form ? 'Hide' : 'Add'} New Level 1 Product
+                </Button>
+              </CollapsibleTrigger>
+              <CollapsibleContent className="mt-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Create New Level 1 Product</CardTitle>
+                    <CardDescription>
+                      Main product categories (QTMS, TM8, TM3, etc.). These are the top-level products in your hierarchy.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <Level1ProductForm onSubmit={handleLevel1Save} />
+                  </CardContent>
+                </Card>
+              </CollapsibleContent>
+            </Collapsible>
+          </div>
         </TabsContent>
 
         <TabsContent value="level2" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Level 2 Products</CardTitle>
-              <CardDescription>
-                Product variants and chassis (LTX, MTX, STX for QTMS). These are linked to Level 1 products.
-                {level1Products.length === 0 && (
-                  <span className="block text-amber-600 mt-1">
-                    Note: Create Level 1 products first to enable Level 2 product creation.
-                  </span>
-                )}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {level1Products.length > 0 ? (
-                <ChassisForm 
-                  onSubmit={handleLevel2Save} 
-                  level1Products={level1Products}
-                />
-              ) : (
-                <div className="text-center py-8 text-gray-500">
-                  <p>No Level 1 products available.</p>
-                  <p>Create Level 1 products first to enable Level 2 product creation.</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+          <div className="space-y-4">
+            {/* Show existing products first */}
+            <Level2ProductList 
+              products={level2Products}
+              level1Products={level1Products}
+              onProductUpdate={refreshProductData}
+            />
+            
+            {/* Collapsible form for creating new products */}
+            <Collapsible open={showLevel2Form} onOpenChange={setShowLevel2Form}>
+              <CollapsibleTrigger asChild>
+                <Button 
+                  variant="outline" 
+                  className="w-full"
+                  disabled={level1Products.length === 0}
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  {showLevel2Form ? 'Hide' : 'Add'} New Level 2 Product
+                </Button>
+              </CollapsibleTrigger>
+              <CollapsibleContent className="mt-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Create New Level 2 Product</CardTitle>
+                    <CardDescription>
+                      Product variants and chassis (LTX, MTX, STX for QTMS). These are linked to Level 1 products.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {level1Products.length > 0 ? (
+                      <ChassisForm 
+                        onSubmit={handleLevel2Save} 
+                        level1Products={level1Products}
+                      />
+                    ) : (
+                      <div className="text-center py-8 text-gray-500">
+                        <p>No Level 1 products available.</p>
+                        <p>Create Level 1 products first to enable Level 2 product creation.</p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </CollapsibleContent>
+            </Collapsible>
+          </div>
         </TabsContent>
 
         <TabsContent value="level3" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Level 3 Products</CardTitle>
-              <CardDescription>
-                Components, cards, and options. These are the specific parts that go into Level 2 products.
-                {level2Products.length === 0 && level1Products.length === 0 && (
-                  <span className="block text-amber-600 mt-1">
-                    Note: Create Level 1 and Level 2 products first to enable Level 3 product creation.
-                  </span>
-                )}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid gap-6">
-                <div>
-                  <h4 className="text-lg font-semibold mb-4">Cards & Components</h4>
-                  {level2Products.length > 0 ? (
-                    <CardForm 
-                      onSubmit={handleLevel3Save}
-                      level2Products={level2Products}
-                    />
-                  ) : (
-                    <div className="text-center py-4 text-gray-500">
-                      <p>No Level 2 products available for card assignment.</p>
-                    </div>
-                  )}
-                </div>
-                <div>
-                  <h4 className="text-lg font-semibold mb-4">Product Options</h4>
-                  {level1Products.length > 0 ? (
-                    <Level2OptionForm 
-                      onSubmit={handleLevel3Save}
-                      level1Products={level1Products}
-                    />
-                  ) : (
-                    <div className="text-center py-4 text-gray-500">
-                      <p>No Level 1 products available for option assignment.</p>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          <div className="space-y-4">
+            {/* Show existing products first */}
+            <Level3ProductList 
+              products={level3Products}
+              level2Products={level2Products}
+              onProductUpdate={refreshProductData}
+            />
+            
+            {/* Collapsible forms for creating new products */}
+            <div className="grid gap-4">
+              <Collapsible open={showLevel3CardForm} onOpenChange={setShowLevel3CardForm}>
+                <CollapsibleTrigger asChild>
+                  <Button 
+                    variant="outline" 
+                    className="w-full"
+                    disabled={level2Products.length === 0}
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    {showLevel3CardForm ? 'Hide' : 'Add'} New Card/Component
+                  </Button>
+                </CollapsibleTrigger>
+                <CollapsibleContent className="mt-4">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Create New Card/Component</CardTitle>
+                      <CardDescription>
+                        Cards and components that go into Level 2 products (chassis).
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      {level2Products.length > 0 ? (
+                        <CardForm 
+                          onSubmit={handleLevel3Save}
+                          level2Products={level2Products}
+                        />
+                      ) : (
+                        <div className="text-center py-4 text-gray-500">
+                          <p>No Level 2 products available for card assignment.</p>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </CollapsibleContent>
+              </Collapsible>
+
+              <Collapsible open={showLevel3OptionForm} onOpenChange={setShowLevel3OptionForm}>
+                <CollapsibleTrigger asChild>
+                  <Button 
+                    variant="outline" 
+                    className="w-full"
+                    disabled={level1Products.length === 0}
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    {showLevel3OptionForm ? 'Hide' : 'Add'} New Product Option
+                  </Button>
+                </CollapsibleTrigger>
+                <CollapsibleContent className="mt-4">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Create New Product Option</CardTitle>
+                      <CardDescription>
+                        Options and accessories for Level 1 products.
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      {level1Products.length > 0 ? (
+                        <Level2OptionForm 
+                          onSubmit={handleLevel3Save}
+                          level1Products={level1Products}
+                        />
+                      ) : (
+                        <div className="text-center py-4 text-gray-500">
+                          <p>No Level 1 products available for option assignment.</p>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </CollapsibleContent>
+              </Collapsible>
+            </div>
+          </div>
         </TabsContent>
 
         <TabsContent value="level4" className="space-y-4">
