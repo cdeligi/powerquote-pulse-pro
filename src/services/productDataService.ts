@@ -548,6 +548,45 @@ class ProductDataService {
     return newProduct;
   }
 
+  async updateLevel2Product(id: string, updates: Partial<Omit<Level2Product, 'id'>>): Promise<Level2Product | null> {
+    await this.initialize();
+    const index = this.level2Products.findIndex(product => product.id === id);
+    if (index !== -1) {
+      this.level2Products[index] = { ...this.level2Products[index], ...updates };
+      this.saveToLocalStorage();
+
+      try {
+        await supabase.from('products')
+          .update({
+            name: this.level2Products[index].name,
+            description: this.level2Products[index].description,
+            subcategory: this.level2Products[index].type,
+            price: this.level2Products[index].price,
+            cost: this.level2Products[index].cost ?? null,
+            is_active: this.level2Products[index].enabled
+          })
+          .eq('id', id);
+      } catch (error) {
+        console.error('Failed to update level2 product', error);
+      }
+
+      return this.level2Products[index];
+    }
+    return null;
+  }
+
+  async deleteLevel2Product(id: string): Promise<void> {
+    await this.initialize();
+    this.level2Products = this.level2Products.filter(product => product.id !== id);
+    this.saveToLocalStorage();
+
+    try {
+      await supabase.from('products').delete().eq('id', id);
+    } catch (error) {
+      console.error('Failed to delete level2 product', error);
+    }
+  }
+
   // Level 3 and Level 4 methods
   async createLevel3Product(product: Omit<Level3Product, 'id'>): Promise<Level3Product> {
     await this.initialize();
@@ -574,6 +613,45 @@ class ProductDataService {
     }
 
     return newProduct;
+  }
+
+  async updateLevel3Product(id: string, updates: Partial<Omit<Level3Product, 'id'>>): Promise<Level3Product | null> {
+    await this.initialize();
+    const index = this.level3Products.findIndex(product => product.id === id);
+    if (index !== -1) {
+      this.level3Products[index] = { ...this.level3Products[index], ...updates };
+      this.saveToLocalStorage();
+
+      try {
+        await supabase.from('products')
+          .update({
+            name: this.level3Products[index].name,
+            description: this.level3Products[index].description,
+            subcategory: this.level3Products[index].type,
+            price: this.level3Products[index].price,
+            cost: this.level3Products[index].cost ?? null,
+            is_active: this.level3Products[index].enabled ?? true
+          })
+          .eq('id', id);
+      } catch (error) {
+        console.error('Failed to update level3 product', error);
+      }
+
+      return this.level3Products[index];
+    }
+    return null;
+  }
+
+  async deleteLevel3Product(id: string): Promise<void> {
+    await this.initialize();
+    this.level3Products = this.level3Products.filter(product => product.id !== id);
+    this.saveToLocalStorage();
+
+    try {
+      await supabase.from('products').delete().eq('id', id);
+    } catch (error) {
+      console.error('Failed to delete level3 product', error);
+    }
   }
 
   async createLevel4Product(product: Omit<Level4Product, 'id'>): Promise<Level4Product> {
