@@ -724,8 +724,8 @@ class ProductDataService {
 
 export const productDataService = new ProductDataService();
 
-// Expose for debugging
-if (typeof window !== 'undefined') {
+// Expose for debugging in development only
+if (process.env.NODE_ENV !== 'production' && typeof window !== 'undefined') {
   (window as any).productDataService = productDataService;
   (window as any).clearProductData = () => productDataService.clearCorruptedData();
   (window as any).getProductDebugInfo = () => productDataService.getDebugInfo();
