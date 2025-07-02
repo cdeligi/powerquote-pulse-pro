@@ -55,8 +55,23 @@ const BOMDisplay = ({ bomItems, onUpdateBOM, onEditConfiguration, canSeePrices }
   };
 
   const isConfigurableItem = (item: BOMItem) => {
-    // Check if item is a consolidated QTMS configuration
-    return item.product.type === 'QTMS' || item.configuration;
+    // Check if item is configurable - includes QTMS, Level 4 products, analog sensors, and bushing configurations
+    return item.product.type === 'QTMS' || 
+           item.configuration || 
+           (item.product as any).configurationType ||
+           item.product.name?.toLowerCase().includes('analog') ||
+           item.product.name?.toLowerCase().includes('bushing') ||
+           item.product.name?.toLowerCase().includes('digital');
+  };
+
+  const needsConfiguration = (item: BOMItem) => {
+    // Items that require configuration but don't have it yet
+    const hasLevel4Config = (item.product as any).configurationType;
+    const hasAnalogConfig = item.product.name?.toLowerCase().includes('analog');
+    const hasBushingConfig = item.product.name?.toLowerCase().includes('bushing');
+    const hasDigitalConfig = item.product.name?.toLowerCase().includes('digital');
+    
+    return (hasLevel4Config || hasAnalogConfig || hasBushingConfig || hasDigitalConfig) && !item.configuration;
   };
 
   const getPartNumber = (item: BOMItem) => {
@@ -94,6 +109,7 @@ const BOMDisplay = ({ bomItems, onUpdateBOM, onEditConfiguration, canSeePrices }
             <div className="flex justify-between items-start mb-2">
               <div className="flex-1 min-w-0">
                 <h4 className="text-white font-medium truncate">{item.product.name}</h4>
+                {/* Enhanced description display from product data */}
                 {item.product.description && (
                   <p className="text-gray-400 text-xs mt-1">{item.product.description}</p>
                 )}
@@ -111,6 +127,11 @@ const BOMDisplay = ({ bomItems, onUpdateBOM, onEditConfiguration, canSeePrices }
                   {isConfigurableItem(item) && (
                     <Badge variant="outline" className="text-xs text-purple-400 border-purple-400">
                       Configurable
+                    </Badge>
+                  )}
+                  {needsConfiguration(item) && (
+                    <Badge variant="outline" className="text-xs text-orange-400 border-orange-400">
+                      Config Required
                     </Badge>
                   )}
                 </div>
@@ -194,6 +215,12 @@ const BOMDisplay = ({ bomItems, onUpdateBOM, onEditConfiguration, canSeePrices }
                       ${item.product.price?.toLocaleString() || '—'} each
                     </div>
                   )}
+                  {/* Display cost information if available */}
+                  {item.product.cost && (
+                    <div className="text-orange-400 text-xs">
+                      Cost: ${((item.product.cost || 0) * item.quantity).toLocaleString()}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -208,6 +235,18 @@ const BOMDisplay = ({ bomItems, onUpdateBOM, onEditConfiguration, canSeePrices }
                 ${calculateTotal().toLocaleString()}
               </span>
             </div>
+            {/* Display total cost if available */}
+            {bomItems.some(item => item.product.cost) && (
+              <div className="flex justify-between items-center mt-1">
+                <span className="text-orange-400 text-sm">Total Cost:</span>
+                <span className="text-orange-400 text-sm font-medium">
+                  ${bomItems.reduce((total, item) => {
+                    const cost = item.product.cost || 0;
+                    return total + (cost * item.quantity);
+                  }, 0).toLocaleString()}
+                </span>
+              </div>
+            )}
           </div>
         )}
       </CardContent>

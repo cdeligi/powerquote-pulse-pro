@@ -137,7 +137,7 @@ class ProductDataService {
         return false;
       }
 
-      // Transform database format to our format with proper relationships
+      // Transform database format to our format with proper relationships and ensure cost data flows through
       this.level1Products = this.transformDbToLevel1(level1Data || []);
       this.level2Products = this.transformDbToLevel2(level2Data || [], l1l2Relations || []);
       this.level3Products = this.transformDbToLevel3(level3Data || [], l2l3Relations || []);
@@ -226,7 +226,7 @@ class ProductDataService {
     }
   }
 
-  // Transform database format to our format with proper relationships
+  // Transform database format to our format with proper relationships and ensure cost data flows through
   private transformDbToLevel1(dbData: any[]): Level1Product[] {
     return dbData.map(item => ({
       id: item.id,
@@ -235,7 +235,7 @@ class ProductDataService {
       category: item.category,
       description: item.description || '',
       price: parseFloat(item.price) || 0,
-      cost: parseFloat(item.cost) || 0,
+      cost: parseFloat(item.cost) || 0, // Ensure cost is included
       enabled: item.is_active !== false
     }));
   }
@@ -252,7 +252,7 @@ class ProductDataService {
         type: item.subcategory || 'LTX',
         description: item.description || '',
         price: parseFloat(item.price) || 0,
-        cost: parseFloat(item.cost) || 0,
+        cost: parseFloat(item.cost) || 0, // Ensure cost is included
         enabled: item.is_active !== false,
         specifications: this.parseSpecifications(item.subcategory)
       };
@@ -271,7 +271,7 @@ class ProductDataService {
         type: item.subcategory || 'card',
         description: item.description || '',
         price: parseFloat(item.price) || 0,
-        cost: parseFloat(item.cost) || 0,
+        cost: parseFloat(item.cost) || 0, // Ensure cost is included
         enabled: item.is_active !== false,
         specifications: this.parseLevel3Specifications(item.subcategory, item.name)
       };
