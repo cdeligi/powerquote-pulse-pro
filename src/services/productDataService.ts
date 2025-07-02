@@ -653,6 +653,111 @@ class ProductDataService {
     }
   }
 
+  // Level 4 Products methods
+  async createLevel4Product(product: Omit<Level4Product, 'id'>): Promise<Level4Product> {
+    await this.initialize();
+    const newProduct: Level4Product = {
+      ...product,
+      id: `level4-${Date.now()}`
+    };
+    this.level4Products.push(newProduct);
+    this.saveToLocalStorage();
+
+    try {
+      await supabase.from('level4_products').insert({
+        id: newProduct.id,
+        name: newProduct.name,
+        description: newProduct.description,
+        parent_product_id: newProduct.parentProductId,
+        configuration_type: newProduct.configurationType,
+        price: newProduct.price,
+        cost: newProduct.cost ?? null,
+        enabled: newProduct.enabled
+      });
+
+      // Insert configuration options if they exist
+      if (newProduct.options && newProduct.options.length > 0) {
+        const optionsToInsert = newProduct.options.map(option => ({
+          id: option.id,
+          level4_product_id: newProduct.id,
+          option_key: option.optionKey,
+          option_value: option.optionValue,
+          display_order: option.displayOrder,
+          enabled: option.enabled
+        }));
+        
+        await supabase.from('level4_configuration_options').insert(optionsToInsert);
+      }
+    } catch (error) {
+      console.error('Failed to persist level4 product', error);
+    }
+
+    return newProduct;
+  }
+
+  async updateLevel4Product(id: string, updates: Partial<Omit<Level4Product, 'id'>>): Promise<Level4Product | null> {
+    await this.initialize();
+    const index = this.level4Products.findIndex(product => product.id === id);
+    if (index !== -1) {
+      this.level4Products[index] = { ...this.level4Products[index], ...updates };
+      this.saveToLocalStorage();
+
+      try {
+        await supabase.from('level4_products')
+          .update({
+            name: this.level4Products[index].name,
+            description: this.level4Products[index].description,
+            parent_product_id: this.level4Products[index].parentProductId,
+            configuration_type: this.level4Products[index].configurationType,
+            price: this.level4Products[index].price,
+            cost: this.level4Products[index].cost ?? null,
+            enabled: this.level4Products[index].enabled
+          })
+          .eq('id', id);
+
+        // Update configuration options if they exist
+        if (this.level4Products[index].options) {
+          // Delete existing options
+          await supabase.from('level4_configuration_options').delete().eq('level4_product_id', id);
+          
+          // Insert new options
+          if (this.level4Products[index].options!.length > 0) {
+            const optionsToInsert = this.level4Products[index].options!.map(option => ({
+              id: option.id,
+              level4_product_id: id,
+              option_key: option.optionKey,
+              option_value: option.optionValue,
+              display_order: option.displayOrder,
+              enabled: option.enabled
+            }));
+            
+            await supabase.from('level4_configuration_options').insert(optionsToInsert);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to update level4 product', error);
+      }
+
+      return this.level4Products[index];
+    }
+    return null;
+  }
+
+  async deleteLevel4Product(id: string): Promise<void> {
+    await this.initialize();
+    this.level4Products = this.level4Products.filter(product => product.id !== id);
+    this.saveToLocalStorage();
+
+    try {
+      // Delete configuration options first
+      await supabase.from('level4_configuration_options').delete().eq('level4_product_id', id);
+      // Delete the product
+      await supabase.from('level4_products').delete().eq('id', id);
+    } catch (error) {
+      console.error('Failed to delete level4 product', error);
+    }
+  }
+
   // Debug method to reset and reload
   async resetAndReload(): Promise<void> {
     console.log('ProductDataService: Resetting and reloading...');
