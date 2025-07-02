@@ -32,9 +32,9 @@ cd <YOUR_PROJECT_NAME>
 # Step 3: Install the necessary dependencies.
 npm i
 
-# Step 4: Create a `.env` file from the included template.
-cp .env.example .env
-# Edit the new `.env` file and set the variables listed below.
+# Step 4: Create or read a `.env` file from the included repo.
+cp .env
+# Edit or confirm `.env` file with the credentials below
 
 # Step 5: Start the development server with auto-reloading and an instant preview.
 npm run dev
@@ -83,8 +83,8 @@ An `.env.example` file is checked into the repository. Copy it to `.env` and pro
 Required variables:
 
 ```dotenv
-VITE_SUPABASE_URL=<your-supabase-url>
-VITE_SUPABASE_ANON_KEY=<your-supabase-anon-key>
+VITE_SUPABASE_URL=https://cwhmxpitwblqxgrvaigg.supabase.co
+VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN3aG14cGl0d2JscXhncnZhaWdnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA3MTc3MTIsImV4cCI6MjA2NjI5MzcxMn0.NaAtGg1Fpx1obdHK5rBGM5IzSWJea7lniuimr5ZyFGU
 ```
 
 If you plan to run migrations you will also need to authenticate the Supabase CLI with `SUPABASE_ACCESS_TOKEN`.
