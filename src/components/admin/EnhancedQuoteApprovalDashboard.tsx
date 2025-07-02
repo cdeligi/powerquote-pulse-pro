@@ -142,7 +142,7 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
 
   const handleQuoteAction = async (
     quoteId: string,
-    action: 'approve' | 'reject' | 'counter_offer',
+    action: 'approve' | 'reject',
     notes?: string,
     updatedBOMItems?: any[]
   ) => {
@@ -151,7 +151,7 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
     
     try {
       const updates: any = {
-        status: action === 'approve' ? 'approved' : action === 'reject' ? 'rejected' : 'counter_offered',
+        status: action === 'approve' ? 'approved' : 'rejected',
         reviewed_by: user?.id,
         reviewed_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
@@ -161,18 +161,6 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
         updates.approval_notes = notes || '';
       } else if (action === 'reject') {
         updates.rejection_reason = notes || '';
-      } else if (action === 'counter_offer') {
-        updates.approval_notes = notes || '';
-        const existingCounterOffers = quotes.find(q => q.id === quoteId)?.counter_offers || [];
-        updates.counter_offers = [
-          ...existingCounterOffers,
-          {
-            id: Date.now().toString(),
-            notes: notes || '',
-            created_at: new Date().toISOString(),
-            created_by: user?.id
-          }
-        ];
       }
 
       if (updatedBOMItems && updatedBOMItems.length > 0) {
@@ -206,7 +194,7 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
 
       toast({
         title: "Success",
-        description: `Quote ${action === 'approve' ? 'approved' : action === 'reject' ? 'rejected' : 'counter offered'} successfully`,
+        description: `Quote ${action === 'approve' ? 'approved' : 'rejected'} successfully`,
       });
 
       await refetch();
@@ -239,8 +227,6 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
         return <Badge className="bg-red-600 text-white">Rejected</Badge>;
       case 'pending_approval':
         return <Badge className="bg-yellow-600 text-white">Pending Approval</Badge>;
-      case 'counter_offered':
-        return <Badge className="bg-orange-600 text-white">Counter Offered</Badge>;
       default:
         return <Badge className="bg-gray-600 text-white">Unknown</Badge>;
     }
@@ -301,7 +287,6 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
             <option value="pending_approval">Pending Approval</option>
             <option value="approved">Approved</option>
             <option value="rejected">Rejected</option>
-            <option value="counter_offered">Counter Offered</option>
           </select>
         </div>
 
@@ -381,7 +366,6 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
                           quote={selectedQuote}
                           onApprove={(notes, updatedBOMItems) => handleQuoteAction(quote.id, 'approve', notes, updatedBOMItems)}
                           onReject={notes => handleQuoteAction(quote.id, 'reject', notes)}
-                          onCounterOffer={notes => handleQuoteAction(quote.id, 'counter_offer', notes)}
                           isLoading={actionLoading[quote.id] || false}
                           user={user}
                         />
@@ -460,7 +444,6 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
                           quote={selectedQuote}
                           onApprove={(notes, updatedBOMItems) => handleQuoteAction(quote.id, 'approve', notes, updatedBOMItems)}
                           onReject={notes => handleQuoteAction(quote.id, 'reject', notes)}
-                          onCounterOffer={notes => handleQuoteAction(quote.id, 'counter_offer', notes)}
                           isLoading={actionLoading[quote.id] || false}
                           user={user}
                         />
