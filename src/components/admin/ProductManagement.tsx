@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -316,12 +317,8 @@ export const ProductManagement = () => {
 
         <TabsContent value="level2" className="space-y-4">
           <div className="space-y-4">
-            {/* Show existing products first */}
-            <Level2ProductList 
-              products={level2Products}
-              level1Products={level1Products}
-              onProductUpdate={refreshProductData}
-            />
+            {/* Level2ProductList manages its own data internally, no props needed */}
+            <Level2ProductList />
             
             {/* Collapsible form for creating new products */}
             <Collapsible open={showLevel2Form} onOpenChange={setShowLevel2Form}>
