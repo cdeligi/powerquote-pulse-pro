@@ -6,6 +6,8 @@ export interface QuoteAnalytics {
     rejected: number;
     underAnalysis: number;
     totalQuotedValue: number;
+    avgMargin: number;
+    totalGrossProfit: number;
   };
   yearly: {
     executed: number;
@@ -13,6 +15,8 @@ export interface QuoteAnalytics {
     rejected: number;
     underAnalysis: number;
     totalQuotedValue: number;
+    avgMargin: number;
+    totalGrossProfit: number;
   };
 }
 
@@ -21,6 +25,8 @@ export interface QuoteData {
   status: 'draft' | 'pending_approval' | 'approved' | 'rejected' | 'finalized';
   total: number;
   createdAt: string;
+  margin: number;
+  grossProfit: number;
 }
 
 export const calculateQuoteAnalytics = (quotes: QuoteData[]): QuoteAnalytics => {
@@ -43,7 +49,9 @@ export const calculateQuoteAnalytics = (quotes: QuoteData[]): QuoteAnalytics => 
     approved: quoteSet.filter(q => q.status === 'approved').length,
     rejected: quoteSet.filter(q => q.status === 'rejected').length,
     underAnalysis: quoteSet.filter(q => ['draft', 'pending_approval'].includes(q.status)).length,
-    totalQuotedValue: quoteSet.reduce((sum, q) => sum + q.total, 0)
+    totalQuotedValue: quoteSet.reduce((sum, q) => sum + q.total, 0),
+    avgMargin: quoteSet.length > 0 ? quoteSet.reduce((sum, q) => sum + q.margin, 0) / quoteSet.length : 0,
+    totalGrossProfit: quoteSet.reduce((sum, q) => sum + q.grossProfit, 0)
   });
 
   return {
