@@ -61,11 +61,17 @@ const QuoteFieldsSection = ({ quoteFields, onFieldChange }: QuoteFieldsSectionPr
   const renderField = (field: QuoteField) => {
     const value = quoteFields[field.id] || '';
     const isRequired = field.required;
+    const hasError = isRequired && (!value || (typeof value === 'string' && value.trim() === ''));
 
     const commonProps = {
-      className: `bg-gray-700 border-gray-600 text-white ${isRequired ? 'border-red-500' : ''}`,
+      className: `bg-gray-700 border-gray-600 text-white transition-colors ${
+        hasError ? 'border-red-500 focus:border-red-400' : 'focus:border-blue-500'
+      }`,
       value,
-      onChange: (e: any) => onFieldChange(field.id, e.target?.value || e)
+      onChange: (e: any) => {
+        const newValue = e.target?.value || e;
+        onFieldChange(field.id, newValue);
+      }
     };
 
     switch (field.type) {
@@ -88,8 +94,13 @@ const QuoteFieldsSection = ({ quoteFields, onFieldChange }: QuoteFieldsSectionPr
 
       case 'select':
         return (
-          <Select value={value} onValueChange={(newValue) => onFieldChange(field.id, newValue)}>
-            <SelectTrigger className={`bg-gray-700 border-gray-600 text-white ${isRequired ? 'border-red-500' : ''}`}>
+          <Select 
+            value={value} 
+            onValueChange={(newValue) => onFieldChange(field.id, newValue)}
+          >
+            <SelectTrigger className={`bg-gray-700 border-gray-600 text-white transition-colors ${
+              hasError ? 'border-red-500 focus:border-red-400' : 'focus:border-blue-500'
+            }`}>
               <SelectValue placeholder={`Select ${field.label.toLowerCase()}...`} />
             </SelectTrigger>
             <SelectContent className="bg-gray-700 border-gray-600">
