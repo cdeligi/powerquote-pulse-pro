@@ -1,177 +1,140 @@
-import { useState, useEffect } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Textarea } from "@/components/ui/textarea";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { 
-  Plus, 
-  Edit2, 
-  Trash2, 
-  Eye,
-  EyeOff,
-  AlertCircle,
-  Loader2,
-  Shield
-} from "lucide-react";
-import { User } from "@/types/auth";
-import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
+
+import { useState, useEffect } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { toast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
+import { Plus, Edit, Trash2, Save, X, Settings, List, ArrowUp, ArrowDown } from 'lucide-react';
 
 interface QuoteField {
   id: string;
   label: string;
-  type: 'text' | 'textarea' | 'number' | 'select' | 'date' | 'email' | 'tel';
+  type: string;
   required: boolean;
   enabled: boolean;
   options?: string[];
-  display_order: number;
+  display_order?: number;
+  created_at: string;
+  updated_at: string;
 }
 
-interface QuoteFieldConfigurationProps {
-  user: User;
-}
-
-const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
-  const [quoteFields, setQuoteFields] = useState<QuoteField[]>([]);
+const QuoteFieldConfiguration = () => {
+  const [fields, setFields] = useState<QuoteField[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingField, setEditingField] = useState<QuoteField | null>(null);
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [authLoading, setAuthLoading] = useState(true);
-  const { toast } = useToast();
+  const [showNewField, setShowNewField] = useState(false);
+  const [activeTab, setActiveTab] = useState('overview');
+
+  const [newField, setNewField] = useState({
+    id: '',
+    label: '',
+    type: 'text',
+    required: false,
+    enabled: true,
+    options: [] as string[],
+    display_order: 0
+  });
 
   useEffect(() => {
-    checkAuthAndRole();
-    fetchQuoteFields();
+    fetchFields();
   }, []);
 
-  const checkAuthAndRole = async () => {
+  const fetchFields = async () => {
+    setLoading(true);
     try {
-      setAuthLoading(true);
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (session?.user) {
-        setIsAuthenticated(true);
-        
-        // Check if user is admin
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('role')
-          .eq('id', session.user.id)
-          .single();
-        
-        setIsAdmin(profile?.role === 'admin');
-      }
-    } catch (error) {
-      console.error('Error checking auth:', error);
-    } finally {
-      setAuthLoading(false);
-    }
-  };
-
-  const fetchQuoteFields = async () => {
-    try {
-      setLoading(true);
       const { data, error } = await supabase
         .from('quote_fields')
         .select('*')
-        .order('display_order');
+        .order('display_order', { ascending: true });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching quote fields:', error);
+        toast({
+          title: "Error",
+          description: "Failed to fetch quote fields",
+          variant: "destructive",
+        });
+        return;
+      }
 
-      const fields = data.map(field => ({
-        id: field.id,
-        label: field.label,
-        type: field.type as QuoteField['type'],
-        required: field.required || false,
-        enabled: field.enabled || true,
-        options: field.options ? (Array.isArray(field.options) ? field.options : JSON.parse(field.options)) : undefined,
-        display_order: field.display_order || 0
-      }));
-
-      setQuoteFields(fields);
+      setFields(data || []);
     } catch (error) {
-      console.error('Error fetching quote fields:', error);
-      toast({
-        title: "Error",
-        description: "Failed to load quote fields",
-        variant: "destructive"
-      });
+      console.error('Unexpected error:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  const createQuoteField = async (fieldData: Omit<QuoteField, 'id'>) => {
+  const handleSaveField = async (field: Partial<QuoteField>, isNew: boolean = false) => {
     try {
-      const { error } = await supabase
-        .from('quote_fields')
-        .insert({
-          id: `field-${Date.now()}`,
-          label: fieldData.label,
-          type: fieldData.type,
-          required: fieldData.required,
-          enabled: fieldData.enabled,
-          options: fieldData.options ? JSON.stringify(fieldData.options) : null,
-          display_order: fieldData.display_order
+      if (isNew) {
+        const fieldId = `field-${Date.now()}`;
+        const { error } = await supabase
+          .from('quote_fields')
+          .insert({
+            id: fieldId,
+            label: field.label,
+            type: field.type,
+            required: field.required || false,
+            enabled: field.enabled || true,
+            options: field.options || null,
+            display_order: fields.length
+          });
+
+        if (error) throw error;
+        
+        setShowNewField(false);
+        setNewField({
+          id: '',
+          label: '',
+          type: 'text',
+          required: false,
+          enabled: true,
+          options: [],
+          display_order: 0
         });
+      } else {
+        const { error } = await supabase
+          .from('quote_fields')
+          .update({
+            label: field.label,
+            type: field.type,
+            required: field.required,
+            enabled: field.enabled,
+            options: field.options || null,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', field.id);
 
-      if (error) throw error;
+        if (error) throw error;
+        setEditingField(null);
+      }
 
-      await fetchQuoteFields();
       toast({
         title: "Success",
-        description: "Quote field created successfully"
+        description: `Quote field ${isNew ? 'created' : 'updated'} successfully`,
       });
-    } catch (error) {
-      console.error('Error creating quote field:', error);
+
+      fetchFields();
+    } catch (error: any) {
+      console.error('Save error:', error);
       toast({
         title: "Error",
-        description: error.message || "Failed to create quote field",
-        variant: "destructive"
+        description: error.message || `Failed to ${isNew ? 'create' : 'update'} quote field`,
+        variant: "destructive",
       });
     }
   };
 
-  const updateQuoteField = async (fieldId: string, fieldData: Omit<QuoteField, 'id'>) => {
-    try {
-      const { error } = await supabase
-        .from('quote_fields')
-        .update({
-          label: fieldData.label,
-          type: fieldData.type,
-          required: fieldData.required,
-          enabled: fieldData.enabled,
-          options: fieldData.options ? JSON.stringify(fieldData.options) : null,
-          display_order: fieldData.display_order
-        })
-        .eq('id', fieldId);
+  const handleDeleteField = async (fieldId: string) => {
+    if (!confirm('Are you sure you want to delete this field?')) return;
 
-      if (error) throw error;
-
-      await fetchQuoteFields();
-      toast({
-        title: "Success",
-        description: "Quote field updated successfully"
-      });
-    } catch (error) {
-      console.error('Error updating quote field:', error);
-      toast({
-        title: "Error",
-        description: error.message || "Failed to update quote field",
-        variant: "destructive"
-      });
-    }
-  };
-
-  const deleteQuoteField = async (fieldId: string) => {
     try {
       const { error } = await supabase
         .from('quote_fields')
@@ -180,399 +143,333 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
 
       if (error) throw error;
 
-      await fetchQuoteFields();
       toast({
         title: "Success",
-        description: "Quote field deleted successfully"
+        description: "Quote field deleted successfully",
       });
-    } catch (error) {
-      console.error('Error deleting quote field:', error);
+
+      fetchFields();
+    } catch (error: any) {
+      console.error('Delete error:', error);
       toast({
         title: "Error",
         description: error.message || "Failed to delete quote field",
-        variant: "destructive"
+        variant: "destructive",
       });
     }
   };
 
-  const toggleFieldEnabled = async (fieldId: string) => {
-    const field = quoteFields.find(f => f.id === fieldId);
-    if (!field) return;
+  const handleMoveField = async (fieldId: string, direction: 'up' | 'down') => {
+    const currentIndex = fields.findIndex(f => f.id === fieldId);
+    if (currentIndex === -1) return;
+
+    const newIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
+    if (newIndex < 0 || newIndex >= fields.length) return;
+
+    const updatedFields = [...fields];
+    [updatedFields[currentIndex], updatedFields[newIndex]] = [updatedFields[newIndex], updatedFields[currentIndex]];
 
     try {
-      const { error } = await supabase
-        .from('quote_fields')
-        .update({ enabled: !field.enabled })
-        .eq('id', fieldId);
+      const updates = updatedFields.map((field, index) => ({
+        id: field.id,
+        display_order: index
+      }));
 
-      if (error) throw error;
+      for (const update of updates) {
+        await supabase
+          .from('quote_fields')
+          .update({ display_order: update.display_order })
+          .eq('id', update.id);
+      }
 
-      await fetchQuoteFields();
-    } catch (error) {
-      console.error('Error toggling field:', error);
+      fetchFields();
+    } catch (error: any) {
+      console.error('Reorder error:', error);
       toast({
         title: "Error",
-        description: error.message || "Failed to toggle field status",
-        variant: "destructive"
+        description: "Failed to reorder fields",
+        variant: "destructive",
       });
     }
   };
 
-  const handleCreateField = async (fieldData: Omit<QuoteField, 'id'>) => {
-    await createQuoteField(fieldData);
-    setDialogOpen(false);
-    setEditingField(null);
-  };
+  const FieldEditor = ({ field, isNew = false }: { field: any, isNew?: boolean }) => {
+    const [localField, setLocalField] = useState(field);
+    const [optionsText, setOptionsText] = useState(
+      field.options ? field.options.join('\n') : ''
+    );
 
-  const handleUpdateField = async (fieldData: Omit<QuoteField, 'id'>) => {
-    if (!editingField) return;
-    await updateQuoteField(editingField.id, fieldData);
-    setDialogOpen(false);
-    setEditingField(null);
-  };
+    const handleSave = () => {
+      const options = field.type === 'select' && optionsText.trim() 
+        ? optionsText.split('\n').filter(opt => opt.trim()) 
+        : [];
+      
+      handleSaveField({ ...localField, options }, isNew);
+    };
 
-  const handleDeleteField = async (fieldId: string) => {
-    await deleteQuoteField(fieldId);
-  };
-
-  const openEditDialog = (field: QuoteField) => {
-    setEditingField(field);
-    setDialogOpen(true);
-  };
-
-  const openCreateDialog = () => {
-    setEditingField(null);
-    setDialogOpen(true);
-  };
-
-  if (authLoading || loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin text-white" />
-        <span className="ml-2 text-white">Loading...</span>
+      <div className="space-y-4 p-4 bg-gray-800 rounded border border-gray-700">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <Label className="text-white">Field Label *</Label>
+            <Input
+              value={localField.label}
+              onChange={(e) => setLocalField(prev => ({ ...prev, label: e.target.value }))}
+              className="bg-gray-700 border-gray-600 text-white"
+              placeholder="Enter field label"
+            />
+          </div>
+          <div>
+            <Label className="text-white">Field Type</Label>
+            <Select 
+              value={localField.type} 
+              onValueChange={(value) => setLocalField(prev => ({ ...prev, type: value }))}
+            >
+              <SelectTrigger className="bg-gray-700 border-gray-600 text-white">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className="bg-gray-700 border-gray-600">
+                <SelectItem value="text">Text</SelectItem>
+                <SelectItem value="textarea">Textarea</SelectItem>
+                <SelectItem value="select">Select</SelectItem>
+                <SelectItem value="number">Number</SelectItem>
+                <SelectItem value="checkbox">Checkbox</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        {localField.type === 'select' && (
+          <div>
+            <Label className="text-white">Options (one per line)</Label>
+            <textarea
+              value={optionsText}
+              onChange={(e) => setOptionsText(e.target.value)}
+              className="w-full h-24 p-2 bg-gray-700 border border-gray-600 text-white rounded"
+              placeholder="Option 1&#10;Option 2&#10;Option 3"
+            />
+          </div>
+        )}
+
+        <div className="flex items-center space-x-6">
+          <div className="flex items-center space-x-2">
+            <Checkbox
+              checked={localField.required}
+              onCheckedChange={(checked) => setLocalField(prev => ({ ...prev, required: !!checked }))}
+            />
+            <Label className="text-white">Required</Label>
+          </div>
+          <div className="flex items-center space-x-2">
+            <Checkbox
+              checked={localField.enabled}
+              onCheckedChange={(checked) => setLocalField(prev => ({ ...prev, enabled: !!checked }))}
+            />
+            <Label className="text-white">Enabled</Label>
+          </div>
+        </div>
+
+        <div className="flex space-x-2">
+          <Button onClick={handleSave} className="bg-green-600 hover:bg-green-700 text-white">
+            <Save className="mr-2 h-4 w-4" />
+            {isNew ? 'Create Field' : 'Save Changes'}
+          </Button>
+          <Button 
+            onClick={() => {
+              if (isNew) {
+                setShowNewField(false);
+              } else {
+                setEditingField(null);
+              }
+            }}
+            variant="outline"
+            className="border-gray-600 text-gray-300 hover:bg-gray-800"
+          >
+            <X className="mr-2 h-4 w-4" />
+            Cancel
+          </Button>
+        </div>
       </div>
     );
-  }
-
-  if (!isAuthenticated) {
-    return (
-      <div className="space-y-6">
-        <Alert className="bg-red-900/20 border-red-600">
-          <Shield className="h-4 w-4" />
-          <AlertDescription className="text-red-400">
-            You must be logged in to manage quote fields. Please sign in to continue.
-          </AlertDescription>
-        </Alert>
-      </div>
-    );
-  }
-
-  if (!isAdmin) {
-    return (
-      <div className="space-y-6">
-        <Alert className="bg-orange-900/20 border-orange-600">
-          <Shield className="h-4 w-4" />
-          <AlertDescription className="text-orange-400">
-            You need administrator privileges to manage quote fields. Contact your system administrator for access.
-          </AlertDescription>
-        </Alert>
-        
-        {/* Show read-only view for non-admins */}
-        <Card className="bg-gray-900 border-gray-800">
-          <CardHeader>
-            <CardTitle className="text-white">Current Quote Fields (Read-Only)</CardTitle>
-            <CardDescription className="text-gray-400">
-              These are the fields currently configured for quote requests
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              {quoteFields.map((field) => (
-                <div key={field.id} className="flex justify-between items-center p-2 bg-gray-800 rounded">
-                  <div>
-                    <span className="text-white">{field.label}</span>
-                    <span className="text-gray-400 ml-2 text-sm">({field.type})</span>
-                  </div>
-                  <div className="flex space-x-2">
-                    {field.required && (
-                      <Badge variant="outline" className="text-xs border-red-500 text-red-400">
-                        Required
-                      </Badge>
-                    )}
-                    <Badge 
-                      variant="outline" 
-                      className={`text-xs ${
-                        field.enabled 
-                          ? "border-green-500 text-green-400" 
-                          : "border-gray-500 text-gray-400"
-                      }`}
-                    >
-                      {field.enabled ? "Enabled" : "Disabled"}
-                    </Badge>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
+  };
 
   return (
-    <div className="space-y-6">
+    <div className="w-full max-w-none p-6 space-y-6 bg-gray-950 min-h-screen">
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-2xl font-bold text-white">Quote Field Configuration</h2>
-          <p className="text-gray-400">Configure and manage quote request form fields for the BOM Builder</p>
+          <h1 className="text-3xl font-semibold text-white mb-2">Quote Field Configuration</h1>
+          <p className="text-gray-400">Configure custom fields for quote requests</p>
         </div>
-        <Button 
-          className="bg-red-600 hover:bg-red-700"
-          onClick={openCreateDialog}
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          Add Field
+        <Button onClick={fetchFields} disabled={loading} className="bg-blue-600 hover:bg-blue-700 text-white">
+          <Settings className="mr-2 h-4 w-4" />
+          {loading ? "Loading..." : "Refresh"}
         </Button>
       </div>
 
-      {/* Fields Grid */}
-      <div className="grid gap-4">
-        {quoteFields.map((field) => (
-          <Card key={field.id} className="bg-gray-900 border-gray-800">
-            <CardHeader>
-              <div className="flex justify-between items-start">
-                <div className="flex-1">
-                  <div className="flex items-center space-x-3">
-                    <CardTitle className="text-white">{field.label}</CardTitle>
-                    <Badge variant="outline" className="text-xs capitalize">
-                      {field.type}
-                    </Badge>
-                    {field.required && (
-                      <Badge variant="outline" className="text-xs border-red-500 text-red-400">
-                        <AlertCircle className="h-3 w-3 mr-1" />
-                        Required
-                      </Badge>
-                    )}
-                    <Badge 
-                      variant="outline" 
-                      className={`text-xs ${
-                        field.enabled 
-                          ? "border-green-500 text-green-400" 
-                          : "border-gray-500 text-gray-400"
-                      }`}
-                    >
-                      {field.enabled ? (
-                        <>
-                          <Eye className="h-3 w-3 mr-1" />
-                          Enabled
-                        </>
-                      ) : (
-                        <>
-                          <EyeOff className="h-3 w-3 mr-1" />
-                          Disabled
-                        </>
-                      )}
-                    </Badge>
-                  </div>
-                  <CardDescription className="text-gray-400 mt-2">
-                    Field ID: <code className="text-xs bg-gray-800 px-1 rounded">{field.id}</code>
-                  </CardDescription>
-                </div>
-                <div className="flex space-x-2">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => toggleFieldEnabled(field.id)}
-                    className={field.enabled ? "text-orange-400 hover:text-orange-300" : "text-green-400 hover:text-green-300"}
-                  >
-                    {field.enabled ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </Button>
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    className="text-blue-400 hover:text-blue-300"
-                    onClick={() => openEditDialog(field)}
-                  >
-                    <Edit2 className="h-4 w-4" />
-                  </Button>
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    className="text-red-400 hover:text-red-300"
-                    onClick={() => handleDeleteField(field.id)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                <div>
-                  <p className="text-gray-400">Order</p>
-                  <p className="text-white font-medium">{field.display_order}</p>
-                </div>
-                {field.options && (
-                  <div className="col-span-3">
-                    <p className="text-gray-400">Options</p>
-                    <div className="flex flex-wrap gap-1 mt-1">
-                      {field.options.map((option, index) => (
-                        <Badge key={index} variant="outline" className="text-xs">
-                          {option}
-                        </Badge>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="w-full justify-start bg-gray-800 border-gray-700">
+          <TabsTrigger value="overview" className="text-white data-[state=active]:bg-blue-600">
+            <List className="mr-2 h-4 w-4" />
+            Field Overview ({fields.length})
+          </TabsTrigger>
+          <TabsTrigger value="manage" className="text-white data-[state=active]:bg-blue-600">
+            <Settings className="mr-2 h-4 w-4" />
+            Manage Fields
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="overview" className="space-y-4">
+          {loading ? (
+            <Card className="bg-gray-900 border-gray-800">
+              <CardContent className="p-8 text-center">
+                <div className="text-white">Loading fields...</div>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card className="bg-gray-900 border-gray-800">
+              <CardHeader>
+                <CardTitle className="text-white">Quick Field Overview</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b border-gray-700">
+                        <th className="text-left text-gray-400 pb-2 text-sm">#</th>
+                        <th className="text-left text-gray-400 pb-2 text-sm">Label</th>
+                        <th className="text-left text-gray-400 pb-2 text-sm">Type</th>
+                        <th className="text-left text-gray-400 pb-2 text-sm">Status</th>
+                        <th className="text-left text-gray-400 pb-2 text-sm">Required</th>
+                        <th className="text-left text-gray-400 pb-2 text-sm">Options</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {fields.map((field, index) => (
+                        <tr key={field.id} className="border-b border-gray-800 hover:bg-gray-800/50">
+                          <td className="py-2 text-gray-300 text-sm">{index + 1}</td>
+                          <td className="py-2 text-white text-sm font-medium">{field.label}</td>
+                          <td className="py-2 text-gray-300 text-sm">
+                            <Badge variant="outline" className="text-xs">
+                              {field.type}
+                            </Badge>
+                          </td>
+                          <td className="py-2 text-sm">
+                            <Badge className={field.enabled ? 'bg-green-600' : 'bg-red-600'}>
+                              {field.enabled ? 'Enabled' : 'Disabled'}
+                            </Badge>
+                          </td>
+                          <td className="py-2 text-sm">
+                            {field.required ? (
+                              <Badge className="bg-orange-600">Required</Badge>
+                            ) : (
+                              <span className="text-gray-400">Optional</span>
+                            )}
+                          </td>
+                          <td className="py-2 text-gray-300 text-sm">
+                            {field.options ? `${field.options.length} options` : '-'}
+                          </td>
+                        </tr>
                       ))}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+
+        <TabsContent value="manage" className="space-y-4">
+          <div className="flex justify-between items-center">
+            <h2 className="text-xl text-white">Manage Fields</h2>
+            <Button
+              onClick={() => setShowNewField(true)}
+              className="bg-green-600 hover:bg-green-700 text-white"
+            >
+              <Plus className="mr-2 h-4 w-4" />
+              Add New Field
+            </Button>
+          </div>
+
+          {showNewField && (
+            <Card className="bg-gray-900 border-gray-800">
+              <CardHeader>
+                <CardTitle className="text-white">Create New Field</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <FieldEditor field={newField} isNew={true} />
+              </CardContent>
+            </Card>
+          )}
+
+          <div className="space-y-3">
+            {fields.map((field, index) => (
+              <Card key={field.id} className="bg-gray-900 border-gray-800">
+                <CardContent className="p-4">
+                  {editingField?.id === field.id ? (
+                    <FieldEditor field={editingField} />
+                  ) : (
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-4">
+                        <div className="text-gray-400 text-sm w-8">#{index + 1}</div>
+                        <div>
+                          <h3 className="text-white font-medium">{field.label}</h3>
+                          <div className="flex items-center space-x-2 mt-1">
+                            <Badge variant="outline" className="text-xs">
+                              {field.type}
+                            </Badge>
+                            <Badge className={field.enabled ? 'bg-green-600' : 'bg-red-600'}>
+                              {field.enabled ? 'Enabled' : 'Disabled'}
+                            </Badge>
+                            {field.required && (
+                              <Badge className="bg-orange-600">Required</Badge>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Button
+                          onClick={() => handleMoveField(field.id, 'up')}
+                          disabled={index === 0}
+                          size="sm"
+                          variant="ghost"
+                          className="text-gray-400 hover:text-white"
+                        >
+                          <ArrowUp className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          onClick={() => handleMoveField(field.id, 'down')}
+                          disabled={index === fields.length - 1}
+                          size="sm"
+                          variant="ghost"
+                          className="text-gray-400 hover:text-white"
+                        >
+                          <ArrowDown className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          onClick={() => setEditingField(field)}
+                          size="sm"
+                          variant="ghost"
+                          className="text-blue-400 hover:text-blue-300"
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          onClick={() => handleDeleteField(field.id)}
+                          size="sm"
+                          variant="ghost"
+                          className="text-red-400 hover:text-red-300"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      {/* Create/Edit Dialog */}
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="bg-gray-900 border-gray-800 max-w-2xl">
-          <DialogHeader>
-            <DialogTitle className="text-white">
-              {editingField ? 'Edit' : 'Create'} Quote Field
-            </DialogTitle>
-          </DialogHeader>
-          
-          <QuoteFieldForm
-            onSubmit={editingField ? handleUpdateField : handleCreateField}
-            initialData={editingField}
-            onCancel={() => setDialogOpen(false)}
-          />
-        </DialogContent>
-      </Dialog>
+                  )}
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </TabsContent>
+      </Tabs>
     </div>
-  );
-};
-
-interface QuoteFieldFormProps {
-  onSubmit: (fieldData: Omit<QuoteField, 'id'>) => void;
-  initialData?: QuoteField | null;
-  onCancel: () => void;
-}
-
-const QuoteFieldForm = ({ onSubmit, initialData, onCancel }: QuoteFieldFormProps) => {
-  const [formData, setFormData] = useState<Omit<QuoteField, 'id'>>({
-    label: initialData?.label || '',
-    type: initialData?.type || 'text',
-    required: initialData?.required ?? false,
-    enabled: initialData?.enabled ?? true,
-    options: initialData?.options || [],
-    display_order: initialData?.display_order || 1
-  });
-
-  const [optionsText, setOptionsText] = useState(
-    initialData?.options?.join('\n') || ''
-  );
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const finalData = {
-      ...formData,
-      options: formData.type === 'select' ? optionsText.split('\n').filter(o => o.trim()) : undefined
-    };
-    onSubmit(finalData);
-  };
-
-  return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <Label htmlFor="label" className="text-white">Field Label</Label>
-          <Input
-            id="label"
-            value={formData.label}
-            onChange={(e) => setFormData({ ...formData, label: e.target.value })}
-            className="bg-gray-800 border-gray-700 text-white"
-            required
-          />
-        </div>
-        <div>
-          <Label htmlFor="type" className="text-white">Field Type</Label>
-          <Select
-            value={formData.type}
-            onValueChange={(value: QuoteField['type']) => setFormData({ ...formData, type: value })}
-          >
-            <SelectTrigger className="bg-gray-800 border-gray-700 text-white">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent className="bg-gray-800 border-gray-700">
-              <SelectItem value="text" className="text-white">Text</SelectItem>
-              <SelectItem value="textarea" className="text-white">Textarea</SelectItem>
-              <SelectItem value="number" className="text-white">Number</SelectItem>
-              <SelectItem value="select" className="text-white">Select</SelectItem>
-              <SelectItem value="date" className="text-white">Date</SelectItem>
-              <SelectItem value="email" className="text-white">Email</SelectItem>
-              <SelectItem value="tel" className="text-white">Phone</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-
-      <div>
-        <Label htmlFor="order" className="text-white">Display Order</Label>
-        <Input
-          id="order"
-          type="number"
-          value={formData.display_order}
-          onChange={(e) => setFormData({ ...formData, display_order: parseInt(e.target.value) })}
-          className="bg-gray-800 border-gray-700 text-white"
-          min="1"
-        />
-      </div>
-
-      {formData.type === 'select' && (
-        <div>
-          <Label htmlFor="options" className="text-white">Options (one per line)</Label>
-          <Textarea
-            id="options"
-            value={optionsText}
-            onChange={(e) => setOptionsText(e.target.value)}
-            className="bg-gray-800 border-gray-700 text-white"
-            rows={4}
-            placeholder="Option 1&#10;Option 2&#10;Option 3"
-          />
-        </div>
-      )}
-
-      <div className="flex items-center space-x-4">
-        <div className="flex items-center space-x-2">
-          <Switch
-            id="required"
-            checked={formData.required}
-            onCheckedChange={(required) => setFormData({ ...formData, required })}
-          />
-          <Label htmlFor="required" className="text-white">Required Field</Label>
-        </div>
-        <div className="flex items-center space-x-2">
-          <Switch
-            id="enabled"
-            checked={formData.enabled}
-            onCheckedChange={(enabled) => setFormData({ ...formData, enabled })}
-          />
-          <Label htmlFor="enabled" className="text-white">Enabled</Label>
-        </div>
-      </div>
-
-      <div className="flex justify-end space-x-3 pt-4">
-        <Button 
-          type="button" 
-          variant="outline" 
-          onClick={onCancel}
-          className="border-gray-600 text-gray-300 hover:bg-gray-800"
-        >
-          Cancel
-        </Button>
-        <Button type="submit" className="bg-red-600 hover:bg-red-700">
-          {initialData ? 'Update' : 'Create'} Field
-        </Button>
-      </div>
-    </form>
   );
 };
 
