@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Settings, Users, Package, BarChart3, FileText, Database, UserPlus } from 'lucide-react';
 import UserManagementEnhanced from './UserManagementEnhanced';
-import ProductManagement from './ProductManagement';
+import { ProductManagement } from './ProductManagement';
 import QuoteApprovalDashboard from './QuoteApprovalDashboard';
 import MarginDashboard from './MarginDashboard';
 import QuoteFieldConfiguration from './QuoteFieldConfiguration';
@@ -79,7 +79,7 @@ const AdminPanel = ({ user }: AdminPanelProps) => {
           </TabsContent>
 
           <TabsContent value="margins" className="m-0">
-            <MarginDashboard />
+            <MarginDashboard bomItems={[]} user={user} />
           </TabsContent>
 
           <TabsContent value="quote-fields" className="m-0">

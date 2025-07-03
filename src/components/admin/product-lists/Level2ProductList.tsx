@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -81,16 +80,14 @@ const Level2ProductList = () => {
           .insert({
             id: product.id,
             name: product.name,
-            description: product.description,
+            description: product.productInfoUrl ? 
+              `${product.description || ''}\n\nProduct Info: ${product.productInfoUrl}`.trim() : 
+              product.description,
             price: product.price,
             cost: product.cost,
             category: 'Level2',
             subcategory: product.subcategory,
-            is_active: true,
-            // Store productInfoUrl in description field for now
-            description: product.productInfoUrl ? 
-              `${product.description || ''}\n\nProduct Info: ${product.productInfoUrl}`.trim() : 
-              product.description
+            is_active: true
           });
 
         if (error) throw error;
