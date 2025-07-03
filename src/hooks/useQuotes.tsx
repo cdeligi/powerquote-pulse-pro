@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -130,6 +131,49 @@ export const useQuotes = () => {
     }
   };
 
+  const getMarginThresholds = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('margin_thresholds')
+        .select('*')
+        .order('minimum_margin_percent', { ascending: true });
+
+      if (error) throw error;
+      return data || [];
+    } catch (err) {
+      console.error('Failed to fetch margin thresholds:', err);
+      return [];
+    }
+  };
+
+  const checkMarginApprovalRequired = async (discountedMargin: number, userRole: string) => {
+    const thresholds = await getMarginThresholds();
+    
+    // Find the applicable threshold
+    const applicableThreshold = thresholds.find(t => discountedMargin < t.minimum_margin_percent);
+    
+    if (!applicableThreshold) return { canApprove: true, requiresFinance: false };
+    
+    // Admin can approve up to 25% margin
+    const adminThreshold = 25;
+    
+    if (discountedMargin < adminThreshold && userRole === 'admin') {
+      return { canApprove: true, requiresFinance: false };
+    }
+    
+    // Finance required for margins below admin threshold
+    if (discountedMargin < adminThreshold && userRole !== 'finance') {
+      return { canApprove: false, requiresFinance: true };
+    }
+    
+    // Finance can approve anything
+    if (userRole === 'finance') {
+      return { canApprove: true, requiresFinance: false };
+    }
+    
+    return { canApprove: false, requiresFinance: true };
+  };
+
   const updateQuoteStatus = async (
     quoteId: string, 
     status: Quote['status'], 
@@ -140,10 +184,42 @@ export const useQuotes = () => {
     console.log(`Updating quote ${quoteId} status to ${status}`);
     
     try {
+      const { data: currentUser } = await supabase.auth.getUser();
+      const { data: userProfile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', currentUser.user?.id)
+        .single();
+
+      // Check margin requirements before approval
+      if (status === 'approved') {
+        const { data: quoteData } = await supabase
+          .from('quotes')
+          .select('discounted_margin')
+          .eq('id', quoteId)
+          .single();
+
+        if (quoteData) {
+          const { canApprove, requiresFinance } = await checkMarginApprovalRequired(
+            quoteData.discounted_margin, 
+            userProfile?.role || 'level1'
+          );
+
+          if (!canApprove && requiresFinance) {
+            toast({
+              title: "Approval Restricted",
+              description: "This quote requires Finance approval due to low margin",
+              variant: "destructive"
+            });
+            return;
+          }
+        }
+      }
+
       const updateData: any = {
         status,
         reviewed_at: new Date().toISOString(),
-        reviewed_by: (await supabase.auth.getUser()).data.user?.id
+        reviewed_by: currentUser.user?.id
       };
 
       if (approvedDiscount !== undefined) {
@@ -238,6 +314,9 @@ export const useQuotes = () => {
 
       if (updateError) throw updateError;
 
+      // Recalculate quote totals
+      await recalculateQuoteTotals(currentItem.quote_id);
+
       console.log(`Successfully updated BOM item ${bomItemId} price`);
       
       toast({
@@ -255,6 +334,36 @@ export const useQuotes = () => {
     }
   };
 
+  const recalculateQuoteTotals = async (quoteId: string) => {
+    try {
+      const { data: bomItems } = await supabase
+        .from('bom_items')
+        .select('*')
+        .eq('quote_id', quoteId);
+
+      if (!bomItems) return;
+
+      const totalCost = bomItems.reduce((sum, item) => sum + item.total_cost, 0);
+      const totalPrice = bomItems.reduce((sum, item) => sum + item.total_price, 0);
+      const grossProfit = totalPrice - totalCost;
+      const margin = totalPrice > 0 ? (grossProfit / totalPrice) * 100 : 0;
+
+      await supabase
+        .from('quotes')
+        .update({
+          total_cost: totalCost,
+          discounted_value: totalPrice,
+          gross_profit: grossProfit,
+          discounted_margin: margin,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', quoteId);
+
+    } catch (err) {
+      console.error('Failed to recalculate quote totals:', err);
+    }
+  };
+
   useEffect(() => {
     fetchQuotes();
   }, []);
@@ -266,6 +375,8 @@ export const useQuotes = () => {
     fetchQuotes,
     fetchBOMItems,
     updateQuoteStatus,
-    updateBOMItemPrice
+    updateBOMItemPrice,
+    getMarginThresholds,
+    checkMarginApprovalRequired
   };
 };

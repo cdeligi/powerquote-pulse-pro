@@ -178,13 +178,13 @@ export const ProductManagement = () => {
 
   if (isLoading) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-6 bg-gray-950 text-white min-h-screen p-6">
         <div className="flex justify-between items-center">
           <div>
-            <h2 className="text-3xl font-bold tracking-tight">Product Management</h2>
-            <p className="text-muted-foreground">Loading product data...</p>
+            <h2 className="text-3xl font-bold tracking-tight text-white">Product Management</h2>
+            <p className="text-gray-400">Loading product data...</p>
           </div>
-          <Button onClick={handleResetData} variant="outline">
+          <Button onClick={handleResetData} variant="outline" className="border-gray-600 text-white hover:bg-gray-800">
             <RefreshCw className="h-4 w-4 mr-2" />
             Reset Data
           </Button>
@@ -192,7 +192,7 @@ export const ProductManagement = () => {
         <div className="flex items-center justify-center py-12">
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600 mx-auto mb-4"></div>
-            <p className="text-gray-600">Initializing product management...</p>
+            <p className="text-gray-400">Initializing product management...</p>
           </div>
         </div>
       </div>
@@ -201,40 +201,40 @@ export const ProductManagement = () => {
 
   if (error) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-6 bg-gray-950 text-white min-h-screen p-6">
         <div className="flex justify-between items-center">
           <div>
-            <h2 className="text-3xl font-bold tracking-tight">Product Management</h2>
-            <p className="text-red-600 flex items-center">
+            <h2 className="text-3xl font-bold tracking-tight text-white">Product Management</h2>
+            <p className="text-red-400 flex items-center">
               <AlertCircle className="h-4 w-4 mr-2" />
               {error}
             </p>
           </div>
           <div className="flex gap-2">
-            <Button onClick={handleResetData} variant="outline">
+            <Button onClick={handleResetData} variant="outline" className="border-gray-600 text-white hover:bg-gray-800">
               <RefreshCw className="h-4 w-4 mr-2" />
               Reset Data
             </Button>
-            <Button onClick={refreshProductData} variant="default">
+            <Button onClick={refreshProductData} className="bg-red-600 hover:bg-red-700">
               <RefreshCw className="h-4 w-4 mr-2" />
               Retry
             </Button>
           </div>
         </div>
-        <Card>
+        <Card className="bg-gray-900 border-gray-800">
           <CardContent className="pt-6">
             <div className="text-center py-8">
               <AlertCircle className="h-12 w-12 mx-auto text-red-500 mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">Failed to Load Product Data</h3>
-              <p className="text-gray-600 mb-4">
+              <h3 className="text-lg font-medium text-white mb-2">Failed to Load Product Data</h3>
+              <p className="text-gray-400 mb-4">
                 There was an error loading the product data. You can try to reset the data or retry loading.
               </p>
               <div className="flex justify-center gap-2">
-                <Button onClick={refreshProductData} variant="default">
+                <Button onClick={refreshProductData} className="bg-red-600 hover:bg-red-700">
                   <RefreshCw className="h-4 w-4 mr-2" />
                   Retry Loading
                 </Button>
-                <Button onClick={handleResetData} variant="outline">
+                <Button onClick={handleResetData} variant="outline" className="border-gray-600 text-gray-300 hover:bg-gray-800">
                   Reset to Defaults
                 </Button>
               </div>
@@ -246,14 +246,14 @@ export const ProductManagement = () => {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 bg-gray-950 text-white min-h-screen p-6">
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight">Product Management</h2>
-          <p className="text-muted-foreground">
+          <h2 className="text-3xl font-bold tracking-tight text-white">Product Management</h2>
+          <p className="text-gray-400">
             Manage your product hierarchy and configurations across all levels.
           </p>
-          <div className="mt-2 text-sm text-gray-600 flex items-center gap-4">
+          <div className="mt-2 text-sm text-gray-400 flex items-center gap-4">
             <span>Level 1: {level1Products.length} products</span>
             <span>Level 2: {level2Products.length} products</span>
             <span>Level 3: {level3Products.length} products</span>
@@ -261,25 +261,25 @@ export const ProductManagement = () => {
               onClick={refreshProductData} 
               variant="ghost" 
               size="sm"
-              className="h-6 px-2 text-xs"
+              className="h-6 px-2 text-xs text-gray-400 hover:text-white hover:bg-gray-800"
             >
               <RefreshCw className="h-3 w-3 mr-1" />
               Refresh
             </Button>
           </div>
         </div>
-        <Button onClick={handleResetData} variant="outline">
+        <Button onClick={handleResetData} variant="outline" className="border-gray-600 text-white hover:bg-gray-800">
           <RefreshCw className="h-4 w-4 mr-2" />
           Reset Data
         </Button>
       </div>
 
       <Tabs defaultValue="level1" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="level1">Level 1 Products</TabsTrigger>
-          <TabsTrigger value="level2">Level 2 Products</TabsTrigger>
-          <TabsTrigger value="level3">Level 3 Products</TabsTrigger>
-          <TabsTrigger value="level4">Level 4 Configuration</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-4 bg-gray-800 border-gray-700">
+          <TabsTrigger value="level1" className="text-white data-[state=active]:bg-red-600">Level 1 Products</TabsTrigger>
+          <TabsTrigger value="level2" className="text-white data-[state=active]:bg-red-600">Level 2 Products</TabsTrigger>
+          <TabsTrigger value="level3" className="text-white data-[state=active]:bg-red-600">Level 3 Products</TabsTrigger>
+          <TabsTrigger value="level4" className="text-white data-[state=active]:bg-red-600">Level 4 Configuration</TabsTrigger>
         </TabsList>
 
         <TabsContent value="level1" className="space-y-4">
@@ -293,16 +293,16 @@ export const ProductManagement = () => {
             {/* Collapsible form for creating new products */}
             <Collapsible open={showLevel1Form} onOpenChange={setShowLevel1Form}>
               <CollapsibleTrigger asChild>
-                <Button variant="outline" className="w-full">
+                <Button variant="outline" className="w-full border-gray-600 text-white hover:bg-gray-800">
                   <Plus className="h-4 w-4 mr-2" />
                   {showLevel1Form ? 'Hide' : 'Add'} New Level 1 Product
                 </Button>
               </CollapsibleTrigger>
               <CollapsibleContent className="mt-4">
-                <Card>
+                <Card className="bg-gray-900 border-gray-800">
                   <CardHeader>
-                    <CardTitle>Create New Level 1 Product</CardTitle>
-                    <CardDescription>
+                    <CardTitle className="text-white">Create New Level 1 Product</CardTitle>
+                    <CardDescription className="text-gray-400">
                       Main product categories (QTMS, TM8, TM3, etc.). These are the top-level products in your hierarchy.
                     </CardDescription>
                   </CardHeader>
@@ -325,7 +325,7 @@ export const ProductManagement = () => {
               <CollapsibleTrigger asChild>
                 <Button 
                   variant="outline" 
-                  className="w-full"
+                  className="w-full border-gray-600 text-white hover:bg-gray-800"
                   disabled={level1Products.length === 0}
                 >
                   <Plus className="h-4 w-4 mr-2" />
@@ -333,10 +333,10 @@ export const ProductManagement = () => {
                 </Button>
               </CollapsibleTrigger>
               <CollapsibleContent className="mt-4">
-                <Card>
+                <Card className="bg-gray-900 border-gray-800">
                   <CardHeader>
-                    <CardTitle>Create New Level 2 Product</CardTitle>
-                    <CardDescription>
+                    <CardTitle className="text-white">Create New Level 2 Product</CardTitle>
+                    <CardDescription className="text-gray-400">
                       Product variants and chassis (LTX, MTX, STX for QTMS). These are linked to Level 1 products.
                     </CardDescription>
                   </CardHeader>
@@ -347,7 +347,7 @@ export const ProductManagement = () => {
                         level1Products={level1Products}
                       />
                     ) : (
-                      <div className="text-center py-8 text-gray-500">
+                      <div className="text-center py-8 text-gray-400">
                         <p>No Level 1 products available.</p>
                         <p>Create Level 1 products first to enable Level 2 product creation.</p>
                       </div>
@@ -374,7 +374,7 @@ export const ProductManagement = () => {
                 <CollapsibleTrigger asChild>
                   <Button 
                     variant="outline" 
-                    className="w-full"
+                    className="w-full border-gray-600 text-white hover:bg-gray-800"
                     disabled={level2Products.length === 0}
                   >
                     <Plus className="h-4 w-4 mr-2" />
@@ -382,10 +382,10 @@ export const ProductManagement = () => {
                   </Button>
                 </CollapsibleTrigger>
                 <CollapsibleContent className="mt-4">
-                  <Card>
+                  <Card className="bg-gray-900 border-gray-800">
                     <CardHeader>
-                      <CardTitle>Create New Card/Component</CardTitle>
-                      <CardDescription>
+                      <CardTitle className="text-white">Create New Card/Component</CardTitle>
+                      <CardDescription className="text-gray-400">
                         Cards and components that go into Level 2 products (chassis).
                       </CardDescription>
                     </CardHeader>
@@ -396,7 +396,7 @@ export const ProductManagement = () => {
                           level2Products={level2Products}
                         />
                       ) : (
-                        <div className="text-center py-4 text-gray-500">
+                        <div className="text-center py-4 text-gray-400">
                           <p>No Level 2 products available for card assignment.</p>
                         </div>
                       )}
@@ -409,7 +409,7 @@ export const ProductManagement = () => {
                 <CollapsibleTrigger asChild>
                   <Button 
                     variant="outline" 
-                    className="w-full"
+                    className="w-full border-gray-600 text-white hover:bg-gray-800"
                     disabled={level1Products.length === 0}
                   >
                     <Plus className="h-4 w-4 mr-2" />
@@ -417,10 +417,10 @@ export const ProductManagement = () => {
                   </Button>
                 </CollapsibleTrigger>
                 <CollapsibleContent className="mt-4">
-                  <Card>
+                  <Card className="bg-gray-900 border-gray-800">
                     <CardHeader>
-                      <CardTitle>Create New Product Option</CardTitle>
-                      <CardDescription>
+                      <CardTitle className="text-white">Create New Product Option</CardTitle>
+                      <CardDescription className="text-gray-400">
                         Options and accessories for Level 1 products.
                       </CardDescription>
                     </CardHeader>
@@ -431,7 +431,7 @@ export const ProductManagement = () => {
                           level1Products={level1Products}
                         />
                       ) : (
-                        <div className="text-center py-4 text-gray-500">
+                        <div className="text-center py-4 text-gray-400">
                           <p>No Level 1 products available for option assignment.</p>
                         </div>
                       )}
@@ -444,10 +444,10 @@ export const ProductManagement = () => {
         </TabsContent>
 
         <TabsContent value="level4" className="space-y-4">
-          <Card>
+          <Card className="bg-gray-900 border-gray-800">
             <CardHeader>
-              <CardTitle>Level 4 Configuration</CardTitle>
-              <CardDescription>
+              <CardTitle className="text-white">Level 4 Configuration</CardTitle>
+              <CardDescription className="text-gray-400">
                 Product-specific configurations tied to Level 3 products. Create dropdown selections or multi-line configurations for your products.
               </CardDescription>
             </CardHeader>

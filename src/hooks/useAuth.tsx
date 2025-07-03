@@ -82,7 +82,7 @@ function useProvideAuth(): AuthContextType {
           id: data.id,
           name: `${data.first_name || ''} ${data.last_name || ''}`.trim() || 'User',
           email: data.email,
-          role: data.role as 'level1' | 'level2' | 'admin',
+          role: data.role as 'level1' | 'level2' | 'admin' | 'finance',
           department: data.department
         };
         setUser(appUser);
@@ -112,6 +112,26 @@ function useProvideAuth(): AuthContextType {
     }
   };
 
+  const logSecurityEvent = async (action: string, details: any = {}) => {
+    try {
+      // Get user's IP and user agent
+      const userAgent = navigator.userAgent;
+      const ipResponse = await fetch('https://api.ipify.org?format=json');
+      const ipData = await ipResponse.json();
+      
+      await supabase.rpc('log_security_event', {
+        p_user_id: session?.user?.id,
+        p_action: action,
+        p_details: details,
+        p_ip_address: ipData.ip,
+        p_user_agent: userAgent,
+        p_severity: 'info'
+      });
+    } catch (error) {
+      console.error('Failed to log security event:', error);
+    }
+  };
+
   useEffect(() => {
     console.log('[useAuth] Initializing auth state...');
     
@@ -133,6 +153,15 @@ function useProvideAuth(): AuthContextType {
           console.log('[useAuth] User session found, fetching profile...');
           try {
             await fetchProfile(session.user.id, 3000);
+            
+            if (event === 'SIGNED_IN') {
+              // Log successful login and update login info
+              await supabase.rpc('update_user_login', {
+                p_user_id: session.user.id,
+                p_success: true
+              });
+              await logSecurityEvent('session_established');
+            }
           } catch (error) {
             console.error('[useAuth] Error fetching profile in auth state change:', error);
             // Create fallback user
@@ -149,6 +178,9 @@ function useProvideAuth(): AuthContextType {
           }
         } else {
           console.log('[useAuth] No user session, clearing user state');
+          if (event === 'SIGNED_OUT') {
+            await logSecurityEvent('session_terminated');
+          }
           setUser(null);
           setLoading(false);
         }
@@ -202,6 +234,23 @@ function useProvideAuth(): AuthContextType {
         email,
         password
       });
+      
+      if (error) {
+        // Log failed login attempt
+        const { data: userData } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('email', email)
+          .single();
+          
+        if (userData) {
+          await supabase.rpc('update_user_login', {
+            p_user_id: userData.id,
+            p_success: false
+          });
+        }
+      }
+      
       return { error };
     } catch (err) {
       console.error('[useAuth] Sign in error:', err);
@@ -212,6 +261,7 @@ function useProvideAuth(): AuthContextType {
   const signOut = async () => {
     console.log('[useAuth] Signing out user...');
     try {
+      await logSecurityEvent('logout_initiated');
       const { error } = await supabase.auth.signOut();
       return { error };
     } catch (err) {
