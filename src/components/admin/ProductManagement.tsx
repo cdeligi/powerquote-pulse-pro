@@ -10,7 +10,7 @@ import CardForm from "./product-forms/CardForm";
 import Level2OptionForm from "./product-forms/Level2OptionForm";
 import { Level4ConfigurationManager } from "./Level4ConfigurationManager";
 import { Level1ProductList } from "./product-lists/Level1ProductList";
-import { Level2ProductList } from "./product-lists/Level2ProductList";
+import Level2ProductList from "./product-lists/Level2ProductList";
 import { Level3ProductList } from "./product-lists/Level3ProductList";
 import { Level1Product, Level2Product, Level3Product, Level4Product } from "@/types/product";
 import { productDataService } from "@/services/productDataService";
