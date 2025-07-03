@@ -13,13 +13,62 @@ interface DashboardOverviewProps {
 const DashboardOverview = ({ user }: DashboardOverviewProps) => {
   // Mock data for demonstration - in production, this would come from your API
   const mockQuoteData = [
-    { id: 'Q-2024-001', status: 'pending_approval' as const, total: 45250, createdAt: '2024-01-15' },
-    { id: 'Q-2024-002', status: 'approved' as const, total: 78900, createdAt: '2024-01-14' },
-    { id: 'Q-2024-003', status: 'draft' as const, total: 32100, createdAt: '2024-01-13' },
-    { id: 'Q-2024-004', status: 'finalized' as const, total: 89400, createdAt: '2024-01-10' },
-    { id: 'Q-2024-005', status: 'rejected' as const, total: 25600, createdAt: '2024-01-08' },
-    { id: 'Q-2023-087', status: 'finalized' as const, total: 156700, createdAt: '2023-12-20' },
-    { id: 'Q-2023-088', status: 'approved' as const, total: 67300, createdAt: '2023-12-18' }
+    { 
+      id: 'Q-2024-001', 
+      status: 'pending_approval' as const, 
+      total: 45250, 
+      createdAt: '2024-01-15',
+      margin: 28.5,
+      grossProfit: 12921.25
+    },
+    { 
+      id: 'Q-2024-002', 
+      status: 'approved' as const, 
+      total: 78900, 
+      createdAt: '2024-01-14',
+      margin: 32.1,
+      grossProfit: 25327.9
+    },
+    { 
+      id: 'Q-2024-003', 
+      status: 'draft' as const, 
+      total: 32100, 
+      createdAt: '2024-01-13',
+      margin: 25.8,
+      grossProfit: 8281.8
+    },
+    { 
+      id: 'Q-2024-004', 
+      status: 'finalized' as const, 
+      total: 89400, 
+      createdAt: '2024-01-10',
+      margin: 30.2,
+      grossProfit: 27000.8
+    },
+    { 
+      id: 'Q-2024-005', 
+      status: 'rejected' as const, 
+      total: 25600, 
+      createdAt: '2024-01-08',
+      margin: 22.3,
+      grossProfit: 5708.8
+    },
+    { 
+      id: 'Q-2023-087', 
+      status: 'finalized' as const, 
+      total: 156700, 
+      createdAt: '2023-12-20',
+      margin: 35.4,
+      grossProfit: 55471.8
+    },
+    { 
+      id: 'Q-2023-088', 
+      status: 'approved' as const, 
+      total: 67300, 
+      createdAt: '2023-12-18',
+      margin: 29.7,
+      grossProfit: 19988.1
+    }
   ];
 
   const analytics = calculateQuoteAnalytics(mockQuoteData);
