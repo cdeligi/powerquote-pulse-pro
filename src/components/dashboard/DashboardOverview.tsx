@@ -1,174 +1,176 @@
 
-import { User } from "@/types/auth";
+/**
+ * © 2025 Qualitrol Corp. All rights reserved.
+ * Confidential and proprietary. Unauthorized copying or distribution is prohibited.
+ */
+
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { FileText, Clock, CheckCircle, AlertCircle } from "lucide-react";
-import QuoteAnalyticsDashboard from "./QuoteAnalyticsDashboard";
-import { calculateQuoteAnalytics, QuoteData } from "@/utils/quoteAnalytics";
-import { useQuotes } from "@/hooks/useQuotes";
+import { TrendingUp, TrendingDown, BarChart3, DollarSign, FileText, CheckCircle, XCircle, Clock } from "lucide-react";
+import { QuoteAnalytics, formatCurrency } from "@/utils/quoteAnalytics";
+import QuoteVolumeChart from "./QuoteVolumeChart";
 
 interface DashboardOverviewProps {
-  user: User;
+  analytics: QuoteAnalytics;
+  isAdmin?: boolean;
 }
 
-const DashboardOverview = ({ user }: DashboardOverviewProps) => {
-  const { quotes, loading, error } = useQuotes();
+const DashboardOverview = ({ analytics, isAdmin = false }: DashboardOverviewProps) => {
+  const { monthly, yearly } = analytics;
 
-  if (loading) {
-    return (
-      <div className="flex justify-center items-center h-full">
-        <div className="text-center py-8">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4" />
-          <p className="text-gray-400">Loading dashboard...</p>
+  const StatCard = ({ 
+    title, 
+    monthlyValue, 
+    yearlyValue, 
+    icon: Icon, 
+    color,
+    isCurrency = false 
+  }: {
+    title: string;
+    monthlyValue: number;
+    yearlyValue: number;
+    icon: any;
+    color: string;
+    isCurrency?: boolean;
+  }) => (
+    <Card className="bg-gray-900 border-gray-800">
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardTitle className="text-sm font-medium text-gray-300">{title}</CardTitle>
+        <Icon className={`h-4 w-4 ${color}`} />
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-2">
+          <div>
+            <div className="text-lg font-bold text-white">
+              {isCurrency ? formatCurrency(monthlyValue) : monthlyValue.toLocaleString()}
+            </div>
+            <p className="text-xs text-gray-400">This Month</p>
+          </div>
+          <div className="pt-1 border-t border-gray-700">
+            <div className="text-sm font-medium text-gray-200">
+              {isCurrency ? formatCurrency(yearlyValue) : yearlyValue.toLocaleString()}
+            </div>
+            <p className="text-xs text-gray-500">This Year</p>
+          </div>
         </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="flex justify-center items-center h-full">
-        <p className="text-red-500">Failed to load quotes.</p>
-      </div>
-    );
-  }
-
-  const mappedQuotes: QuoteData[] = quotes.map((q) => ({
-    id: q.id,
-    status: q.status === 'under-review' ? 'draft' : (q.status as QuoteData['status']),
-    total: q.discounted_value,
-    createdAt: q.created_at,
-    margin: q.discounted_margin,
-    grossProfit: q.gross_profit
-  }));
-
-  const analytics = calculateQuoteAnalytics(mappedQuotes);
-
-  const stats = {
-    totalQuotes: quotes.length,
-    pendingApproval: quotes.filter(q => q.status === 'pending_approval').length,
-    approved: quotes.filter(q => q.status === 'approved').length,
-    rejected: quotes.filter(q => q.status === 'rejected').length
-  };
-
-  const recentQuotes = quotes.slice(0, 3).map((q) => ({
-    id: q.id,
-    customer: q.customer_name,
-    value: `$${q.discounted_value.toLocaleString()}`,
-    status: q.status,
-    date: q.created_at.split('T')[0]
-  }));
-
-  const getStatusBadge = (status: string) => {
-    const statusConfig = {
-      draft: { color: 'bg-gray-600', text: 'Draft' },
-      pending_approval: { color: 'bg-yellow-600', text: 'Pending' },
-      approved: { color: 'bg-green-600', text: 'Approved' },
-      rejected: { color: 'bg-red-600', text: 'Rejected' }
-    };
-    return statusConfig[status as keyof typeof statusConfig] || statusConfig.draft;
-  };
+      </CardContent>
+    </Card>
+  );
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold text-white mb-2">
-          Welcome back, {user.name}
-        </h1>
-        <p className="text-gray-400">
-          Here's an overview of your quoting activity
+        <h2 className="text-2xl font-bold text-white mb-2">
+          {isAdmin ? 'Platform Analytics' : 'Your Quote Analytics'}
+        </h2>
+        <p className="text-gray-300">
+          Performance metrics for quote processing and quoted values
         </p>
       </div>
 
-      {/* Analytics Dashboard */}
-      <QuoteAnalyticsDashboard analytics={analytics} isAdmin={user.role === 'admin'} />
-
-      {/* Quick Stats Grid */}
+      {/* Main Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Card className="bg-gray-900 border-gray-800">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-gray-400">
-              Total Quotes
-            </CardTitle>
-            <FileText className="h-4 w-4 text-gray-400" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-white">{stats.totalQuotes}</div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-gray-900 border-gray-800">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-gray-400">
-              Pending Approval
-            </CardTitle>
-            <Clock className="h-4 w-4 text-yellow-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-white">{stats.pendingApproval}</div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-gray-900 border-gray-800">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-gray-400">
-              Approved
-            </CardTitle>
-            <CheckCircle className="h-4 w-4 text-green-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-white">{stats.approved}</div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-gray-900 border-gray-800">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-gray-400">
-              Rejected
-            </CardTitle>
-            <AlertCircle className="h-4 w-4 text-red-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-white">{stats.rejected}</div>
-          </CardContent>
-        </Card>
+        <StatCard
+          title="Executed Quotes"
+          monthlyValue={monthly.executed}
+          yearlyValue={yearly.executed}
+          icon={CheckCircle}
+          color="text-green-500"
+        />
+        
+        <StatCard
+          title="Approved Quotes"
+          monthlyValue={monthly.approved}
+          yearlyValue={yearly.approved}
+          icon={FileText}
+          color="text-blue-500"
+        />
+        
+        <StatCard
+          title="Under Analysis"
+          monthlyValue={monthly.underAnalysis}
+          yearlyValue={yearly.underAnalysis}
+          icon={Clock}
+          color="text-yellow-500"
+        />
+        
+        <StatCard
+          title="Rejected Quotes"
+          monthlyValue={monthly.rejected}
+          yearlyValue={yearly.rejected}
+          icon={XCircle}
+          color="text-red-500"
+        />
       </div>
 
-      {/* Recent Quotes */}
+      {/* Quote Volume Trend Chart */}
+      <QuoteVolumeChart />
+
+      {/* Quoted Value */}
       <Card className="bg-gray-900 border-gray-800">
         <CardHeader>
-          <CardTitle className="text-white">Recent Quotes</CardTitle>
-          <CardDescription className="text-gray-400">
-            Your latest quoting activity
+          <CardTitle className="text-white flex items-center">
+            <DollarSign className="mr-2 h-5 w-5 text-green-500" />
+            Total Quoted Value
+          </CardTitle>
+          <CardDescription className="text-gray-300">
+            Cumulative value of all quotes processed
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
-            {recentQuotes.map((quote) => {
-              const statusBadge = getStatusBadge(quote.status);
-              return (
-                <div
-                  key={quote.id}
-                  className="flex items-center justify-between p-4 bg-gray-800 rounded-lg"
-                >
-                  <div className="flex-1">
-                    <div className="flex items-center space-x-3">
-                      <span className="text-white font-medium">{quote.id}</span>
-                      <Badge className={`${statusBadge.color} text-white`}>
-                        {statusBadge.text}
-                      </Badge>
-                    </div>
-                    <p className="text-gray-400 text-sm mt-1">{quote.customer}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-white font-bold">
-                      {user.role === 'level1' ? '—' : quote.value}
-                    </p>
-                    <p className="text-gray-400 text-sm">{quote.date}</p>
-                  </div>
-                </div>
-              );
-            })}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="text-center p-4 bg-gray-800 rounded-lg">
+              <div className="text-3xl font-bold text-white mb-2">
+                {formatCurrency(monthly.totalQuotedValue)}
+              </div>
+              <p className="text-gray-300">This Month</p>
+              <Badge variant="outline" className="mt-2 border-green-600 text-green-400">
+                <TrendingUp className="mr-1 h-3 w-3" />
+                Monthly
+              </Badge>
+            </div>
+            <div className="text-center p-4 bg-gray-800 rounded-lg">
+              <div className="text-3xl font-bold text-white mb-2">
+                {formatCurrency(yearly.totalQuotedValue)}
+              </div>
+              <p className="text-gray-300">This Year</p>
+              <Badge variant="outline" className="mt-2 border-blue-600 text-blue-400">
+                <BarChart3 className="mr-1 h-3 w-3" />
+                Yearly
+              </Badge>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Performance Summary */}
+      <Card className="bg-gray-900 border-gray-800">
+        <CardHeader>
+          <CardTitle className="text-white">Performance Summary</CardTitle>
+          <CardDescription className="text-gray-300">
+            Key performance indicators for quote processing
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="text-center p-3 bg-gray-800 rounded">
+              <div className="text-xl font-bold text-green-400">
+                {yearly.executed > 0 ? ((yearly.executed / (yearly.executed + yearly.approved + yearly.rejected + yearly.underAnalysis)) * 100).toFixed(1) : 0}%
+              </div>
+              <p className="text-gray-300 text-sm">Execution Rate</p>
+            </div>
+            <div className="text-center p-3 bg-gray-800 rounded">
+              <div className="text-xl font-bold text-blue-400">
+                {yearly.approved > 0 ? ((yearly.approved / (yearly.approved + yearly.rejected)) * 100).toFixed(1) : 0}%
+              </div>
+              <p className="text-gray-300 text-sm">Approval Rate</p>
+            </div>
+            <div className="text-center p-3 bg-gray-800 rounded">
+              <div className="text-xl font-bold text-yellow-400">
+                {yearly.totalQuotedValue > 0 ? formatCurrency(yearly.totalQuotedValue / (yearly.executed + yearly.approved + yearly.rejected + yearly.underAnalysis || 1)) : '$0'}
+              </div>
+              <p className="text-gray-300 text-sm">Avg Quote Value</p>
+            </div>
           </div>
         </CardContent>
       </Card>

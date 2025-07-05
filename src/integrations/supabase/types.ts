@@ -416,6 +416,39 @@ export type Database = {
         }
         Relationships: []
       }
+      quote_analytics: {
+        Row: {
+          created_at: string | null
+          id: string
+          month: string
+          quote_count: number
+          status: string
+          total_cost: number | null
+          total_value: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          month: string
+          quote_count?: number
+          status: string
+          total_cost?: number | null
+          total_value?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          month?: string
+          quote_count?: number
+          status?: string
+          total_cost?: number | null
+          total_value?: number | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       quote_fields: {
         Row: {
           created_at: string
@@ -657,6 +690,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      calculate_bom_total_cost: {
+        Args: { quote_id_param: string }
+        Returns: number
+      }
       deactivate_user: {
         Args: { target_user_id: string }
         Returns: boolean
@@ -672,6 +709,10 @@ export type Database = {
       is_admin_user: {
         Args: Record<PropertyKey, never>
         Returns: boolean
+      }
+      update_quote_analytics: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
       }
     }
     Enums: {

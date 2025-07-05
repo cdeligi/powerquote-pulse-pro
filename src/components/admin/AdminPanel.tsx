@@ -9,13 +9,10 @@ import { User } from "@/types/auth";
 import QuoteApprovalDashboard from "./QuoteApprovalDashboard";
 import UserManagementEnhanced from "./UserManagementEnhanced";
 import { ProductManagement } from "./ProductManagement";
-import Level2ProductManager from "./Level2ProductManager";
 import QuoteFieldConfiguration from "./QuoteFieldConfiguration";
 import AdminSettings from "./AdminSettings";
-import FinanceApprovalSettings from "./FinanceApprovalSettings";
-import UserActivityMonitor from "./UserActivityMonitor";
 import AdminMarginDashboard from "./AdminMarginDashboard";
-import { Settings, Users, Package, FileText, BarChart3, Shield, Activity, DollarSign, Package2 } from "lucide-react";
+import { Settings, Users, Package, FileText, BarChart3, Shield } from "lucide-react";
 
 interface AdminPanelProps {
   user: User;
@@ -43,8 +40,8 @@ const AdminPanel = ({ user }: AdminPanelProps) => {
         <Tabs defaultValue="quotes" className="w-full">
           <TabsList className="grid w-full bg-gray-900 border-gray-800" style={{
             gridTemplateColumns: isFinanceUser 
-              ? 'repeat(4, 1fr)' 
-              : 'repeat(9, 1fr)'
+              ? 'repeat(2, 1fr)' 
+              : 'repeat(6, 1fr)'
           }}>
             <TabsTrigger value="quotes" className="text-white data-[state=active]:bg-blue-600 data-[state=active]:text-white">
               <FileText className="mr-2 h-4 w-4" />
@@ -54,16 +51,6 @@ const AdminPanel = ({ user }: AdminPanelProps) => {
             <TabsTrigger value="margin" className="text-white data-[state=active]:bg-blue-600 data-[state=active]:text-white">
               <BarChart3 className="mr-2 h-4 w-4" />
               Margin Dashboard
-            </TabsTrigger>
-
-            <TabsTrigger value="finance" className="text-white data-[state=active]:bg-blue-600 data-[state=active]:text-white">
-              <DollarSign className="mr-2 h-4 w-4" />
-              Finance Settings
-            </TabsTrigger>
-
-            <TabsTrigger value="activity" className="text-white data-[state=active]:bg-blue-600 data-[state=active]:text-white">
-              <Activity className="mr-2 h-4 w-4" />
-              User Activity
             </TabsTrigger>
 
             {isAdminUser && (
@@ -76,11 +63,6 @@ const AdminPanel = ({ user }: AdminPanelProps) => {
                 <TabsTrigger value="products" className="text-white data-[state=active]:bg-blue-600 data-[state=active]:text-white">
                   <Package className="mr-2 h-4 w-4" />
                   Products
-                </TabsTrigger>
-
-                <TabsTrigger value="level2products" className="text-white data-[state=active]:bg-blue-600 data-[state=active]:text-white">
-                  <Package2 className="mr-2 h-4 w-4" />
-                  Level 2 Products
                 </TabsTrigger>
 
                 <TabsTrigger value="fields" className="text-white data-[state=active]:bg-blue-600 data-[state=active]:text-white">
@@ -104,14 +86,6 @@ const AdminPanel = ({ user }: AdminPanelProps) => {
             <AdminMarginDashboard user={user} />
           </TabsContent>
 
-          <TabsContent value="finance" className="mt-6">
-            <FinanceApprovalSettings />
-          </TabsContent>
-
-          <TabsContent value="activity" className="mt-6">
-            <UserActivityMonitor />
-          </TabsContent>
-
           {isAdminUser && (
             <>
               <TabsContent value="users" className="mt-6">
@@ -120,10 +94,6 @@ const AdminPanel = ({ user }: AdminPanelProps) => {
 
               <TabsContent value="products" className="mt-6">
                 <ProductManagement />
-              </TabsContent>
-
-              <TabsContent value="level2products" className="mt-6">
-                <Level2ProductManager />
               </TabsContent>
 
               <TabsContent value="fields" className="mt-6">
