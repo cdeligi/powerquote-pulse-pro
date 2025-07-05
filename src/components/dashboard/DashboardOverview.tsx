@@ -4,106 +4,60 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { FileText, Clock, CheckCircle, AlertCircle } from "lucide-react";
 import QuoteAnalyticsDashboard from "./QuoteAnalyticsDashboard";
-import { calculateQuoteAnalytics } from "@/utils/quoteAnalytics";
+import { calculateQuoteAnalytics, QuoteData } from "@/utils/quoteAnalytics";
+import { useQuotes } from "@/hooks/useQuotes";
 
 interface DashboardOverviewProps {
   user: User;
 }
 
 const DashboardOverview = ({ user }: DashboardOverviewProps) => {
-  // Mock data for demonstration - in production, this would come from your API
-  const mockQuoteData = [
-    { 
-      id: 'Q-2024-001', 
-      status: 'pending_approval' as const, 
-      total: 45250, 
-      createdAt: '2024-01-15',
-      margin: 28.5,
-      grossProfit: 12921.25
-    },
-    { 
-      id: 'Q-2024-002', 
-      status: 'approved' as const, 
-      total: 78900, 
-      createdAt: '2024-01-14',
-      margin: 32.1,
-      grossProfit: 25327.9
-    },
-    { 
-      id: 'Q-2024-003', 
-      status: 'draft' as const, 
-      total: 32100, 
-      createdAt: '2024-01-13',
-      margin: 25.8,
-      grossProfit: 8281.8
-    },
-    { 
-      id: 'Q-2024-004', 
-      status: 'finalized' as const, 
-      total: 89400, 
-      createdAt: '2024-01-10',
-      margin: 30.2,
-      grossProfit: 27000.8
-    },
-    { 
-      id: 'Q-2024-005', 
-      status: 'rejected' as const, 
-      total: 25600, 
-      createdAt: '2024-01-08',
-      margin: 22.3,
-      grossProfit: 5708.8
-    },
-    { 
-      id: 'Q-2023-087', 
-      status: 'finalized' as const, 
-      total: 156700, 
-      createdAt: '2023-12-20',
-      margin: 35.4,
-      grossProfit: 55471.8
-    },
-    { 
-      id: 'Q-2023-088', 
-      status: 'approved' as const, 
-      total: 67300, 
-      createdAt: '2023-12-18',
-      margin: 29.7,
-      grossProfit: 19988.1
-    }
-  ];
+  const { quotes, loading, error } = useQuotes();
 
-  const analytics = calculateQuoteAnalytics(mockQuoteData);
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center h-full">
+        <div className="text-center py-8">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4" />
+          <p className="text-gray-400">Loading dashboard...</p>
+        </div>
+      </div>
+    );
+  }
 
-  // Mock data for recent quotes
+  if (error) {
+    return (
+      <div className="flex justify-center items-center h-full">
+        <p className="text-red-500">Failed to load quotes.</p>
+      </div>
+    );
+  }
+
+  const mappedQuotes: QuoteData[] = quotes.map((q) => ({
+    id: q.id,
+    status: q.status === 'under-review' ? 'draft' : (q.status as QuoteData['status']),
+    total: q.discounted_value,
+    createdAt: q.created_at,
+    margin: q.discounted_margin,
+    grossProfit: q.gross_profit
+  }));
+
+  const analytics = calculateQuoteAnalytics(mappedQuotes);
+
   const stats = {
-    totalQuotes: 12,
-    pendingApproval: 3,
-    approved: 8,
-    rejected: 1
+    totalQuotes: quotes.length,
+    pendingApproval: quotes.filter(q => q.status === 'pending_approval').length,
+    approved: quotes.filter(q => q.status === 'approved').length,
+    rejected: quotes.filter(q => q.status === 'rejected').length
   };
 
-  const recentQuotes = [
-    {
-      id: 'Q-2024-001',
-      customer: 'ABC Power Company',
-      value: '$45,250',
-      status: 'pending_approval',
-      date: '2024-01-15'
-    },
-    {
-      id: 'Q-2024-002',
-      customer: 'Delta Electric',
-      value: '$78,900',
-      status: 'approved',
-      date: '2024-01-14'
-    },
-    {
-      id: 'Q-2024-003',
-      customer: 'Phoenix Utilities',
-      value: '$32,100',
-      status: 'draft',
-      date: '2024-01-13'
-    }
-  ];
+  const recentQuotes = quotes.slice(0, 3).map((q) => ({
+    id: q.id,
+    customer: q.customer_name,
+    value: `$${q.discounted_value.toLocaleString()}`,
+    status: q.status,
+    date: q.created_at.split('T')[0]
+  }));
 
   const getStatusBadge = (status: string) => {
     const statusConfig = {
