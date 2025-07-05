@@ -301,29 +301,39 @@ function useProvideAuth(): AuthContextType {
 
   const signOut = async () => {
     console.log('[useAuth] Signing out user...');
-    try {
-      await logSecurityEvent('logout_initiated');
-      const { error } = await supabase.auth.signOut();
+    let error: any = null;
 
-      if (error) {
-        console.error('[useAuth] Supabase signOut error:', error);
-      } else {
-        console.log('[useAuth] Supabase signOut successful');
-        // Clear auth state immediately
-        setUser(null);
-        setSession(null);
-        try {
-          localStorage.removeItem('supabase.auth.token');
-        } catch (storageErr) {
-          console.warn('[useAuth] Failed to clear local storage:', storageErr);
-        }
+    try {
+      try {
+        await logSecurityEvent('logout_initiated');
+      } catch (logErr) {
+        console.error('[useAuth] Failed to log logout initiation:', logErr);
       }
 
-      return { error };
-    } catch (err) {
-      console.error('[useAuth] Sign out error:', err);
-      return { error: err };
+      try {
+        const { error: signOutError } = await supabase.auth.signOut();
+        error = signOutError;
+
+        if (error) {
+          console.error('[useAuth] Supabase signOut error:', error);
+        } else {
+          console.log('[useAuth] Supabase signOut successful');
+        }
+      } catch (supabaseErr) {
+        console.error('[useAuth] Supabase signOut threw:', supabaseErr);
+        error = supabaseErr;
+      }
+    } finally {
+      setUser(null);
+      setSession(null);
+      try {
+        localStorage.removeItem('supabase.auth.token');
+      } catch (storageErr) {
+        console.warn('[useAuth] Failed to clear local storage:', storageErr);
+      }
     }
+
+    return { error };
   };
 
   return {
