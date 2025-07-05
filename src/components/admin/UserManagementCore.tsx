@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { User, UserPlus, Shield, Mail, Calendar, Search } from 'lucide-react';
+import { User, Users, UserPlus, Shield, Mail, Calendar, Search } from 'lucide-react';
 
 interface UserProfile {
   id: string;

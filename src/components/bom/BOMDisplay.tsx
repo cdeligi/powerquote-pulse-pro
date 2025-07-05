@@ -9,8 +9,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Edit, DollarSign, Package, Settings } from 'lucide-react';
-import { BOMItem } from '@/types/bom';
-import { PriceOverrideManager } from './PriceOverrideManager';
+import { BOMItem } from '@/types/product';
+import PriceOverrideManager from './PriceOverrideManager';
 import { useAuth } from '@/hooks/useAuth';
 
 interface BOMDisplayProps {

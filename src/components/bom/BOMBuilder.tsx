@@ -370,6 +370,20 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
     onBOMUpdate(updatedItems);
   };
 
+  const handleUpdateBOMItem = (itemId: string, updates: Partial<BOMItem>) => {
+    const updated = bomItems.map(item =>
+      item.id === itemId ? { ...item, ...updates } : item
+    );
+    setBomItems(updated);
+    onBOMUpdate(updated);
+  };
+
+  const handleRemoveBOMItem = (itemId: string) => {
+    const updated = bomItems.filter(item => item.id !== itemId);
+    setBomItems(updated);
+    onBOMUpdate(updated);
+  };
+
   const handleDiscountChange = (discount: number, justification: string) => {
     setDiscountPercentage(discount);
     setDiscountJustification(justification);
@@ -712,10 +726,9 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
         {/* Right side - BOM Display and Discount (1/3 width) */}
         <div className="lg:col-span-1 space-y-6">
           <BOMDisplay
-            bomItems={bomItems}
-            onUpdateBOM={handleBOMUpdate}
-            onEditConfiguration={handleBOMConfigurationEdit}
-            canSeePrices={canSeePrices}
+            items={bomItems}
+            onUpdateItem={handleUpdateBOMItem}
+            onRemoveItem={handleRemoveBOMItem}
           />
           
           {/* Discount Section with Submit Quote Button */}
