@@ -1,4 +1,3 @@
-
 /**
  * © 2025 Qualitrol Corp. All rights reserved.
  * Confidential and proprietary. Unauthorized copying or distribution is prohibited.
@@ -133,7 +132,29 @@ export const useQuotes = () => {
       }
 
       console.log(`Fetched ${bomData?.length || 0} BOM items for quote ${quoteId}`);
-      return bomData || [];
+      
+      // Ensure all required fields are present and properly typed
+      const processedItems: BOMItemWithDetails[] = (bomData || []).map(item => ({
+        id: item.id,
+        quote_id: item.quote_id,
+        product_id: item.product_id,
+        name: item.name || 'Unnamed Product',
+        description: item.description || '',
+        part_number: item.part_number || '',
+        quantity: item.quantity || 1,
+        unit_price: Number(item.unit_price) || 0,
+        unit_cost: Number(item.unit_cost) || 0,
+        total_price: Number(item.total_price) || 0,
+        total_cost: Number(item.total_cost) || 0,
+        margin: Number(item.margin) || 0,
+        original_unit_price: Number(item.original_unit_price) || Number(item.unit_price) || 0,
+        approved_unit_price: Number(item.approved_unit_price) || Number(item.unit_price) || 0,
+        product_type: item.product_type || 'standard',
+        configuration_data: item.configuration_data || null,
+        price_adjustment_history: item.price_adjustment_history || []
+      }));
+
+      return processedItems;
     } catch (err) {
       console.error('Failed to fetch BOM items:', err);
       toast({
@@ -142,152 +163,6 @@ export const useQuotes = () => {
         variant: "destructive"
       });
       return [];
-    }
-  };
-
-  const getMarginThresholds = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('margin_thresholds')
-        .select('*')
-        .order('minimum_margin_percent', { ascending: true });
-
-      if (error) throw error;
-      return data || [];
-    } catch (err) {
-      console.error('Failed to fetch margin thresholds:', err);
-      return [];
-    }
-  };
-
-  const checkMarginApprovalRequired = async (discountedMargin: number, userRole: string) => {
-    try {
-      // Get margin limit from settings
-      const { data: settingsData, error: settingsError } = await supabase
-        .from('app_settings')
-        .select('value')
-        .eq('key', 'margin_limit')
-        .single();
-
-      if (settingsError) {
-        console.error('Error fetching margin limit:', settingsError);
-        return { canApprove: true, requiresFinance: false };
-      }
-
-      const marginLimit = parseFloat(settingsData.value as string) || 25;
-      
-      // Check if margin is below limit
-      if (discountedMargin >= marginLimit) {
-        return { canApprove: true, requiresFinance: false };
-      }
-
-      // Finance role can approve anything
-      if (userRole === 'finance') {
-        return { canApprove: true, requiresFinance: false };
-      }
-
-      // Admin can approve margins above admin threshold (15%)
-      const adminThreshold = 15;
-      if (userRole === 'admin' && discountedMargin >= adminThreshold) {
-        return { canApprove: true, requiresFinance: false };
-      }
-
-      // Requires finance approval
-      return { canApprove: false, requiresFinance: true };
-
-    } catch (err) {
-      console.error('Failed to check margin approval:', err);
-      return { canApprove: false, requiresFinance: true };
-    }
-  };
-
-  const updateQuoteStatus = async (
-    quoteId: string, 
-    status: Quote['status'], 
-    approvedDiscount?: number,
-    approvalNotes?: string,
-    rejectionReason?: string
-  ) => {
-    console.log(`Updating quote ${quoteId} status to ${status}`);
-    
-    try {
-      const { data: currentUser } = await supabase.auth.getUser();
-      const { data: userProfile } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', currentUser.user?.id)
-        .single();
-
-      // Check margin requirements before approval
-      if (status === 'approved') {
-        const { data: quoteData } = await supabase
-          .from('quotes')
-          .select('discounted_margin')
-          .eq('id', quoteId)
-          .single();
-
-        if (quoteData) {
-          const { canApprove, requiresFinance } = await checkMarginApprovalRequired(
-            quoteData.discounted_margin, 
-            userProfile?.role || 'level1'
-          );
-
-          if (!canApprove && requiresFinance) {
-            toast({
-              title: "Approval Restricted",
-              description: "This quote requires Finance approval due to low margin",
-              variant: "destructive"
-            });
-            return;
-          }
-        }
-      }
-
-      const updateData: any = {
-        status,
-        reviewed_at: new Date().toISOString(),
-        reviewed_by: currentUser.user?.id
-      };
-
-      if (approvedDiscount !== undefined) {
-        updateData.approved_discount = approvedDiscount;
-      }
-      
-      if (approvalNotes) {
-        updateData.approval_notes = approvalNotes;
-      }
-      
-      if (rejectionReason) {
-        updateData.rejection_reason = rejectionReason;
-      }
-
-      const { error } = await supabase
-        .from('quotes')
-        .update(updateData)
-        .eq('id', quoteId);
-
-      if (error) {
-        console.error('Error updating quote status:', error);
-        throw error;
-      }
-
-      console.log(`Successfully updated quote ${quoteId} status to ${status}`);
-      
-      // Refresh quotes after update
-      await fetchQuotes();
-      
-      toast({
-        title: "Success",
-        description: `Quote ${status} successfully`
-      });
-    } catch (err) {
-      console.error('Failed to update quote status:', err);
-      toast({
-        title: "Error",
-        description: "Failed to update quote status",
-        variant: "destructive"
-      });
-      throw err;
     }
   };
 
@@ -309,7 +184,7 @@ export const useQuotes = () => {
 
       if (fetchError) throw fetchError;
 
-      // Get current user
+      // Get current user and check permissions
       const { data: currentUser } = await supabase.auth.getUser();
       const { data: userProfile } = await supabase
         .from('profiles')
@@ -339,9 +214,10 @@ export const useQuotes = () => {
         return;
       }
 
-      // Calculate new totals
+      // Calculate new totals and margin
       const newTotalPrice = newPrice * currentItem.quantity;
-      const newMargin = currentItem.unit_cost > 0 
+      const newTotalCost = currentItem.unit_cost * currentItem.quantity;
+      const newMargin = newPrice > 0 
         ? ((newPrice - currentItem.unit_cost) / newPrice) * 100 
         : 0;
 
@@ -359,6 +235,7 @@ export const useQuotes = () => {
         priceAdjustment
       ];
 
+      // Update the BOM item
       const { error: updateError } = await supabase
         .from('bom_items')
         .update({
@@ -427,15 +304,20 @@ export const useQuotes = () => {
 
       if (!bomItems) return;
 
-      const totalCost = bomItems.reduce((sum, item) => sum + item.total_cost, 0);
-      const totalPrice = bomItems.reduce((sum, item) => sum + item.total_price, 0);
+      const totalCost = bomItems.reduce((sum, item) => sum + (item.total_cost || 0), 0);
+      const totalPrice = bomItems.reduce((sum, item) => sum + (item.total_price || 0), 0);
       const grossProfit = totalPrice - totalCost;
       const margin = totalPrice > 0 ? (grossProfit / totalPrice) * 100 : 0;
 
       // Check if finance approval is required
-      const requiresFinanceApproval = await supabase.rpc('check_finance_approval_required', {
-        p_quote_id: quoteId
-      });
+      const { data: marginSetting } = await supabase
+        .from('app_settings')
+        .select('value')
+        .eq('key', 'margin_limit')
+        .single();
+
+      const marginLimit = parseFloat(marginSetting?.value as string) || 25;
+      const requiresFinanceApproval = margin < marginLimit;
 
       await supabase
         .from('quotes')
@@ -444,7 +326,7 @@ export const useQuotes = () => {
           discounted_value: totalPrice,
           gross_profit: grossProfit,
           discounted_margin: margin,
-          requires_finance_approval: requiresFinanceApproval.data,
+          requires_finance_approval: requiresFinanceApproval,
           updated_at: new Date().toISOString()
         })
         .eq('id', quoteId);
@@ -464,9 +346,7 @@ export const useQuotes = () => {
     error,
     fetchQuotes,
     fetchBOMItems,
-    updateQuoteStatus,
     updateBOMItemPrice,
-    getMarginThresholds,
-    checkMarginApprovalRequired
+    recalculateQuoteTotals
   };
 };
