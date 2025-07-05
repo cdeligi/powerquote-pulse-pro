@@ -304,6 +304,21 @@ function useProvideAuth(): AuthContextType {
     try {
       await logSecurityEvent('logout_initiated');
       const { error } = await supabase.auth.signOut();
+
+      if (error) {
+        console.error('[useAuth] Supabase signOut error:', error);
+      } else {
+        console.log('[useAuth] Supabase signOut successful');
+        // Clear auth state immediately
+        setUser(null);
+        setSession(null);
+        try {
+          localStorage.removeItem('supabase.auth.token');
+        } catch (storageErr) {
+          console.warn('[useAuth] Failed to clear local storage:', storageErr);
+        }
+      }
+
       return { error };
     } catch (err) {
       console.error('[useAuth] Sign out error:', err);
