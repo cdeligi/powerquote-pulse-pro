@@ -12,7 +12,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { TrendingUp, TrendingDown, AlertTriangle, DollarSign } from 'lucide-react';
+import { TrendingUp, TrendingDown, AlertTriangle, DollarSign, CheckCircle } from 'lucide-react';
 
 interface PriceOverrideManagerProps {
   itemId: string;
@@ -81,9 +81,24 @@ const PriceOverrideManager = ({
       return;
     }
 
+    if (price === currentPrice) {
+      toast({
+        title: "No Change",
+        description: "The new price is the same as the current price",
+        variant: "destructive"
+      });
+      return;
+    }
+
     onPriceChange(price, reason, isIncrease);
     setReason('');
+    setNewPrice(price.toString());
     setIsOpen(false);
+    
+    toast({
+      title: "Price Updated",
+      description: `Price ${isIncrease ? 'increased' : 'decreased'} successfully`,
+    });
   };
 
   const priceChange = parseFloat(newPrice) - currentPrice;
@@ -137,6 +152,7 @@ const PriceOverrideManager = ({
         </DialogHeader>
         
         <div className="space-y-4">
+          {/* Current Price Display */}
           <div className="bg-gray-800 rounded-lg p-3">
             <div className="flex justify-between items-center text-sm">
               <span className="text-gray-400">Current Price:</span>
@@ -148,6 +164,7 @@ const PriceOverrideManager = ({
             </div>
           </div>
 
+          {/* New Price Input */}
           <div>
             <Label htmlFor="new-price" className="text-white">New Price</Label>
             <div className="flex space-x-2 mt-1">
@@ -170,6 +187,7 @@ const PriceOverrideManager = ({
             </div>
           </div>
 
+          {/* Permission Warnings */}
           {parseFloat(newPrice) < currentPrice && !canDecrease && (
             <div className="bg-red-900/20 border border-red-600/50 rounded-lg p-3">
               <div className="flex items-center space-x-2">
@@ -184,6 +202,18 @@ const PriceOverrideManager = ({
             </div>
           )}
 
+          {parseFloat(newPrice) > currentPrice && canIncrease && (
+            <div className="bg-green-900/20 border border-green-600/50 rounded-lg p-3">
+              <div className="flex items-center space-x-2">
+                <CheckCircle className="h-4 w-4 text-green-400" />
+                <span className="text-green-400 text-sm font-medium">
+                  Price increase allowed
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* Reason Input */}
           <div>
             <Label htmlFor="reason" className="text-white">Reason for Change *</Label>
             <Textarea
@@ -196,11 +226,14 @@ const PriceOverrideManager = ({
             />
           </div>
 
-          <div className="text-xs text-gray-400 space-y-1">
+          {/* Permission Summary */}
+          <div className="text-xs text-gray-400 space-y-1 bg-gray-800 rounded p-2">
+            <p className="font-medium text-gray-300">Your Permissions:</p>
             <p>• {canIncrease ? '✓' : '✗'} Price increases allowed</p>
             <p>• {canDecrease ? '✓' : '✗'} Price decreases allowed</p>
           </div>
 
+          {/* Action Buttons */}
           <div className="flex space-x-2">
             <Button
               onClick={handlePriceSubmit}
