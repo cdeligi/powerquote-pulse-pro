@@ -671,12 +671,12 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
           </Card>
 
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full bg-gray-800" style={{ gridTemplateColumns: `repeat(${level1Products.length + 1}, 1fr)` }}>
+            <TabsList className="flex w-full overflow-x-auto bg-gray-800 space-x-2">
               {level1Products.map((product) => (
-                <TabsTrigger 
+                <TabsTrigger
                   key={product.id}
-                  value={product.id} 
-                  className="text-white data-[state=active]:bg-red-600 data-[state=active]:text-white"
+                  value={product.id}
+                  className="flex-shrink-0 whitespace-normal text-white data-[state=active]:bg-red-600 data-[state=active]:text-white"
                 >
                   {product.name}
                   {product.category && (
@@ -686,9 +686,9 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
                   )}
                 </TabsTrigger>
               ))}
-              <TabsTrigger 
-                value="additional-config" 
-                className="text-white data-[state=active]:bg-red-600 data-[state=active]:text-white"
+              <TabsTrigger
+                value="additional-config"
+                className="flex-shrink-0 whitespace-normal text-white data-[state=active]:bg-red-600 data-[state=active]:text-white"
               >
                 Additional Config
                 <Badge variant="outline" className="ml-2 text-xs">
