@@ -8,12 +8,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { User } from "@/types/auth";
 import QuoteApprovalDashboard from "./QuoteApprovalDashboard";
 import UserManagementEnhanced from "./UserManagementEnhanced";
-import ProductManagement from "./ProductManagement";
+import { ProductManagement } from "./ProductManagement";
 import QuoteFieldConfiguration from "./QuoteFieldConfiguration";
 import AdminSettings from "./AdminSettings";
 import FinanceApprovalSettings from "./FinanceApprovalSettings";
 import UserActivityMonitor from "./UserActivityMonitor";
-import MarginDashboard from "./MarginDashboard";
+import AdminMarginDashboard from "./AdminMarginDashboard";
 import { Settings, Users, Package, FileText, BarChart3, Shield, Activity, DollarSign } from "lucide-react";
 
 interface AdminPanelProps {
@@ -95,7 +95,7 @@ const AdminPanel = ({ user }: AdminPanelProps) => {
           </TabsContent>
 
           <TabsContent value="margin" className="mt-6">
-            <MarginDashboard user={user} />
+            <AdminMarginDashboard user={user} />
           </TabsContent>
 
           <TabsContent value="finance" className="mt-6">
