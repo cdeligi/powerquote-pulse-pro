@@ -1,256 +1,200 @@
 
+/**
+ * © 2025 Qualitrol Corp. All rights reserved.
+ * Confidential and proprietary. Unauthorized copying or distribution is prohibited.
+ */
+
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
-import { Trash2, Edit3, Save, X, Settings } from 'lucide-react';
-import { BOMItem } from '@/types/product';
+import { Edit, DollarSign, Package, Settings } from 'lucide-react';
+import { BOMItem } from '@/types/bom';
+import { PriceOverrideManager } from './PriceOverrideManager';
+import { useAuth } from '@/hooks/useAuth';
 
 interface BOMDisplayProps {
-  bomItems: BOMItem[];
-  onUpdateBOM: (items: BOMItem[]) => void;
-  onEditConfiguration?: (item: BOMItem) => void;
-  canSeePrices: boolean;
+  items: BOMItem[];
+  onUpdateItem: (itemId: string, updates: Partial<BOMItem>) => void;
+  onRemoveItem: (itemId: string) => void;
+  readOnly?: boolean;
 }
 
-const BOMDisplay = ({ bomItems, onUpdateBOM, onEditConfiguration, canSeePrices }: BOMDisplayProps) => {
-  const [editingItem, setEditingItem] = useState<string | null>(null);
-  const [editQuantity, setEditQuantity] = useState<number>(1);
+const BOMDisplay = ({ items, onUpdateItem, onRemoveItem, readOnly = false }: BOMDisplayProps) => {
+  const { user } = useAuth();
+  const [editingItemId, setEditingItemId] = useState<string | null>(null);
 
-  const handleEditStart = (item: BOMItem) => {
-    setEditingItem(item.id);
-    setEditQuantity(item.quantity);
+  const getTotalPrice = () => {
+    return items.reduce((sum, item) => sum + (item.unitPrice * item.quantity), 0);
   };
 
-  const handleEditSave = (itemId: string) => {
-    const updatedItems = bomItems.map(item =>
-      item.id === itemId ? { ...item, quantity: editQuantity } : item
-    );
-    onUpdateBOM(updatedItems);
-    setEditingItem(null);
+  const getTotalCost = () => {
+    return items.reduce((sum, item) => sum + (item.unitCost * item.quantity), 0);
   };
 
-  const handleEditCancel = () => {
-    setEditingItem(null);
-    setEditQuantity(1);
+  const getMargin = () => {
+    const totalPrice = getTotalPrice();
+    const totalCost = getTotalCost();
+    if (totalPrice === 0) return 0;
+    return ((totalPrice - totalCost) / totalPrice) * 100;
   };
 
-  const handleRemoveItem = (itemId: string) => {
-    const updatedItems = bomItems.filter(item => item.id !== itemId);
-    onUpdateBOM(updatedItems);
+  const canEditPrices = user && ['admin', 'finance', 'level2'].includes(user.role);
+
+  const handlePriceUpdate = (itemId: string, newPrice: number, reason: string) => {
+    const item = items.find(i => i.id === itemId);
+    if (!item) return;
+
+    const updatedItem = {
+      ...item,
+      unitPrice: newPrice,
+      totalPrice: newPrice * item.quantity,
+      margin: newPrice > 0 ? ((newPrice - item.unitCost) / newPrice) * 100 : 0
+    };
+
+    onUpdateItem(itemId, updatedItem);
+    setEditingItemId(null);
   };
 
-  const handleConfigurationEdit = (item: BOMItem) => {
-    if (onEditConfiguration) {
-      onEditConfiguration(item);
-    }
-  };
-
-  const calculateTotal = () => {
-    return bomItems.reduce((total, item) => {
-      const price = item.product.price || 0;
-      return total + (price * item.quantity);
-    }, 0);
-  };
-
-  const isConfigurableItem = (item: BOMItem) => {
-    // Check if item is configurable - includes QTMS, Level 4 products, analog sensors, and bushing configurations
-    return item.product.type === 'QTMS' || 
-           item.configuration || 
-           (item.product as any).configurationType ||
-           item.product.name?.toLowerCase().includes('analog') ||
-           item.product.name?.toLowerCase().includes('bushing') ||
-           item.product.name?.toLowerCase().includes('digital');
-  };
-
-  const needsConfiguration = (item: BOMItem) => {
-    // Items that require configuration but don't have it yet
-    const hasLevel4Config = (item.product as any).configurationType;
-    const hasAnalogConfig = item.product.name?.toLowerCase().includes('analog');
-    const hasBushingConfig = item.product.name?.toLowerCase().includes('bushing');
-    const hasDigitalConfig = item.product.name?.toLowerCase().includes('digital');
-    
-    return (hasLevel4Config || hasAnalogConfig || hasBushingConfig || hasDigitalConfig) && !item.configuration;
-  };
-
-  const getPartNumber = (item: BOMItem) => {
-    return item.partNumber || item.product.partNumber || 'N/A';
-  };
-
-  if (bomItems.length === 0) {
+  if (items.length === 0) {
     return (
-      <Card className="bg-gray-900 border-gray-800 h-fit">
-        <CardHeader>
-          <CardTitle className="text-white">Bill of Materials</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-gray-400 text-center py-8">
-            No items selected yet. Start building your configuration.
-          </p>
+      <Card className="bg-gray-900 border-gray-800">
+        <CardContent className="p-8 text-center">
+          <Package className="h-16 w-16 text-gray-500 mx-auto mb-4" />
+          <h3 className="text-xl font-semibold text-white mb-2">No Items in BOM</h3>
+          <p className="text-gray-400">Add products to your Bill of Materials to get started.</p>
         </CardContent>
       </Card>
     );
   }
 
   return (
-    <Card className="bg-gray-900 border-gray-800 h-fit">
-      <CardHeader>
-        <CardTitle className="text-white flex items-center justify-between">
-          Bill of Materials
-          <Badge variant="outline" className="text-white border-gray-500">
-            {bomItems.length} items
-          </Badge>
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        {bomItems.map((item) => (
-          <div key={item.id} className="p-3 bg-gray-800 rounded-lg border border-gray-700">
-            <div className="flex justify-between items-start mb-2">
-              <div className="flex-1 min-w-0">
-                <h4 className="text-white font-medium truncate">{item.product.name}</h4>
-                {/* Enhanced description display from product data */}
-                {item.product.description && (
-                  <p className="text-gray-400 text-xs mt-1">{item.product.description}</p>
-                )}
-                
-                {/* Part Number Display */}
-                <div className="flex items-center space-x-2 mt-1">
-                  <Badge variant="outline" className="text-xs text-green-400 border-green-400">
-                    P/N: {getPartNumber(item)}
-                  </Badge>
-                  {item.slot && (
-                    <Badge variant="outline" className="text-xs text-blue-400 border-blue-400">
-                      Slot {item.slot}
-                    </Badge>
-                  )}
-                  {isConfigurableItem(item) && (
-                    <Badge variant="outline" className="text-xs text-purple-400 border-purple-400">
-                      Configurable
-                    </Badge>
-                  )}
-                  {needsConfiguration(item) && (
-                    <Badge variant="outline" className="text-xs text-orange-400 border-orange-400">
-                      Config Required
-                    </Badge>
-                  )}
+    <div className="space-y-6">
+      {/* BOM Items */}
+      <div className="space-y-4">
+        {items.map((item) => (
+          <Card key={item.id} className="bg-gray-900 border-gray-800">
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <div className="bg-blue-600 p-2 rounded-lg">
+                    <Package className="h-5 w-5 text-white" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-white text-lg">{item.name}</CardTitle>
+                    <p className="text-gray-400 text-sm">{item.description}</p>
+                    {item.partNumber && (
+                      <p className="text-gray-500 text-xs">Part: {item.partNumber}</p>
+                    )}
+                  </div>
                 </div>
-              </div>
-              
-              <div className="flex items-center space-x-2 ml-2">
-                {isConfigurableItem(item) && onEditConfiguration && (
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => handleConfigurationEdit(item)}
-                    className="h-6 w-6 p-0 text-purple-400 hover:text-purple-300"
-                    title="Edit configuration"
-                  >
-                    <Settings className="h-3 w-3" />
-                  </Button>
-                )}
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => handleEditStart(item)}
-                  className="h-6 w-6 p-0 text-gray-400 hover:text-white"
-                  title="Edit quantity"
-                >
-                  <Edit3 className="h-3 w-3" />
-                </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => handleRemoveItem(item.id)}
-                  className="h-6 w-6 p-0 text-red-400 hover:text-red-300"
-                  title="Remove item"
-                >
-                  <Trash2 className="h-3 w-3" />
-                </Button>
-              </div>
-            </div>
-            
-            <div className="flex justify-between items-center">
-              <div className="flex items-center space-x-2">
-                <span className="text-gray-400 text-sm">Qty:</span>
-                {editingItem === item.id ? (
-                  <div className="flex items-center space-x-1">
-                    <Input
-                      type="number"
-                      min="1"
-                      value={editQuantity}
-                      onChange={(e) => setEditQuantity(parseInt(e.target.value) || 1)}
-                      className="w-16 h-6 text-xs bg-gray-700 border-gray-600 text-white"
-                    />
-                    <Button
-                      size="sm"
-                      onClick={() => handleEditSave(item.id)}
-                      className="h-6 w-6 p-0 bg-green-600 hover:bg-green-700"
-                      title="Save"
-                    >
-                      <Save className="h-3 w-3" />
-                    </Button>
+                <div className="flex items-center space-x-2">
+                  <Badge variant="outline" className="text-blue-400 border-blue-600">
+                    Qty: {item.quantity}
+                  </Badge>
+                  {canEditPrices && !readOnly && (
                     <Button
                       size="sm"
                       variant="ghost"
-                      onClick={handleEditCancel}
-                      className="h-6 w-6 p-0 text-gray-400 hover:text-white"
-                      title="Cancel"
+                      onClick={() => setEditingItemId(item.id)}
+                      className="text-green-400 hover:text-green-300 hover:bg-green-900/20"
                     >
-                      <X className="h-3 w-3" />
+                      <Edit className="h-4 w-4" />
                     </Button>
-                  </div>
-                ) : (
-                  <span className="text-white font-medium">{item.quantity}</span>
-                )}
-              </div>
-              
-              {canSeePrices && (
-                <div className="text-right">
-                  <div className="text-white font-medium">
-                    ${((item.product.price || 0) * item.quantity).toLocaleString()}
-                  </div>
-                  {item.quantity > 1 && (
-                    <div className="text-gray-400 text-xs">
-                      ${item.product.price?.toLocaleString() || '—'} each
-                    </div>
-                  )}
-                  {/* Display cost information if available */}
-                  {item.product.cost && (
-                    <div className="text-orange-400 text-xs">
-                      Cost: ${((item.product.cost || 0) * item.quantity).toLocaleString()}
-                    </div>
                   )}
                 </div>
-              )}
-            </div>
-          </div>
-        ))}
-        
-        {canSeePrices && bomItems.length > 0 && (
-          <div className="pt-3 border-t border-gray-700">
-            <div className="flex justify-between items-center">
-              <span className="text-white font-semibold">Total:</span>
-              <span className="text-white font-bold text-lg">
-                ${calculateTotal().toLocaleString()}
-              </span>
-            </div>
-            {/* Display total cost if available */}
-            {bomItems.some(item => item.product.cost) && (
-              <div className="flex justify-between items-center mt-1">
-                <span className="text-orange-400 text-sm">Total Cost:</span>
-                <span className="text-orange-400 text-sm font-medium">
-                  ${bomItems.reduce((total, item) => {
-                    const cost = item.product.cost || 0;
-                    return total + (cost * item.quantity);
-                  }, 0).toLocaleString()}
-                </span>
               </div>
-            )}
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="bg-gray-800 p-3 rounded-lg">
+                  <div className="flex items-center space-x-2 mb-1">
+                    <DollarSign className="h-4 w-4 text-green-400" />
+                    <span className="text-gray-400 text-sm">Unit Price</span>
+                  </div>
+                  <p className="text-white font-semibold">${item.unitPrice.toFixed(2)}</p>
+                </div>
+                
+                <div className="bg-gray-800 p-3 rounded-lg">
+                  <div className="flex items-center space-x-2 mb-1">
+                    <Settings className="h-4 w-4 text-orange-400" />
+                    <span className="text-gray-400 text-sm">Unit Cost</span>
+                  </div>
+                  <p className="text-white font-semibold">${item.unitCost.toFixed(2)}</p>
+                </div>
+                
+                <div className="bg-gray-800 p-3 rounded-lg">
+                  <div className="text-gray-400 text-sm mb-1">Total Price</div>
+                  <p className="text-green-400 font-semibold">${item.totalPrice.toFixed(2)}</p>
+                </div>
+                
+                <div className="bg-gray-800 p-3 rounded-lg">
+                  <div className="text-gray-400 text-sm mb-1">Margin</div>
+                  <p className={`font-semibold ${item.margin >= 25 ? 'text-green-400' : item.margin >= 15 ? 'text-yellow-400' : 'text-red-400'}`}>
+                    {item.margin.toFixed(1)}%
+                  </p>
+                </div>
+              </div>
+
+              {editingItemId === item.id && (
+                <div className="mt-4 border-t border-gray-700 pt-4">
+                  <PriceOverrideManager
+                    item={item}
+                    onPriceUpdate={(newPrice, reason) => handlePriceUpdate(item.id, newPrice, reason)}
+                    onCancel={() => setEditingItemId(null)}
+                  />
+                </div>
+              )}
+
+              {!readOnly && (
+                <div className="mt-4 flex justify-end">
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    onClick={() => onRemoveItem(item.id)}
+                    className="bg-red-600 hover:bg-red-700"
+                  >
+                    Remove Item
+                  </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {/* BOM Summary */}
+      <Card className="bg-gray-900 border-gray-800">
+        <CardHeader>
+          <CardTitle className="text-white flex items-center">
+            <DollarSign className="mr-2 h-5 w-5 text-green-500" />
+            BOM Summary
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="bg-gray-800 p-4 rounded-lg text-center">
+              <div className="text-2xl font-bold text-green-400">${getTotalPrice().toFixed(2)}</div>
+              <div className="text-gray-400 text-sm">Total Price</div>
+            </div>
+            <div className="bg-gray-800 p-4 rounded-lg text-center">
+              <div className="text-2xl font-bold text-orange-400">${getTotalCost().toFixed(2)}</div>
+              <div className="text-gray-400 text-sm">Total Cost</div>
+            </div>
+            <div className="bg-gray-800 p-4 rounded-lg text-center">
+              <div className="text-2xl font-bold text-blue-400">${(getTotalPrice() - getTotalCost()).toFixed(2)}</div>
+              <div className="text-gray-400 text-sm">Gross Profit</div>
+            </div>
+            <div className="bg-gray-800 p-4 rounded-lg text-center">
+              <div className={`text-2xl font-bold ${getMargin() >= 25 ? 'text-green-400' : getMargin() >= 15 ? 'text-yellow-400' : 'text-red-400'}`}>
+                {getMargin().toFixed(1)}%
+              </div>
+              <div className="text-gray-400 text-sm">Overall Margin</div>
+            </div>
           </div>
-        )}
-      </CardContent>
-    </Card>
+        </CardContent>
+      </Card>
+    </div>
   );
 };
 
