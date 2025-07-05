@@ -3,6 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { TrendingUp, TrendingDown, BarChart3, DollarSign, FileText, CheckCircle, XCircle, Clock } from "lucide-react";
 import { QuoteAnalytics, formatCurrency } from "@/utils/quoteAnalytics";
+import QuoteVolumeChart from "./QuoteVolumeChart";
 
 interface QuoteAnalyticsDashboardProps {
   analytics: QuoteAnalytics;
@@ -96,6 +97,9 @@ const QuoteAnalyticsDashboard = ({ analytics, isAdmin = false }: QuoteAnalyticsD
           color="text-red-500"
         />
       </div>
+
+      {/* Quote Volume Trend Chart */}
+      <QuoteVolumeChart />
 
       {/* Quoted Value */}
       <Card className="bg-gray-900 border-gray-800">
