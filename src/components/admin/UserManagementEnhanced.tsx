@@ -1,4 +1,9 @@
 
+/**
+ * © 2025 Qualitrol Corp. All rights reserved.
+ * Confidential and proprietary. Unauthorized copying or distribution is prohibited.
+ */
+
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -321,6 +326,16 @@ const UserManagementEnhanced = () => {
                             <div className="text-xs text-gray-500">
                               Logins: {profile.login_count}
                             </div>
+                            {profile.account_locked_until && new Date(profile.account_locked_until) > new Date() && (
+                              <Badge className="bg-red-800 text-white text-xs">
+                                Locked
+                              </Badge>
+                            )}
+                            {profile.failed_login_attempts > 0 && (
+                              <Badge className="bg-orange-600 text-white text-xs">
+                                {profile.failed_login_attempts} failed attempts
+                              </Badge>
+                            )}
                           </div>
                         </div>
                       </div>
