@@ -1,4 +1,9 @@
 
+/**
+ * © 2025 Qualitrol Corp. All rights reserved.
+ * Confidential and proprietary. Unauthorized copying or distribution is prohibited.
+ */
+
 import { useState, useEffect, useContext, createContext } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
@@ -132,6 +137,41 @@ function useProvideAuth(): AuthContextType {
     }
   };
 
+  const trackUserSession = async () => {
+    if (!session?.user?.id) return;
+    
+    try {
+      const userAgent = navigator.userAgent;
+      const ipResponse = await fetch('https://api.ipify.org?format=json');
+      const ipData = await ipResponse.json();
+      
+      // Get device info
+      const deviceInfo = {
+        userAgent,
+        platform: navigator.platform,
+        vendor: navigator.vendor,
+        language: navigator.language,
+        screen: `${screen.width}x${screen.height}`,
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
+      };
+
+      // Get location data (approximate from IP)
+      const locationResponse = await fetch(`http://ip-api.com/json/${ipData.ip}`);
+      const locationData = await locationResponse.json();
+
+      await supabase.rpc('track_user_session', {
+        p_user_id: session.user.id,
+        p_session_token: session.access_token,
+        p_ip_address: ipData.ip,
+        p_user_agent: userAgent,
+        p_device_info: deviceInfo,
+        p_location_data: locationData
+      });
+    } catch (error) {
+      console.error('Failed to track user session:', error);
+    }
+  };
+
   useEffect(() => {
     console.log('[useAuth] Initializing auth state...');
     
@@ -161,6 +201,7 @@ function useProvideAuth(): AuthContextType {
                 p_success: true
               });
               await logSecurityEvent('session_established');
+              await trackUserSession();
             }
           } catch (error) {
             console.error('[useAuth] Error fetching profile in auth state change:', error);

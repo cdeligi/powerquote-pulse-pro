@@ -1,4 +1,9 @@
 
+/**
+ * © 2025 Qualitrol Corp. All rights reserved.
+ * Confidential and proprietary. Unauthorized copying or distribution is prohibited.
+ */
+
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -38,6 +43,15 @@ export interface Quote {
   rejection_reason?: string;
   reviewed_at?: string;
   reviewed_by?: string;
+  price_override_history?: Array<{
+    item_id: string;
+    original_price: number;
+    new_price: number;
+    reason: string;
+    timestamp: string;
+    approved_by: string;
+  }>;
+  requires_finance_approval?: boolean;
 }
 
 export interface BOMItemWithDetails {
@@ -147,31 +161,44 @@ export const useQuotes = () => {
   };
 
   const checkMarginApprovalRequired = async (discountedMargin: number, userRole: string) => {
-    const thresholds = await getMarginThresholds();
-    
-    // Find the applicable threshold
-    const applicableThreshold = thresholds.find(t => discountedMargin < t.minimum_margin_percent);
-    
-    if (!applicableThreshold) return { canApprove: true, requiresFinance: false };
-    
-    // Admin can approve up to 25% margin
-    const adminThreshold = 25;
-    
-    if (discountedMargin < adminThreshold && userRole === 'admin') {
-      return { canApprove: true, requiresFinance: false };
-    }
-    
-    // Finance required for margins below admin threshold
-    if (discountedMargin < adminThreshold && userRole !== 'finance') {
+    try {
+      // Get margin limit from settings
+      const { data: settingsData, error: settingsError } = await supabase
+        .from('app_settings')
+        .select('value')
+        .eq('key', 'margin_limit')
+        .single();
+
+      if (settingsError) {
+        console.error('Error fetching margin limit:', settingsError);
+        return { canApprove: true, requiresFinance: false };
+      }
+
+      const marginLimit = parseFloat(settingsData.value as string) || 25;
+      
+      // Check if margin is below limit
+      if (discountedMargin >= marginLimit) {
+        return { canApprove: true, requiresFinance: false };
+      }
+
+      // Finance role can approve anything
+      if (userRole === 'finance') {
+        return { canApprove: true, requiresFinance: false };
+      }
+
+      // Admin can approve margins above admin threshold (15%)
+      const adminThreshold = 15;
+      if (userRole === 'admin' && discountedMargin >= adminThreshold) {
+        return { canApprove: true, requiresFinance: false };
+      }
+
+      // Requires finance approval
+      return { canApprove: false, requiresFinance: true };
+
+    } catch (err) {
+      console.error('Failed to check margin approval:', err);
       return { canApprove: false, requiresFinance: true };
     }
-    
-    // Finance can approve anything
-    if (userRole === 'finance') {
-      return { canApprove: true, requiresFinance: false };
-    }
-    
-    return { canApprove: false, requiresFinance: true };
   };
 
   const updateQuoteStatus = async (
@@ -267,7 +294,8 @@ export const useQuotes = () => {
   const updateBOMItemPrice = async (
     bomItemId: string,
     newPrice: number,
-    reason: string
+    reason: string,
+    isIncrease: boolean = true
   ) => {
     console.log(`Updating BOM item ${bomItemId} price to ${newPrice}`);
     
@@ -281,6 +309,36 @@ export const useQuotes = () => {
 
       if (fetchError) throw fetchError;
 
+      // Get current user
+      const { data: currentUser } = await supabase.auth.getUser();
+      const { data: userProfile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', currentUser.user?.id)
+        .single();
+
+      // Check permissions for price changes
+      const canIncrease = ['admin', 'finance', 'level2'].includes(userProfile?.role || '');
+      const canDecrease = ['admin', 'finance'].includes(userProfile?.role || '');
+
+      if (!isIncrease && !canDecrease) {
+        toast({
+          title: "Permission Denied",
+          description: "You don't have permission to decrease prices. Use the discount request process instead.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      if (isIncrease && !canIncrease) {
+        toast({
+          title: "Permission Denied",
+          description: "You don't have permission to increase prices",
+          variant: "destructive"
+        });
+        return;
+      }
+
       // Calculate new totals
       const newTotalPrice = newPrice * currentItem.quantity;
       const newMargin = currentItem.unit_cost > 0 
@@ -292,7 +350,7 @@ export const useQuotes = () => {
         original_price: currentItem.unit_price,
         new_price: newPrice,
         adjusted_at: new Date().toISOString(),
-        adjusted_by: (await supabase.auth.getUser()).data.user?.id,
+        adjusted_by: currentUser.user?.id,
         reason
       };
 
@@ -313,6 +371,32 @@ export const useQuotes = () => {
         .eq('id', bomItemId);
 
       if (updateError) throw updateError;
+
+      // Update quote with price override history
+      const { data: quoteData } = await supabase
+        .from('quotes')
+        .select('price_override_history')
+        .eq('id', currentItem.quote_id)
+        .single();
+
+      const overrideEntry = {
+        item_id: bomItemId,
+        original_price: currentItem.unit_price,
+        new_price: newPrice,
+        reason,
+        timestamp: new Date().toISOString(),
+        approved_by: currentUser.user?.id
+      };
+
+      const updatedOverrides = [
+        ...(quoteData?.price_override_history || []),
+        overrideEntry
+      ];
+
+      await supabase
+        .from('quotes')
+        .update({ price_override_history: updatedOverrides })
+        .eq('id', currentItem.quote_id);
 
       // Recalculate quote totals
       await recalculateQuoteTotals(currentItem.quote_id);
@@ -348,6 +432,11 @@ export const useQuotes = () => {
       const grossProfit = totalPrice - totalCost;
       const margin = totalPrice > 0 ? (grossProfit / totalPrice) * 100 : 0;
 
+      // Check if finance approval is required
+      const requiresFinanceApproval = await supabase.rpc('check_finance_approval_required', {
+        p_quote_id: quoteId
+      });
+
       await supabase
         .from('quotes')
         .update({
@@ -355,6 +444,7 @@ export const useQuotes = () => {
           discounted_value: totalPrice,
           gross_profit: grossProfit,
           discounted_margin: margin,
+          requires_finance_approval: requiresFinanceApproval.data,
           updated_at: new Date().toISOString()
         })
         .eq('id', quoteId);
