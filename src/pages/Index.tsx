@@ -24,6 +24,12 @@ const Index = () => {
       } else {
         console.log('Logout successful');
       }
+      // Log the auth state immediately after sign-out
+      console.log('Auth state after logout call:', {
+        user,
+        loading,
+        timestamp: new Date().toISOString(),
+      });
     } catch (err) {
       console.error('Unexpected logout error:', err);
     }
