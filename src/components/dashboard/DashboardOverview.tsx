@@ -1,4 +1,3 @@
-
 /**
  * © 2025 Qualitrol Corp. All rights reserved.
  * Confidential and proprietary. Unauthorized copying or distribution is prohibited.
@@ -8,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { TrendingUp, TrendingDown, DollarSign, FileText, Clock, AlertCircle } from "lucide-react";
+import { TrendingUp, TrendingDown, DollarSign, FileText, Clock, AlertCircle, RefreshCw } from "lucide-react";
 import QuoteVolumeChart from "./QuoteVolumeChart";
 import { useState } from "react";
 
@@ -44,9 +43,11 @@ interface QuoteAnalytics {
 interface DashboardOverviewProps {
   analytics: QuoteAnalytics;
   isAdmin: boolean;
+  loading?: boolean;
+  onRetry?: () => void;
 }
 
-const DashboardOverview = ({ analytics, isAdmin }: DashboardOverviewProps) => {
+const DashboardOverview = ({ analytics, isAdmin, loading = false, onRetry }: DashboardOverviewProps) => {
   const [timeFilter, setTimeFilter] = useState("3months");
 
   const getFilteredData = () => {
@@ -108,6 +109,46 @@ const DashboardOverview = ({ analytics, isAdmin }: DashboardOverviewProps) => {
       </div>
     );
   };
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold text-white mb-2">Dashboard Overview</h1>
+            <p className="text-gray-300">Loading analytics data...</p>
+          </div>
+          <div className="flex items-center space-x-4">
+            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div>
+            {onRetry && (
+              <Button 
+                onClick={onRetry}
+                variant="outline"
+                size="sm"
+                className="border-gray-600 text-white hover:bg-gray-800"
+              >
+                <RefreshCw className="mr-2 h-4 w-4" />
+                Retry
+              </Button>
+            )}
+          </div>
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {[...Array(4)].map((_, i) => (
+            <Card key={i} className="bg-gray-900 border-gray-800">
+              <CardHeader className="pb-2">
+                <div className="h-4 bg-gray-700 rounded animate-pulse"></div>
+              </CardHeader>
+              <CardContent>
+                <div className="h-8 bg-gray-700 rounded animate-pulse"></div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -214,7 +255,17 @@ const DashboardOverview = ({ analytics, isAdmin }: DashboardOverviewProps) => {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <QuoteVolumeChart data={filteredAnalytics.monthlyBreakdown} />
+          {filteredAnalytics.monthlyBreakdown.length > 0 ? (
+            <QuoteVolumeChart data={filteredAnalytics.monthlyBreakdown} />
+          ) : (
+            <div className="h-80 flex items-center justify-center text-gray-400">
+              <div className="text-center">
+                <TrendingUp className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <p>No analytics data available</p>
+                <p className="text-sm">Data will appear as quotes are created</p>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -335,6 +386,16 @@ const DashboardOverview = ({ analytics, isAdmin }: DashboardOverviewProps) => {
               <TrendingUp className="mr-2 h-4 w-4" />
               View Detailed Analytics
             </Button>
+            {onRetry && (
+              <Button 
+                onClick={onRetry}
+                variant="outline" 
+                className="border-gray-600 text-gray-300 hover:bg-gray-800"
+              >
+                <RefreshCw className="mr-2 h-4 w-4" />
+                Refresh Data
+              </Button>
+            )}
           </div>
         </CardContent>
       </Card>
