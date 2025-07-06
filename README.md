@@ -1,132 +1,312 @@
-# Welcome to your Lovable project
 
-## Project info
+# PowerQuotePro - Qualitrol Transformer Quoting System
 
-**URL**: https://lovable.dev/projects/8d08ecff-3bea-40af-9fd0-71cf8c824485
+PowerQuotePro is a comprehensive enterprise quoting system designed specifically for Qualitrol Corporation's transformer monitoring solutions. The platform enables sales teams to create, manage, and approve quotes for QTMS (Qualitrol Transformer Monitoring System) configurations, DGA (Dissolved Gas Analysis) units, and other transformer monitoring equipment.
 
-## How can I edit this code?
+## 🚀 Project Overview
 
-There are several ways of editing your application.
+PowerQuotePro streamlines the quote-to-order process with:
+- **Multi-level Product Configuration**: Build complex QTMS configurations with chassis, cards, and sensor options
+- **Advanced Pricing Management**: Dynamic pricing with discount approvals and margin controls
+- **Role-based Access Control**: Level 1, Level 2, Admin, and Finance user roles with specific permissions
+- **Quote Approval Workflow**: Automated approval routing based on margins and discount thresholds
+- **Real-time Analytics**: Dashboard with quote volume trends and performance metrics
+- **Integration Ready**: Oracle Customer ID and Salesforce Opportunity tracking
 
-**Use Lovable**
+## 🛠 Technology Stack
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/8d08ecff-3bea-40af-9fd0-71cf8c824485) and start prompting.
+### Frontend
+- **React 18** with TypeScript for type-safe development
+- **Vite** for fast development and optimized builds
+- **Tailwind CSS** for utility-first responsive styling
+- **shadcn/ui** for consistent, accessible UI components
+- **Recharts** for interactive data visualizations
+- **React Router** for client-side routing
+- **TanStack Query** for server state management
 
-Changes made via Lovable will be committed automatically to this repo.
+### Backend & Database
+- **Supabase** for authentication, database, and real-time features
+- **PostgreSQL** with Row Level Security (RLS) policies
+- **Edge Functions** for serverless backend logic
+- **Real-time subscriptions** for live quote updates
 
-**Use your preferred IDE**
+### Development Tools
+- **TypeScript** for static type checking
+- **ESLint** for code quality
+- **Prettier** for code formatting
+- **Cypress** for end-to-end testing
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+## 📋 Prerequisites
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+Before running this project, ensure you have:
+- **Node.js** (v18 or higher) - [Install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+- **npm** (comes with Node.js)
+- **Supabase Account** - [Create account](https://supabase.com)
+- **Git** for version control
 
-Follow these steps:
+## 🔧 Installation & Setup
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
+### 1. Clone the Repository
+```bash
 git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
 cd <YOUR_PROJECT_NAME>
+```
 
-# Step 3: Install the necessary dependencies.
-npm i
+### 2. Install Dependencies
+```bash
+npm install
+```
 
-# Step 4: Copy `.env.example` to `.env` and fill in your credentials.
+### 3. Environment Configuration
+```bash
+# Copy the environment template
 cp .env.example .env
-# Edit the `.env` file and set the variables listed below.
 
-# Step 5: Start the development server with auto-reloading and an instant preview.
-npm run dev
+# Edit .env and add your Supabase credentials
+VITE_SUPABASE_URL=https://your-project.supabase.co
+VITE_SUPABASE_ANON_KEY=your-anon-key
 ```
 
-**Edit a file directly in GitHub**
+**Finding Your Supabase Credentials:**
+1. Go to [Supabase Dashboard](https://supabase.com/dashboard)
+2. Select your project
+3. Go to Settings → API
+4. Copy the Project URL and anon/public key
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
-
-**Use GitHub Codespaces**
-
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
-
-## What technologies are used for this project?
-
-This project is built with:
-
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
-
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/8d08ecff-3bea-40af-9fd0-71cf8c824485) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
-
-## Environment Variables
-
-An `.env.example` file is checked into the repository. Copy it to `.env` and provide your Supabase credentials. The `.env` file is ignored by Git, so you'll need to recreate it whenever you clone the repo.
-
-Required variables:
-
-```dotenv
-VITE_SUPABASE_URL=<your-supabase-url>
-VITE_SUPABASE_ANON_KEY=<your-supabase-anon-key>
-```
-
-If you plan to run migrations you will also need to authenticate the Supabase CLI with `SUPABASE_ACCESS_TOKEN`.
-
-## Installing Dependencies
-
-Install all project dependencies with npm:
-
-```sh
-npm i
-```
-
-## Running the Development Server
-
-Launch the Vite dev server with:
-
-```sh
-npm run dev
-```
-
-By default, Vite listens on <http://localhost:5173>. This project overrides the
-port to `8080` in [`vite.config.ts`](vite.config.ts) under `server.port`. Adjust
-that value if you'd like to run the server on a different port.
-
-## Running Supabase Migrations
-
-With the Supabase CLI installed and authenticated, apply the migrations in the `supabase` directory with:
-
-```sh
+### 4. Database Setup
+```bash
+# Run database migrations
 npx supabase db push
+
+# Optional: Seed with sample data
+npx supabase db seed
 ```
 
-## Cypress Tests
+### 5. Start Development Server
+```bash
+npm run dev
+```
 
-End-to-end tests are located in the `cypress/` folder. Execute them in headless mode with:
+The application will be available at `http://localhost:8080`
 
-```sh
+## 🏗 Project Structure
+
+```
+src/
+├── components/           # Reusable UI components
+│   ├── admin/           # Admin panel components
+│   ├── auth/            # Authentication components
+│   ├── bom/             # Bill of Materials builder
+│   ├── dashboard/       # Dashboard and analytics
+│   ├── quotes/          # Quote management
+│   └── ui/              # shadcn/ui components
+├── hooks/               # Custom React hooks
+├── integrations/        # Third-party integrations
+│   └── supabase/        # Supabase client and types
+├── pages/               # Route components
+├── types/               # TypeScript type definitions
+├── utils/               # Utility functions
+└── data/                # Static data and configurations
+
+supabase/
+├── migrations/          # Database schema migrations
+└── config.toml         # Supabase configuration
+```
+
+## 🎯 Key Features
+
+### Product Configuration System
+- **Level 1**: Base products (QTMS Chassis, DGA Units)
+- **Level 2**: Product variants and options
+- **Level 3**: Cards and customizations
+- **Level 4**: Detailed sensor configurations
+
+### User Roles & Permissions
+- **Level 1**: Basic quote creation and viewing
+- **Level 2**: Price adjustments and quote approvals
+- **Admin**: Full system access and user management
+- **Finance**: Financial oversight and margin control
+
+### Quote Management
+- Dynamic BOM building with real-time pricing
+- Multi-currency support (USD, EUR, GBP, CAD)
+- Discount request and approval workflow
+- Quote status tracking and history
+
+### Analytics Dashboard
+- Quote volume trends and performance metrics
+- Margin analysis and profitability insights
+- User activity monitoring
+- Approval rate tracking
+
+## 🔐 Authentication Setup
+
+### Supabase Auth Configuration
+1. In Supabase Dashboard, go to Authentication → Settings
+2. Configure Site URL: `http://localhost:8080` (development) or your production URL
+3. Add Redirect URLs:
+   - `http://localhost:8080`
+   - Your production domain
+4. Disable "Confirm email" for faster development testing
+
+### User Registration
+New users must be approved by administrators. The registration flow:
+1. User submits registration request
+2. Admin reviews and approves/rejects
+3. Approved users receive login credentials
+4. Role assignment determines system access
+
+## 📊 Database Schema
+
+### Core Tables
+- `profiles` - User information and roles
+- `quotes` - Quote headers and metadata
+- `bom_items` - Bill of materials line items
+- `products` - Product catalog (Levels 1-3)
+- `level4_products` - Detailed configurations
+- `quote_analytics` - Performance metrics
+
+### Key Relationships
+- Hierarchical product relationships (Level 1 → 2 → 3 → 4)
+- Quote-to-BOM item associations
+- User role permissions and quote access
+
+## 🚀 Deployment
+
+### Using Lovable (Recommended)
+1. Visit your [Lovable Project](https://lovable.dev/projects/8d08ecff-3bea-40af-9fd0-71cf8c824485)
+2. Click Share → Publish
+3. Configure custom domain if needed
+
+### Manual Deployment
+```bash
+# Build for production
+npm run build
+
+# Deploy dist/ folder to your hosting provider
+```
+
+### Environment Variables for Production
+```bash
+VITE_SUPABASE_URL=https://your-project.supabase.co
+VITE_SUPABASE_ANON_KEY=your-production-anon-key
+```
+
+## 🧪 Testing
+
+### Run End-to-End Tests
+```bash
+# Run tests in headless mode
 npx cypress run
+
+# Open interactive test runner
+npx cypress open
 ```
 
-You can also open the interactive runner using `npx cypress open`.
+### Test Coverage
+- Quote creation and approval workflow
+- User authentication and authorization
+- Product configuration and pricing
+- Dashboard analytics and reporting
 
-## License
+## 🔧 Development Guidelines
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+### Code Style
+- Use TypeScript for all new code
+- Follow established component patterns
+- Implement proper error boundaries
+- Use React Query for server state
+- Implement RLS policies for data security
+
+### Component Architecture
+```typescript
+// Example component structure
+interface ComponentProps {
+  // Type all props
+}
+
+const Component = ({ prop }: ComponentProps) => {
+  // Component logic
+  return <div>JSX</div>;
+};
+
+export default Component;
+```
+
+### Database Operations
+```typescript
+// Use proper error handling
+const { data, error } = await supabase
+  .from('table')
+  .select('*')
+  .eq('id', id);
+
+if (error) {
+  console.error('Database error:', error);
+  // Handle error appropriately
+}
+```
+
+## 🐛 Troubleshooting
+
+### Common Issues
+
+**Application Not Loading**
+- Check browser console for JavaScript errors
+- Verify Supabase environment variables
+- Ensure database migrations are applied
+- Check network connectivity to Supabase
+
+**Authentication Problems**
+- Verify Site URL and Redirect URLs in Supabase
+- Check user roles and permissions
+- Ensure RLS policies are correctly configured
+
+**Database Connection Issues**
+- Verify Supabase project is active
+- Check API keys are correct and not expired
+- Ensure proper network access to Supabase
+
+**Build Errors**
+- Clear node_modules and reinstall dependencies
+- Check for TypeScript errors
+- Verify all imports are correct
+
+### Performance Optimization
+- Enable Supabase connection pooling
+- Implement proper caching strategies
+- Use React.memo for expensive components
+- Optimize database queries
+
+## 📞 Support & Documentation
+
+### Useful Links
+- [Supabase Documentation](https://supabase.com/docs)
+- [React Documentation](https://react.dev)
+- [Tailwind CSS Documentation](https://tailwindcss.com/docs)
+- [shadcn/ui Components](https://ui.shadcn.com)
+
+### Project Management
+- **Project URL**: https://lovable.dev/projects/8d08ecff-3bea-40af-9fd0-71cf8c824485
+- **Version Control**: Git-based with automatic Lovable synchronization
+- **Issue Tracking**: Use GitHub Issues or Lovable project management
+
+## 📄 License
+
+This project is proprietary software owned by Qualitrol Corporation. All rights reserved.
+
+**© 2025 Qualitrol Corp. All rights reserved.**
+**Confidential and proprietary. Unauthorized copying or distribution is prohibited.**
+
+---
+
+## 🔄 Recent Updates
+
+### Latest Changes
+- Enhanced error handling and loading states
+- Improved analytics dashboard performance
+- Updated authentication flow reliability
+- Comprehensive documentation overhaul
+- Database optimization and query improvements
+
+For detailed change history, see the git commit log or Lovable project history.
