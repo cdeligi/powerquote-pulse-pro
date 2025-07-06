@@ -47,14 +47,20 @@ export const supabase = createClient(
 );
 
 // Add connection health check
-supabase.from('profiles').select('count', { count: 'exact', head: true })
-  .then(({ error }) => {
+async function testSupabaseConnection(): Promise<void> {
+  try {
+    const { error } = await supabase
+      .from('profiles')
+      .select('count', { count: 'exact', head: true });
+
     if (error) {
       console.error('❌ Supabase connection test failed:', error.message);
     } else {
       console.log('✅ Supabase connection established successfully');
     }
-  })
-  .catch((err) => {
+  } catch (err) {
     console.error('❌ Supabase connection error:', err);
-  });
+  }
+}
+
+void testSupabaseConnection();
