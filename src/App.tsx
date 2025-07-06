@@ -8,6 +8,7 @@ import { AuthProvider } from "@/hooks/useAuth";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
+import { supabaseConfigValid } from "@/integrations/supabase/client";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -33,6 +34,24 @@ const App = () => {
     version: '2.0.0',
     environment: import.meta.env.MODE
   });
+
+  if (!supabaseConfigValid) {
+    console.error('Supabase configuration missing. Check README setup steps.');
+    return (
+      <div className="min-h-screen bg-black flex items-center justify-center">
+        <div className="text-white text-center max-w-md p-6">
+          <h2 className="text-2xl font-bold mb-4 text-red-400">
+            Supabase Configuration Required
+          </h2>
+          <p className="text-gray-300 mb-6">
+            Missing <code>VITE_SUPABASE_URL</code> or{' '}
+            <code>VITE_SUPABASE_ANON_KEY</code>. See the README for setup
+            instructions.
+          </p>
+        </div>
+      </div>
+    );
+  }
   
   return (
     <ErrorBoundary fallback={

@@ -1,8 +1,12 @@
 
 import { createClient } from '@supabase/supabase-js'
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string
+// Capture environment variables
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined
+
+// Flag indicating whether Supabase configuration is present
+export const supabaseConfigValid = Boolean(supabaseUrl && supabaseAnonKey)
 
 console.log('Supabase client initialization:', {
   url: supabaseUrl ? 'configured' : 'missing',
@@ -63,4 +67,6 @@ async function testSupabaseConnection(): Promise<void> {
   }
 }
 
-void testSupabaseConnection();
+if (supabaseConfigValid) {
+  void testSupabaseConnection();
+}
