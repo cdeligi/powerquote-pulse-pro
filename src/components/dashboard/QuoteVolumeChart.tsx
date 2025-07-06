@@ -76,7 +76,6 @@ const QuoteVolumeChart = ({ data }: QuoteVolumeChartProps) => {
             stroke="#10B981"
             fill="#10B981"
             fillOpacity={0.6}
-            yAxisId="right"
           />
         </AreaChart>
       </ResponsiveContainer>

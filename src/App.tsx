@@ -14,6 +14,7 @@ const queryClient = new QueryClient({
     queries: {
       retry: 1,
       staleTime: 5 * 60 * 1000, // 5 minutes
+      refetchOnWindowFocus: false, // Prevent excessive refetching
     },
   },
 });
@@ -29,8 +30,8 @@ const App = () => {
             <ErrorBoundary fallback={
               <div className="min-h-screen bg-black flex items-center justify-center">
                 <div className="text-white text-center max-w-md">
-                  <h2 className="text-xl mb-4">Application Loading Error</h2>
-                  <p className="text-gray-400 mb-6">The application encountered an issue while loading.</p>
+                  <h2 className="text-xl mb-4">Application Error</h2>
+                  <p className="text-gray-400 mb-6">The application encountered an unexpected error.</p>
                   <div className="space-y-2">
                     <button 
                       onClick={() => window.location.reload()} 
@@ -41,6 +42,7 @@ const App = () => {
                     <button 
                       onClick={() => {
                         localStorage.clear();
+                        sessionStorage.clear();
                         window.location.reload();
                       }} 
                       className="w-full px-6 py-3 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
