@@ -60,7 +60,7 @@ npm install
 ### 3. Environment Configuration
 ```bash
 # Copy the environment template
-cp .env
+cp .env.example .env
 
 # Edit .env and add your Supabase credentials
 VITE_SUPABASE_URL=https://cwhmxpitwblqxgrvaigg.supabase.co
