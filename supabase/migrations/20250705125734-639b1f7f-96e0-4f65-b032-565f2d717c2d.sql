@@ -32,8 +32,8 @@ LANGUAGE plpgsql
 SECURITY DEFINER
 AS $$
 BEGIN
-  -- Clear existing analytics
-  DELETE FROM public.quote_analytics;
+  -- Clear existing analytics with proper WHERE clause
+  DELETE FROM public.quote_analytics WHERE created_at < now();
   
   -- Insert updated analytics data
   INSERT INTO public.quote_analytics (month, status, quote_count, total_value, total_cost)
