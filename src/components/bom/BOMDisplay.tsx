@@ -28,11 +28,11 @@ const BOMDisplay = ({ items, onUpdateItem, onRemoveItem, readOnly = false }: BOM
   const [priceIncreases, setPriceIncreases] = useState<Record<string, string>>({});
 
   const getTotalPrice = () => {
-    return items.reduce((sum, item) => sum + (item.unitPrice * item.quantity), 0);
+    return items.reduce((sum, item) => sum + (item.unit_price * item.quantity), 0);
   };
 
   const getTotalCost = () => {
-    return items.reduce((sum, item) => sum + (item.unitCost * item.quantity), 0);
+    return items.reduce((sum, item) => sum + (item.unit_cost * item.quantity), 0);
   };
 
   const getMargin = () => {
@@ -43,8 +43,8 @@ const BOMDisplay = ({ items, onUpdateItem, onRemoveItem, readOnly = false }: BOM
   };
 
   const getItemMargin = (item: BOMItem) => {
-    if (item.unitPrice === 0) return 0;
-    return ((item.unitPrice - item.unitCost) / item.unitPrice) * 100;
+    if (item.unit_price === 0) return 0;
+    return ((item.unit_price - item.unit_cost) / item.unit_price) * 100;
   };
 
   const canEditPrices = user && ['admin', 'finance', 'level2'].includes(user.role);
@@ -55,15 +55,15 @@ const BOMDisplay = ({ items, onUpdateItem, onRemoveItem, readOnly = false }: BOM
     const newPrice = parseFloat(priceIncreases[itemId] || '0');
     const item = items.find(i => i.id === itemId);
     
-    if (!item || newPrice <= item.unitPrice) {
+    if (!item || newPrice <= item.unit_price) {
       return; // Only allow increases
     }
 
     const updatedItem = {
       ...item,
-      unitPrice: newPrice,
-      totalPrice: newPrice * item.quantity,
-      margin: newPrice > 0 ? ((newPrice - item.unitCost) / newPrice) * 100 : 0
+      unit_price: newPrice,
+      total_price: newPrice * item.quantity,
+      margin: newPrice > 0 ? ((newPrice - item.unit_cost) / newPrice) * 100 : 0
     };
 
     onUpdateItem(itemId, updatedItem);
@@ -76,9 +76,9 @@ const BOMDisplay = ({ items, onUpdateItem, onRemoveItem, readOnly = false }: BOM
 
     const updatedItem = {
       ...item,
-      unitPrice: newPrice,
-      totalPrice: newPrice * item.quantity,
-      margin: newPrice > 0 ? ((newPrice - item.unitCost) / newPrice) * 100 : 0
+      unit_price: newPrice,
+      total_price: newPrice * item.quantity,
+      margin: newPrice > 0 ? ((newPrice - item.unit_cost) / newPrice) * 100 : 0
     };
 
     onUpdateItem(itemId, updatedItem);
@@ -112,8 +112,8 @@ const BOMDisplay = ({ items, onUpdateItem, onRemoveItem, readOnly = false }: BOM
                   <div>
                     <CardTitle className="text-white text-lg">{item.name}</CardTitle>
                     <p className="text-gray-300 text-sm">{item.description}</p>
-                    {item.partNumber && (
-                      <p className="text-gray-400 text-xs">Part: {item.partNumber}</p>
+                    {item.part_number && (
+                      <p className="text-gray-400 text-xs">Part: {item.part_number}</p>
                     )}
                   </div>
                 </div>
@@ -141,7 +141,7 @@ const BOMDisplay = ({ items, onUpdateItem, onRemoveItem, readOnly = false }: BOM
                     <DollarSign className="h-4 w-4 text-green-400" />
                     <span className="text-gray-300 text-sm">Unit Price</span>
                   </div>
-                  <p className="text-white font-semibold">${item.unitPrice.toFixed(2)}</p>
+                  <p className="text-white font-semibold">${item.unit_price.toFixed(2)}</p>
                 </div>
                 
                 {isAdmin && (
@@ -150,13 +150,13 @@ const BOMDisplay = ({ items, onUpdateItem, onRemoveItem, readOnly = false }: BOM
                       <Settings className="h-4 w-4 text-orange-400" />
                       <span className="text-gray-300 text-sm">Unit Cost</span>
                     </div>
-                    <p className="text-white font-semibold">${item.unitCost.toFixed(2)}</p>
+                    <p className="text-white font-semibold">${item.unit_cost.toFixed(2)}</p>
                   </div>
                 )}
                 
                 <div className="bg-gray-800 p-3 rounded-lg">
                   <div className="text-gray-300 text-sm mb-1">Total Price</div>
-                  <p className="text-green-400 font-semibold">${item.totalPrice.toFixed(2)}</p>
+                  <p className="text-green-400 font-semibold">${item.total_price.toFixed(2)}</p>
                 </div>
                 
                 {isAdmin && (
@@ -179,7 +179,7 @@ const BOMDisplay = ({ items, onUpdateItem, onRemoveItem, readOnly = false }: BOM
                       <Input
                         type="number"
                         step="0.01"
-                        min={item.unitPrice}
+                        min={item.unit_price}
                         value={priceIncreases[item.id] || ''}
                         onChange={(e) => setPriceIncreases(prev => ({
                           ...prev,
@@ -191,7 +191,7 @@ const BOMDisplay = ({ items, onUpdateItem, onRemoveItem, readOnly = false }: BOM
                       <Button
                         size="sm"
                         onClick={() => handlePriceIncrease(item.id)}
-                        disabled={!priceIncreases[item.id] || parseFloat(priceIncreases[item.id]) <= item.unitPrice}
+                        disabled={!priceIncreases[item.id] || parseFloat(priceIncreases[item.id]) <= item.unit_price}
                         className="bg-green-600 hover:bg-green-700 h-8 px-2"
                       >
                         <ArrowUp className="h-3 w-3" />
@@ -204,8 +204,12 @@ const BOMDisplay = ({ items, onUpdateItem, onRemoveItem, readOnly = false }: BOM
               {editingItemId === item.id && (
                 <div className="mt-4 border-t border-gray-700 pt-4">
                   <PriceOverrideManager
-                    item={item}
-                    onPriceUpdate={(newPrice, reason) => handlePriceUpdate(item.id, newPrice, reason)}
+                    itemId={item.id}
+                    currentPrice={item.unit_price}
+                    originalPrice={item.original_unit_price || item.unit_price}
+                    canIncrease={canIncreasePrice}
+                    canDecrease={canEditPrices}
+                    onPriceChange={(newPrice, reason) => handlePriceUpdate(item.id, newPrice, reason)}
                     onCancel={() => setEditingItemId(null)}
                   />
                 </div>
