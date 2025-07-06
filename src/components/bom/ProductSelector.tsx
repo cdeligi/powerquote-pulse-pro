@@ -44,10 +44,21 @@ const ProductSelector = ({ level, onProductSelect, canSeePrices }: ProductSelect
   const handleProductSelect = (product: any) => {
     const bomItem: BOMItem = {
       id: Math.random().toString(),
+      product: {
+        id: product.id,
+        name: product.name,
+        description: product.description,
+        price: product.price,
+        cost: product.cost,
+        enabled: true,
+        type: level === 'level1' ? 'QTMS' : 'Standard',
+        category: level
+      },
+      quantity: 1,
+      enabled: true,
       name: product.name,
       description: product.description,
-      partNumber: product.id,
-      quantity: 1,
+      part_number: product.id,
       unit_price: product.price,
       unit_cost: product.cost,
       total_price: product.price,
