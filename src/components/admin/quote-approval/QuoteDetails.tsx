@@ -1,13 +1,18 @@
 
+/**
+ * © 2025 Qualitrol Corp. All rights reserved.
+ * Confidential and proprietary. Unauthorized copying or distribution is prohibited.
+ */
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { CheckCircle, XCircle, DollarSign, Edit3, Save, X, Settings } from "lucide-react";
-import QTMSConfigurationEditor from "@/components/bom/QTMSConfigurationEditor";
-import { consolidateQTMSConfiguration, QTMSConfiguration, ConsolidatedQTMS } from "@/utils/qtmsConsolidation";
+import { CheckCircle, XCircle, DollarSign, Edit3, Save, X, Settings, Cog } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import BOMBuilder from "@/components/bom/BOMBuilder";
 import { useState, useEffect } from "react";
 import { Quote, BOMItemWithDetails } from "@/types/quote";
 import { User } from "@/types/auth";
@@ -32,7 +37,7 @@ const QuoteDetails = ({
   const [rejectionReason, setRejectionReason] = useState('');
   const [selectedAction, setSelectedAction] = useState<'approve' | 'reject' | null>(null);
   const [editingPrices, setEditingPrices] = useState<Record<string, string>>({});
-  const [quoteFieldLabels, setQuoteFieldLabels] = useState<Record<string, string>>({});
+  const [editingConfigId, setEditingConfigId] = useState<string | null>(null);
   const [bomItems, setBomItems] = useState<BOMItemWithDetails[]>(
     (quote.bom_items || []).map(item => ({
       ...item,
@@ -48,51 +53,6 @@ const QuoteDetails = ({
       product: item.product
     }))
   );
-  const [qtmsConfig, setQtmsConfig] = useState<ConsolidatedQTMS | null>(null);
-  const [editingQTMS, setEditingQTMS] = useState(false);
-
-  useEffect(() => {
-    fetchQuoteFieldLabels();
-  }, []);
-
-  useEffect(() => {
-    const item = bomItems.find(i => i.product.type === 'QTMS' && i.configuration);
-    if (item && item.configuration) {
-      const config = item.configuration as QTMSConfiguration;
-      const consolidated = consolidateQTMSConfiguration(
-        config.chassis,
-        config.slotAssignments,
-        config.hasRemoteDisplay,
-        config.analogConfigurations,
-        config.bushingConfigurations
-      );
-      setQtmsConfig({ ...consolidated, id: item.id, price: item.unit_price, name: item.name, description: item.description || '' });
-    } else {
-      setQtmsConfig(null);
-    }
-  }, [bomItems]);
-
-  const fetchQuoteFieldLabels = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('quote_fields')
-        .select('id, label')
-        .eq('enabled', true);
-
-      if (error) {
-        console.error('Error fetching quote field labels:', error);
-        return;
-      }
-
-      const labelMap: Record<string, string> = {};
-      data?.forEach(field => {
-        labelMap[field.id] = field.label;
-      });
-      setQuoteFieldLabels(labelMap);
-    } catch (error) {
-      console.error('Failed to fetch quote field labels:', error);
-    }
-  };
 
   const handleApprove = () => {
     onApprove(approvalNotes, bomItems);
@@ -140,28 +100,6 @@ const QuoteDetails = ({
     });
   };
 
-  const handleQTMSConfigurationSave = (updated: ConsolidatedQTMS) => {
-    setBomItems(prev => prev.map(item => {
-      if (item.id === updated.id) {
-        const newItem = {
-          ...item,
-          name: updated.name,
-          description: updated.description,
-          part_number: updated.partNumber,
-          unit_price: updated.price,
-          total_price: updated.price * item.quantity,
-          margin: updated.price > 0 ? ((updated.price - item.unit_cost) / updated.price) * 100 : 0,
-          configuration: updated.configuration,
-          product: { ...item.product, name: updated.name, description: updated.description, price: updated.price, partNumber: updated.partNumber }
-        } as BOMItemWithDetails;
-        return newItem;
-      }
-      return item;
-    }));
-    setQtmsConfig(updated);
-    setEditingQTMS(false);
-  };
-
   const calculateTotals = () => {
     const totalRevenue = bomItems.reduce((sum, item) => sum + item.total_price, 0);
     const totalCost = bomItems.reduce((sum, item) => sum + (item.unit_cost * item.quantity), 0);
@@ -172,6 +110,7 @@ const QuoteDetails = ({
   };
 
   const totals = calculateTotals();
+  const isAdmin = user && ['admin', 'finance'].includes(user.role);
 
   const getStatusBadge = () => {
     switch (quote.status) {
@@ -188,13 +127,9 @@ const QuoteDetails = ({
     }
   };
 
-  // Prepare consolidated quote information - remove duplicates and format properly
-  const basicQuoteFields = ['customer_name', 'oracle_customer_id', 'sfdc_opportunity', 'is_rep_involved', 'payment_terms', 'shipping_terms'];
-  const additionalFields = quote.quote_fields ? Object.keys(quote.quote_fields).filter(key => !basicQuoteFields.includes(key)) : [];
-
   return (
     <div className="space-y-6">
-      {/* Consolidated Quote Information */}
+      {/* Quote Information */}
       <Card className="bg-gray-900 border-gray-800">
         <CardHeader>
           <CardTitle className="text-white flex items-center justify-between">
@@ -212,367 +147,259 @@ const QuoteDetails = ({
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* Basic Quote Fields */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
             <div>
-              <Label className="text-gray-400">Customer</Label>
+              <Label className="text-gray-300">Customer</Label>
               <p className="text-white font-medium">{quote.customer_name}</p>
             </div>
             <div>
-              <Label className="text-gray-400">Oracle Customer ID</Label>
+              <Label className="text-gray-300">Oracle Customer ID</Label>
               <p className="text-white font-medium">{quote.oracle_customer_id}</p>
             </div>
             <div>
-              <Label className="text-gray-400">SFDC Opportunity</Label>
+              <Label className="text-gray-300">SFDC Opportunity</Label>
               <p className="text-white font-medium">{quote.sfdc_opportunity}</p>
             </div>
             <div>
-              <Label className="text-gray-400">Rep Involved</Label>
+              <Label className="text-gray-300">Rep Involved</Label>
               <p className="text-white font-medium">{quote.is_rep_involved ? 'Yes' : 'No'}</p>
             </div>
-            <div>
-              <Label className="text-gray-400">Payment Terms</Label>
-              <p className="text-white font-medium">{quote.payment_terms}</p>
-            </div>
-            <div>
-              <Label className="text-gray-400">Shipping Terms</Label>
-              <p className="text-white font-medium">{quote.shipping_terms}</p>
-            </div>
-            <div>
-              <Label className="text-gray-400">Currency</Label>
-              <p className="text-white font-medium">{quote.currency}</p>
-            </div>
           </div>
-
-          {/* Additional Quote Fields with Proper Labels */}
-          {additionalFields.length > 0 && (
-            <div className="mt-6 pt-4 border-t border-gray-700">
-              <h4 className="text-white font-medium mb-3">Additional Information</h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                {additionalFields.map((key) => (
-                  <div key={key}>
-                    <Label className="text-gray-400">
-                      {quoteFieldLabels[key] || key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                    </Label>
-                    <p className="text-white font-medium">{String(quote.quote_fields![key])}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {quote.discount_justification && (
-            <div className="mt-4 pt-4 border-t border-gray-700">
-              <Label className="text-gray-400">Discount Justification</Label>
-              <p className="text-gray-300 bg-gray-800 p-3 rounded mt-1">{quote.discount_justification}</p>
-            </div>
-          )}
         </CardContent>
       </Card>
 
       {/* Financial Summary */}
       <Card className="bg-gray-900 border-gray-800">
         <CardHeader>
-          <CardTitle className="text-white">Project Financial Analysis</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="text-center p-4 bg-gray-800 rounded">
-              <p className="text-gray-400 text-sm">Original Value</p>
-              <p className="text-white text-xl font-bold">{quote.currency} {quote.original_quote_value.toLocaleString()}</p>
-            </div>
-            <div className="text-center p-4 bg-gray-800 rounded">
-              <p className="text-gray-400 text-sm">Current Total</p>
-              <p className="text-white text-xl font-bold">{quote.currency} {totals.totalRevenue.toLocaleString()}</p>
-            </div>
-            <div className="text-center p-4 bg-gray-800 rounded">
-              <p className="text-gray-400 text-sm">Total Cost</p>
-              <p className="text-orange-400 text-xl font-bold">{quote.currency} {totals.totalCost.toLocaleString()}</p>
-            </div>
-            <div className="text-center p-4 bg-gray-800 rounded">
-              <p className="text-gray-400 text-sm">Margin</p>
-              <p className={`text-xl font-bold ${
-                totals.marginPercentage >= 25 ? 'text-green-400' : 
-                totals.marginPercentage >= 15 ? 'text-yellow-400' : 'text-red-400'
-              }`}>
-                {totals.marginPercentage.toFixed(1)}%
-              </p>
-            </div>
-          </div>
-          <div className="mt-4 p-4 bg-gray-800 rounded">
-            <div className="flex justify-between items-center">
-              <span className="text-gray-400">Gross Profit:</span>
-              <span className="text-green-400 text-lg font-bold">
-                {quote.currency} {totals.grossProfit.toLocaleString()}
-              </span>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* BOM Items with Editing */}
-      <Card className="bg-gray-900 border-gray-800">
-        <CardHeader>
           <CardTitle className="text-white flex items-center">
-            <DollarSign className="h-5 w-5 mr-2" />
-            BOM Items ({bomItems.length}) - Real-time Price Editing
+            <DollarSign className="mr-2 h-5 w-5 text-green-500" />
+            Financial Summary
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {bomItems.length > 0 ? (
-            <div className="space-y-4">
-              {bomItems.map((item) => (
-                <div key={item.id} className="p-4 bg-gray-800 rounded border border-gray-700">
-                  <div className="flex justify-between items-start mb-3">
-                    <div className="flex-1">
-                      <h4 className="text-white font-medium">{item.name}</h4>
-                      {item.description && (
-                        <p className="text-gray-400 text-sm">{item.description}</p>
-                      )}
-                      {item.part_number && (
-                        <Badge variant="outline" className="text-xs text-green-400 border-green-400 mt-1">
-                          P/N: {item.part_number}
-                        </Badge>
-                      )}
-                    </div>
-                    <div className="flex space-x-1">
-                      {item.product?.type === 'QTMS' && item.configuration && (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => {
-                            setEditingQTMS(true);
-                          }}
-                          className="h-6 w-6 p-0 text-purple-400 hover:text-purple-300"
-                          title="Edit configuration"
-                        >
-                          <Settings className="h-3 w-3" />
-                        </Button>
-                      )}
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => handlePriceEdit(item.id, item.unit_price.toString())}
-                        className="h-6 w-6 p-0 text-gray-400 hover:text-white"
-                        title="Edit unit price"
-                      >
-                        <Edit3 className="h-3 w-3" />
-                      </Button>
-                    </div>
-                  </div>
-                  
-                  <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
-                    <div>
-                      <span className="text-gray-400">Quantity:</span>
-                      <div className="text-white font-medium">{item.quantity}</div>
-                    </div>
-                    
-                    <div>
-                      <span className="text-gray-400">Unit Price:</span>
-                      {editingPrices[item.id] ? (
-                        <div className="flex items-center space-x-1 mt-1">
-                          <Input
-                            type="number"
-                            step="0.01"
-                            value={editingPrices[item.id]}
-                            onChange={(e) => handlePriceEdit(item.id, e.target.value)}
-                            className="w-24 h-6 text-xs bg-gray-700 border-gray-600 text-white"
-                          />
-                          <Button
-                            size="sm"
-                            onClick={() => handlePriceUpdate(item.id)}
-                            className="h-5 w-5 p-0 bg-green-600 hover:bg-green-700"
-                          >
-                            <Save className="h-3 w-3" />
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => handlePriceEditCancel(item.id)}
-                            className="h-5 w-5 p-0 text-gray-400 hover:text-white"
-                          >
-                            <X className="h-3 w-3" />
-                          </Button>
-                        </div>
-                      ) : (
-                        <div className="text-white font-medium">
-                          ${item.unit_price.toLocaleString()}
-                        </div>
-                      )}
-                    </div>
-                    
-                    <div>
-                      <span className="text-gray-400">Unit Cost:</span>
-                      <div className="text-orange-400 font-medium">${item.unit_cost.toLocaleString()}</div>
-                    </div>
-                    
-                    <div>
-                      <span className="text-gray-400">Total Price:</span>
-                      <div className="text-white font-medium">${item.total_price.toLocaleString()}</div>
-                    </div>
-                    
-                    <div>
-                      <span className="text-gray-400">Margin:</span>
-                      <div className={`font-medium ${
-                        item.margin >= 25 ? 'text-green-400' : 
-                        item.margin >= 15 ? 'text-yellow-400' : 'text-red-400'
-                      }`}>
-                        {item.margin.toFixed(1)}%
-                      </div>
-                    </div>
-                  </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="bg-gray-800 p-4 rounded-lg text-center">
+              <div className="text-2xl font-bold text-green-400">${totals.totalRevenue.toLocaleString()}</div>
+              <div className="text-gray-300 text-sm">Total Revenue</div>
+            </div>
+            {isAdmin && (
+              <div className="bg-gray-800 p-4 rounded-lg text-center">
+                <div className="text-2xl font-bold text-orange-400">${totals.totalCost.toLocaleString()}</div>
+                <div className="text-gray-300 text-sm">Total Cost</div>
+              </div>
+            )}
+            {isAdmin && (
+              <div className="bg-gray-800 p-4 rounded-lg text-center">
+                <div className="text-2xl font-bold text-blue-400">${totals.grossProfit.toLocaleString()}</div>
+                <div className="text-gray-300 text-sm">Gross Profit</div>
+              </div>
+            )}
+            {isAdmin && (
+              <div className="bg-gray-800 p-4 rounded-lg text-center">
+                <div className={`text-2xl font-bold ${totals.marginPercentage >= 25 ? 'text-green-400' : totals.marginPercentage >= 15 ? 'text-yellow-400' : 'text-red-400'}`}>
+                  {totals.marginPercentage.toFixed(1)}%
                 </div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-gray-400 text-center py-4">
-              No BOM items found for this quote.
-            </div>
-          )}
+                <div className="text-gray-300 text-sm">Overall Margin</div>
+              </div>
+            )}
+          </div>
         </CardContent>
       </Card>
 
-      {qtmsConfig && (
-        <QTMSConfigurationEditor
-          consolidatedQTMS={qtmsConfig}
-          onSave={handleQTMSConfigurationSave}
-          onClose={() => setEditingQTMS(false)}
-          canSeePrices={true}
-          readOnly={!editingQTMS}
-        />
-      )}
+      {/* BOM Items with Edit Configuration */}
+      <Card className="bg-gray-900 border-gray-800">
+        <CardHeader>
+          <CardTitle className="text-white">Review Details & BOM</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {bomItems.map((item, index) => (
+              <div key={item.id} className="bg-gray-800 p-4 rounded-lg">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex-1">
+                    <h4 className="text-white font-medium">{item.name}</h4>
+                    <p className="text-gray-300 text-sm">{item.description}</p>
+                    {item.part_number && (
+                      <p className="text-gray-400 text-xs">Part: {item.part_number}</p>
+                    )}
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Badge variant="outline" className="text-blue-400 border-blue-600">
+                      Qty: {item.quantity}
+                    </Badge>
+                    {isAdmin && (
+                      <Dialog>
+                        <DialogTrigger asChild>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="text-blue-400 hover:text-blue-300 hover:bg-blue-900/20"
+                          >
+                            <Cog className="h-4 w-4 mr-1" />
+                            Edit Configuration
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto bg-gray-900 border-gray-800">
+                          <DialogHeader>
+                            <DialogTitle className="text-white">Edit Configuration - {item.name}</DialogTitle>
+                          </DialogHeader>
+                          <div className="mt-4">
+                            <BOMBuilder
+                              onBOMUpdate={() => {}}
+                              canSeePrices={true}
+                            />
+                          </div>
+                        </DialogContent>
+                      </Dialog>
+                    )}
+                  </div>
+                </div>
+                
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                  <div className="bg-gray-700 p-2 rounded">
+                    <div className="text-gray-300 text-xs">Unit Price</div>
+                    <div className="text-white font-semibold text-sm">${item.unit_price.toFixed(2)}</div>
+                  </div>
+                  {isAdmin && (
+                    <div className="bg-gray-700 p-2 rounded">
+                      <div className="text-gray-300 text-xs">Unit Cost</div>
+                      <div className="text-white font-semibold text-sm">${item.unit_cost.toFixed(2)}</div>
+                    </div>
+                  )}
+                  <div className="bg-gray-700 p-2 rounded">
+                    <div className="text-gray-300 text-xs">Total Price</div>
+                    <div className="text-green-400 font-semibold text-sm">${item.total_price.toFixed(2)}</div>
+                  </div>
+                  {isAdmin && (
+                    <div className="bg-gray-700 p-2 rounded">
+                      <div className="text-gray-300 text-xs">Margin</div>
+                      <div className={`font-semibold text-sm ${item.margin >= 25 ? 'text-green-400' : item.margin >= 15 ? 'text-yellow-400' : 'text-red-400'}`}>
+                        {item.margin.toFixed(1)}%
+                      </div>
+                    </div>
+                  )}
+                  {isAdmin && editingPrices[item.id] !== undefined && (
+                    <div className="bg-gray-700 p-2 rounded">
+                      <div className="text-gray-300 text-xs">Edit Price</div>
+                      <div className="flex items-center space-x-1">
+                        <Input
+                          type="number"
+                          step="0.01"
+                          value={editingPrices[item.id]}
+                          onChange={(e) => handlePriceEdit(item.id, e.target.value)}
+                          className="bg-gray-600 border-gray-500 text-white text-xs h-6"
+                        />
+                        <Button size="sm" onClick={() => handlePriceUpdate(item.id)} className="h-6 px-2 text-xs">
+                          <Save className="h-3 w-3" />
+                        </Button>
+                        <Button size="sm" variant="ghost" onClick={() => handlePriceEditCancel(item.id)} className="h-6 px-2 text-xs">
+                          <X className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+                
+                {isAdmin && editingPrices[item.id] === undefined && (
+                  <div className="mt-2">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => handlePriceEdit(item.id, item.unit_price.toString())}
+                      className="text-green-400 hover:text-green-300 hover:bg-green-900/20"
+                    >
+                      <Edit3 className="h-3 w-3 mr-1" />
+                      Edit Price
+                    </Button>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
 
-      {/* Approval Actions */}
-      {quote.status === 'pending_approval' && (
+      {/* Action Buttons */}
+      {selectedAction === 'approve' && (
         <Card className="bg-gray-900 border-gray-800">
           <CardHeader>
-            <CardTitle className="text-white">Approval Actions</CardTitle>
+            <CardTitle className="text-white">Approval Notes</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-2 gap-3">
-              <Button
-                onClick={() => setSelectedAction('approve')}
-                variant={selectedAction === 'approve' ? 'default' : 'outline'}
-                className={`${
-                  selectedAction === 'approve' 
-                    ? 'bg-green-600 hover:bg-green-700 text-white' 
-                    : 'border-green-600 text-green-400 hover:bg-green-600 hover:text-white'
-                }`}
+            <Textarea
+              value={approvalNotes}
+              onChange={(e) => setApprovalNotes(e.target.value)}
+              className="bg-gray-800 border-gray-600 text-white"
+              placeholder="Add any approval notes..."
+              rows={3}
+            />
+            <div className="flex space-x-2">
+              <Button 
+                onClick={handleApprove}
                 disabled={isLoading}
+                className="bg-green-600 hover:bg-green-700"
               >
-                <CheckCircle className="h-4 w-4 mr-2" />
-                Approve Quote
+                <CheckCircle className="mr-2 h-4 w-4" />
+                Confirm Approval
               </Button>
-              
-              <Button
-                onClick={() => setSelectedAction('reject')}
-                variant={selectedAction === 'reject' ? 'default' : 'outline'}
-                className={`${
-                  selectedAction === 'reject' 
-                    ? 'bg-red-600 hover:bg-red-700 text-white' 
-                    : 'border-red-600 text-red-400 hover:bg-red-600 hover:text-white'
-                }`}
-                disabled={isLoading}
-              >
-                <XCircle className="h-4 w-4 mr-2" />
-                Reject Quote
+              <Button variant="outline" onClick={() => setSelectedAction(null)}>
+                Cancel
               </Button>
             </div>
-
-            {selectedAction === 'approve' && (
-              <div className="space-y-3 p-4 bg-green-900/20 border border-green-600 rounded-lg">
-                <Label htmlFor="approval-notes" className="text-white">
-                  Approval Notes (Optional)
-                </Label>
-                <Textarea
-                  id="approval-notes"
-                  value={approvalNotes}
-                  onChange={(e) => setApprovalNotes(e.target.value)}
-                  placeholder="Add any notes about the approval..."
-                  className="bg-gray-800 border-gray-700 text-white min-h-[80px]"
-                />
-                <div className="flex space-x-2">
-                  <Button
-                    onClick={handleApprove}
-                    className="bg-green-600 hover:bg-green-700 text-white"
-                    disabled={isLoading}
-                  >
-                    {isLoading ? 'Processing...' : 'Confirm Approval'}
-                  </Button>
-                  <Button
-                    onClick={() => setSelectedAction(null)}
-                    variant="outline"
-                    className="border-gray-600 text-gray-300 hover:bg-gray-800"
-                    disabled={isLoading}
-                  >
-                    Cancel
-                  </Button>
-                </div>
-              </div>
-            )}
-
-            {selectedAction === 'reject' && (
-              <div className="space-y-3 p-4 bg-red-900/20 border border-red-600 rounded-lg">
-                <Label htmlFor="rejection-reason" className="text-white">
-                  Rejection Reason *
-                </Label>
-                <Textarea
-                  id="rejection-reason"
-                  value={rejectionReason}
-                  onChange={(e) => setRejectionReason(e.target.value)}
-                  placeholder="Explain why this quote is being rejected..."
-                  className="bg-gray-800 border-gray-700 text-white min-h-[100px]"
-                  required
-                />
-                <div className="flex space-x-2">
-                  <Button
-                    onClick={handleReject}
-                    className="bg-red-600 hover:bg-red-700 text-white"
-                    disabled={isLoading || !rejectionReason.trim()}
-                  >
-                    {isLoading ? 'Processing...' : 'Confirm Rejection'}
-                  </Button>
-                  <Button
-                    onClick={() => setSelectedAction(null)}
-                    variant="outline"
-                    className="border-gray-600 text-gray-300 hover:bg-gray-800"
-                    disabled={isLoading}
-                  >
-                    Cancel
-                  </Button>
-                </div>
-              </div>
-            )}
           </CardContent>
         </Card>
       )}
 
-      {/* Status Information for Non-Pending Quotes */}
-      {quote.status !== 'pending_approval' && (
+      {selectedAction === 'reject' && (
         <Card className="bg-gray-900 border-gray-800">
           <CardHeader>
-            <CardTitle className="text-white">Quote Status</CardTitle>
+            <CardTitle className="text-white">Rejection Reason</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              <p className="text-gray-400">
-                This quote has been <span className="text-white font-medium">{quote.status.replace('_', ' ')}</span>
-                {quote.reviewed_at && (
-                  <span> on {new Date(quote.reviewed_at).toLocaleDateString()}</span>
-                )}
-              </p>
-              {quote.approval_notes && (
-                <div>
-                  <Label className="text-gray-400">Approval Notes:</Label>
-                  <p className="text-gray-300 bg-gray-800 p-2 rounded mt-1">{quote.approval_notes}</p>
-                </div>
-              )}
-              {quote.rejection_reason && (
-                <div>
-                  <Label className="text-gray-400">Rejection Reason:</Label>
-                  <p className="text-gray-300 bg-gray-800 p-2 rounded mt-1">{quote.rejection_reason}</p>
-                </div>
-              )}
+          <CardContent className="space-y-4">
+            <Textarea
+              value={rejectionReason}
+              onChange={(e) => setRejectionReason(e.target.value)}
+              className="bg-gray-800 border-gray-600 text-white"
+              placeholder="Please provide a reason for rejecting this quote..."
+              rows={4}
+              required
+            />
+            <div className="flex space-x-2">
+              <Button 
+                onClick={handleReject}
+                disabled={isLoading || !rejectionReason.trim()}
+                className="bg-red-600 hover:bg-red-700"
+              >
+                <XCircle className="mr-2 h-4 w-4" />
+                Confirm Rejection
+              </Button>
+              <Button variant="outline" onClick={() => setSelectedAction(null)}>
+                Cancel
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {!selectedAction && (
+        <Card className="bg-gray-900 border-gray-800">
+          <CardContent className="pt-6">
+            <div className="flex flex-wrap gap-3">
+              <Button 
+                onClick={() => setSelectedAction('approve')}
+                className="bg-green-600 hover:bg-green-700 text-white"
+              >
+                <CheckCircle className="mr-2 h-4 w-4" />
+                Approve Quote
+              </Button>
+              <Button 
+                onClick={() => setSelectedAction('reject')}
+                variant="outline"
+                className="border-red-600 text-red-400 hover:bg-red-900/20"
+              >
+                <XCircle className="mr-2 h-4 w-4" />
+                Reject Quote
+              </Button>
             </div>
           </CardContent>
         </Card>
