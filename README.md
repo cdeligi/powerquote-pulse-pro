@@ -60,7 +60,7 @@ npm install
 ### 3. Environment Configuration
 ```bash
 # Copy the environment template
-cp .env.example .env
+cp .env
 
 # Edit .env and add your Supabase credentials
 VITE_SUPABASE_URL=https://cwhmxpitwblqxgrvaigg.supabase.co
@@ -188,8 +188,8 @@ npm run build
 
 ### Environment Variables for Production
 ```bash
-VITE_SUPABASE_URL=https://your-project.supabase.co
-VITE_SUPABASE_ANON_KEY=your-production-anon-key
+VITE_SUPABASE_URL=https://cwhmxpitwblqxgrvaigg.supabase.co
+VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN3aG14cGl0d2JscXhncnZhaWdnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA3MTc3MTIsImV4cCI6MjA2NjI5MzcxMn0.NaAtGg1Fpx1obdHK5rBGM5IzSWJea7lniuimr5ZyFGU
 ```
 
 ## 🧪 Testing
