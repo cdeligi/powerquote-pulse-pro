@@ -48,9 +48,9 @@ const ProductSelector = ({ level, onProductSelect, canSeePrices }: ProductSelect
       description: product.description,
       partNumber: product.id,
       quantity: 1,
-      unitPrice: product.price,
-      unitCost: product.cost,
-      totalPrice: product.price,
+      unit_price: product.price,
+      unit_cost: product.cost,
+      total_price: product.price,
       margin: ((product.price - product.cost) / product.price) * 100
     };
 

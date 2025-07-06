@@ -38,7 +38,7 @@ const QuoteRequestForm = ({ bomItems, onClose, onSubmit }: QuoteRequestFormProps
       await onSubmit({
         ...formData,
         bomItems,
-        totalValue: bomItems.reduce((sum, item) => sum + item.totalPrice, 0)
+        totalValue: bomItems.reduce((sum, item) => sum + item.total_price, 0)
       });
     } finally {
       setIsSubmitting(false);
