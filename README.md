@@ -32,9 +32,9 @@ cd <YOUR_PROJECT_NAME>
 # Step 3: Install the necessary dependencies.
 npm i
 
-# Step 4: Create a `.env` file from the included template.
+# Step 4: Copy `.env.example` to `.env` and fill in your credentials.
 cp .env.example .env
-# Edit the new `.env` file and set the variables listed below.
+# Edit the `.env` file and set the variables listed below.
 
 # Step 5: Start the development server with auto-reloading and an instant preview.
 npm run dev
