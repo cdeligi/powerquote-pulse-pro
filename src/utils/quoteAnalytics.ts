@@ -1,11 +1,4 @@
 
-export interface MonthlyData {
-  month: string;
-  quotes: number;
-  value: number;
-  cost: number;
-}
-
 export interface QuoteAnalytics {
   monthly: {
     executed: number;
@@ -25,7 +18,6 @@ export interface QuoteAnalytics {
     avgMargin: number;
     totalGrossProfit: number;
   };
-  monthlyBreakdown: MonthlyData[];
 }
 
 export interface QuoteData {
@@ -62,30 +54,9 @@ export const calculateQuoteAnalytics = (quotes: QuoteData[]): QuoteAnalytics => 
     totalGrossProfit: quoteSet.reduce((sum, q) => sum + q.grossProfit, 0)
   });
 
-  // Generate monthly breakdown for the last 12 months
-  const monthlyBreakdown: MonthlyData[] = [];
-  for (let i = 11; i >= 0; i--) {
-    const date = new Date(currentYear, currentMonth - i, 1);
-    const monthStr = date.toISOString().slice(0, 7); // YYYY-MM format
-    
-    const monthQuotes = quotes.filter(quote => {
-      const quoteDate = new Date(quote.createdAt);
-      return quoteDate.getFullYear() === date.getFullYear() && 
-             quoteDate.getMonth() === date.getMonth();
-    });
-
-    monthlyBreakdown.push({
-      month: monthStr,
-      quotes: monthQuotes.length,
-      value: monthQuotes.reduce((sum, q) => sum + q.total, 0),
-      cost: monthQuotes.reduce((sum, q) => sum + (q.total - q.grossProfit), 0)
-    });
-  }
-
   return {
     monthly: calculateStats(monthlyQuotes),
-    yearly: calculateStats(yearlyQuotes),
-    monthlyBreakdown
+    yearly: calculateStats(yearlyQuotes)
   };
 };
 

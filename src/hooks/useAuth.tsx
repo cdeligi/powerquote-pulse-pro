@@ -1,5 +1,6 @@
+
 /**
- *  2025 Qualitrol Corp. All rights reserved.
+ * © 2025 Qualitrol Corp. All rights reserved.
  * Confidential and proprietary. Unauthorized copying or distribution is prohibited.
  */
 
@@ -36,18 +37,47 @@ function useProvideAuth(): AuthContextType {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const fetchProfile = async (uid: string): Promise<void> => {
+  const fetchProfile = async (uid: string, timeoutMs: number = 3000): Promise<void> => {
     console.log('[useAuth] fetchProfile start for:', uid);
     
+    // Create a timeout promise
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => reject(new Error('Profile fetch timeout')), timeoutMs);
+    });
+    
     try {
-      const { data, error } = await supabase.client
+      const profilePromise = supabase
         .from('profiles')
         .select('*')
         .eq('id', uid)
         .single();
 
+      const { data, error } = await Promise.race([profilePromise, timeoutPromise]);
+
       if (error) {
-        console.error('[useAuth] Profile fetch error:', error);
+        if (error.code === 'PGRST116') {
+          console.warn('[useAuth] No profile found for user:', uid);
+          // Create a default user profile if none exists
+          const defaultUser: AppUser = {
+            id: uid,
+            name: 'User',
+            email: session?.user?.email || 'unknown@example.com',
+            role: 'level1',
+            department: undefined
+          };
+          setUser(defaultUser);
+        } else {
+          console.error('[useAuth] Profile fetch error:', error);
+          // Create fallback user even on error
+          const fallbackUser: AppUser = {
+            id: uid,
+            name: 'User',
+            email: session?.user?.email || 'unknown@example.com',
+            role: 'level1',
+            department: undefined
+          };
+          setUser(fallbackUser);
+        }
         return;
       }
 
@@ -61,89 +91,223 @@ function useProvideAuth(): AuthContextType {
           department: data.department
         };
         setUser(appUser);
+      } else {
+        console.warn('[useAuth] Profile data is null for user:', uid);
+        // Create fallback user
+        const fallbackUser: AppUser = {
+          id: uid,
+          name: 'User',
+          email: session?.user?.email || 'unknown@example.com',
+          role: 'level1',
+          department: undefined
+        };
+        setUser(fallbackUser);
       }
     } catch (err) {
-      console.error('[useAuth] Profile fetch error:', err);
+      console.error('[useAuth] Profile fetch timeout or error:', err);
+      // Always create a fallback user to prevent loading hang
+      const fallbackUser: AppUser = {
+        id: uid,
+        name: 'User',
+        email: session?.user?.email || 'unknown@example.com',
+        role: 'level1',
+        department: undefined
+      };
+      setUser(fallbackUser);
+    }
+  };
+
+  const logSecurityEvent = async (action: string, details: any = {}) => {
+    try {
+      // Get user's IP and user agent
+      const userAgent = navigator.userAgent;
+      const ipResponse = await fetch('https://api.ipify.org?format=json');
+      const ipData = await ipResponse.json();
+      
+      await supabase.rpc('log_security_event', {
+        p_user_id: session?.user?.id,
+        p_action: action,
+        p_details: details,
+        p_ip_address: ipData.ip,
+        p_user_agent: userAgent,
+        p_severity: 'info'
+      });
+    } catch (error) {
+      console.error('Failed to log security event:', error);
+    }
+  };
+
+  const trackUserSession = async () => {
+    if (!session?.user?.id) return;
+    
+    try {
+      const userAgent = navigator.userAgent;
+      const ipResponse = await fetch('https://api.ipify.org?format=json');
+      const ipData = await ipResponse.json();
+      
+      // Get device info
+      const deviceInfo = {
+        userAgent,
+        platform: navigator.platform,
+        vendor: navigator.vendor,
+        language: navigator.language,
+        screen: `${screen.width}x${screen.height}`,
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
+      };
+
+      // Get location data (approximate from IP)
+      const locationResponse = await fetch(`http://ip-api.com/json/${ipData.ip}`);
+      const locationData = await locationResponse.json();
+
+      await supabase.rpc('track_user_session', {
+        p_user_id: session.user.id,
+        p_session_token: session.access_token,
+        p_ip_address: ipData.ip,
+        p_user_agent: userAgent,
+        p_device_info: deviceInfo,
+        p_location_data: locationData
+      });
+    } catch (error) {
+      console.error('Failed to track user session:', error);
     }
   };
 
   useEffect(() => {
     console.log('[useAuth] Initializing auth state...');
     
-    // Wait for Supabase client to be ready
-    const initAuth = async () => {
-      try {
-        await supabase.init();
+    // Force loading to false after maximum timeout
+    const maxLoadingTimeout = setTimeout(() => {
+      console.warn('[useAuth] Maximum loading timeout reached, forcing loading to false');
+      setLoading(false);
+    }, 8000);
+
+    // Setup auth state listener first
+    const { data: listener } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        console.log('[useAuth] Auth state change:', event, session?.user?.email || 'no user');
         
-        // Set up auth state listener
-        const { data: listener } = supabase.client.auth.onAuthStateChange(
-          async (event, session) => {
-            console.log('[useAuth] Auth state change:', event, session?.user?.email || 'no user');
+        clearTimeout(maxLoadingTimeout);
+        setSession(session);
+        
+        if (session?.user) {
+          console.log('[useAuth] User session found, fetching profile...');
+          try {
+            await fetchProfile(session.user.id, 3000);
             
-            setSession(session);
-            
-            if (session?.user) {
-              console.log('[useAuth] User session found, fetching profile...');
-              await fetchProfile(session.user.id);
-            } else {
-              console.log('[useAuth] No user session, clearing user state');
-              setUser(null);
+            if (event === 'SIGNED_IN') {
+              // Log successful login and update login info
+              await supabase.rpc('update_user_login', {
+                p_user_id: session.user.id,
+                p_success: true
+              });
+              await logSecurityEvent('session_established');
+              await trackUserSession();
             }
-            
+          } catch (error) {
+            console.error('[useAuth] Error fetching profile in auth state change:', error);
+            // Create fallback user
+            const fallbackUser: AppUser = {
+              id: session.user.id,
+              name: 'User',
+              email: session.user.email || 'unknown@example.com',
+              role: 'level1',
+              department: undefined
+            };
+            setUser(fallbackUser);
+          } finally {
             setLoading(false);
           }
-        );
+        } else {
+          console.log('[useAuth] No user session, clearing user state');
+          if (event === 'SIGNED_OUT') {
+            await logSecurityEvent('session_terminated');
+          }
+          setUser(null);
+          setLoading(false);
+        }
+      }
+    );
 
-        // Get initial session
-        const { data: { session }, error } = await supabase.client.auth.getSession();
+    // Get initial session with timeout
+    const getInitialSession = async () => {
+      try {
+        const sessionPromise = supabase.auth.getSession();
+        const timeoutPromise = new Promise<never>((_, reject) => {
+          setTimeout(() => reject(new Error('Session fetch timeout')), 5000);
+        });
+
+        const { data: { session }, error } = await Promise.race([sessionPromise, timeoutPromise]);
         
         if (error) {
           console.error('[useAuth] getSession error:', error);
+          clearTimeout(maxLoadingTimeout);
           setLoading(false);
-        } else {
-          setSession(session);
-          if (session?.user) {
-            await fetchProfile(session.user.id);
-          }
-          setLoading(false);
+          return;
         }
-      } catch (error) {
-        console.error('[useAuth] Initialization error:', error);
+        
+        console.log('[useAuth] Initial session check:', session?.user?.email || 'no session');
+        setSession(session);
+        
+        if (session?.user) {
+          await fetchProfile(session.user.id, 3000);
+        }
+      } catch (err) {
+        console.error('[useAuth] getSession timeout or error:', err);
+      } finally {
+        clearTimeout(maxLoadingTimeout);
         setLoading(false);
       }
     };
 
-    initAuth();
+    getInitialSession();
+
+    return () => {
+      console.log('[useAuth] Cleaning up auth listener...');
+      clearTimeout(maxLoadingTimeout);
+      listener.subscription.unsubscribe();
+    };
   }, []);
 
   const signIn = async (email: string, password: string) => {
+    console.log('[useAuth] Signing in user:', email);
     try {
-      const { data, error } = await supabase.client.auth.signInWithPassword({
+      const { error } = await supabase.auth.signInWithPassword({
         email,
         password
       });
-
-      if (error) throw error;
-      if (data.session?.user) {
-        await fetchProfile(data.session.user.id);
+      
+      if (error) {
+        // Log failed login attempt
+        const { data: userData } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('email', email)
+          .single();
+          
+        if (userData) {
+          await supabase.rpc('update_user_login', {
+            p_user_id: userData.id,
+            p_success: false
+          });
+        }
       }
-      return { error: null };
-    } catch (error) {
-      console.error('[useAuth] Sign in error:', error);
+      
       return { error };
+    } catch (err) {
+      console.error('[useAuth] Sign in error:', err);
+      return { error: err };
     }
   };
 
   const signOut = async () => {
+    console.log('[useAuth] Signing out user...');
     try {
-      const { error } = await supabase.client.auth.signOut();
-      if (error) throw error;
-      setUser(null);
-      setSession(null);
-      return { error: null };
-    } catch (error) {
-      console.error('[useAuth] Sign out error:', error);
+      await logSecurityEvent('logout_initiated');
+      const { error } = await supabase.auth.signOut();
       return { error };
+    } catch (err) {
+      console.error('[useAuth] Sign out error:', err);
+      return { error: err };
     }
   };
 
@@ -152,6 +316,6 @@ function useProvideAuth(): AuthContextType {
     session,
     loading,
     signIn,
-    signOut,
+    signOut
   };
 }
