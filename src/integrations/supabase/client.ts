@@ -1,37 +1,33 @@
-
 import { createClient } from '@supabase/supabase-js'
 
-// Capture environment variables
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined
+// Direct configuration
+const supabaseUrl = 'https://cwhmxpitwblqxgrvaigg.supabase.co'
+const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN3aG14cGl0d2JscXhncnZhaWdnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA3MTc3MTIsImV4cCI6MjA2NjI5MzcxMn0.NaAtGg1Fpx1obdHK5rBGM5IzSWJea7lniuimr5ZyFGU'
 
 // Flag indicating whether Supabase configuration is present
 export const supabaseConfigValid = Boolean(supabaseUrl && supabaseAnonKey)
 
-console.log('Supabase client initialization:', {
-  url: supabaseUrl ? 'configured' : 'missing',
-  key: supabaseAnonKey ? 'configured' : 'missing',
+console.log('=== Supabase Client Initialization ===');
+console.log('Using direct configuration:', {
+  url: supabaseUrl,
+  key: supabaseAnonKey,
   timestamp: new Date().toISOString()
 });
 
 if (!supabaseUrl || !supabaseAnonKey) {
-  console.error('❌ Missing Supabase environment variables:', {
-    VITE_SUPABASE_URL: !!supabaseUrl,
-    VITE_SUPABASE_ANON_KEY: !!supabaseAnonKey
-  });
-  
-  // Provide helpful error message for development
-  const errorMessage = `
-    Missing Supabase configuration. Please check your .env file:
-    - VITE_SUPABASE_URL=${supabaseUrl || 'missing'}
-    - VITE_SUPABASE_ANON_KEY=${supabaseAnonKey ? 'configured' : 'missing'}
-  `;
-  console.error(errorMessage);
+  throw new Error(`Supabase configuration missing:
+    URL: ${supabaseUrl || 'undefined'}
+    Key: ${supabaseAnonKey || 'undefined'}
+    
+    Please check your configuration and ensure it contains:
+    VITE_SUPABASE_URL=your_supabase_url
+    VITE_SUPABASE_ANON_KEY=your_supabase_key`);
 }
 
-export const supabase = createClient(
-  supabaseUrl || 'https://placeholder.supabase.co', 
-  supabaseAnonKey || 'placeholder-key', 
+// Create client with configuration
+const client = createClient(
+  supabaseUrl,
+  supabaseAnonKey,
   {
     auth: {
       storage: localStorage,
@@ -50,23 +46,52 @@ export const supabase = createClient(
   }
 );
 
-// Add connection health check
-async function testSupabaseConnection(): Promise<void> {
+// Test the connection before exposing the client
+async function testConnection(): Promise<boolean> {
   try {
-    const { error } = await supabase
+    console.log('Attempting Supabase connection test...');
+    
+    // Try a simple ping to test the connection
+    const { data, error } = await client
       .from('profiles')
-      .select('count', { count: 'exact', head: true });
+      .select('id')
+      .limit(1);
 
     if (error) {
-      console.error('❌ Supabase connection test failed:', error.message);
-    } else {
-      console.log('✅ Supabase connection established successfully');
+      console.error('Connection test failed:', {
+        error: error.message,
+        details: error,
+        data: data
+      });
+      return false;
     }
-  } catch (err) {
-    console.error('❌ Supabase connection error:', err);
+
+    console.log('Connection test successful!', { 
+      hasData: !!data?.length,
+      dataSample: data?.[0]
+    });
+    return true;
+  } catch (error) {
+    console.error('Connection test failed with error:', {
+      error: error instanceof Error ? error.message : 'Unknown error',
+      details: error
+    });
+    return false;
   }
 }
 
-if (supabaseConfigValid) {
-  void testSupabaseConnection();
-}
+// Export the client with a ready state
+export const supabase = {
+  client: client,
+  isReady: false,
+  init: async () => {
+    const isConnected = await testConnection();
+    if (isConnected) {
+      console.log('Supabase client initialized successfully');
+      return client;
+    } else {
+      throw new Error('Failed to initialize Supabase client');
+    }
+  },
+  get: () => client
+};
