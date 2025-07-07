@@ -40,7 +40,6 @@ function useProvideAuth(): AuthContextType {
   const fetchProfile = async (uid: string, timeoutMs: number = 3000): Promise<void> => {
     console.log('[useAuth] fetchProfile start for:', uid);
     
-    // Create a timeout promise
     const timeoutPromise = new Promise<never>((_, reject) => {
       setTimeout(() => reject(new Error('Profile fetch timeout')), timeoutMs);
     });
@@ -57,7 +56,6 @@ function useProvideAuth(): AuthContextType {
       if (error) {
         if (error.code === 'PGRST116') {
           console.warn('[useAuth] No profile found for user:', uid);
-          // Create a default user profile if none exists
           const defaultUser: AppUser = {
             id: uid,
             name: 'User',
@@ -68,7 +66,6 @@ function useProvideAuth(): AuthContextType {
           setUser(defaultUser);
         } else {
           console.error('[useAuth] Profile fetch error:', error);
-          // Create fallback user even on error
           const fallbackUser: AppUser = {
             id: uid,
             name: 'User',
@@ -93,7 +90,6 @@ function useProvideAuth(): AuthContextType {
         setUser(appUser);
       } else {
         console.warn('[useAuth] Profile data is null for user:', uid);
-        // Create fallback user
         const fallbackUser: AppUser = {
           id: uid,
           name: 'User',
@@ -105,7 +101,6 @@ function useProvideAuth(): AuthContextType {
       }
     } catch (err) {
       console.error('[useAuth] Profile fetch timeout or error:', err);
-      // Always create a fallback user to prevent loading hang
       const fallbackUser: AppUser = {
         id: uid,
         name: 'User',
@@ -119,7 +114,6 @@ function useProvideAuth(): AuthContextType {
 
   const logSecurityEvent = async (action: string, details: any = {}) => {
     try {
-      // Get user's IP and user agent
       const userAgent = navigator.userAgent;
       const ipResponse = await fetch('https://api.ipify.org?format=json');
       const ipData = await ipResponse.json();
@@ -145,7 +139,6 @@ function useProvideAuth(): AuthContextType {
       const ipResponse = await fetch('https://api.ipify.org?format=json');
       const ipData = await ipResponse.json();
       
-      // Get device info
       const deviceInfo = {
         userAgent,
         platform: navigator.platform,
@@ -155,7 +148,6 @@ function useProvideAuth(): AuthContextType {
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
       };
 
-      // Get location data (approximate from IP)
       const locationResponse = await fetch(`http://ip-api.com/json/${ipData.ip}`);
       const locationData = await locationResponse.json();
 
@@ -175,13 +167,11 @@ function useProvideAuth(): AuthContextType {
   useEffect(() => {
     console.log('[useAuth] Initializing auth state...');
     
-    // Force loading to false after maximum timeout
     const maxLoadingTimeout = setTimeout(() => {
       console.warn('[useAuth] Maximum loading timeout reached, forcing loading to false');
       setLoading(false);
     }, 8000);
 
-    // Setup auth state listener first
     const { data: listener } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         console.log('[useAuth] Auth state change:', event, session?.user?.email || 'no user');
@@ -195,7 +185,6 @@ function useProvideAuth(): AuthContextType {
             await fetchProfile(session.user.id, 3000);
             
             if (event === 'SIGNED_IN') {
-              // Log successful login and update login info
               await supabase.rpc('update_user_login', {
                 p_user_id: session.user.id,
                 p_success: true
@@ -205,7 +194,6 @@ function useProvideAuth(): AuthContextType {
             }
           } catch (error) {
             console.error('[useAuth] Error fetching profile in auth state change:', error);
-            // Create fallback user
             const fallbackUser: AppUser = {
               id: session.user.id,
               name: 'User',
@@ -221,6 +209,12 @@ function useProvideAuth(): AuthContextType {
           console.log('[useAuth] No user session, clearing user state');
           if (event === 'SIGNED_OUT') {
             await logSecurityEvent('session_terminated');
+            // Force clear all state immediately on sign out
+            setUser(null);
+            setSession(null);
+            // Clear any cached data in localStorage
+            localStorage.clear();
+            sessionStorage.clear();
           }
           setUser(null);
           setLoading(false);
@@ -228,7 +222,6 @@ function useProvideAuth(): AuthContextType {
       }
     );
 
-    // Get initial session with timeout
     const getInitialSession = async () => {
       try {
         const sessionPromise = supabase.auth.getSession();
@@ -277,7 +270,6 @@ function useProvideAuth(): AuthContextType {
       });
       
       if (error) {
-        // Log failed login attempt
         const { data: userData } = await supabase
           .from('profiles')
           .select('id')
@@ -303,10 +295,33 @@ function useProvideAuth(): AuthContextType {
     console.log('[useAuth] Signing out user...');
     try {
       await logSecurityEvent('logout_initiated');
+      
+      // Clear state immediately before calling Supabase signOut
+      setUser(null);
+      setSession(null);
+      
+      // Clear browser storage
+      localStorage.clear();
+      sessionStorage.clear();
+      
       const { error } = await supabase.auth.signOut();
+      
+      // Force reload to ensure clean state
+      setTimeout(() => {
+        window.location.href = '/';
+      }, 100);
+      
       return { error };
     } catch (err) {
       console.error('[useAuth] Sign out error:', err);
+      // Even if there's an error, clear local state and redirect
+      setUser(null);
+      setSession(null);
+      localStorage.clear();
+      sessionStorage.clear();
+      setTimeout(() => {
+        window.location.href = '/';
+      }, 100);
       return { error: err };
     }
   };

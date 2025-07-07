@@ -13,7 +13,6 @@ import PDProductSelector from './PDProductSelector';
 import BOMDisplay from './BOMDisplay';
 import AnalogCardConfigurator from './AnalogCardConfigurator';
 import BushingCardConfigurator from './BushingCardConfigurator';
-import AdditionalConfigTab from './AdditionalConfigTab';
 import { productDataService } from '@/services/productDataService';
 import QuoteFieldsSection from './QuoteFieldsSection';
 import DiscountSection from './DiscountSection';
@@ -31,7 +30,6 @@ interface BOMBuilderProps {
 }
 
 const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
-  // ALL HOOKS MUST BE AT THE TOP - NO CONDITIONAL RETURNS BEFORE HOOKS
   const { user, loading } = useAuth();
 
   const [selectedLevel1Product, setSelectedLevel1Product] = useState<Level1Product | null>(null);
@@ -50,7 +48,6 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [editingQTMS, setEditingQTMS] = useState<ConsolidatedQTMS | null>(null);
 
-  // Get available quote fields for validation
   const [availableQuoteFields, setAvailableQuoteFields] = useState<any[]>([]);
   
   useEffect(() => {
@@ -72,15 +69,12 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
     fetchQuoteFields();
   }, []);
 
-  // Use quote validation hook
   const { validation, validateFields } = useQuoteValidation(quoteFields, availableQuoteFields);
 
-  // Fixed field change handler to match expected signature
   const handleQuoteFieldChange = (fieldId: string, value: any) => {
     setQuoteFields(prev => ({ ...prev, [fieldId]: value }));
   };
 
-  // Load Level 1 products for dynamic tabs
   const [level1Products, setLevel1Products] = useState<Level1Product[]>([]);
   const [level1Loading, setLevel1Loading] = useState(true);
 
@@ -91,7 +85,6 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
         setLevel1Products(products.filter(p => p.enabled));
       } catch (error) {
         console.error('Error loading Level 1 products:', error);
-        // Fallback to sync method
         const syncProducts = productDataService.getLevel1ProductsSync();
         setLevel1Products(syncProducts.filter(p => p.enabled));
       } finally {
@@ -102,16 +95,14 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
     loadLevel1Products();
   }, []);
 
-  // Set default active tab when products are loaded
   useEffect(() => {
     if (level1Products.length > 0 && !activeTab) {
       setActiveTab(level1Products[0].id);
     }
   }, [level1Products.length, activeTab]);
 
-  // Update selected product when tab changes
   useEffect(() => {
-    if (activeTab && activeTab !== 'additional-config') {
+    if (activeTab) {
       const product = level1Products.find(p => p.id === activeTab);
       if (product && selectedLevel1Product?.id !== activeTab) {
         setSelectedLevel1Product(product);
@@ -378,7 +369,6 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
   const submitQuoteRequest = async () => {
     if (isSubmitting) return;
 
-    // Validate required fields before submission
     const { isValid, missingFields } = validateFields();
     
     if (!isValid) {
@@ -529,17 +519,7 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
     }
   };
 
-  // Render product content based on selected tab
   const renderProductContent = (productId: string) => {
-    if (productId === 'additional-config') {
-      return (
-        <AdditionalConfigTab
-          onCardSelect={handleCardSelect}
-          canSeePrices={canSeePrices}
-        />
-      );
-    }
-
     const product = level1Products.find(p => p.id === productId);
     if (!product) return null;
 
@@ -624,7 +604,6 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
     }
   };
 
-  // CONDITIONAL RENDERING IN JSX - NO EARLY RETURNS
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -650,14 +629,12 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
 
   return (
     <div className="space-y-6">
-      {/* Quote Fields Section - Always at the top */}
       <QuoteFieldsSection
         quoteFields={quoteFields}
         onFieldChange={handleQuoteFieldChange}
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full">
-        {/* Left side - Product selection (2/3 width) */}
         <div className="lg:col-span-2 space-y-6">
           <Card className="bg-gray-900 border-gray-800">
             <CardHeader>
@@ -671,7 +648,7 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
           </Card>
 
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full bg-gray-800" style={{ gridTemplateColumns: `repeat(${level1Products.length + 1}, 1fr)` }}>
+            <TabsList className="grid w-full bg-gray-800" style={{ gridTemplateColumns: `repeat(${level1Products.length}, 1fr)` }}>
               {level1Products.map((product) => (
                 <TabsTrigger 
                   key={product.id}
@@ -686,15 +663,6 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
                   )}
                 </TabsTrigger>
               ))}
-              <TabsTrigger 
-                value="additional-config" 
-                className="text-white data-[state=active]:bg-red-600 data-[state=active]:text-white"
-              >
-                Additional Config
-                <Badge variant="outline" className="ml-2 text-xs">
-                  Cards
-                </Badge>
-              </TabsTrigger>
             </TabsList>
             
             {level1Products.map((product) => (
@@ -702,14 +670,9 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
                 {renderProductContent(product.id)}
               </TabsContent>
             ))}
-            
-            <TabsContent value="additional-config" className="mt-6">
-              {renderProductContent('additional-config')}
-            </TabsContent>
           </Tabs>
         </div>
 
-        {/* Right side - BOM Display and Discount (1/3 width) */}
         <div className="lg:col-span-1 space-y-6">
           <BOMDisplay
             bomItems={bomItems}
@@ -718,7 +681,6 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
             canSeePrices={canSeePrices}
           />
           
-          {/* Discount Section with Submit Quote Button */}
           <DiscountSection
             bomItems={bomItems}
             onDiscountChange={handleDiscountChange}
@@ -727,7 +689,6 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
             initialJustification={discountJustification}
           />
 
-          {/* Submit Quote Button - Moved here to bottom of discount section */}
           {bomItems.length > 0 && (
             <Card className="bg-gray-900 border-gray-800">
               <CardContent className="pt-6">
@@ -751,7 +712,6 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
         </div>
       </div>
 
-      {/* Card Configuration Dialogs */}
       {configuringCard && configuringCard.product.name.toLowerCase().includes('analog') && (
         <AnalogCardConfigurator
           bomItem={configuringCard}
@@ -768,7 +728,6 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
         />
       )}
 
-      {/* QTMS Configuration Editor */}
       {editingQTMS && (
         <QTMSConfigurationEditor
           consolidatedQTMS={editingQTMS}
@@ -777,8 +736,6 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
           canSeePrices={canSeePrices}
         />
       )}
-
-      {/* End of dialogs */}
     </div>
   );
 };
