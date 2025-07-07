@@ -1,4 +1,3 @@
-
 /**
  * © 2025 Qualitrol Corp. All rights reserved.
  * Confidential and proprietary. Unauthorized copying or distribution is prohibited.
@@ -134,37 +133,26 @@ export const useQuotes = () => {
 
       console.log(`Fetched ${bomData?.length || 0} BOM items for quote ${quoteId}`);
       
-      // Calculate proper costs from product hierarchy
-      const processedItems: BOMItemWithDetails[] = await Promise.all(
-        (bomData || []).map(async (item) => {
-          let calculatedCost = Number(item.unit_cost) || 0;
-          
-          // For QTMS configurations, sum costs from product hierarchy
-          if (item.product_type === 'qtms_configuration' && item.configuration_data) {
-            calculatedCost = await calculateQTMSCost(item.configuration_data);
-          }
-          
-          return {
-            id: item.id,
-            quote_id: item.quote_id,
-            product_id: item.product_id,
-            name: item.name || 'Unnamed Product',
-            description: item.description || '',
-            part_number: item.part_number || '',
-            quantity: item.quantity || 1,
-            unit_price: Number(item.unit_price) || 0,
-            unit_cost: calculatedCost,
-            total_price: Number(item.total_price) || 0,
-            total_cost: calculatedCost * (item.quantity || 1),
-            margin: Number(item.margin) || 0,
-            original_unit_price: Number(item.original_unit_price) || Number(item.unit_price) || 0,
-            approved_unit_price: Number(item.approved_unit_price) || Number(item.unit_price) || 0,
-            product_type: item.product_type || 'standard',
-            configuration_data: item.configuration_data || null,
-            price_adjustment_history: item.price_adjustment_history || []
-          };
-        })
-      );
+      // Ensure all required fields are present and properly typed
+      const processedItems: BOMItemWithDetails[] = (bomData || []).map(item => ({
+        id: item.id,
+        quote_id: item.quote_id,
+        product_id: item.product_id,
+        name: item.name || 'Unnamed Product',
+        description: item.description || '',
+        part_number: item.part_number || '',
+        quantity: item.quantity || 1,
+        unit_price: Number(item.unit_price) || 0,
+        unit_cost: Number(item.unit_cost) || 0,
+        total_price: Number(item.total_price) || 0,
+        total_cost: Number(item.total_cost) || 0,
+        margin: Number(item.margin) || 0,
+        original_unit_price: Number(item.original_unit_price) || Number(item.unit_price) || 0,
+        approved_unit_price: Number(item.approved_unit_price) || Number(item.unit_price) || 0,
+        product_type: item.product_type || 'standard',
+        configuration_data: item.configuration_data || null,
+        price_adjustment_history: item.price_adjustment_history || []
+      }));
 
       return processedItems;
     } catch (err) {
@@ -175,59 +163,6 @@ export const useQuotes = () => {
         variant: "destructive"
       });
       return [];
-    }
-  };
-
-  const calculateQTMSCost = async (configurationData: any): Promise<number> => {
-    let totalCost = 0;
-
-    try {
-      // Sum costs from Level 1 (base chassis)
-      if (configurationData.level1Product) {
-        const { data: level1Data } = await supabase
-          .from('products')
-          .select('cost')
-          .eq('id', configurationData.level1Product)
-          .single();
-        
-        if (level1Data?.cost) {
-          totalCost += Number(level1Data.cost);
-        }
-      }
-
-      // Sum costs from Level 2 (chassis variant)
-      if (configurationData.level2Product) {
-        const { data: level2Data } = await supabase
-          .from('products')
-          .select('cost')
-          .eq('id', configurationData.level2Product)
-          .single();
-        
-        if (level2Data?.cost) {
-          totalCost += Number(level2Data.cost);
-        }
-      }
-
-      // Sum costs from Level 3 (cards and options)
-      if (configurationData.level3Products && Array.isArray(configurationData.level3Products)) {
-        for (const level3Item of configurationData.level3Products) {
-          const { data: level3Data } = await supabase
-            .from('products')
-            .select('cost')
-            .eq('id', level3Item.productId)
-            .single();
-          
-          if (level3Data?.cost) {
-            totalCost += Number(level3Data.cost) * (level3Item.quantity || 1);
-          }
-        }
-      }
-
-      console.log(`Calculated QTMS cost: ${totalCost}`);
-      return totalCost;
-    } catch (error) {
-      console.error('Error calculating QTMS cost:', error);
-      return 0;
     }
   };
 
@@ -281,6 +216,7 @@ export const useQuotes = () => {
 
       // Calculate new totals and margin
       const newTotalPrice = newPrice * currentItem.quantity;
+      const newTotalCost = currentItem.unit_cost * currentItem.quantity;
       const newMargin = newPrice > 0 
         ? ((newPrice - currentItem.unit_cost) / newPrice) * 100 
         : 0;

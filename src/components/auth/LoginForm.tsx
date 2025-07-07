@@ -144,7 +144,11 @@ const LoginForm = ({ onLogin }: LoginFormProps) => {
           </div>
           
           <div className="mt-6 text-sm text-gray-400">
-            <p className="text-gray-500">Use your assigned credentials to sign in.</p>
+            <p className="mb-2">Admin Account:</p>
+            <div className="space-y-1 text-xs">
+              <p>Email: cdeligi@qualitrolcorp.com</p>
+              <p className="text-gray-500">Use your assigned password</p>
+            </div>
           </div>
         </CardContent>
       </Card>

@@ -1,401 +1,220 @@
-/**
- * © 2025 Qualitrol Corp. All rights reserved.
- * Confidential and proprietary. Unauthorized copying or distribution is prohibited.
- */
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { User } from "@/types/auth";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { TrendingUp, TrendingDown, DollarSign, FileText, Clock, AlertCircle, RefreshCw } from "lucide-react";
-import QuoteVolumeChart from "./QuoteVolumeChart";
-import { useState } from "react";
-
-interface MonthlyData {
-  month: string;
-  quotes: number;
-  value: number;
-  cost: number;
-}
-
-interface QuoteAnalytics {
-  monthly: {
-    executed: number;
-    approved: number;
-    rejected: number;
-    underAnalysis: number;
-    totalQuotedValue: number;
-    avgMargin: number;
-    totalGrossProfit: number;
-  };
-  yearly: {
-    executed: number;
-    approved: number;
-    rejected: number;
-    underAnalysis: number;
-    totalQuotedValue: number;
-    avgMargin: number;
-    totalGrossProfit: number;
-  };
-  monthlyBreakdown: MonthlyData[];
-}
+import { FileText, Clock, CheckCircle, AlertCircle } from "lucide-react";
+import QuoteAnalyticsDashboard from "./QuoteAnalyticsDashboard";
+import { calculateQuoteAnalytics } from "@/utils/quoteAnalytics";
 
 interface DashboardOverviewProps {
-  analytics: QuoteAnalytics;
-  isAdmin: boolean;
-  loading?: boolean;
-  onRetry?: () => void;
+  user: User;
 }
 
-const DashboardOverview = ({ analytics, isAdmin, loading = false, onRetry }: DashboardOverviewProps) => {
-  const [timeFilter, setTimeFilter] = useState("3months");
-
-  const getFilteredData = () => {
-    const now = new Date();
-    let cutoffDate: Date;
-
-    switch (timeFilter) {
-      case "1month":
-        cutoffDate = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
-        break;
-      case "6months":
-        cutoffDate = new Date(now.getFullYear(), now.getMonth() - 6, now.getDate());
-        break;
-      case "1year":
-        cutoffDate = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate());
-        break;
-      default: // 3months
-        cutoffDate = new Date(now.getFullYear(), now.getMonth() - 3, now.getDate());
+const DashboardOverview = ({ user }: DashboardOverviewProps) => {
+  // Mock data for demonstration - in production, this would come from your API
+  const mockQuoteData = [
+    { 
+      id: 'Q-2024-001', 
+      status: 'pending_approval' as const, 
+      total: 45250, 
+      createdAt: '2024-01-15',
+      margin: 28.5,
+      grossProfit: 12921.25
+    },
+    { 
+      id: 'Q-2024-002', 
+      status: 'approved' as const, 
+      total: 78900, 
+      createdAt: '2024-01-14',
+      margin: 32.1,
+      grossProfit: 25327.9
+    },
+    { 
+      id: 'Q-2024-003', 
+      status: 'draft' as const, 
+      total: 32100, 
+      createdAt: '2024-01-13',
+      margin: 25.8,
+      grossProfit: 8281.8
+    },
+    { 
+      id: 'Q-2024-004', 
+      status: 'finalized' as const, 
+      total: 89400, 
+      createdAt: '2024-01-10',
+      margin: 30.2,
+      grossProfit: 27000.8
+    },
+    { 
+      id: 'Q-2024-005', 
+      status: 'rejected' as const, 
+      total: 25600, 
+      createdAt: '2024-01-08',
+      margin: 22.3,
+      grossProfit: 5708.8
+    },
+    { 
+      id: 'Q-2023-087', 
+      status: 'finalized' as const, 
+      total: 156700, 
+      createdAt: '2023-12-20',
+      margin: 35.4,
+      grossProfit: 55471.8
+    },
+    { 
+      id: 'Q-2023-088', 
+      status: 'approved' as const, 
+      total: 67300, 
+      createdAt: '2023-12-18',
+      margin: 29.7,
+      grossProfit: 19988.1
     }
+  ];
 
-    // Filter analytics data based on selected timeframe
-    const filteredData = analytics.monthlyBreakdown?.filter(item => {
-      const itemDate = new Date(item.month + '-01');
-      return itemDate >= cutoffDate;
-    }) || [];
+  const analytics = calculateQuoteAnalytics(mockQuoteData);
 
-    // Calculate filtered totals
-    const totalQuotes = filteredData.reduce((sum, item) => sum + item.quotes, 0);
-    const totalValue = filteredData.reduce((sum, item) => sum + item.value, 0);
-    const totalCost = filteredData.reduce((sum, item) => sum + item.cost, 0);
-    const pendingQuotes = Math.floor(totalQuotes * 0.15); // Mock pending calculation
-    const approvedQuotes = Math.floor(totalQuotes * 0.7);
-    const rejectedQuotes = totalQuotes - approvedQuotes - pendingQuotes;
-    const approvalRate = totalQuotes > 0 ? (approvedQuotes / totalQuotes) * 100 : 0;
+  // Mock data for recent quotes
+  const stats = {
+    totalQuotes: 12,
+    pendingApproval: 3,
+    approved: 8,
+    rejected: 1
+  };
 
-    return {
-      totalQuotes,
-      totalValue,
-      totalCost,
-      pendingQuotes,
-      approvedQuotes,
-      rejectedQuotes,
-      approvalRate,
-      monthlyBreakdown: filteredData
+  const recentQuotes = [
+    {
+      id: 'Q-2024-001',
+      customer: 'ABC Power Company',
+      value: '$45,250',
+      status: 'pending_approval',
+      date: '2024-01-15'
+    },
+    {
+      id: 'Q-2024-002',
+      customer: 'Delta Electric',
+      value: '$78,900',
+      status: 'approved',
+      date: '2024-01-14'
+    },
+    {
+      id: 'Q-2024-003',
+      customer: 'Phoenix Utilities',
+      value: '$32,100',
+      status: 'draft',
+      date: '2024-01-13'
+    }
+  ];
+
+  const getStatusBadge = (status: string) => {
+    const statusConfig = {
+      draft: { color: 'bg-gray-600', text: 'Draft' },
+      pending_approval: { color: 'bg-yellow-600', text: 'Pending' },
+      approved: { color: 'bg-green-600', text: 'Approved' },
+      rejected: { color: 'bg-red-600', text: 'Rejected' }
     };
+    return statusConfig[status as keyof typeof statusConfig] || statusConfig.draft;
   };
-
-  const filteredAnalytics = getFilteredData();
-
-  const getTrendIndicator = (current: number, previous: number) => {
-    if (previous === 0) return null;
-    const change = ((current - previous) / previous) * 100;
-    const isPositive = change > 0;
-    
-    return (
-      <div className={`flex items-center text-sm ${isPositive ? 'text-green-400' : 'text-red-400'}`}>
-        {isPositive ? <TrendingUp className="h-4 w-4 mr-1" /> : <TrendingDown className="h-4 w-4 mr-1" />}
-        {Math.abs(change).toFixed(1)}%
-      </div>
-    );
-  };
-
-  if (loading) {
-    return (
-      <div className="space-y-6">
-        <div className="flex justify-between items-center">
-          <div>
-            <h1 className="text-3xl font-bold text-white mb-2">Dashboard Overview</h1>
-            <p className="text-gray-300">Loading analytics data...</p>
-          </div>
-          <div className="flex items-center space-x-4">
-            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div>
-            {onRetry && (
-              <Button 
-                onClick={onRetry}
-                variant="outline"
-                size="sm"
-                className="border-gray-600 text-white hover:bg-gray-800"
-              >
-                <RefreshCw className="mr-2 h-4 w-4" />
-                Retry
-              </Button>
-            )}
-          </div>
-        </div>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {[...Array(4)].map((_, i) => (
-            <Card key={i} className="bg-gray-900 border-gray-800">
-              <CardHeader className="pb-2">
-                <div className="h-4 bg-gray-700 rounded animate-pulse"></div>
-              </CardHeader>
-              <CardContent>
-                <div className="h-8 bg-gray-700 rounded animate-pulse"></div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      </div>
-    );
-  }
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold text-white mb-2">Dashboard Overview</h1>
-          <p className="text-gray-300">Monitor your quote performance and key metrics</p>
-        </div>
-        <div className="flex items-center space-x-4">
-          <Select value={timeFilter} onValueChange={setTimeFilter}>
-            <SelectTrigger className="w-40 bg-gray-800 border-gray-700 text-white">
-              <SelectValue placeholder="Select timeframe" />
-            </SelectTrigger>
-            <SelectContent className="bg-gray-800 border-gray-700">
-              <SelectItem value="1month" className="text-white hover:bg-gray-700">Last Month</SelectItem>
-              <SelectItem value="3months" className="text-white hover:bg-gray-700">Last 3 Months</SelectItem>
-              <SelectItem value="6months" className="text-white hover:bg-gray-700">Last 6 Months</SelectItem>
-              <SelectItem value="1year" className="text-white hover:bg-gray-700">Last Year</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+    <div className="space-y-8">
+      <div>
+        <h1 className="text-3xl font-bold text-white mb-2">
+          Welcome back, {user.name}
+        </h1>
+        <p className="text-gray-400">
+          Here's an overview of your quoting activity
+        </p>
       </div>
 
-      {/* Key Metrics Cards */}
+      {/* Analytics Dashboard */}
+      <QuoteAnalyticsDashboard analytics={analytics} isAdmin={user.role === 'admin'} />
+
+      {/* Quick Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <Card className="bg-gray-900 border-gray-800">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-gray-300 text-sm font-medium flex items-center">
-              <FileText className="h-4 w-4 mr-2 text-blue-400" />
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-gray-400">
               Total Quotes
             </CardTitle>
+            <FileText className="h-4 w-4 text-gray-400" />
           </CardHeader>
           <CardContent>
-            <div className="flex items-center justify-between">
-              <div className="text-3xl font-bold text-white">{filteredAnalytics.totalQuotes}</div>
-              {getTrendIndicator(filteredAnalytics.totalQuotes, analytics.monthly.executed)}
-            </div>
+            <div className="text-2xl font-bold text-white">{stats.totalQuotes}</div>
           </CardContent>
         </Card>
 
         <Card className="bg-gray-900 border-gray-800">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-gray-300 text-sm font-medium flex items-center">
-              <DollarSign className="h-4 w-4 mr-2 text-green-400" />
-              Total Value
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center justify-between">
-              <div className="text-3xl font-bold text-white">${filteredAnalytics.totalValue.toLocaleString()}</div>
-              {getTrendIndicator(filteredAnalytics.totalValue, analytics.monthly.totalQuotedValue)}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-gray-900 border-gray-800">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-gray-300 text-sm font-medium flex items-center">
-              <Clock className="h-4 w-4 mr-2 text-yellow-400" />
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-gray-400">
               Pending Approval
             </CardTitle>
+            <Clock className="h-4 w-4 text-yellow-500" />
           </CardHeader>
           <CardContent>
-            <div className="flex items-center justify-between">
-              <div className="text-3xl font-bold text-white">{filteredAnalytics.pendingQuotes}</div>
-              <Badge variant="outline" className="text-yellow-400 border-yellow-600">
-                Needs Attention
-              </Badge>
-            </div>
+            <div className="text-2xl font-bold text-white">{stats.pendingApproval}</div>
           </CardContent>
         </Card>
 
         <Card className="bg-gray-900 border-gray-800">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-gray-300 text-sm font-medium flex items-center">
-              <TrendingUp className="h-4 w-4 mr-2 text-purple-400" />
-              Approval Rate
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-gray-400">
+              Approved
             </CardTitle>
+            <CheckCircle className="h-4 w-4 text-green-500" />
           </CardHeader>
           <CardContent>
-            <div className="flex items-center justify-between">
-              <div className="text-3xl font-bold text-white">{filteredAnalytics.approvalRate.toFixed(1)}%</div>
-              <div className={`text-sm ${filteredAnalytics.approvalRate >= 80 ? 'text-green-400' : filteredAnalytics.approvalRate >= 60 ? 'text-yellow-400' : 'text-red-400'}`}>
-                {filteredAnalytics.approvalRate >= 80 ? 'Excellent' : filteredAnalytics.approvalRate >= 60 ? 'Good' : 'Needs Improvement'}
-              </div>
-            </div>
+            <div className="text-2xl font-bold text-white">{stats.approved}</div>
           </CardContent>
         </Card>
-      </div>
 
-      {/* Quote Volume Chart */}
-      <Card className="bg-gray-900 border-gray-800">
-        <CardHeader>
-          <CardTitle className="text-white flex items-center justify-between">
-            <div className="flex items-center">
-              <TrendingUp className="mr-2 h-5 w-5 text-blue-400" />
-              Quote Volume Trends
-            </div>
-            <Badge variant="outline" className="text-gray-300 border-gray-600">
-              {timeFilter === "1month" ? "Monthly" : 
-               timeFilter === "3months" ? "Quarterly" : 
-               timeFilter === "6months" ? "Semi-Annual" : "Annual"} View
-            </Badge>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {filteredAnalytics.monthlyBreakdown.length > 0 ? (
-            <QuoteVolumeChart data={filteredAnalytics.monthlyBreakdown} />
-          ) : (
-            <div className="h-80 flex items-center justify-center text-gray-400">
-              <div className="text-center">
-                <TrendingUp className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                <p>No analytics data available</p>
-                <p className="text-sm">Data will appear as quotes are created</p>
-              </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Status Breakdown */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card className="bg-gray-900 border-gray-800">
-          <CardHeader>
-            <CardTitle className="text-white">Quote Status Breakdown</CardTitle>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-gray-400">
+              Rejected
+            </CardTitle>
+            <AlertCircle className="h-4 w-4 text-red-500" />
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center justify-between p-3 bg-gray-800 rounded-lg">
-              <div className="flex items-center space-x-3">
-                <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                <span className="text-gray-300">Approved</span>
-              </div>
-              <div className="flex items-center space-x-2">
-                <span className="text-white font-semibold">{filteredAnalytics.approvedQuotes}</span>
-                <span className="text-gray-400 text-sm">
-                  ({((filteredAnalytics.approvedQuotes / filteredAnalytics.totalQuotes) * 100).toFixed(1)}%)
-                </span>
-              </div>
-            </div>
-            
-            <div className="flex items-center justify-between p-3 bg-gray-800 rounded-lg">
-              <div className="flex items-center space-x-3">
-                <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
-                <span className="text-gray-300">Pending</span>
-              </div>
-              <div className="flex items-center space-x-2">
-                <span className="text-white font-semibold">{filteredAnalytics.pendingQuotes}</span>
-                <span className="text-gray-400 text-sm">
-                  ({((filteredAnalytics.pendingQuotes / filteredAnalytics.totalQuotes) * 100).toFixed(1)}%)
-                </span>
-              </div>
-            </div>
-            
-            <div className="flex items-center justify-between p-3 bg-gray-800 rounded-lg">
-              <div className="flex items-center space-x-3">
-                <div className="w-3 h-3 bg-red-500 rounded-full"></div>
-                <span className="text-gray-300">Rejected</span>
-              </div>
-              <div className="flex items-center space-x-2">
-                <span className="text-white font-semibold">{filteredAnalytics.rejectedQuotes}</span>
-                <span className="text-gray-400 text-sm">
-                  ({((filteredAnalytics.rejectedQuotes / filteredAnalytics.totalQuotes) * 100).toFixed(1)}%)
-                </span>
-              </div>
-            </div>
+          <CardContent>
+            <div className="text-2xl font-bold text-white">{stats.rejected}</div>
           </CardContent>
         </Card>
-
-        {isAdmin && (
-          <Card className="bg-gray-900 border-gray-800">
-            <CardHeader>
-              <CardTitle className="text-white flex items-center">
-                <AlertCircle className="mr-2 h-5 w-5 text-orange-400" />
-                Admin Insights
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="p-3 bg-gray-800 rounded-lg">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-gray-300 text-sm">Average Quote Value</span>
-                  <span className="text-white font-semibold">
-                    ${filteredAnalytics.totalQuotes > 0 
-                      ? (filteredAnalytics.totalValue / filteredAnalytics.totalQuotes).toLocaleString()
-                      : '0'}
-                  </span>
-                </div>
-                <div className="w-full bg-gray-700 rounded-full h-2">
-                  <div 
-                    className="bg-blue-500 h-2 rounded-full" 
-                    style={{ width: `${Math.min((filteredAnalytics.totalValue / 1000000) * 100, 100)}%` }}
-                  ></div>
-                </div>
-              </div>
-
-              <div className="p-3 bg-gray-800 rounded-lg">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-gray-300 text-sm">Processing Time</span>
-                  <Badge variant="outline" className="text-green-400 border-green-600">
-                    Optimal
-                  </Badge>
-                </div>
-                <p className="text-white text-sm">Average approval time: 2.3 days</p>
-              </div>
-
-              <div className="p-3 bg-gray-800 rounded-lg">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-gray-300 text-sm">Top Priority Items</span>
-                  <span className="text-orange-400 font-semibold">{filteredAnalytics.pendingQuotes}</span>
-                </div>
-                <p className="text-gray-300 text-sm">Quotes requiring immediate attention</p>
-              </div>
-            </CardContent>
-          </Card>
-        )}
       </div>
 
-      {/* Quick Actions */}
+      {/* Recent Quotes */}
       <Card className="bg-gray-900 border-gray-800">
         <CardHeader>
-          <CardTitle className="text-white">Quick Actions</CardTitle>
+          <CardTitle className="text-white">Recent Quotes</CardTitle>
+          <CardDescription className="text-gray-400">
+            Your latest quoting activity
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="flex flex-wrap gap-3">
-            <Button className="bg-blue-600 hover:bg-blue-700 text-white">
-              <FileText className="mr-2 h-4 w-4" />
-              Create New Quote
-            </Button>
-            {isAdmin && (
-              <Button variant="outline" className="border-gray-600 text-gray-300 hover:bg-gray-800">
-                <Clock className="mr-2 h-4 w-4" />
-                Review Pending Approvals
-              </Button>
-            )}
-            <Button variant="outline" className="border-gray-600 text-gray-300 hover:bg-gray-800">
-              <TrendingUp className="mr-2 h-4 w-4" />
-              View Detailed Analytics
-            </Button>
-            {onRetry && (
-              <Button 
-                onClick={onRetry}
-                variant="outline" 
-                className="border-gray-600 text-gray-300 hover:bg-gray-800"
-              >
-                <RefreshCw className="mr-2 h-4 w-4" />
-                Refresh Data
-              </Button>
-            )}
+          <div className="space-y-4">
+            {recentQuotes.map((quote) => {
+              const statusBadge = getStatusBadge(quote.status);
+              return (
+                <div
+                  key={quote.id}
+                  className="flex items-center justify-between p-4 bg-gray-800 rounded-lg"
+                >
+                  <div className="flex-1">
+                    <div className="flex items-center space-x-3">
+                      <span className="text-white font-medium">{quote.id}</span>
+                      <Badge className={`${statusBadge.color} text-white`}>
+                        {statusBadge.text}
+                      </Badge>
+                    </div>
+                    <p className="text-gray-400 text-sm mt-1">{quote.customer}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-white font-bold">
+                      {user.role === 'level1' ? '—' : quote.value}
+                    </p>
+                    <p className="text-gray-400 text-sm">{quote.date}</p>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </CardContent>
       </Card>

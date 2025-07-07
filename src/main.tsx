@@ -1,14 +1,13 @@
+
 import { createRoot } from 'react-dom/client'
 import App from './App.tsx'
 import './index.css'
-import './utils/testSupabaseConnection'
 
 console.log('=== Application Starting ===');
 console.log('Environment check:', {
   mode: import.meta.env.MODE,
-  supabaseUrl: import.meta.env.VITE_SUPABASE_URL || 'Not configured',
-  supabaseKey: import.meta.env.VITE_SUPABASE_ANON_KEY ? 'configured' : 'missing',
-  processEnv: process.env
+  supabaseUrl: import.meta.env.VITE_SUPABASE_URL ? 'configured' : 'missing',
+  supabaseKey: import.meta.env.VITE_SUPABASE_ANON_KEY ? 'configured' : 'missing'
 });
 
 // Enhanced global error handling
