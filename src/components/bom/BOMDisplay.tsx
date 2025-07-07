@@ -1,254 +1,327 @@
 
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Trash2, Edit3, Save, X, Settings } from 'lucide-react';
-import { BOMItem } from '@/types/product';
+import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Textarea } from '@/components/ui/textarea';
+import { Trash2, Edit3, Settings, AlertTriangle } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 
 interface BOMDisplayProps {
-  bomItems: BOMItem[];
-  onUpdateBOM: (items: BOMItem[]) => void;
-  onEditConfiguration?: (item: BOMItem) => void;
-  canSeePrices: boolean;
+  items: any[];
+  onItemsChange: (items: any[]) => void;
+  mode?: 'create' | 'edit' | 'admin-edit';
+  userRole?: string;
 }
 
-const BOMDisplay = ({ bomItems, onUpdateBOM, onEditConfiguration, canSeePrices }: BOMDisplayProps) => {
-  const [editingItem, setEditingItem] = useState<string | null>(null);
-  const [editQuantity, setEditQuantity] = useState<number>(1);
+const BOMDisplay: React.FC<BOMDisplayProps> = ({ items, onItemsChange, mode = 'create', userRole }) => {
+  const { toast } = useToast();
+  const [editingItem, setEditingItem] = useState<any>(null);
+  const [discountRequest, setDiscountRequest] = useState({
+    itemId: '',
+    requestedPrice: 0,
+    originalPrice: 0,
+    discountPercent: 0,
+    justification: ''
+  });
 
-  const handleEditStart = (item: BOMItem) => {
-    setEditingItem(item.id);
-    setEditQuantity(item.quantity);
+  const handleQuantityChange = (index: number, quantity: number) => {
+    const updatedItems = [...items];
+    updatedItems[index] = {
+      ...updatedItems[index],
+      quantity: Math.max(1, quantity)
+    };
+    onItemsChange(updatedItems);
   };
 
-  const handleEditSave = (itemId: string) => {
-    const updatedItems = bomItems.map(item =>
-      item.id === itemId ? { ...item, quantity: editQuantity } : item
-    );
-    onUpdateBOM(updatedItems);
-    setEditingItem(null);
-  };
-
-  const handleEditCancel = () => {
-    setEditingItem(null);
-    setEditQuantity(1);
-  };
-
-  const handleRemoveItem = (itemId: string) => {
-    const updatedItems = bomItems.filter(item => item.id !== itemId);
-    onUpdateBOM(updatedItems);
-  };
-
-  const handleConfigurationEdit = (item: BOMItem) => {
-    if (onEditConfiguration) {
-      onEditConfiguration(item);
+  const handlePriceChange = (index: number, newPrice: number) => {
+    const item = items[index];
+    const originalPrice = item.original_unit_price || item.unit_price;
+    
+    // For non-admin users, only allow price increases
+    if (userRole !== 'admin' && userRole !== 'finance' && newPrice < originalPrice) {
+      toast({
+        title: "Price Restriction",
+        description: "You can only increase prices. Use 'Request Discount' for price reductions.",
+        variant: "destructive"
+      });
+      return;
     }
+
+    const updatedItems = [...items];
+    updatedItems[index] = {
+      ...updatedItems[index],
+      unit_price: newPrice,
+      original_unit_price: originalPrice
+    };
+    onItemsChange(updatedItems);
+  };
+
+  const handleDiscountRequest = (item: any, index: number) => {
+    const originalPrice = item.original_unit_price || item.unit_price;
+    setDiscountRequest({
+      itemId: item.id || index.toString(),
+      requestedPrice: 0,
+      originalPrice: originalPrice,
+      discountPercent: 0,
+      justification: ''
+    });
+  };
+
+  const submitDiscountRequest = () => {
+    const { requestedPrice, originalPrice, justification } = discountRequest;
+    
+    if (!justification.trim()) {
+      toast({
+        title: "Error",
+        description: "Please provide justification for the discount request",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (requestedPrice >= originalPrice) {
+      toast({
+        title: "Error", 
+        description: "Requested price must be lower than original price",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // In a real app, this would create a discount request record
+    toast({
+      title: "Discount Request Submitted",
+      description: "Your discount request has been sent to admin for approval",
+    });
+
+    setDiscountRequest({
+      itemId: '',
+      requestedPrice: 0,
+      originalPrice: 0,
+      discountPercent: 0,
+      justification: ''
+    });
+  };
+
+  const removeItem = (index: number) => {
+    const updatedItems = items.filter((_, i) => i !== index);
+    onItemsChange(updatedItems);
   };
 
   const calculateTotal = () => {
-    return bomItems.reduce((total, item) => {
-      const price = item.product.price || 0;
-      return total + (price * item.quantity);
-    }, 0);
+    return items.reduce((sum, item) => sum + (item.unit_price * item.quantity), 0);
   };
 
-  const isConfigurableItem = (item: BOMItem) => {
-    // Check if item is configurable - includes QTMS, Level 4 products, analog sensors, and bushing configurations
-    return item.product.type === 'QTMS' || 
-           item.configuration || 
-           (item.product as any).configurationType ||
-           item.product.name?.toLowerCase().includes('analog') ||
-           item.product.name?.toLowerCase().includes('bushing') ||
-           item.product.name?.toLowerCase().includes('digital');
+  const calculateMargin = (item: any) => {
+    if (item.unit_price <= 0) return 0;
+    return ((item.unit_price - (item.unit_cost || 0)) / item.unit_price) * 100;
   };
 
-  const needsConfiguration = (item: BOMItem) => {
-    // Items that require configuration but don't have it yet
-    const hasLevel4Config = (item.product as any).configurationType;
-    const hasAnalogConfig = item.product.name?.toLowerCase().includes('analog');
-    const hasBushingConfig = item.product.name?.toLowerCase().includes('bushing');
-    const hasDigitalConfig = item.product.name?.toLowerCase().includes('digital');
-    
-    return (hasLevel4Config || hasAnalogConfig || hasBushingConfig || hasDigitalConfig) && !item.configuration;
-  };
-
-  const getPartNumber = (item: BOMItem) => {
-    return item.partNumber || item.product.partNumber || 'N/A';
-  };
-
-  if (bomItems.length === 0) {
+  if (items.length === 0) {
     return (
-      <Card className="bg-gray-900 border-gray-800 h-fit">
-        <CardHeader>
-          <CardTitle className="text-white">Bill of Materials</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-gray-400 text-center py-8">
-            No items selected yet. Start building your configuration.
-          </p>
+      <Card className="bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700">
+        <CardContent className="p-8 text-center text-gray-500 dark:text-gray-400">
+          No items in BOM. Add products from the Products tab.
         </CardContent>
       </Card>
     );
   }
 
   return (
-    <Card className="bg-gray-900 border-gray-800 h-fit">
+    <Card className="bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700">
       <CardHeader>
-        <CardTitle className="text-white flex items-center justify-between">
+        <CardTitle className="text-gray-900 dark:text-white flex items-center gap-2">
+          <Settings className="w-5 h-5" />
           Bill of Materials
-          <Badge variant="outline" className="text-white border-gray-500">
-            {bomItems.length} items
-          </Badge>
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-3">
-        {bomItems.map((item) => (
-          <div key={item.id} className="p-3 bg-gray-800 rounded-lg border border-gray-700">
-            <div className="flex justify-between items-start mb-2">
-              <div className="flex-1 min-w-0">
-                <h4 className="text-white font-medium truncate">{item.product.name}</h4>
-                {/* Enhanced description display from product data */}
-                {item.product.description && (
-                  <p className="text-gray-400 text-xs mt-1">{item.product.description}</p>
-                )}
-                
-                {/* Part Number Display */}
-                <div className="flex items-center space-x-2 mt-1">
-                  <Badge variant="outline" className="text-xs text-green-400 border-green-400">
-                    P/N: {getPartNumber(item)}
-                  </Badge>
-                  {item.slot && (
-                    <Badge variant="outline" className="text-xs text-blue-400 border-blue-400">
-                      Slot {item.slot}
-                    </Badge>
+      <CardContent className="space-y-4">
+        {items.map((item, index) => {
+          const margin = calculateMargin(item);
+          const isLowMargin = margin < 25;
+          
+          return (
+            <div key={index} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 bg-gray-50 dark:bg-gray-800">
+              <div className="flex justify-between items-start mb-3">
+                <div className="flex-1">
+                  <h4 className="font-medium text-gray-900 dark:text-white">{item.name}</h4>
+                  {item.description && (
+                    <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{item.description}</p>
                   )}
-                  {isConfigurableItem(item) && (
-                    <Badge variant="outline" className="text-xs text-purple-400 border-purple-400">
-                      Configurable
-                    </Badge>
-                  )}
-                  {needsConfiguration(item) && (
-                    <Badge variant="outline" className="text-xs text-orange-400 border-orange-400">
-                      Config Required
-                    </Badge>
+                  {item.part_number && (
+                    <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">PN: {item.part_number}</p>
                   )}
                 </div>
-              </div>
-              
-              <div className="flex items-center space-x-2 ml-2">
-                {isConfigurableItem(item) && onEditConfiguration && (
+                
+                <div className="flex items-center gap-2 ml-4">
+                  {mode === 'admin-edit' && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setEditingItem(item)}
+                      className="border-blue-300 text-blue-600 hover:bg-blue-50 dark:border-blue-600 dark:text-blue-400 dark:hover:bg-blue-900"
+                    >
+                      <Edit3 className="w-4 h-4" />
+                    </Button>
+                  )}
+                  
                   <Button
                     size="sm"
-                    variant="ghost"
-                    onClick={() => handleConfigurationEdit(item)}
-                    className="h-6 w-6 p-0 text-purple-400 hover:text-purple-300"
-                    title="Edit configuration"
+                    variant="outline"
+                    onClick={() => removeItem(index)}
+                    className="border-red-300 text-red-600 hover:bg-red-50 dark:border-red-600 dark:text-red-400 dark:hover:bg-red-900"
                   >
-                    <Settings className="h-3 w-3" />
+                    <Trash2 className="w-4 h-4" />
                   </Button>
-                )}
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => handleEditStart(item)}
-                  className="h-6 w-6 p-0 text-gray-400 hover:text-white"
-                  title="Edit quantity"
-                >
-                  <Edit3 className="h-3 w-3" />
-                </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => handleRemoveItem(item.id)}
-                  className="h-6 w-6 p-0 text-red-400 hover:text-red-300"
-                  title="Remove item"
-                >
-                  <Trash2 className="h-3 w-3" />
-                </Button>
+                </div>
               </div>
-            </div>
-            
-            <div className="flex justify-between items-center">
-              <div className="flex items-center space-x-2">
-                <span className="text-gray-400 text-sm">Qty:</span>
-                {editingItem === item.id ? (
-                  <div className="flex items-center space-x-1">
+
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div>
+                  <Label className="text-gray-700 dark:text-gray-300">Quantity</Label>
+                  <Input
+                    type="number"
+                    min="1"
+                    value={item.quantity}
+                    onChange={(e) => handleQuantityChange(index, parseInt(e.target.value) || 1)}
+                    className="bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white"
+                  />
+                </div>
+
+                <div>
+                  <Label className="text-gray-700 dark:text-gray-300">Unit Price</Label>
+                  <div className="flex gap-2">
                     <Input
                       type="number"
-                      min="1"
-                      value={editQuantity}
-                      onChange={(e) => setEditQuantity(parseInt(e.target.value) || 1)}
-                      className="w-16 h-6 text-xs bg-gray-700 border-gray-600 text-white"
+                      step="0.01"
+                      min="0"
+                      value={item.unit_price}
+                      onChange={(e) => handlePriceChange(index, parseFloat(e.target.value) || 0)}
+                      className="bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white"
                     />
-                    <Button
-                      size="sm"
-                      onClick={() => handleEditSave(item.id)}
-                      className="h-6 w-6 p-0 bg-green-600 hover:bg-green-700"
-                      title="Save"
-                    >
-                      <Save className="h-3 w-3" />
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={handleEditCancel}
-                      className="h-6 w-6 p-0 text-gray-400 hover:text-white"
-                      title="Cancel"
-                    >
-                      <X className="h-3 w-3" />
-                    </Button>
+                    {userRole !== 'admin' && userRole !== 'finance' && (
+                      <Dialog>
+                        <DialogTrigger asChild>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleDiscountRequest(item, index)}
+                            className="border-orange-300 text-orange-600 hover:bg-orange-50 dark:border-orange-600 dark:text-orange-400 dark:hover:bg-orange-900"
+                          >
+                            Request Discount
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700">
+                          <DialogHeader>
+                            <DialogTitle className="text-gray-900 dark:text-white">Request Price Discount</DialogTitle>
+                          </DialogHeader>
+                          <div className="space-y-4">
+                            <div>
+                              <Label className="text-gray-700 dark:text-gray-300">Original Price</Label>
+                              <Input
+                                value={`$${discountRequest.originalPrice.toFixed(2)}`}
+                                disabled
+                                className="bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400"
+                              />
+                            </div>
+                            <div>
+                              <Label className="text-gray-700 dark:text-gray-300">Requested Price</Label>
+                              <Input
+                                type="number"
+                                step="0.01"
+                                value={discountRequest.requestedPrice}
+                                onChange={(e) => {
+                                  const requested = parseFloat(e.target.value) || 0;
+                                  const discount = discountRequest.originalPrice > 0 
+                                    ? ((discountRequest.originalPrice - requested) / discountRequest.originalPrice) * 100 
+                                    : 0;
+                                  setDiscountRequest(prev => ({
+                                    ...prev,
+                                    requestedPrice: requested,
+                                    discountPercent: discount
+                                  }));
+                                }}
+                                className="bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white"
+                              />
+                            </div>
+                            <div>
+                              <Label className="text-gray-700 dark:text-gray-300">Discount %</Label>
+                              <Input
+                                value={`${discountRequest.discountPercent.toFixed(1)}%`}
+                                disabled
+                                className="bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400"
+                              />
+                            </div>
+                            <div>
+                              <Label className="text-gray-700 dark:text-gray-300">Justification *</Label>
+                              <Textarea
+                                value={discountRequest.justification}
+                                onChange={(e) => setDiscountRequest(prev => ({ ...prev, justification: e.target.value }))}
+                                placeholder="Explain why this discount is needed..."
+                                className="bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white"
+                              />
+                            </div>
+                            <Button 
+                              onClick={submitDiscountRequest}
+                              className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                            >
+                              Submit Discount Request
+                            </Button>
+                          </div>
+                        </DialogContent>
+                      </Dialog>
+                    )}
                   </div>
-                ) : (
-                  <span className="text-white font-medium">{item.quantity}</span>
-                )}
+                </div>
+
+                <div>
+                  <Label className="text-gray-700 dark:text-gray-300">Total</Label>
+                  <div className="text-lg font-semibold text-gray-900 dark:text-white">
+                    ${(item.unit_price * item.quantity).toFixed(2)}
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  {(userRole === 'admin' || userRole === 'finance') && (
+                    <Badge variant="outline" className="text-gray-600 dark:text-gray-400">
+                      Cost: ${((item.unit_cost || 0) * item.quantity).toFixed(2)}
+                    </Badge>
+                  )}
+                  <Badge 
+                    variant={isLowMargin ? "destructive" : "default"}
+                    className={isLowMargin ? "text-red-600 border-red-300" : "text-green-600 border-green-300"}
+                  >
+                    {isLowMargin && <AlertTriangle className="w-3 h-3 mr-1" />}
+                    Margin: {margin.toFixed(1)}%
+                  </Badge>
+                </div>
               </div>
-              
-              {canSeePrices && (
-                <div className="text-right">
-                  <div className="text-white font-medium">
-                    ${((item.product.price || 0) * item.quantity).toLocaleString()}
-                  </div>
-                  {item.quantity > 1 && (
-                    <div className="text-gray-400 text-xs">
-                      ${item.product.price?.toLocaleString() || '—'} each
-                    </div>
-                  )}
-                  {/* Display cost information if available */}
-                  {item.product.cost && (
-                    <div className="text-orange-400 text-xs">
-                      Cost: ${((item.product.cost || 0) * item.quantity).toLocaleString()}
-                    </div>
-                  )}
+
+              {item.configuration_data && (
+                <div className="mt-3 p-3 bg-gray-100 dark:bg-gray-700 rounded-md">
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    Configuration: {JSON.stringify(item.configuration_data)}
+                  </p>
                 </div>
               )}
             </div>
+          );
+        })}
+
+        <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+          <div className="flex justify-between items-center">
+            <span className="text-lg font-semibold text-gray-900 dark:text-white">
+              Total BOM Value:
+            </span>
+            <span className="text-xl font-bold text-blue-600 dark:text-blue-400">
+              ${calculateTotal().toFixed(2)}
+            </span>
           </div>
-        ))}
-        
-        {canSeePrices && bomItems.length > 0 && (
-          <div className="pt-3 border-t border-gray-700">
-            <div className="flex justify-between items-center">
-              <span className="text-white font-semibold">Total:</span>
-              <span className="text-white font-bold text-lg">
-                ${calculateTotal().toLocaleString()}
-              </span>
-            </div>
-            {/* Display total cost if available */}
-            {bomItems.some(item => item.product.cost) && (
-              <div className="flex justify-between items-center mt-1">
-                <span className="text-orange-400 text-sm">Total Cost:</span>
-                <span className="text-orange-400 text-sm font-medium">
-                  ${bomItems.reduce((total, item) => {
-                    const cost = item.product.cost || 0;
-                    return total + (cost * item.quantity);
-                  }, 0).toLocaleString()}
-                </span>
-              </div>
-            )}
-          </div>
-        )}
+        </div>
       </CardContent>
     </Card>
   );
