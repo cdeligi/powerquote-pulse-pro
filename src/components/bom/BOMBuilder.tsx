@@ -16,7 +16,7 @@ import RackVisualizer from './RackVisualizer';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { Calculator, Package, Rack, FileText, Percent } from 'lucide-react';
+import { Calculator, Package, Server, FileText, Percent } from 'lucide-react';
 
 interface BOMBuilderProps {
   isOpen: boolean;
@@ -42,7 +42,7 @@ const BOMBuilder: React.FC<BOMBuilderProps> = ({
   // Enhanced tab configuration with responsive design
   const tabs = [
     { id: 'products', label: 'Products', icon: Package },
-    { id: 'chassis', label: 'Chassis', icon: Rack },
+    { id: 'chassis', label: 'Chassis', icon: Server },
     { id: 'config', label: 'Config', icon: Calculator },
     { id: 'quote', label: 'Quote Info', icon: FileText },
     { id: 'discount', label: 'Discount', icon: Percent },
