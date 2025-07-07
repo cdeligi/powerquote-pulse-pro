@@ -1,89 +1,71 @@
 
-/**
- * © 2025 Qualitrol Corp. All rights reserved.
- * Confidential and proprietary. Unauthorized copying or distribution is prohibited.
- */
-
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { Package, Plus, Edit, Trash2, Eye, EyeOff } from 'lucide-react';
+import { useAuth } from '@/hooks/useAuth';
+import { Plus, Edit3, Trash2, Package, AlertCircle } from 'lucide-react';
 
-interface Level2Product {
-  id: string;
-  name: string;
-  parentProductId: string;
-  type: string;
-  description: string;
-  price: number;
-  cost?: number;
-  enabled: boolean;
-  specifications?: any;
-  partNumber?: string;
-  image?: string;
-  productInfoUrl?: string;
-}
-
-const Level2ProductManager = () => {
-  const [level2Products, setLevel2Products] = useState<Level2Product[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [editingProduct, setEditingProduct] = useState<Level2Product | null>(null);
-  const [showForm, setShowForm] = useState(false);
+const Level2ProductManager: React.FC = () => {
   const { toast } = useToast();
-
+  const { user } = useAuth();
+  const [products, setProducts] = useState<any[]>([]);
+  const [level1Products, setLevel1Products] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<any>(null);
   const [formData, setFormData] = useState({
+    id: '',
     name: '',
-    parentProductId: '',
-    type: '',
     description: '',
-    price: 0,
+    category: 'level2',
+    subcategory: '',
     cost: 0,
-    enabled: true,
-    partNumber: '',
-    specifications: {}
+    price: 0,
+    is_active: true,
+    level1_relationships: [] as string[]
   });
 
   useEffect(() => {
-    fetchLevel2Products();
-  }, []);
+    if (user?.role === 'admin') {
+      fetchProducts();
+      fetchLevel1Products();
+    }
+  }, [user]);
 
-  const fetchLevel2Products = async () => {
+  const fetchProducts = async () => {
     try {
-      setLoading(true);
+      console.log('[Level2ProductManager] Fetching Level2 products...');
       
-      // Fetch from products table where category indicates Level 2
-      const { data, error } = await supabase
+      // Fetch Level2 products with their relationships
+      const { data: productsData, error: productsError } = await supabase
         .from('products')
-        .select('*')
+        .select(`
+          *,
+          level1_level2_relationships!level2_product_id (
+            level1_product_id
+          )
+        `)
         .eq('category', 'level2')
         .order('name');
 
-      if (error) throw error;
+      if (productsError) {
+        console.error('[Level2ProductManager] Error fetching products:', productsError);
+        throw productsError;
+      }
 
-      const products: Level2Product[] = (data || []).map(item => ({
-        id: item.id,
-        name: item.name,
-        parentProductId: item.subcategory || '',
-        type: item.subcategory || 'Standard',
-        description: item.description || '',
-        price: Number(item.price) || 0,
-        cost: Number(item.cost) || 0,
-        enabled: item.is_active || false,
-        partNumber: '',
-        specifications: {}
-      }));
-
-      setLevel2Products(products);
+      console.log('[Level2ProductManager] Fetched products:', productsData);
+      setProducts(productsData || []);
     } catch (error) {
-      console.error('Error fetching Level 2 products:', error);
+      console.error('Error fetching Level2 products:', error);
       toast({
         title: "Error",
-        description: "Failed to fetch Level 2 products",
+        description: "Failed to load Level2 products. Check console for details.",
         variant: "destructive"
       });
     } finally {
@@ -91,324 +73,408 @@ const Level2ProductManager = () => {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
+  const fetchLevel1Products = async () => {
     try {
-      if (editingProduct) {
-        // Update existing product
-        const { error } = await supabase
-          .from('products')
-          .update({
-            name: formData.name,
-            description: formData.description,
-            price: formData.price,
-            cost: formData.cost,
-            is_active: formData.enabled,
-            subcategory: formData.type,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', editingProduct.id);
+      const { data, error } = await supabase
+        .from('products')
+        .select('*')
+        .eq('category', 'level1')
+        .eq('is_active', true)
+        .order('name');
 
-        if (error) throw error;
-
-        toast({
-          title: "Success",
-          description: "Level 2 product updated successfully"
-        });
-      } else {
-        // Create new product
-        const { error } = await supabase
-          .from('products')
-          .insert({
-            id: `level2-${Date.now()}`,
-            name: formData.name,
-            description: formData.description,
-            price: formData.price,
-            cost: formData.cost,
-            category: 'level2',
-            subcategory: formData.type,
-            is_active: formData.enabled
-          });
-
-        if (error) throw error;
-
-        toast({
-          title: "Success",
-          description: "Level 2 product created successfully"
-        });
-      }
-
-      // Reset form and refresh data
-      resetForm();
-      fetchLevel2Products();
+      if (error) throw error;
+      setLevel1Products(data || []);
     } catch (error) {
-      console.error('Error saving Level 2 product:', error);
-      toast({
-        title: "Error",
-        description: "Failed to save Level 2 product",
-        variant: "destructive"
-      });
+      console.error('Error fetching Level1 products:', error);
     }
   };
 
-  const handleEdit = (product: Level2Product) => {
-    setEditingProduct(product);
-    setFormData({
-      name: product.name,
-      parentProductId: product.parentProductId,
-      type: product.type,
-      description: product.description,
-      price: product.price,
-      cost: product.cost || 0,
-      enabled: product.enabled,
-      partNumber: product.partNumber || '',
-      specifications: product.specifications || {}
-    });
-    setShowForm(true);
-  };
+  const handleSave = async () => {
+    if (!formData.name.trim()) {
+      toast({
+        title: "Error",
+        description: "Product name is required",
+        variant: "destructive"
+      });
+      return;
+    }
 
-  const handleToggleEnabled = async (product: Level2Product) => {
+    if (!formData.id.trim()) {
+      toast({
+        title: "Error", 
+        description: "Product ID is required",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setLoading(true);
     try {
-      const { error } = await supabase
-        .from('products')
-        .update({ 
-          is_active: !product.enabled,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', product.id);
+      const productData = {
+        id: formData.id,
+        name: formData.name,
+        description: formData.description,
+        category: 'level2',
+        subcategory: formData.subcategory,
+        cost: formData.cost,
+        price: formData.price,
+        is_active: formData.is_active
+      };
+
+      let error;
+      if (editingProduct) {
+        const { error: updateError } = await supabase
+          .from('products')
+          .update(productData)
+          .eq('id', editingProduct.id);
+        error = updateError;
+      } else {
+        const { error: insertError } = await supabase
+          .from('products')
+          .insert(productData);
+        error = insertError;
+      }
 
       if (error) throw error;
 
+      // Handle Level1 relationships
+      if (formData.level1_relationships.length > 0) {
+        // Remove existing relationships
+        await supabase
+          .from('level1_level2_relationships')
+          .delete()
+          .eq('level2_product_id', formData.id);
+
+        // Add new relationships
+        const relationships = formData.level1_relationships.map(level1Id => ({
+          level1_product_id: level1Id,
+          level2_product_id: formData.id
+        }));
+
+        const { error: relationshipError } = await supabase
+          .from('level1_level2_relationships')
+          .insert(relationships);
+
+        if (relationshipError) throw relationshipError;
+      }
+
       toast({
         title: "Success",
-        description: `Product ${!product.enabled ? 'enabled' : 'disabled'} successfully`
+        description: `Level2 product ${editingProduct ? 'updated' : 'created'} successfully`,
       });
-      
-      fetchLevel2Products();
-    } catch (error) {
-      console.error('Error toggling product status:', error);
+
+      setIsDialogOpen(false);
+      resetForm();
+      fetchProducts();
+    } catch (error: any) {
+      console.error('Error saving Level2 product:', error);
       toast({
         title: "Error",
-        description: "Failed to update product status",
+        description: error.message || "Failed to save Level2 product", 
         variant: "destructive"
       });
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleDelete = async (product: Level2Product) => {
-    if (!confirm(`Are you sure you want to delete "${product.name}"?`)) return;
+  const handleEdit = (product: any) => {
+    setEditingProduct(product);
+    setFormData({
+      id: product.id,
+      name: product.name,
+      description: product.description || '',
+      category: 'level2',
+      subcategory: product.subcategory || '',
+      cost: product.cost || 0,
+      price: product.price || 0,
+      is_active: product.is_active,
+      level1_relationships: product.level1_level2_relationships?.map((rel: any) => rel.level1_product_id) || []
+    });
+    setIsDialogOpen(true);
+  };
 
+  const handleDelete = async (productId: string) => {
+    if (!confirm('Are you sure you want to delete this Level2 product?')) return;
+
+    setLoading(true);
     try {
+      // Delete relationships first
+      await supabase
+        .from('level1_level2_relationships')
+        .delete()
+        .eq('level2_product_id', productId);
+
+      // Then delete product
       const { error } = await supabase
         .from('products')
         .delete()
-        .eq('id', product.id);
+        .eq('id', productId);
 
       if (error) throw error;
 
       toast({
         title: "Success",
-        description: "Level 2 product deleted successfully"
+        description: "Level2 product deleted successfully",
       });
-      
-      fetchLevel2Products();
-    } catch (error) {
-      console.error('Error deleting Level 2 product:', error);
+
+      fetchProducts();
+    } catch (error: any) {
+      console.error('Error deleting Level2 product:', error);
       toast({
         title: "Error",
-        description: "Failed to delete Level 2 product",
+        description: error.message || "Failed to delete Level2 product",
         variant: "destructive"
       });
+    } finally {
+      setLoading(false);
     }
   };
 
   const resetForm = () => {
     setFormData({
+      id: '',
       name: '',
-      parentProductId: '',
-      type: '',
       description: '',
-      price: 0,
+      category: 'level2',
+      subcategory: '',
       cost: 0,
-      enabled: true,
-      partNumber: '',
-      specifications: {}
+      price: 0,
+      is_active: true,
+      level1_relationships: []
     });
     setEditingProduct(null);
-    setShowForm(false);
   };
 
-  if (loading) {
+  const handleOpenDialog = () => {
+    resetForm();
+    setIsDialogOpen(true);
+  };
+
+  if (user?.role !== 'admin') {
     return (
-      <Card className="bg-gray-900 border-gray-800">
-        <CardContent className="pt-6">
-          <div className="animate-pulse space-y-4">
-            <div className="h-4 bg-gray-700 rounded w-1/4"></div>
-            <div className="h-4 bg-gray-700 rounded w-1/2"></div>
-            <div className="h-4 bg-gray-700 rounded w-3/4"></div>
-          </div>
+      <Card className="bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700">
+        <CardContent className="p-8 text-center">
+          <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+          <p className="text-gray-600 dark:text-gray-400">Access denied. Admin privileges required.</p>
         </CardContent>
       </Card>
     );
   }
 
   return (
-    <div className="space-y-6">
-      <Card className="bg-gray-900 border-gray-800">
-        <CardHeader>
-          <CardTitle className="text-white flex items-center justify-between">
-            <div className="flex items-center">
-              <Package className="mr-2 h-5 w-5" />
-              Level 2 Products Management
-            </div>
-            <Button
-              onClick={() => setShowForm(true)}
-              className="bg-blue-600 hover:bg-blue-700 text-white"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Add Level 2 Product
-            </Button>
+    <Card className="bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700">
+      <CardHeader>
+        <div className="flex justify-between items-center">
+          <CardTitle className="text-gray-900 dark:text-white flex items-center gap-2">
+            <Package className="w-5 h-5" />
+            Level 2 Products ({products.length})
           </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {showForm && (
-            <form onSubmit={handleSubmit} className="space-y-4 mb-6 p-4 bg-gray-800 rounded-lg">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="name" className="text-white">Product Name *</Label>
-                  <Input
-                    id="name"
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    className="bg-gray-700 border-gray-600 text-white"
-                    required
-                  />
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <DialogTrigger asChild>
+              <Button 
+                onClick={handleOpenDialog}
+                className="bg-blue-600 hover:bg-blue-700 text-white"
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Add Level2 Product
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-2xl bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700">
+              <DialogHeader>
+                <DialogTitle className="text-gray-900 dark:text-white">
+                  {editingProduct ? 'Edit Level2 Product' : 'Add New Level2 Product'}
+                </DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-gray-700 dark:text-gray-300">Product ID *</Label>
+                    <Input
+                      value={formData.id}
+                      onChange={(e) => setFormData(prev => ({ ...prev, id: e.target.value }))}
+                      placeholder="e.g., L2-OPTION-001"
+                      disabled={!!editingProduct}
+                      className="bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-gray-700 dark:text-gray-300">Name *</Label>
+                    <Input
+                      value={formData.name}
+                      onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                      placeholder="Product name"
+                      className="bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white"
+                    />
+                  </div>
                 </div>
-                <div>
-                  <Label htmlFor="type" className="text-white">Product Type *</Label>
-                  <Input
-                    id="type"
-                    value={formData.type}
-                    onChange={(e) => setFormData({ ...formData, type: e.target.value })}
-                    className="bg-gray-700 border-gray-600 text-white"
-                    required
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="price" className="text-white">Price *</Label>
-                  <Input
-                    id="price"
-                    type="number"
-                    step="0.01"
-                    value={formData.price}
-                    onChange={(e) => setFormData({ ...formData, price: parseFloat(e.target.value) || 0 })}
-                    className="bg-gray-700 border-gray-600 text-white"
-                    required
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="cost" className="text-white">Cost</Label>
-                  <Input
-                    id="cost"
-                    type="number"
-                    step="0.01"
-                    value={formData.cost}
-                    onChange={(e) => setFormData({ ...formData, cost: parseFloat(e.target.value) || 0 })}
-                    className="bg-gray-700 border-gray-600 text-white"
-                  />
-                </div>
-              </div>
-              <div>
-                <Label htmlFor="description" className="text-white">Description</Label>
-                <Input
-                  id="description"
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  className="bg-gray-700 border-gray-600 text-white"
-                />
-              </div>
-              <div className="flex items-center space-x-2">
-                <input
-                  type="checkbox"
-                  id="enabled"
-                  checked={formData.enabled}
-                  onChange={(e) => setFormData({ ...formData, enabled: e.target.checked })}
-                  className="rounded"
-                />
-                <Label htmlFor="enabled" className="text-white">Enabled</Label>
-              </div>
-              <div className="flex space-x-2">
-                <Button type="submit" className="bg-green-600 hover:bg-green-700 text-white">
-                  {editingProduct ? 'Update' : 'Create'} Product
-                </Button>
-                <Button type="button" onClick={resetForm} variant="outline" className="border-gray-600 text-gray-300">
-                  Cancel
-                </Button>
-              </div>
-            </form>
-          )}
 
-          <div className="space-y-4">
-            {level2Products.map((product) => (
-              <div key={product.id} className="flex items-center justify-between p-4 bg-gray-800 rounded-lg">
-                <div className="flex-1">
-                  <div className="flex items-center space-x-2">
-                    <h4 className="text-white font-medium">{product.name}</h4>
-                    <Badge variant={product.enabled ? "default" : "secondary"}>
-                      {product.type}
-                    </Badge>
-                    {!product.enabled && (
-                      <Badge variant="outline" className="text-red-400 border-red-400">
-                        Disabled
-                      </Badge>
-                    )}
+                <div>
+                  <Label className="text-gray-700 dark:text-gray-300">Description</Label>
+                  <Input
+                    value={formData.description}
+                    onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                    placeholder="Product description"
+                    className="bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white"
+                  />
+                </div>
+
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <Label className="text-gray-700 dark:text-gray-300">Subcategory</Label>
+                    <Input
+                      value={formData.subcategory}
+                      onChange={(e) => setFormData(prev => ({ ...prev, subcategory: e.target.value }))}
+                      placeholder="e.g., advanced"
+                      className="bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white"
+                    />
                   </div>
-                  <p className="text-gray-400 text-sm">{product.description}</p>
-                  <div className="flex space-x-4 text-sm mt-1">
-                    <span className="text-green-400">Price: ${product.price}</span>
-                    {product.cost && product.cost > 0 && (
-                      <span className="text-orange-400">Cost: ${product.cost}</span>
-                    )}
+                  <div>
+                    <Label className="text-gray-700 dark:text-gray-300">Cost</Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      value={formData.cost}
+                      onChange={(e) => setFormData(prev => ({ ...prev, cost: parseFloat(e.target.value) || 0 }))}
+                      className="bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-gray-700 dark:text-gray-300">Price</Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      value={formData.price}
+                      onChange={(e) => setFormData(prev => ({ ...prev, price: parseFloat(e.target.value) || 0 }))}
+                      className="bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white"
+                    />
                   </div>
                 </div>
-                <div className="flex space-x-2">
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => handleToggleEnabled(product)}
-                    className="text-gray-400 hover:text-white"
+
+                <div>
+                  <Label className="text-gray-700 dark:text-gray-300">Compatible Level1 Products</Label>
+                  <div className="max-h-32 overflow-y-auto border border-gray-300 dark:border-gray-600 rounded-md p-2 bg-white dark:bg-gray-700">
+                    {level1Products.map(product => (
+                      <label key={product.id} className="flex items-center gap-2 py-1">
+                        <input
+                          type="checkbox"
+                          checked={formData.level1_relationships.includes(product.id)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setFormData(prev => ({
+                                ...prev,
+                                level1_relationships: [...prev.level1_relationships, product.id]
+                              }));
+                            } else {
+                              setFormData(prev => ({
+                                ...prev,
+                                level1_relationships: prev.level1_relationships.filter(id => id !== product.id)
+                              }));
+                            }
+                          }}
+                          className="rounded"
+                        />
+                        <span className="text-gray-700 dark:text-gray-300">{product.name}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="is_active"
+                    checked={formData.is_active}
+                    onChange={(e) => setFormData(prev => ({ ...prev, is_active: e.target.checked }))}
+                    className="rounded"
+                  />
+                  <Label htmlFor="is_active" className="text-gray-700 dark:text-gray-300">Active</Label>
+                </div>
+
+                <div className="flex gap-2">
+                  <Button 
+                    onClick={handleSave}
+                    disabled={loading}
+                    className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
                   >
-                    {product.enabled ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    {loading ? 'Saving...' : editingProduct ? 'Update Product' : 'Create Product'}
                   </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => handleEdit(product)}
-                    className="text-blue-400 hover:text-blue-300"
+                  <Button 
+                    onClick={() => setIsDialogOpen(false)}
+                    variant="outline"
+                    className="border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
                   >
-                    <Edit className="h-4 w-4" />
+                    Cancel
                   </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => handleDelete(product)}
-                    className="text-red-400 hover:text-red-300"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {loading ? (
+          <div className="text-center py-8 text-gray-500 dark:text-gray-400">Loading Level2 products...</div>
+        ) : products.length === 0 ? (
+          <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+            No Level2 products found. Create your first Level2 product to get started.
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {products.map((product) => (
+              <div key={product.id} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 bg-gray-50 dark:bg-gray-800">
+                <div className="flex justify-between items-start">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-2">
+                      <h3 className="font-semibold text-gray-900 dark:text-white">{product.name}</h3>
+                      <Badge variant={product.is_active ? "default" : "secondary"}>
+                        {product.is_active ? "Active" : "Inactive"}
+                      </Badge>
+                    </div>
+                    <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">ID: {product.id}</p>
+                    {product.description && (
+                      <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">{product.description}</p>
+                    )}
+                    <div className="flex gap-4 text-sm">
+                      <span className="text-gray-600 dark:text-gray-400">Cost: ${product.cost?.toFixed(2) || '0.00'}</span>
+                      <span className="text-gray-600 dark:text-gray-400">Price: ${product.price?.toFixed(2) || '0.00'}</span>
+                      {product.subcategory && (
+                        <span className="text-gray-600 dark:text-gray-400">Type: {product.subcategory}</span>
+                      )}
+                    </div>
+                    {product.level1_level2_relationships && product.level1_level2_relationships.length > 0 && (
+                      <div className="mt-2">
+                        <span className="text-xs text-gray-500 dark:text-gray-500">
+                          Compatible with {product.level1_level2_relationships.length} Level1 product(s)
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={() => handleEdit(product)}
+                      size="sm"
+                      variant="outline"
+                      className="border-blue-300 text-blue-600 hover:bg-blue-50 dark:border-blue-600 dark:text-blue-400 dark:hover:bg-blue-900"
+                    >
+                      <Edit3 className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      onClick={() => handleDelete(product.id)}
+                      size="sm"
+                      variant="outline"
+                      className="border-red-300 text-red-600 hover:bg-red-50 dark:border-red-600 dark:text-red-400 dark:hover:bg-red-900"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
                 </div>
               </div>
             ))}
-            {level2Products.length === 0 && (
-              <div className="text-center py-8 text-gray-400">
-                No Level 2 products found. Click "Add Level 2 Product" to create your first one.
-              </div>
-            )}
           </div>
-        </CardContent>
-      </Card>
-    </div>
+        )}
+      </CardContent>
+    </Card>
   );
 };
 

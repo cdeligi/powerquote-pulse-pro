@@ -608,6 +608,69 @@ export type Database = {
           },
         ]
       }
+      security_events: {
+        Row: {
+          action: string
+          created_at: string | null
+          details: Json | null
+          id: string
+          ip_address: string | null
+          severity: string | null
+          user_agent: string | null
+          user_id: string | null
+        }
+        Insert: {
+          action: string
+          created_at?: string | null
+          details?: Json | null
+          id?: string
+          ip_address?: string | null
+          severity?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          action?: string
+          created_at?: string | null
+          details?: Json | null
+          id?: string
+          ip_address?: string | null
+          severity?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      user_login_attempts: {
+        Row: {
+          created_at: string | null
+          email: string
+          id: string
+          ip_address: string | null
+          success: boolean | null
+          user_agent: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          email: string
+          id?: string
+          ip_address?: string | null
+          success?: boolean | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          email?: string
+          id?: string
+          ip_address?: string | null
+          success?: boolean | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       user_registration_requests: {
         Row: {
           agreed_to_privacy_policy: boolean
@@ -685,6 +748,51 @@ export type Database = {
           },
         ]
       }
+      user_sessions: {
+        Row: {
+          created_at: string | null
+          device_info: Json | null
+          id: string
+          ip_address: string | null
+          is_active: boolean | null
+          last_activity: string | null
+          location_data: Json | null
+          revoked_at: string | null
+          revoked_reason: string | null
+          session_token: string
+          user_agent: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          device_info?: Json | null
+          id?: string
+          ip_address?: string | null
+          is_active?: boolean | null
+          last_activity?: string | null
+          location_data?: Json | null
+          revoked_at?: string | null
+          revoked_reason?: string | null
+          session_token: string
+          user_agent?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          device_info?: Json | null
+          id?: string
+          ip_address?: string | null
+          is_active?: boolean | null
+          last_activity?: string | null
+          location_data?: Json | null
+          revoked_at?: string | null
+          revoked_reason?: string | null
+          session_token?: string
+          user_agent?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -710,9 +818,48 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: boolean
       }
+      log_security_event: {
+        Args: {
+          p_user_id: string
+          p_action: string
+          p_details?: Json
+          p_ip_address?: string
+          p_user_agent?: string
+          p_severity?: string
+        }
+        Returns: string
+      }
+      revoke_user_access: {
+        Args: { p_target_user_id: string; p_reason?: string }
+        Returns: boolean
+      }
+      track_user_session: {
+        Args: {
+          p_user_id: string
+          p_session_token: string
+          p_ip_address?: string
+          p_user_agent?: string
+          p_device_info?: Json
+          p_location_data?: Json
+        }
+        Returns: string
+      }
       update_quote_analytics: {
         Args: Record<PropertyKey, never>
         Returns: undefined
+      }
+      update_session_activity: {
+        Args: { p_session_token: string }
+        Returns: boolean
+      }
+      update_user_login: {
+        Args: {
+          p_user_id: string
+          p_success: boolean
+          p_ip_address?: string
+          p_user_agent?: string
+        }
+        Returns: string
       }
     }
     Enums: {

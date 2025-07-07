@@ -1,741 +1,361 @@
-import { useState, useEffect } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+
+import React, { useState, useEffect } from 'react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { BOMItem, Level1Product, Level2Product, Level3Product, Level3Customization } from '@/types/product';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import Level1ProductSelector from './Level1ProductSelector';
 import Level2OptionsSelector from './Level2OptionsSelector';
 import ChassisSelector from './ChassisSelector';
-import RackVisualizer from './RackVisualizer';
 import SlotCardSelector from './SlotCardSelector';
-import DGAProductSelector from './DGAProductSelector';
-import PDProductSelector from './PDProductSelector';
 import BOMDisplay from './BOMDisplay';
-import AnalogCardConfigurator from './AnalogCardConfigurator';
-import BushingCardConfigurator from './BushingCardConfigurator';
-import { productDataService } from '@/services/productDataService';
-import QuoteFieldsSection from './QuoteFieldsSection';
 import DiscountSection from './DiscountSection';
+import QuoteFieldsSection from './QuoteFieldsSection';
+import RackVisualizer from './RackVisualizer';
+import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { toast } from '@/components/ui/use-toast';
-import QTMSConfigurationEditor from './QTMSConfigurationEditor';
-import { consolidateQTMSConfiguration, createQTMSBOMItem, ConsolidatedQTMS, QTMSConfiguration } from '@/utils/qtmsConsolidation';
-import { findOptimalBushingPlacement, findExistingBushingSlots, isBushingCard } from '@/utils/bushingValidation';
 import { useAuth } from '@/hooks/useAuth';
-import { useQuoteValidation } from './QuoteFieldValidation';
+import { Calculator, Package, Rack3, FileText, Percent } from 'lucide-react';
 
 interface BOMBuilderProps {
-  onBOMUpdate: (items: BOMItem[]) => void;
-  canSeePrices: boolean;
+  isOpen: boolean;
+  onClose: () => void;
+  existingQuoteId?: string;
+  mode?: 'create' | 'edit' | 'admin-edit';
 }
 
-const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
-  const { user, loading } = useAuth();
+const BOMBuilder: React.FC<BOMBuilderProps> = ({ 
+  isOpen, 
+  onClose, 
+  existingQuoteId, 
+  mode = 'create' 
+}) => {
+  const { toast } = useToast();
+  const { user } = useAuth();
+  const [activeTab, setActiveTab] = useState('products');
+  const [bomItems, setBomItems] = useState<any[]>([]);
+  const [selectedChassis, setSelectedChassis] = useState<any>(null);
+  const [quoteFields, setQuoteFields] = useState<any>({});
+  const [loading, setLoading] = useState(false);
 
-  const [selectedLevel1Product, setSelectedLevel1Product] = useState<Level1Product | null>(null);
-  const [selectedLevel2Options, setSelectedLevel2Options] = useState<Level2Product[]>([]);
-  const [selectedChassis, setSelectedChassis] = useState<Level2Product | null>(null);
-  const [slotAssignments, setSlotAssignments] = useState<Record<number, Level3Product>>({});
-  const [selectedSlot, setSelectedSlot] = useState<number | null>(null);
-  const [bomItems, setBomItems] = useState<BOMItem[]>([]);
-  const [activeTab, setActiveTab] = useState<string>('');
-  const [hasRemoteDisplay, setHasRemoteDisplay] = useState<boolean>(false);
-  const [configuringCard, setConfiguringCard] = useState<BOMItem | null>(null);
-  const [configuringBOMItem, setConfiguringBOMItem] = useState<BOMItem | null>(null);
-  const [quoteFields, setQuoteFields] = useState<Record<string, any>>({});
-  const [discountPercentage, setDiscountPercentage] = useState<number>(0);
-  const [discountJustification, setDiscountJustification] = useState<string>('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [editingQTMS, setEditingQTMS] = useState<ConsolidatedQTMS | null>(null);
-
-  const [availableQuoteFields, setAvailableQuoteFields] = useState<any[]>([]);
-  
-  useEffect(() => {
-    const fetchQuoteFields = async () => {
-      try {
-        const { data: fields, error } = await supabase
-          .from('quote_fields')
-          .select('*')
-          .eq('enabled', true)
-          .order('display_order');
-        
-        if (error) throw error;
-        setAvailableQuoteFields(fields || []);
-      } catch (error) {
-        console.error('Error fetching quote fields:', error);
-      }
-    };
-
-    fetchQuoteFields();
-  }, []);
-
-  const { validation, validateFields } = useQuoteValidation(quoteFields, availableQuoteFields);
-
-  const handleQuoteFieldChange = (fieldId: string, value: any) => {
-    setQuoteFields(prev => ({ ...prev, [fieldId]: value }));
-  };
-
-  const [level1Products, setLevel1Products] = useState<Level1Product[]>([]);
-  const [level1Loading, setLevel1Loading] = useState(true);
+  // Enhanced tab configuration with responsive design
+  const tabs = [
+    { id: 'products', label: 'Products', icon: Package },
+    { id: 'chassis', label: 'Chassis', icon: Rack3 },
+    { id: 'config', label: 'Config', icon: Calculator },
+    { id: 'quote', label: 'Quote Info', icon: FileText },
+    { id: 'discount', label: 'Discount', icon: Percent },
+  ];
 
   useEffect(() => {
-    const loadLevel1Products = async () => {
-      try {
-        const products = await productDataService.getLevel1Products();
-        setLevel1Products(products.filter(p => p.enabled));
-      } catch (error) {
-        console.error('Error loading Level 1 products:', error);
-        const syncProducts = productDataService.getLevel1ProductsSync();
-        setLevel1Products(syncProducts.filter(p => p.enabled));
-      } finally {
-        setLevel1Loading(false);
-      }
-    };
-
-    loadLevel1Products();
-  }, []);
-
-  useEffect(() => {
-    if (level1Products.length > 0 && !activeTab) {
-      setActiveTab(level1Products[0].id);
+    if (existingQuoteId && isOpen) {
+      loadExistingQuote();
     }
-  }, [level1Products.length, activeTab]);
+  }, [existingQuoteId, isOpen]);
 
-  useEffect(() => {
-    if (activeTab) {
-      const product = level1Products.find(p => p.id === activeTab);
-      if (product && selectedLevel1Product?.id !== activeTab) {
-        setSelectedLevel1Product(product);
-        setSelectedLevel2Options([]);
-        setSelectedChassis(null);
-        setSlotAssignments({});
-        setSelectedSlot(null);
-      }
-    }
-  }, [activeTab, level1Products, selectedLevel1Product?.id]);
-
-  const handleLevel2OptionToggle = (option: Level2Product) => {
-    setSelectedLevel2Options(prev => {
-      const exists = prev.find(item => item.id === option.id);
-      if (exists) {
-        return prev.filter(item => item.id !== option.id);
-      } else {
-        return [...prev, option];
-      }
-    });
-  };
-
-  const handleChassisSelect = (chassis: Level2Product) => {
-    setSelectedChassis(chassis);
-    setSlotAssignments({});
-    setSelectedSlot(null);
-    setHasRemoteDisplay(false);
-  };
-
-  const handleSlotClick = (slot: number) => {
-    setSelectedSlot(slot);
-  };
-
-  const handleSlotClear = (slot: number) => {
-    setSlotAssignments(prev => {
-      const updated = { ...prev };
-      const card = updated[slot];
-      
-      if (card && isBushingCard(card)) {
-        const bushingSlots = findExistingBushingSlots(updated);
-        bushingSlots.forEach(bushingSlot => {
-          delete updated[bushingSlot];
-        });
-      } else {
-        delete updated[slot];
-      }
-      
-      return updated;
-    });
-  };
-
-  const handleCardSelect = (card: Level3Product, slot?: number) => {
-    if (isBushingCard(card)) {
-      if (!selectedChassis) return;
-      
-      const placement = findOptimalBushingPlacement(selectedChassis, slotAssignments);
-      if (!placement) {
-        console.error('Cannot place bushing card - no valid placement found');
-        return;
-      }
-
-      setSlotAssignments(prev => {
-        const updated = { ...prev };
-        
-        if (placement.shouldClearExisting) {
-          placement.existingSlotsToClear.forEach(slotToClear => {
-            delete updated[slotToClear];
-          });
-        }
-        
-        updated[placement.primarySlot] = card;
-        updated[placement.secondarySlot] = card;
-        
-        return updated;
-      });
-
-      if (card.name.toLowerCase().includes('bushing')) {
-        const newItem: BOMItem = {
-          id: `${Date.now()}-${Math.random()}`,
-          product: card,
-          quantity: 1,
-          slot: placement.primarySlot,
-          enabled: true
-        };
-        setConfiguringCard(newItem);
-        return;
-      }
-
-      setSelectedSlot(null);
-      return;
-    }
-
-    if (card.name.toLowerCase().includes('analog')) {
-      const newItem: BOMItem = {
-        id: `${Date.now()}-${Math.random()}`,
-        product: card,
-        quantity: 1,
-        slot: slot || selectedSlot,
-        enabled: true
-      };
-      setConfiguringCard(newItem);
-      return;
-    }
-
-    if (selectedSlot !== null || slot !== undefined) {
-      const targetSlot = slot !== undefined ? slot : selectedSlot!;
-      setSlotAssignments(prev => ({
-        ...prev,
-        [targetSlot]: card
-      }));
-      setSelectedSlot(null);
-    } else {
-      const newItem: BOMItem = {
-        id: `${Date.now()}-${Math.random()}`,
-        product: card,
-        quantity: 1,
-        slot,
-        enabled: true
-      };
-      
-      const updatedItems = [...bomItems, newItem];
-      setBomItems(updatedItems);
-      onBOMUpdate(updatedItems);
-    }
-  };
-
-  const handleCardConfiguration = (customizations: Level3Customization[]) => {
-    if (!configuringCard) return;
-
-    const configuredItem: BOMItem = {
-      ...configuringCard,
-      level3Customizations: customizations
-    };
-
-    if (configuringCard.slot !== undefined) {
-      setSlotAssignments(prev => ({
-        ...prev,
-        [configuringCard.slot!]: configuringCard.product as Level3Product
-      }));
-    } else {
-      const updatedItems = [...bomItems, configuredItem];
-      setBomItems(updatedItems);
-      onBOMUpdate(updatedItems);
-    }
-
-    setConfiguringCard(null);
-    setSelectedSlot(null);
-  };
-
-  const handleDGAProductSelect = (product: Level1Product, configuration?: Record<string, any>, level2Options?: Level2Product[]) => {
-    const newItem: BOMItem = {
-      id: `${Date.now()}-${Math.random()}`,
-      product: product,
-      quantity: 1,
-      enabled: true,
-      configuration
-    };
+  const loadExistingQuote = async () => {
+    if (!existingQuoteId) return;
     
-    const updatedItems = [...bomItems, newItem];
-    
-    if (level2Options) {
-      level2Options.forEach(option => {
-        const optionItem: BOMItem = {
-          id: `${Date.now()}-${Math.random()}-${option.id}`,
-          product: option as any,
-          quantity: 1,
-          enabled: true
-        };
-        updatedItems.push(optionItem);
-      });
-    }
-    
-    setBomItems(updatedItems);
-    onBOMUpdate(updatedItems);
-  };
+    setLoading(true);
+    try {
+      const { data: quote, error: quoteError } = await supabase
+        .from('quotes')
+        .select('*')
+        .eq('id', existingQuoteId)
+        .single();
 
-  const handleRemoteDisplayToggle = (enabled: boolean) => {
-    setHasRemoteDisplay(enabled);
-  };
+      if (quoteError) throw quoteError;
 
-  const handleAddChassisAndCardsToBOM = () => {
-    if (!selectedChassis) return;
+      const { data: items, error: itemsError } = await supabase
+        .from('bom_items')
+        .select('*')
+        .eq('quote_id', existingQuoteId);
 
-    const consolidatedQTMS = consolidateQTMSConfiguration(
-      selectedChassis,
-      slotAssignments,
-      hasRemoteDisplay,
-      {},
-      {}
-    );
+      if (itemsError) throw itemsError;
 
-    const bomItem = createQTMSBOMItem(consolidatedQTMS);
-    
-    const updatedItems = [...bomItems, bomItem];
-    setBomItems(updatedItems);
-    onBOMUpdate(updatedItems);
-
-    setSelectedChassis(null);
-    setSlotAssignments({});
-    setSelectedSlot(null);
-    setHasRemoteDisplay(false);
-  };
-
-  const handleBOMConfigurationEdit = (item: BOMItem) => {
-    if (item.product.type === 'QTMS' && item.configuration) {
-      const consolidatedQTMS: ConsolidatedQTMS = {
-        id: item.id,
-        name: item.product.name,
-        description: item.product.description || '',
-        partNumber: item.partNumber || item.product.partNumber || '',
-        price: item.product.price || 0,
-        configuration: item.configuration as QTMSConfiguration,
-        components: []
-      };
-      setEditingQTMS(consolidatedQTMS);
-    } else {
-      setConfiguringBOMItem(item);
-    }
-  };
-
-  const handleQTMSConfigurationSave = (updatedQTMS: ConsolidatedQTMS) => {
-    console.log('Saving QTMS configuration:', updatedQTMS);
-    
-    const updatedBOMItem = createQTMSBOMItem(updatedQTMS);
-    
-    const existingItemIndex = bomItems.findIndex(item => item.id === updatedQTMS.id);
-    
-    let updatedItems;
-    if (existingItemIndex >= 0) {
-      console.log('Updating existing QTMS item at index:', existingItemIndex);
-      updatedItems = bomItems.map((item, index) => 
-        index === existingItemIndex ? updatedBOMItem : item
-      );
-    } else {
-      console.log('Adding new QTMS item to BOM');
-      updatedItems = [...bomItems, updatedBOMItem];
-    }
-    
-    console.log('Updated BOM items:', updatedItems);
-    setBomItems(updatedItems);
-    onBOMUpdate(updatedItems);
-    setEditingQTMS(null);
-  };
-
-  const handleSubmitQuote = (quoteId: string) => {
-    console.log('Quote submitted with ID:', quoteId);
-    setBomItems([]);
-    setQuoteFields({});
-    setDiscountPercentage(0);
-    setDiscountJustification('');
-    onBOMUpdate([]);
-  };
-
-  const handleBOMUpdate = (updatedItems: BOMItem[]) => {
-    setBomItems(updatedItems);
-    onBOMUpdate(updatedItems);
-  };
-
-  const handleDiscountChange = (discount: number, justification: string) => {
-    setDiscountPercentage(discount);
-    setDiscountJustification(justification);
-  };
-
-  const submitQuoteRequest = async () => {
-    if (isSubmitting) return;
-
-    const { isValid, missingFields } = validateFields();
-    
-    if (!isValid) {
+      setBomItems(items || []);
+      setQuoteFields(quote?.quote_fields || {});
+    } catch (error) {
+      console.error('Error loading existing quote:', error);
       toast({
-        title: 'Missing Required Fields',
-        description: `Please fill in the following required fields: ${missingFields.join(', ')}`,
-        variant: 'destructive',
+        title: "Error",
+        description: "Failed to load existing quote data",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSaveQuote = async () => {
+    if (!user) {
+      toast({
+        title: "Error",
+        description: "You must be logged in to save a quote",
+        variant: "destructive"
       });
       return;
     }
 
     if (bomItems.length === 0) {
       toast({
-        title: 'No Items in BOM',
-        description: 'Please add at least one item to the Bill of Materials before submitting.',
-        variant: 'destructive',
+        title: "Error",
+        description: "Please add at least one item to your BOM",
+        variant: "destructive"
       });
       return;
     }
 
-    setIsSubmitting(true);
+    // Validate required quote fields
+    const requiredFields = ['customer_name', 'oracle_customer_id', 'sfdc_opportunity'];
+    const missingFields = requiredFields.filter(field => !quoteFields[field]);
+    
+    if (missingFields.length > 0) {
+      toast({
+        title: "Error",
+        description: `Please fill in all required fields: ${missingFields.join(', ')}`,
+        variant: "destructive"
+      });
+      setActiveTab('quote');
+      return;
+    }
 
+    setLoading(true);
     try {
-      const quoteId = `Q-${Date.now()}`;
+      const totalCost = bomItems.reduce((sum, item) => sum + (item.unit_cost * item.quantity), 0);
+      const totalPrice = bomItems.reduce((sum, item) => sum + (item.unit_price * item.quantity), 0);
+      const originalMargin = totalPrice > 0 ? ((totalPrice - totalCost) / totalPrice) * 100 : 0;
 
-      const originalQuoteValue = bomItems.reduce(
-        (sum, item) => sum + item.product.price * item.quantity,
-        0
-      );
-      const discountedValue =
-        originalQuoteValue * (1 - discountPercentage / 100);
-      const totalCost = bomItems.reduce(
-        (sum, item) => sum + (item.product.cost || 0) * item.quantity,
-        0
-      );
-      const grossProfit = discountedValue - totalCost;
-      const discountedMargin =
-        discountedValue > 0 ? (grossProfit / discountedValue) * 100 : 0;
-
-      const { error: quoteError } = await supabase.from('quotes').insert({
-        id: quoteId,
-        customer_name: quoteFields.customerName,
-        oracle_customer_id: quoteFields.oracleCustomerId,
-        sfdc_opportunity: quoteFields.sfdcOpportunity,
-        status: 'pending_approval',
-        user_id: user!.id,
-        submitted_by_name: user!.name,
-        submitted_by_email: user!.email,
-        original_quote_value: originalQuoteValue,
-        requested_discount: discountPercentage,
-        discount_justification: discountJustification,
-        discounted_value: discountedValue,
+      const quoteData = {
+        id: existingQuoteId || `QTE-${Date.now()}`,
+        user_id: user.id,
+        customer_name: quoteFields.customer_name,
+        oracle_customer_id: quoteFields.oracle_customer_id,
+        sfdc_opportunity: quoteFields.sfdc_opportunity,
+        status: 'pending',
+        requested_discount: quoteFields.requested_discount || 0,
+        original_quote_value: totalPrice,
+        discounted_value: totalPrice * (1 - (quoteFields.requested_discount || 0) / 100),
         total_cost: totalCost,
-        gross_profit: grossProfit,
-        original_margin:
-          originalQuoteValue > 0
-            ? ((originalQuoteValue - totalCost) / originalQuoteValue) * 100
-            : 0,
-        discounted_margin: discountedMargin,
-        quote_fields: quoteFields,
-        priority: 'Medium',
+        original_margin: originalMargin,
+        discounted_margin: totalPrice > 0 ? ((totalPrice * (1 - (quoteFields.requested_discount || 0) / 100) - totalCost) / (totalPrice * (1 - (quoteFields.requested_discount || 0) / 100))) * 100 : 0,
+        gross_profit: (totalPrice * (1 - (quoteFields.requested_discount || 0) / 100)) - totalCost,
+        payment_terms: quoteFields.payment_terms || 'Net 30',
+        shipping_terms: quoteFields.shipping_terms || 'FOB Origin',
         currency: 'USD',
-        payment_terms: 'Net 30',
-        shipping_terms: 'FOB Origin',
-      });
+        quote_fields: quoteFields,
+        discount_justification: quoteFields.discount_justification,
+        submitted_by_name: user.name,
+        submitted_by_email: user.email
+      };
 
-      if (quoteError) {
-        console.error('SUPABASE ERROR:', quoteError);
-        toast({
-          title: 'Submission Failed',
-          description:
-            quoteError.message || 'Unknown error. Check console for more info.',
-          variant: 'destructive',
-        });
-        setIsSubmitting(false);
-        return;
+      if (existingQuoteId) {
+        const { error } = await supabase
+          .from('quotes')
+          .update(quoteData)
+          .eq('id', existingQuoteId);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from('quotes')
+          .insert(quoteData);
+        if (error) throw error;
       }
 
+      // Save BOM items
       for (const item of bomItems) {
-        const { error: bomError } = await supabase.from('bom_items').insert({
-          quote_id: quoteId,
-          product_id: item.product.id,
-          name: item.product.name,
-          description: item.product.description || '',
-          part_number: item.product.partNumber || item.partNumber || '',
-          quantity: item.quantity,
-          unit_price: item.product.price,
-          unit_cost: item.product.cost || 0,
-          total_price: item.product.price * item.quantity,
-          total_cost: (item.product.cost || 0) * item.quantity,
-          margin:
-            item.product.price > 0
-              ? ((item.product.price - (item.product.cost || 0)) /
-                  item.product.price) *
-                100
-              : 0,
-          original_unit_price: item.product.price,
-          approved_unit_price: item.product.price,
-          configuration_data: item.configuration || {},
-          product_type: item.product.type || 'standard',
-        });
+        const bomData = {
+          ...item,
+          quote_id: quoteData.id,
+          margin: item.unit_price > 0 ? ((item.unit_price - item.unit_cost) / item.unit_price) * 100 : 0,
+          total_cost: item.unit_cost * item.quantity,
+          total_price: item.unit_price * item.quantity
+        };
 
-        if (bomError) {
-          console.error('SUPABASE BOM ERROR:', bomError);
-          toast({
-            title: 'BOM Item Error',
-            description: bomError.message || 'Failed to create BOM item',
-            variant: 'destructive',
-          });
-          throw bomError;
+        if (item.id) {
+          const { error } = await supabase
+            .from('bom_items')
+            .update(bomData)
+            .eq('id', item.id);
+          if (error) throw error;
+        } else {
+          const { error } = await supabase
+            .from('bom_items')
+            .insert(bomData);
+          if (error) throw error;
         }
-      }
-
-      try {
-        const { data: adminIds } = await supabase.rpc('get_admin_user_ids');
-        if (adminIds && adminIds.length > 0) {
-          await supabase.from('admin_notifications').insert({
-            quote_id: quoteId,
-            notification_type: 'quote_pending_approval',
-            sent_to: adminIds,
-            message_content: {
-              customer_name: quoteFields.customerName,
-              submitted_by: user!.name,
-              quote_value: discountedValue,
-              discount_percentage: discountPercentage,
-            },
-          });
-        }
-      } catch (notificationError) {
-        console.error('Failed to send admin notifications:', notificationError);
       }
 
       toast({
-        title: 'Quote Submitted Successfully',
-        description: `Quote ${quoteId} has been submitted for approval.`,
+        title: "Success",
+        description: existingQuoteId ? "Quote updated successfully!" : "Quote created successfully!",
       });
 
-      handleSubmitQuote(quoteId);
+      onClose();
     } catch (error) {
-      console.error('Error submitting quote:', error);
+      console.error('Error saving quote:', error);
       toast({
-        title: 'Submission Failed',
-        description: 'Failed to submit quote. Please try again.',
-        variant: 'destructive',
+        title: "Error",
+        description: "Failed to save quote. Please try again.",
+        variant: "destructive"
       });
     } finally {
-      setIsSubmitting(false);
+      setLoading(false);
     }
   };
 
-  const renderProductContent = (productId: string) => {
-    const product = level1Products.find(p => p.id === productId);
-    if (!product) return null;
-
-    switch (productId) {
-      case 'qtms':
-        return (
-          <div className="space-y-6">
-            <ChassisSelector
-              onChassisSelect={handleChassisSelect}
-              selectedChassis={selectedChassis}
-              canSeePrices={canSeePrices}
-            />
-            
-            {selectedChassis && (
-              <div className="space-y-6">
-                <RackVisualizer
-                  chassis={selectedChassis as any}
-                  slotAssignments={slotAssignments as any}
-                  onSlotClick={handleSlotClick}
-                  onSlotClear={handleSlotClear}
-                  selectedSlot={selectedSlot}
-                  hasRemoteDisplay={hasRemoteDisplay}
-                  onRemoteDisplayToggle={handleRemoteDisplayToggle}
-                />
-                
-                {Object.keys(slotAssignments).length > 0 && (
-                  <Card className="bg-gray-900 border-gray-800">
-                    <CardContent className="pt-6">
-                      <button
-                        onClick={handleAddChassisAndCardsToBOM}
-                        className="w-full bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded font-medium"
-                      >
-                        Add Chassis & Cards to BOM
-                      </button>
-                    </CardContent>
-                  </Card>
-                )}
-              </div>
-            )}
-            
-            {selectedSlot !== null && selectedChassis && (
-              <SlotCardSelector
-                chassis={selectedChassis as any}
-                slot={selectedSlot}
-                onCardSelect={handleCardSelect}
-                onClose={() => setSelectedSlot(null)}
-                canSeePrices={canSeePrices}
-                currentSlotAssignments={slotAssignments}
-              />
-            )}
-          </div>
-        );
-      
-      case 'dga':
-        return (
-          <DGAProductSelector
-            onProductSelect={handleDGAProductSelect}
-            canSeePrices={canSeePrices}
-          />
-        );
-      
-      case 'partial-discharge':
-        return (
-          <PDProductSelector
-            onProductSelect={handleDGAProductSelect}
-            canSeePrices={canSeePrices}
-          />
-        );
-      
-      default:
-        return (
-          <div className="space-y-6">
-            {selectedLevel1Product && (
-              <Level2OptionsSelector
-                level1Product={selectedLevel1Product}
-                selectedOptions={selectedLevel2Options}
-                onOptionToggle={handleLevel2OptionToggle}
-              />
-            )}
-          </div>
-        );
-    }
-  };
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-white">Loading...</div>
-      </div>
-    );
-  }
-
-  if (!user) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-white text-center">
-          <p className="mb-4">Please log in to use the BOM Builder</p>
-          <p className="text-gray-400">Authentication is required to submit quotes</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (level1Loading) {
-    return <div className="text-white">Loading products...</div>;
-  }
+  if (!isOpen) return null;
 
   return (
-    <div className="space-y-6">
-      <QuoteFieldsSection
-        quoteFields={quoteFields}
-        onFieldChange={handleQuoteFieldChange}
-      />
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <Card className="w-full max-w-7xl h-[90vh] bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700">
+        <CardHeader className="border-b border-gray-200 dark:border-gray-700">
+          <div className="flex justify-between items-center">
+            <CardTitle className="text-gray-900 dark:text-white">
+              {mode === 'admin-edit' ? 'Admin Edit Quote' : existingQuoteId ? 'Edit Quote' : 'Build New Quote'}
+            </CardTitle>
+            <Button 
+              onClick={onClose} 
+              variant="outline"
+              className="border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
+            >
+              Close
+            </Button>
+          </div>
+        </CardHeader>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full">
-        <div className="lg:col-span-2 space-y-6">
-          <Card className="bg-gray-900 border-gray-800">
-            <CardHeader>
-              <CardTitle className="text-white">BOM Builder</CardTitle>
-              <CardDescription className="text-gray-400">
-                Build your Bill of Materials by selecting products and configurations
-                <br />
-                <span className="text-green-400">Logged in as: {user.name} ({user.email})</span>
-              </CardDescription>
-            </CardHeader>
-          </Card>
+        <CardContent className="p-0 h-full">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full flex flex-col">
+            {/* Responsive Tab List */}
+            <div className="border-b border-gray-200 dark:border-gray-700 px-6 pt-4">
+              <TabsList className="grid w-full grid-cols-2 md:grid-cols-5 gap-1 bg-gray-100 dark:bg-gray-800 p-1 rounded-lg">
+                {tabs.map((tab) => {
+                  const Icon = tab.icon;
+                  return (
+                    <TabsTrigger
+                      key={tab.id}
+                      value={tab.id}
+                      className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 
+                                data-[state=active]:bg-white dark:data-[state=active]:bg-gray-700 
+                                data-[state=active]:text-gray-900 dark:data-[state=active]:text-white
+                                data-[state=active]:shadow-sm rounded-md transition-all duration-200"
+                    >
+                      <Icon className="w-4 h-4" />
+                      <span className="hidden sm:inline">{tab.label}</span>
+                    </TabsTrigger>
+                  );
+                })}
+              </TabsList>
+            </div>
 
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full bg-gray-800" style={{ gridTemplateColumns: `repeat(${level1Products.length}, 1fr)` }}>
-              {level1Products.map((product) => (
-                <TabsTrigger 
-                  key={product.id}
-                  value={product.id} 
-                  className="text-white data-[state=active]:bg-red-600 data-[state=active]:text-white"
+            {/* Tab Content with proper scrolling */}
+            <div className="flex-1 overflow-hidden">
+              <ScrollArea className="h-full">
+                <div className="p-6">
+                  <TabsContent value="products" className="mt-0">
+                    <div className="space-y-6">
+                      <Level1ProductSelector
+                        onProductSelect={(product) => {
+                          setBomItems(prev => [...prev, {
+                            ...product,
+                            id: null,
+                            quantity: 1,
+                            unit_cost: product.cost || 0,
+                            unit_price: product.price || 0
+                          }]);
+                        }}
+                      />
+                      <Level2OptionsSelector
+                        selectedLevel1Products={bomItems.filter(item => item.category === 'level1')}
+                        onOptionSelect={(option) => {
+                          setBomItems(prev => [...prev, {
+                            ...option,
+                            id: null,
+                            quantity: 1,
+                            unit_cost: option.cost || 0,
+                            unit_price: option.price || 0
+                          }]);
+                        }}
+                      />
+                    </div>
+                  </TabsContent>
+
+                  <TabsContent value="chassis" className="mt-0">
+                    <ChassisSelector
+                      selectedChassis={selectedChassis}
+                      onChassisSelect={setSelectedChassis}
+                      onSlotConfigured={(slotConfig) => {
+                        setBomItems(prev => [...prev, {
+                          ...slotConfig,
+                          id: null,
+                          quantity: 1,
+                          unit_cost: slotConfig.cost || 0,
+                          unit_price: slotConfig.price || 0
+                        }]);
+                      }}
+                    />
+                  </TabsContent>
+
+                  <TabsContent value="config" className="mt-0">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                      <BOMDisplay 
+                        items={bomItems}
+                        onItemsChange={setBomItems}
+                        mode={mode}
+                        userRole={user?.role}
+                      />
+                      {selectedChassis && (
+                        <RackVisualizer 
+                          chassis={selectedChassis}
+                          configuredSlots={bomItems.filter(item => item.slot_position)}
+                        />
+                      )}
+                    </div>
+                  </TabsContent>
+
+                  <TabsContent value="quote" className="mt-0">
+                    <QuoteFieldsSection
+                      quoteFields={quoteFields}
+                      onFieldsChange={setQuoteFields}
+                    />
+                  </TabsContent>
+
+                  <TabsContent value="discount" className="mt-0">
+                    <DiscountSection
+                      quoteFields={quoteFields}
+                      onFieldsChange={setQuoteFields}
+                      bomItems={bomItems}
+                      userRole={user?.role}
+                    />
+                  </TabsContent>
+                </div>
+              </ScrollArea>
+            </div>
+
+            {/* Footer with Save Button */}
+            <div className="border-t border-gray-200 dark:border-gray-700 p-6">
+              <div className="flex justify-between items-center">
+                <div className="flex items-center gap-4">
+                  <Badge variant="outline" className="text-gray-600 dark:text-gray-400">
+                    Items: {bomItems.length}
+                  </Badge>
+                  <Badge variant="outline" className="text-gray-600 dark:text-gray-400">
+                    Total: ${bomItems.reduce((sum, item) => sum + (item.unit_price * item.quantity), 0).toFixed(2)}
+                  </Badge>
+                </div>
+                <Button 
+                  onClick={handleSaveQuote}
+                  disabled={loading || bomItems.length === 0}
+                  className="bg-blue-600 hover:bg-blue-700 text-white"
                 >
-                  {product.name}
-                  {product.category && (
-                    <Badge variant="outline" className="ml-2 text-xs">
-                      {product.category}
-                    </Badge>
-                  )}
-                </TabsTrigger>
-              ))}
-            </TabsList>
-            
-            {level1Products.map((product) => (
-              <TabsContent key={product.id} value={product.id} className="mt-6">
-                {renderProductContent(product.id)}
-              </TabsContent>
-            ))}
-          </Tabs>
-        </div>
-
-        <div className="lg:col-span-1 space-y-6">
-          <BOMDisplay
-            bomItems={bomItems}
-            onUpdateBOM={handleBOMUpdate}
-            onEditConfiguration={handleBOMConfigurationEdit}
-            canSeePrices={canSeePrices}
-          />
-          
-          <DiscountSection
-            bomItems={bomItems}
-            onDiscountChange={handleDiscountChange}
-            canSeePrices={canSeePrices}
-            initialDiscount={discountPercentage}
-            initialJustification={discountJustification}
-          />
-
-          {bomItems.length > 0 && (
-            <Card className="bg-gray-900 border-gray-800">
-              <CardContent className="pt-6">
-                <Button
-                  onClick={submitQuoteRequest}
-                  className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3"
-                  size="lg"
-                  disabled={isSubmitting}
-                  data-cy="submit-quote"
-                >
-                  {isSubmitting ? 'Submitting...' : `Submit Quote Request (${bomItems.length} items)`}
+                  {loading ? 'Saving...' : existingQuoteId ? 'Update Quote' : 'Save Quote'}
                 </Button>
-                {!validation.isValid && (
-                  <div className="mt-2 text-sm text-red-400">
-                    Missing required fields: {validation.missingFields.join(', ')}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          )}
-        </div>
-      </div>
-
-      {configuringCard && configuringCard.product.name.toLowerCase().includes('analog') && (
-        <AnalogCardConfigurator
-          bomItem={configuringCard}
-          onSave={handleCardConfiguration}
-          onClose={() => setConfiguringCard(null)}
-        />
-      )}
-
-      {configuringCard && configuringCard.product.name.toLowerCase().includes('bushing') && (
-        <BushingCardConfigurator
-          bomItem={configuringCard}
-          onSave={handleCardConfiguration}
-          onClose={() => setConfiguringCard(null)}
-        />
-      )}
-
-      {editingQTMS && (
-        <QTMSConfigurationEditor
-          consolidatedQTMS={editingQTMS}
-          onSave={handleQTMSConfigurationSave}
-          onClose={() => setEditingQTMS(null)}
-          canSeePrices={canSeePrices}
-        />
-      )}
+              </div>
+            </div>
+          </Tabs>
+        </CardContent>
+      </Card>
     </div>
   );
 };

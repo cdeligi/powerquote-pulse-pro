@@ -37,7 +37,7 @@ function useProvideAuth(): AuthContextType {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const fetchProfile = async (uid: string, timeoutMs: number = 3000): Promise<void> => {
+  const fetchProfile = async (uid: string, timeoutMs: number = 3000): Promise<AppUser | null> => {
     console.log('[useAuth] fetchProfile start for:', uid);
     
     const timeoutPromise = new Promise<never>((_, reject) => {
@@ -56,26 +56,11 @@ function useProvideAuth(): AuthContextType {
       if (error) {
         if (error.code === 'PGRST116') {
           console.warn('[useAuth] No profile found for user:', uid);
-          const defaultUser: AppUser = {
-            id: uid,
-            name: 'User',
-            email: session?.user?.email || 'unknown@example.com',
-            role: 'level1',
-            department: undefined
-          };
-          setUser(defaultUser);
+          return null; // Don't create fake users anymore
         } else {
           console.error('[useAuth] Profile fetch error:', error);
-          const fallbackUser: AppUser = {
-            id: uid,
-            name: 'User',
-            email: session?.user?.email || 'unknown@example.com',
-            role: 'level1',
-            department: undefined
-          };
-          setUser(fallbackUser);
+          return null;
         }
-        return;
       }
 
       if (data) {
@@ -87,28 +72,13 @@ function useProvideAuth(): AuthContextType {
           role: data.role as 'level1' | 'level2' | 'admin' | 'finance',
           department: data.department
         };
-        setUser(appUser);
-      } else {
-        console.warn('[useAuth] Profile data is null for user:', uid);
-        const fallbackUser: AppUser = {
-          id: uid,
-          name: 'User',
-          email: session?.user?.email || 'unknown@example.com',
-          role: 'level1',
-          department: undefined
-        };
-        setUser(fallbackUser);
+        return appUser;
       }
+
+      return null;
     } catch (err) {
       console.error('[useAuth] Profile fetch timeout or error:', err);
-      const fallbackUser: AppUser = {
-        id: uid,
-        name: 'User',
-        email: session?.user?.email || 'unknown@example.com',
-        role: 'level1',
-        department: undefined
-      };
-      setUser(fallbackUser);
+      return null;
     }
   };
 
@@ -182,26 +152,32 @@ function useProvideAuth(): AuthContextType {
         if (session?.user) {
           console.log('[useAuth] User session found, fetching profile...');
           try {
-            await fetchProfile(session.user.id, 3000);
+            const profile = await fetchProfile(session.user.id, 3000);
             
-            if (event === 'SIGNED_IN') {
-              await supabase.rpc('update_user_login', {
-                p_user_id: session.user.id,
-                p_success: true
-              });
-              await logSecurityEvent('session_established');
-              await trackUserSession();
+            if (profile) {
+              setUser(profile);
+              
+              if (event === 'SIGNED_IN') {
+                await supabase.rpc('update_user_login', {
+                  p_user_id: session.user.id,
+                  p_success: true
+                });
+                await logSecurityEvent('session_established');
+                await trackUserSession();
+              }
+            } else {
+              // If no profile found, sign out the user
+              console.warn('[useAuth] No profile found, signing out user');
+              await supabase.auth.signOut();
+              setUser(null);
+              setSession(null);
             }
           } catch (error) {
             console.error('[useAuth] Error fetching profile in auth state change:', error);
-            const fallbackUser: AppUser = {
-              id: session.user.id,
-              name: 'User',
-              email: session.user.email || 'unknown@example.com',
-              role: 'level1',
-              department: undefined
-            };
-            setUser(fallbackUser);
+            // Sign out on profile fetch error
+            await supabase.auth.signOut();
+            setUser(null);
+            setSession(null);
           } finally {
             setLoading(false);
           }
@@ -242,7 +218,13 @@ function useProvideAuth(): AuthContextType {
         setSession(session);
         
         if (session?.user) {
-          await fetchProfile(session.user.id, 3000);
+          const profile = await fetchProfile(session.user.id, 3000);
+          if (profile) {
+            setUser(profile);
+          } else {
+            // Sign out if no profile
+            await supabase.auth.signOut();
+          }
         }
       } catch (err) {
         console.error('[useAuth] getSession timeout or error:', err);
