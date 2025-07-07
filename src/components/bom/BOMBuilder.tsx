@@ -16,7 +16,7 @@ import RackVisualizer from './RackVisualizer';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { Calculator, Package, Rack3, FileText, Percent } from 'lucide-react';
+import { Calculator, Package, Rack, FileText, Percent } from 'lucide-react';
 
 interface BOMBuilderProps {
   isOpen: boolean;
@@ -42,7 +42,7 @@ const BOMBuilder: React.FC<BOMBuilderProps> = ({
   // Enhanced tab configuration with responsive design
   const tabs = [
     { id: 'products', label: 'Products', icon: Package },
-    { id: 'chassis', label: 'Chassis', icon: Rack3 },
+    { id: 'chassis', label: 'Chassis', icon: Rack },
     { id: 'config', label: 'Config', icon: Calculator },
     { id: 'quote', label: 'Quote Info', icon: FileText },
     { id: 'discount', label: 'Discount', icon: Percent },
@@ -267,7 +267,7 @@ const BOMBuilder: React.FC<BOMBuilderProps> = ({
                         }}
                       />
                       <Level2OptionsSelector
-                        selectedLevel1Products={bomItems.filter(item => item.category === 'level1')}
+                        level1Product={bomItems.find(item => item.category === 'level1')}
                         onOptionSelect={(option) => {
                           setBomItems(prev => [...prev, {
                             ...option,
@@ -283,7 +283,7 @@ const BOMBuilder: React.FC<BOMBuilderProps> = ({
 
                   <TabsContent value="chassis" className="mt-0">
                     <ChassisSelector
-                      selectedChassis={selectedChassis}
+                      chassis={selectedChassis}
                       onChassisSelect={setSelectedChassis}
                       onSlotConfigured={(slotConfig) => {
                         setBomItems(prev => [...prev, {
@@ -308,7 +308,7 @@ const BOMBuilder: React.FC<BOMBuilderProps> = ({
                       {selectedChassis && (
                         <RackVisualizer 
                           chassis={selectedChassis}
-                          configuredSlots={bomItems.filter(item => item.slot_position)}
+                          
                         />
                       )}
                     </div>
@@ -316,15 +316,15 @@ const BOMBuilder: React.FC<BOMBuilderProps> = ({
 
                   <TabsContent value="quote" className="mt-0">
                     <QuoteFieldsSection
-                      quoteFields={quoteFields}
-                      onFieldsChange={setQuoteFields}
+                      
+                      onFieldChange={setQuoteFields}
                     />
                   </TabsContent>
 
                   <TabsContent value="discount" className="mt-0">
                     <DiscountSection
-                      quoteFields={quoteFields}
-                      onFieldsChange={setQuoteFields}
+                      
+                      onFieldChange={setQuoteFields}
                       bomItems={bomItems}
                       userRole={user?.role}
                     />
