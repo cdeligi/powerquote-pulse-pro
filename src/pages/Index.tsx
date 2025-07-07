@@ -22,7 +22,7 @@ const Index = () => {
       if (error) {
         console.error('Logout error:', error);
       } else {
-        console.log('Logout successful');
+        console.log('Logout successful - redirecting to login');
       }
     } catch (err) {
       console.error('Unexpected logout error:', err);
