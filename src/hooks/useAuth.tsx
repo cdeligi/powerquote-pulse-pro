@@ -1,6 +1,5 @@
-
 /**
- * © 2025 Qualitrol Corp. All rights reserved.
+ *  2025 Qualitrol Corp. All rights reserved.
  * Confidential and proprietary. Unauthorized copying or distribution is prohibited.
  */
 
@@ -41,7 +40,7 @@ function useProvideAuth(): AuthContextType {
     console.log('[useAuth] fetchProfile start for:', uid);
     
     try {
-      const { data, error } = await supabase
+      const { data, error } = await supabase.client
         .from('profiles')
         .select('*')
         .eq('id', uid)
@@ -71,105 +70,80 @@ function useProvideAuth(): AuthContextType {
   useEffect(() => {
     console.log('[useAuth] Initializing auth state...');
     
-    // Set up auth state listener
-    const { data: listener } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        console.log('[useAuth] Auth state change:', event, session?.user?.email || 'no user');
-        
-        setSession(session);
-        
-        if (session?.user) {
-          console.log('[useAuth] User session found, fetching profile...');
-          await fetchProfile(session.user.id);
-        } else {
-          console.log('[useAuth] No user session, clearing user state');
-          setUser(null);
-        }
-        
-        setLoading(false);
-      }
-    );
-
-    // Get initial session
-    const getInitialSession = async () => {
+    // Wait for Supabase client to be ready
+    const initAuth = async () => {
       try {
-        const { data: { session }, error } = await supabase.auth.getSession();
+        await supabase.init();
+        
+        // Set up auth state listener
+        const { data: listener } = supabase.client.auth.onAuthStateChange(
+          async (event, session) => {
+            console.log('[useAuth] Auth state change:', event, session?.user?.email || 'no user');
+            
+            setSession(session);
+            
+            if (session?.user) {
+              console.log('[useAuth] User session found, fetching profile...');
+              await fetchProfile(session.user.id);
+            } else {
+              console.log('[useAuth] No user session, clearing user state');
+              setUser(null);
+            }
+            
+            setLoading(false);
+          }
+        );
+
+        // Get initial session
+        const { data: { session }, error } = await supabase.client.auth.getSession();
         
         if (error) {
           console.error('[useAuth] getSession error:', error);
           setLoading(false);
-          return;
+        } else {
+          setSession(session);
+          if (session?.user) {
+            await fetchProfile(session.user.id);
+          }
+          setLoading(false);
         }
-        
-        console.log('[useAuth] Initial session check:', session?.user?.email || 'no session');
-        setSession(session);
-        
-        if (session?.user) {
-          await fetchProfile(session.user.id);
-        }
-        
-        setLoading(false);
-      } catch (err) {
-        console.error('[useAuth] getSession error:', err);
+      } catch (error) {
+        console.error('[useAuth] Initialization error:', error);
         setLoading(false);
       }
     };
 
-    getInitialSession();
-
-    return () => {
-      console.log('[useAuth] Cleaning up auth listener...');
-      listener.subscription.unsubscribe();
-    };
+    initAuth();
   }, []);
 
   const signIn = async (email: string, password: string) => {
-    console.log('[useAuth] Signing in user:', email);
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.client.auth.signInWithPassword({
         email,
         password
       });
-      
+
+      if (error) throw error;
+      if (data.session?.user) {
+        await fetchProfile(data.session.user.id);
+      }
+      return { error: null };
+    } catch (error) {
+      console.error('[useAuth] Sign in error:', error);
       return { error };
-    } catch (err) {
-      console.error('[useAuth] Sign in error:', err);
-      return { error: err };
     }
   };
 
   const signOut = async () => {
-    console.log('[useAuth] Signing out user...');
-    
     try {
-      // Clear local state immediately
+      const { error } = await supabase.client.auth.signOut();
+      if (error) throw error;
       setUser(null);
       setSession(null);
-      
-      // Clear any cached data
-      localStorage.removeItem('supabase.auth.token');
-      sessionStorage.clear();
-      
-      // Sign out from Supabase
-      const { error } = await supabase.auth.signOut();
-      
-      if (error) {
-        console.error('[useAuth] Supabase signOut error:', error);
-      } else {
-        console.log('[useAuth] Supabase signOut successful');
-      }
-      
-      // Force reload to ensure clean state
-      window.location.href = '/';
-      
+      return { error: null };
+    } catch (error) {
+      console.error('[useAuth] Sign out error:', error);
       return { error };
-    } catch (err) {
-      console.error('[useAuth] Sign out error:', err);
-      // Still clear local state even if there's an error
-      setUser(null);
-      setSession(null);
-      window.location.href = '/';
-      return { error: err };
     }
   };
 
@@ -178,6 +152,6 @@ function useProvideAuth(): AuthContextType {
     session,
     loading,
     signIn,
-    signOut
+    signOut,
   };
 }
