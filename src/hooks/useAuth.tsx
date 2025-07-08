@@ -56,7 +56,7 @@ function useProvideAuth(): AuthContextType {
       if (error) {
         if (error.code === 'PGRST116') {
           console.warn('[useAuth] No profile found for user:', uid);
-          return null; // Don't create fake users anymore
+          return null;
         } else {
           console.error('[useAuth] Profile fetch error:', error);
           return null;
@@ -65,11 +65,17 @@ function useProvideAuth(): AuthContextType {
 
       if (data) {
         console.log('[useAuth] Profile loaded successfully:', data.email);
+        
+        // Special handling for cdeligi@qualitrolcorp.com - ensure admin access
+        const isMainAdmin = data.email === 'cdeligi@qualitrolcorp.com';
+        const userRole = isMainAdmin ? 'admin' : (data.role as 'level1' | 'level2' | 'admin' | 'finance');
+        
         const appUser: AppUser = {
           id: data.id,
-          name: `${data.first_name || ''} ${data.last_name || ''}`.trim() || 'User',
+          name: `${data.first_name || ''} ${data.last_name || ''}`.trim() || 
+                (isMainAdmin ? 'Admin User' : 'User'),
           email: data.email,
-          role: data.role as 'level1' | 'level2' | 'admin' | 'finance',
+          role: userRole,
           department: data.department
         };
         return appUser;
@@ -166,7 +172,6 @@ function useProvideAuth(): AuthContextType {
                 await trackUserSession();
               }
             } else {
-              // If no profile found, sign out the user
               console.warn('[useAuth] No profile found, signing out user');
               await supabase.auth.signOut();
               setUser(null);
@@ -174,7 +179,6 @@ function useProvideAuth(): AuthContextType {
             }
           } catch (error) {
             console.error('[useAuth] Error fetching profile in auth state change:', error);
-            // Sign out on profile fetch error
             await supabase.auth.signOut();
             setUser(null);
             setSession(null);
@@ -185,10 +189,8 @@ function useProvideAuth(): AuthContextType {
           console.log('[useAuth] No user session, clearing user state');
           if (event === 'SIGNED_OUT') {
             await logSecurityEvent('session_terminated');
-            // Force clear all state immediately on sign out
             setUser(null);
             setSession(null);
-            // Clear any cached data in localStorage
             localStorage.clear();
             sessionStorage.clear();
           }
@@ -222,7 +224,6 @@ function useProvideAuth(): AuthContextType {
           if (profile) {
             setUser(profile);
           } else {
-            // Sign out if no profile
             await supabase.auth.signOut();
           }
         }
@@ -278,7 +279,7 @@ function useProvideAuth(): AuthContextType {
     try {
       await logSecurityEvent('logout_initiated');
       
-      // Clear state immediately before calling Supabase signOut
+      // Clear state immediately
       setUser(null);
       setSession(null);
       
@@ -288,22 +289,18 @@ function useProvideAuth(): AuthContextType {
       
       const { error } = await supabase.auth.signOut();
       
-      // Force reload to ensure clean state
-      setTimeout(() => {
-        window.location.href = '/';
-      }, 100);
+      // Force redirect to ensure clean state
+      window.location.href = '/';
       
       return { error };
     } catch (err) {
       console.error('[useAuth] Sign out error:', err);
-      // Even if there's an error, clear local state and redirect
+      // Force clear state and redirect on error
       setUser(null);
       setSession(null);
       localStorage.clear();
       sessionStorage.clear();
-      setTimeout(() => {
-        window.location.href = '/';
-      }, 100);
+      window.location.href = '/';
       return { error: err };
     }
   };
