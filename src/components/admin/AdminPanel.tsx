@@ -9,11 +9,10 @@ import { User } from "@/types/auth";
 import QuoteApprovalDashboard from "./QuoteApprovalDashboard";
 import UserManagementEnhanced from "./UserManagementEnhanced";
 import { ProductManagement } from "./ProductManagement";
-import Level2ProductManager from "./Level2ProductManager";
 import QuoteFieldConfiguration from "./QuoteFieldConfiguration";
 import AdminSettings from "./AdminSettings";
 import AdminMarginDashboard from "./AdminMarginDashboard";
-import { Settings, Users, Package, FileText, BarChart3, Package2 } from "lucide-react";
+import { Settings, Users, Package, FileText, BarChart3 } from "lucide-react";
 
 interface AdminPanelProps {
   user: User;
@@ -42,7 +41,7 @@ const AdminPanel = ({ user }: AdminPanelProps) => {
           <TabsList className="grid w-full bg-gray-900 border-gray-800" style={{
             gridTemplateColumns: isFinanceUser 
               ? 'repeat(3, 1fr)' 
-              : 'repeat(7, 1fr)'
+              : 'repeat(6, 1fr)'
           }}>
             <TabsTrigger value="quotes" className="text-white data-[state=active]:bg-blue-600 data-[state=active]:text-white">
               <FileText className="mr-2 h-4 w-4" />
@@ -69,11 +68,6 @@ const AdminPanel = ({ user }: AdminPanelProps) => {
                 <TabsTrigger value="products" className="text-white data-[state=active]:bg-blue-600 data-[state=active]:text-white">
                   <Package className="mr-2 h-4 w-4" />
                   Products
-                </TabsTrigger>
-
-                <TabsTrigger value="level2products" className="text-white data-[state=active]:bg-blue-600 data-[state=active]:text-white">
-                  <Package2 className="mr-2 h-4 w-4" />
-                  Level 2 Products
                 </TabsTrigger>
 
                 <TabsTrigger value="fields" className="text-white data-[state=active]:bg-blue-600 data-[state=active]:text-white">
@@ -104,10 +98,6 @@ const AdminPanel = ({ user }: AdminPanelProps) => {
 
               <TabsContent value="products" className="mt-6">
                 <ProductManagement />
-              </TabsContent>
-
-              <TabsContent value="level2products" className="mt-6">
-                <Level2ProductManager />
               </TabsContent>
 
               <TabsContent value="fields" className="mt-6">

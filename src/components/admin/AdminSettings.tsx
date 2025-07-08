@@ -8,8 +8,9 @@ import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import FinanceApprovalSettings from './FinanceApprovalSettings';
-import UserActivityMonitor from './UserActivityMonitor';
-import { Settings, DollarSign, Activity } from 'lucide-react';
+import EmailConfigurationPanel from './EmailConfigurationPanel';
+import MarginConfigurationPanel from './MarginConfigurationPanel';
+import { Settings, DollarSign, Mail, Percent } from 'lucide-react';
 
 const AdminSettings = () => {
   return (
@@ -23,14 +24,18 @@ const AdminSettings = () => {
         </CardHeader>
         <CardContent>
           <Tabs defaultValue="finance" className="w-full">
-            <TabsList className="grid w-full grid-cols-2 bg-gray-800">
+            <TabsList className="grid w-full grid-cols-3 bg-gray-800">
               <TabsTrigger value="finance" className="text-white data-[state=active]:bg-blue-600">
                 <DollarSign className="mr-2 h-4 w-4" />
                 Finance Settings
               </TabsTrigger>
-              <TabsTrigger value="activity" className="text-white data-[state=active]:bg-blue-600">
-                <Activity className="mr-2 h-4 w-4" />
-                User Activity
+              <TabsTrigger value="email" className="text-white data-[state=active]:bg-blue-600">
+                <Mail className="mr-2 h-4 w-4" />
+                Email Configuration
+              </TabsTrigger>
+              <TabsTrigger value="margin" className="text-white data-[state=active]:bg-blue-600">
+                <Percent className="mr-2 h-4 w-4" />
+                Margin Settings
               </TabsTrigger>
             </TabsList>
 
@@ -38,8 +43,12 @@ const AdminSettings = () => {
               <FinanceApprovalSettings />
             </TabsContent>
 
-            <TabsContent value="activity" className="mt-6">
-              <UserActivityMonitor />
+            <TabsContent value="email" className="mt-6">
+              <EmailConfigurationPanel />
+            </TabsContent>
+
+            <TabsContent value="margin" className="mt-6">
+              <MarginConfigurationPanel />
             </TabsContent>
           </Tabs>
         </CardContent>
