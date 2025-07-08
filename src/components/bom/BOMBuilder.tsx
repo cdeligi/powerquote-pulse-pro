@@ -36,6 +36,10 @@ const BOMBuilder: React.FC<BOMBuilderProps> = ({
   const [activeTab, setActiveTab] = useState('products');
   const [bomItems, setBomItems] = useState<any[]>([]);
   const [selectedChassis, setSelectedChassis] = useState<any>(null);
+  const [selectedLevel1Product, setSelectedLevel1Product] = useState<any>(null);
+  const [selectedLevel2Options, setSelectedLevel2Options] = useState<any[]>([]);
+  const [slotAssignments, setSlotAssignments] = useState<Record<number, any>>({});
+  const [selectedSlot, setSelectedSlot] = useState<number | null>(null);
   const [quoteFields, setQuoteFields] = useState<any>({});
   const [loading, setLoading] = useState(false);
 
@@ -86,6 +90,45 @@ const BOMBuilder: React.FC<BOMBuilderProps> = ({
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleLevel2OptionToggle = (option: any) => {
+    setSelectedLevel2Options(prev => {
+      const isSelected = prev.some(item => item.id === option.id);
+      if (isSelected) {
+        return prev.filter(item => item.id !== option.id);
+      } else {
+        return [...prev, option];
+      }
+    });
+
+    // Add to BOM items
+    setBomItems(prev => [...prev, {
+      ...option,
+      id: null,
+      quantity: 1,
+      unit_cost: option.cost || 0,
+      unit_price: option.price || 0
+    }]);
+  };
+
+  const handleSlotClick = (slot: number) => {
+    setSelectedSlot(slot);
+  };
+
+  const handleSlotClear = (slot: number) => {
+    setSlotAssignments(prev => {
+      const newAssignments = { ...prev };
+      delete newAssignments[slot];
+      return newAssignments;
+    });
+  };
+
+  const handleQuoteFieldChange = (fieldId: string, value: any) => {
+    setQuoteFields(prev => ({
+      ...prev,
+      [fieldId]: value
+    }));
   };
 
   const handleSaveQuote = async () => {
@@ -257,6 +300,7 @@ const BOMBuilder: React.FC<BOMBuilderProps> = ({
                     <div className="space-y-6">
                       <Level1ProductSelector
                         onProductSelect={(product) => {
+                          setSelectedLevel1Product(product);
                           setBomItems(prev => [...prev, {
                             ...product,
                             id: null,
@@ -266,24 +310,19 @@ const BOMBuilder: React.FC<BOMBuilderProps> = ({
                           }]);
                         }}
                       />
-                      <Level2OptionsSelector
-                        level1Product={bomItems.find(item => item.category === 'level1')}
-                        onOptionSelect={(option) => {
-                          setBomItems(prev => [...prev, {
-                            ...option,
-                            id: null,
-                            quantity: 1,
-                            unit_cost: option.cost || 0,
-                            unit_price: option.price || 0
-                          }]);
-                        }}
-                      />
+                      {selectedLevel1Product && (
+                        <Level2OptionsSelector
+                          level1Product={selectedLevel1Product}
+                          selectedOptions={selectedLevel2Options}
+                          onOptionToggle={handleLevel2OptionToggle}
+                        />
+                      )}
                     </div>
                   </TabsContent>
 
                   <TabsContent value="chassis" className="mt-0">
                     <ChassisSelector
-                      chassis={selectedChassis}
+                      selectedChassis={selectedChassis}
                       onChassisSelect={setSelectedChassis}
                       onSlotConfigured={(slotConfig) => {
                         setBomItems(prev => [...prev, {
@@ -308,7 +347,10 @@ const BOMBuilder: React.FC<BOMBuilderProps> = ({
                       {selectedChassis && (
                         <RackVisualizer 
                           chassis={selectedChassis}
-                          
+                          slotAssignments={slotAssignments}
+                          onSlotClick={handleSlotClick}
+                          onSlotClear={handleSlotClear}
+                          selectedSlot={selectedSlot}
                         />
                       )}
                     </div>
@@ -316,15 +358,15 @@ const BOMBuilder: React.FC<BOMBuilderProps> = ({
 
                   <TabsContent value="quote" className="mt-0">
                     <QuoteFieldsSection
-                      
-                      onFieldChange={setQuoteFields}
+                      quoteFields={quoteFields}
+                      onFieldChange={handleQuoteFieldChange}
                     />
                   </TabsContent>
 
                   <TabsContent value="discount" className="mt-0">
                     <DiscountSection
-                      
-                      onFieldChange={setQuoteFields}
+                      quoteFields={quoteFields}
+                      onFieldsChange={handleQuoteFieldChange}
                       bomItems={bomItems}
                       userRole={user?.role}
                     />
