@@ -40,11 +40,11 @@ const UserManagementEnhanced = ({ user }: UserManagementEnhancedProps) => {
             </TabsList>
 
             <TabsContent value="users" className="mt-6">
-              <UserManagement />
+              <UserManagement user={user} />
             </TabsContent>
 
             <TabsContent value="activity" className="mt-6">
-              <UserActivityMonitor user={user} />
+              <UserActivityMonitor />
             </TabsContent>
           </Tabs>
         </CardContent>
