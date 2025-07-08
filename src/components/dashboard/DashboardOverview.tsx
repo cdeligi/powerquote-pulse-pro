@@ -199,7 +199,7 @@ const DashboardOverview = ({ user }: DashboardOverviewProps) => {
       {/* Header */}
       <div>
         <h1 className="text-3xl font-bold text-white mb-2">
-          Welcome back, {user.first_name || user.email}
+          Welcome back, {user.name || user.email}
         </h1>
         <p className="text-gray-400">
           Here's an overview of your quoting system performance

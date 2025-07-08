@@ -10,8 +10,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import UserManagement from './UserManagement';
 import UserActivityMonitor from './UserActivityMonitor';
 import { Users, Activity } from 'lucide-react';
+import { User } from '@/types/auth';
 
-const UserManagementEnhanced = () => {
+interface UserManagementEnhancedProps {
+  user: User;
+}
+
+const UserManagementEnhanced = ({ user }: UserManagementEnhancedProps) => {
   return (
     <div className="space-y-6">
       <Card className="bg-gray-900 border-gray-800">
@@ -39,7 +44,7 @@ const UserManagementEnhanced = () => {
             </TabsContent>
 
             <TabsContent value="activity" className="mt-6">
-              <UserActivityMonitor />
+              <UserActivityMonitor user={user} />
             </TabsContent>
           </Tabs>
         </CardContent>
