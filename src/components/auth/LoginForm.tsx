@@ -43,7 +43,6 @@ const LoginForm = ({ onLogin }: LoginFormProps) => {
           setError(error.message || 'An error occurred during sign in. Please try again.');
         }
       }
-      // Success will be handled by the auth hook in the parent component
     } catch (error) {
       console.error('Unexpected error:', error);
       setError('An unexpected error occurred. Please try again.');
@@ -84,9 +83,9 @@ const LoginForm = ({ onLogin }: LoginFormProps) => {
 
       <Card className="bg-gray-900 border-gray-800">
         <CardHeader>
-          <CardTitle className="text-white">Sign In</CardTitle>
+          <CardTitle className="text-white">Enterprise Sign In</CardTitle>
           <CardDescription className="text-gray-400">
-            Access your quoting dashboard
+            Access your enterprise quoting platform
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -101,14 +100,14 @@ const LoginForm = ({ onLogin }: LoginFormProps) => {
             )}
             
             <div>
-              <Label htmlFor="email" className="text-white">Email</Label>
+              <Label htmlFor="email" className="text-white">Corporate Email</Label>
               <Input
                 id="email"
                 type="email"
                 value={credentials.email}
                 onChange={(e) => setCredentials(prev => ({ ...prev, email: e.target.value }))}
                 className="bg-gray-800 border-gray-700 text-white"
-                placeholder="Enter your email"
+                placeholder="Enter your corporate email"
                 required
               />
             </div>
@@ -143,12 +142,8 @@ const LoginForm = ({ onLogin }: LoginFormProps) => {
             </Button>
           </div>
           
-          <div className="mt-6 text-sm text-gray-400">
-            <p className="mb-2">Admin Account:</p>
-            <div className="space-y-1 text-xs">
-              <p>Email: cdeligi@qualitrolcorp.com</p>
-              <p className="text-gray-500">Use your assigned password</p>
-            </div>
+          <div className="mt-6 text-xs text-gray-500 text-center">
+            <p>Enterprise Platform - Authorized Personnel Only</p>
           </div>
         </CardContent>
       </Card>
