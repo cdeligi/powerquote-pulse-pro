@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { User } from "@/types/auth";
 import Sidebar from "./Sidebar";
-import DashboardOverview from "./DashboardOverview";
+import EnhancedDashboardOverview from "./EnhancedDashboardOverview";
 import BOMBuilder from "../bom/BOMBuilder";
 import QuoteManager from "../quotes/QuoteManager";
 import AdminPanel from "../admin/AdminPanel";
@@ -26,7 +26,7 @@ const Dashboard = ({ user, onLogout }: DashboardProps) => {
   const renderContent = () => {
     switch (activeView) {
       case 'overview':
-        return <DashboardOverview user={user} />;
+        return <EnhancedDashboardOverview user={user} />;
       case 'bom':
         return (
           <BOMBuilder
@@ -40,7 +40,7 @@ const Dashboard = ({ user, onLogout }: DashboardProps) => {
       case 'admin':
         return user.role === 'admin' ? <AdminPanel user={user} /> : <div className="text-white">Access Denied</div>;
       default:
-        return <DashboardOverview user={user} />;
+        return <EnhancedDashboardOverview user={user} />;
     }
   };
 
