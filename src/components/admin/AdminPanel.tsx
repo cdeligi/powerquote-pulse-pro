@@ -93,7 +93,7 @@ const AdminPanel = ({ user }: AdminPanelProps) => {
           {isAdminUser && (
             <>
               <TabsContent value="users" className="mt-6">
-                <UserManagementEnhanced />
+                <UserManagementEnhanced user={user} />
               </TabsContent>
 
               <TabsContent value="products" className="mt-6">
