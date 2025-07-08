@@ -42,6 +42,8 @@ const BOMBuilder: React.FC<BOMBuilderProps> = ({
   const [selectedSlot, setSelectedSlot] = useState<number | null>(null);
   const [quoteFields, setQuoteFields] = useState<any>({});
   const [loading, setLoading] = useState(false);
+  const [discountPercentage, setDiscountPercentage] = useState(0);
+  const [discountJustification, setDiscountJustification] = useState('');
 
   // Enhanced tab configuration with responsive design
   const tabs = [
@@ -131,6 +133,11 @@ const BOMBuilder: React.FC<BOMBuilderProps> = ({
     }));
   };
 
+  const handleDiscountChange = (discount: number, justification: string) => {
+    setDiscountPercentage(discount);
+    setDiscountJustification(justification);
+  };
+
   const handleSaveQuote = async () => {
     if (!user) {
       toast({
@@ -177,18 +184,18 @@ const BOMBuilder: React.FC<BOMBuilderProps> = ({
         oracle_customer_id: quoteFields.oracle_customer_id,
         sfdc_opportunity: quoteFields.sfdc_opportunity,
         status: 'pending',
-        requested_discount: quoteFields.requested_discount || 0,
+        requested_discount: discountPercentage,
         original_quote_value: totalPrice,
-        discounted_value: totalPrice * (1 - (quoteFields.requested_discount || 0) / 100),
+        discounted_value: totalPrice * (1 - discountPercentage / 100),
         total_cost: totalCost,
         original_margin: originalMargin,
-        discounted_margin: totalPrice > 0 ? ((totalPrice * (1 - (quoteFields.requested_discount || 0) / 100) - totalCost) / (totalPrice * (1 - (quoteFields.requested_discount || 0) / 100))) * 100 : 0,
-        gross_profit: (totalPrice * (1 - (quoteFields.requested_discount || 0) / 100)) - totalCost,
+        discounted_margin: totalPrice > 0 ? ((totalPrice * (1 - discountPercentage / 100) - totalCost) / (totalPrice * (1 - discountPercentage / 100))) * 100 : 0,
+        gross_profit: (totalPrice * (1 - discountPercentage / 100)) - totalCost,
         payment_terms: quoteFields.payment_terms || 'Net 30',
         shipping_terms: quoteFields.shipping_terms || 'FOB Origin',
         currency: 'USD',
         quote_fields: quoteFields,
-        discount_justification: quoteFields.discount_justification,
+        discount_justification: discountJustification,
         submitted_by_name: user.name,
         submitted_by_email: user.email
       };
@@ -323,16 +330,17 @@ const BOMBuilder: React.FC<BOMBuilderProps> = ({
                   <TabsContent value="chassis" className="mt-0">
                     <ChassisSelector
                       selectedChassis={selectedChassis}
-                      onChassisSelect={setSelectedChassis}
-                      onSlotConfigured={(slotConfig) => {
+                      onChassisSelect={(chassis) => {
+                        setSelectedChassis(chassis);
                         setBomItems(prev => [...prev, {
-                          ...slotConfig,
+                          ...chassis,
                           id: null,
                           quantity: 1,
-                          unit_cost: slotConfig.cost || 0,
-                          unit_price: slotConfig.price || 0
+                          unit_cost: chassis.cost || 0,
+                          unit_price: chassis.price || 0
                         }]);
                       }}
+                      canSeePrices={user?.role === 'admin' || user?.role === 'finance'}
                     />
                   </TabsContent>
 
@@ -365,10 +373,11 @@ const BOMBuilder: React.FC<BOMBuilderProps> = ({
 
                   <TabsContent value="discount" className="mt-0">
                     <DiscountSection
-                      quoteFields={quoteFields}
-                      onFieldsChange={handleQuoteFieldChange}
                       bomItems={bomItems}
-                      userRole={user?.role}
+                      onDiscountChange={handleDiscountChange}
+                      canSeePrices={user?.role === 'admin' || user?.role === 'finance'}
+                      initialDiscount={discountPercentage}
+                      initialJustification={discountJustification}
                     />
                   </TabsContent>
                 </div>
