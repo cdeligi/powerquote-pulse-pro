@@ -3,7 +3,7 @@ import { useState } from "react";
 import { User } from "@/types/auth";
 import Sidebar from "./Sidebar";
 import EnhancedDashboardOverview from "./EnhancedDashboardOverview";
-import BOMBuilder from "../bom/BOMBuilder";
+import HierarchicalBOMBuilder from "../bom/HierarchicalBOMBuilder";
 import QuoteManager from "../quotes/QuoteManager";
 import AdminPanel from "../admin/AdminPanel";
 import { BOMItem } from "@/types/product";
@@ -29,7 +29,7 @@ const Dashboard = ({ user, onLogout }: DashboardProps) => {
         return <EnhancedDashboardOverview user={user} />;
       case 'bom':
         return (
-          <BOMBuilder
+          <HierarchicalBOMBuilder
             isOpen={true}
             onClose={() => setActiveView('overview')}
             mode="create"
