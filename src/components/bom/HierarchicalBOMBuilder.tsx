@@ -3,13 +3,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { 
+  FileText,
   Package, 
   ChevronRight, 
   Settings, 
@@ -17,9 +16,16 @@ import {
   Trash2, 
   Save,
   ArrowLeft,
-  ShoppingCart
+  ShoppingCart,
+  Calculator,
+  Eye,
+  EyeOff,
+  PanelLeftClose,
+  PanelLeft,
+  CheckCircle2
 } from 'lucide-react';
 import QuoteFieldsSection from './QuoteFieldsSection';
+import Level1ProductSelector from './Level1ProductSelector';
 
 interface Product {
   id: string;
@@ -29,17 +35,10 @@ interface Product {
   subcategory?: string;
   price: number;
   cost: number;
-}
-
-interface Level4Product {
-  id: string;
-  name: string;
-  description?: string;
-  parent_product_id: string;
-  configuration_type: string;
-  enabled: boolean;
-  price: number;
-  cost: number;
+  level?: number;
+  hasAdvancedConfig?: boolean;
+  parentId?: string;
+  quantity?: number;
 }
 
 interface BOMItem {
@@ -59,35 +58,53 @@ interface HierarchicalBOMBuilderProps {
   onClose: () => void;
   existingQuoteId?: string;
   mode?: 'create' | 'edit' | 'admin-edit';
+  onSidebarToggle?: (collapsed: boolean) => void;
 }
 
 const HierarchicalBOMBuilder: React.FC<HierarchicalBOMBuilderProps> = ({
   isOpen,
   onClose,
   existingQuoteId,
-  mode = 'create'
+  mode = 'create',
+  onSidebarToggle
 }) => {
   const { toast } = useToast();
   const { user } = useAuth();
   
-  // State management
-  const [step, setStep] = useState(1);
+  // Core state management
+  const [currentStep, setCurrentStep] = useState(0);
   const [quoteFields, setQuoteFields] = useState<any>({});
-  const [level1Products, setLevel1Products] = useState<Product[]>([]);
-  const [level2Products, setLevel2Products] = useState<Product[]>([]);
-  const [level3Products, setLevel3Products] = useState<Product[]>([]);
-  const [level4Products, setLevel4Products] = useState<Level4Product[]>([]);
+  const [selectedProducts, setSelectedProducts] = useState<Product[]>([]);
+  const [bomItems, setBomItems] = useState<BOMItem[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [showCosts, setShowCosts] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   
-  const [selectedLevel1, setSelectedLevel1] = useState<Product | null>(null);
+  // Product levels state
+  const [level1Products, setLevel1Products] = useState<Product[]>([]);
+  const [level1Product, setLevel1Product] = useState<Product | null>(null);
+  const [level2Products, setLevel2Products] = useState<Product[]>([]);
   const [selectedLevel2Options, setSelectedLevel2Options] = useState<Product[]>([]);
+  const [level3Products, setLevel3Products] = useState<Product[]>([]);
   const [selectedLevel3Options, setSelectedLevel3Options] = useState<Product[]>([]);
   const [level4Configurations, setLevel4Configurations] = useState<Record<string, any>>({});
   
-  const [bomItems, setBomItems] = useState<BOMItem[]>([]);
-  const [chassisConfiguration, setChassisConfiguration] = useState<any>(null);
-  const [selectedSlots, setSelectedSlots] = useState<Record<number, Product>>({});
+  // Chassis and slot management
+  const [chassisSlots, setChassisSlots] = useState<any[]>([]);
+  const [selectedSlot, setSelectedSlot] = useState<number | null>(null);
+  const [slotConfigurations, setSlotConfigurations] = useState<Record<number, Product>>({});
+  const [partNumber, setPartNumber] = useState<string>('');
   
-  const [loading, setLoading] = useState(false);
+  // Step management
+  const [step, setStep] = useState(1);
+
+  const canSeePrices = user?.role === 'admin' || user?.role === 'finance';
+
+  useEffect(() => {
+    if (canSeePrices) {
+      setShowCosts(true);
+    }
+  }, [canSeePrices]);
 
   useEffect(() => {
     if (isOpen) {
@@ -164,37 +181,73 @@ const HierarchicalBOMBuilder: React.FC<HierarchicalBOMBuilderProps> = ({
           .order('name');
 
         if (prodError) throw prodError;
-        setLevel3Products(products || []);
+        
+        // Check for Level 4 configurations
+        const { data: level4Relations, error: l4Error } = await supabase
+          .from('level3_level4_relationships')
+          .select('level3_product_id, level4_product_id')
+          .in('level3_product_id', level3Ids);
+
+        if (l4Error) console.warn('Level 4 relationship check failed:', l4Error);
+
+        const level4Map = new Map();
+        if (level4Relations) {
+          level4Relations.forEach(rel => {
+            if (!level4Map.has(rel.level3_product_id)) {
+              level4Map.set(rel.level3_product_id, []);
+            }
+            level4Map.get(rel.level3_product_id).push(rel.level4_product_id);
+          });
+        }
+
+        const enhancedProducts = (products || []).map(product => ({
+          ...product,
+          hasAdvancedConfig: level4Map.has(product.id)
+        }));
+
+        setLevel3Products(enhancedProducts);
+        
+        // Load chassis slots if this is a chassis selection
+        if (level2Id.includes('chassis') || level2Id.includes('ltx')) {
+          loadChassisSlots(level2Id);
+        }
       }
     } catch (error) {
       console.error('Error loading Level 3 products:', error);
     }
   };
 
-  const loadLevel4Products = async (level3Id: string) => {
-    try {
-      const { data: relationships, error: relError } = await supabase
-        .from('level3_level4_relationships')
-        .select('level4_product_id')
-        .eq('level3_product_id', level3Id);
-
-      if (relError) throw relError;
-
-      if (relationships && relationships.length > 0) {
-        const level4Ids = relationships.map(r => r.level4_product_id);
-        const { data: products, error: prodError } = await supabase
-          .from('level4_products')
-          .select('*')
-          .in('id', level4Ids)
-          .eq('enabled', true)
-          .order('name');
-
-        if (prodError) throw prodError;
-        setLevel4Products(products || []);
+  const loadChassisSlots = (chassisId: string) => {
+    // Create chassis slot visualization based on chassis type
+    const slots = [];
+    
+    if (chassisId.includes('ltx') || chassisId.includes('6u')) {
+      // 6U chassis with multiple slots
+      for (let i = 1; i <= 12; i++) {
+        slots.push({
+          id: i,
+          position: i,
+          type: i <= 6 ? 'card' : 'power',
+          available: true,
+          width: 1,
+          height: 1
+        });
       }
-    } catch (error) {
-      console.error('Error loading Level 4 products:', error);
+    } else {
+      // Standard chassis
+      for (let i = 1; i <= 8; i++) {
+        slots.push({
+          id: i,
+          position: i,
+          type: 'card',
+          available: true,
+          width: 1,
+          height: 1
+        });
+      }
     }
+    
+    setChassisSlots(slots);
   };
 
   const loadExistingQuote = async () => {
@@ -234,38 +287,14 @@ const HierarchicalBOMBuilder: React.FC<HierarchicalBOMBuilderProps> = ({
   };
 
   const handleLevel1Select = async (product: Product) => {
-    setSelectedLevel1(product);
+    setLevel1Product(product);
     setSelectedLevel2Options([]);
     setSelectedLevel3Options([]);
     setLevel4Configurations({});
     
-    // Load chassis configuration if this is LTX
-    if (product.name.includes('LTX') || product.subcategory === 'chassis') {
-      await loadChassisConfiguration(product.id);
-    }
-    
     await loadLevel2Products(product.id);
     setStep(2);
-  };
-
-  const loadChassisConfiguration = async (productId: string) => {
-    try {
-      const { data: configs, error } = await supabase
-        .from('app_settings')
-        .select('*')
-        .eq('key', 'chassis_configurations');
-
-      if (error || !configs?.length) return;
-
-      const allConfigs = configs[0].value as any[];
-      const config = allConfigs?.find(c => c.level2ProductId === productId);
-      
-      if (config) {
-        setChassisConfiguration(config);
-      }
-    } catch (error) {
-      console.error('Error loading chassis configuration:', error);
-    }
+    generatePartNumber();
   };
 
   const handleLevel2Select = async (product: Product) => {
@@ -284,9 +313,17 @@ const HierarchicalBOMBuilder: React.FC<HierarchicalBOMBuilderProps> = ({
     if (updatedOptions.length > 0) {
       setStep(3);
     }
+    generatePartNumber();
   };
 
-  const handleLevel3Select = async (product: Product) => {
+  const handleLevel3Select = async (product: Product, slotId?: number) => {
+    if (slotId !== undefined) {
+      setSlotConfigurations(prev => ({
+        ...prev,
+        [slotId]: product
+      }));
+    }
+    
     const updatedOptions = [...selectedLevel3Options];
     const existingIndex = updatedOptions.findIndex(p => p.id === product.id);
     
@@ -294,48 +331,46 @@ const HierarchicalBOMBuilder: React.FC<HierarchicalBOMBuilderProps> = ({
       updatedOptions.splice(existingIndex, 1);
     } else {
       updatedOptions.push(product);
-      await loadLevel4Products(product.id);
     }
     
     setSelectedLevel3Options(updatedOptions);
+    generatePartNumber();
   };
 
-  const handleSlotSelect = (slotNumber: number, product: Product) => {
-    setSelectedSlots(prev => ({
-      ...prev,
-      [slotNumber]: product
-    }));
+  const handleSlotClick = (slotId: number) => {
+    setSelectedSlot(slotId);
   };
 
   const generatePartNumber = () => {
-    if (!selectedLevel1) return '';
+    if (!level1Product) return '';
     
-    let partNumber = selectedLevel1.id;
+    let partNum = level1Product.id;
     
     if (selectedLevel2Options.length > 0) {
-      partNumber += '-' + selectedLevel2Options.map(p => p.id).join('-');
+      partNum += '-' + selectedLevel2Options.map(p => p.id).join('-');
     }
     
     if (selectedLevel3Options.length > 0) {
-      partNumber += '-' + selectedLevel3Options.map(p => p.id).join('-');
+      partNum += '-' + selectedLevel3Options.map(p => p.id).join('-');
     }
     
-    return partNumber;
+    setPartNumber(partNum);
+    return partNum;
   };
 
   const addToBOM = () => {
     const newItems: BOMItem[] = [];
     
     // Add Level 1 product
-    if (selectedLevel1) {
+    if (level1Product) {
       newItems.push({
         id: `bom-${Date.now()}-1`,
-        productId: selectedLevel1.id,
-        name: selectedLevel1.name,
-        description: selectedLevel1.description,
+        productId: level1Product.id,
+        name: level1Product.name,
+        description: level1Product.description,
         quantity: 1,
-        unitPrice: selectedLevel1.price,
-        unitCost: selectedLevel1.cost,
+        unitPrice: level1Product.price,
+        unitCost: level1Product.cost,
         partNumber: generatePartNumber()
       });
     }
@@ -372,7 +407,7 @@ const HierarchicalBOMBuilder: React.FC<HierarchicalBOMBuilderProps> = ({
     setBomItems(prev => [...prev, ...newItems]);
     
     // Reset selection
-    setSelectedLevel1(null);
+    setLevel1Product(null);
     setSelectedLevel2Options([]);
     setSelectedLevel3Options([]);
     setLevel4Configurations({});
@@ -403,6 +438,7 @@ const HierarchicalBOMBuilder: React.FC<HierarchicalBOMBuilderProps> = ({
         description: `Please fill in: ${missingFields.join(', ')}`,
         variant: "destructive"
       });
+      setCurrentStep(0);
       return;
     }
 
@@ -487,274 +523,435 @@ const HierarchicalBOMBuilder: React.FC<HierarchicalBOMBuilderProps> = ({
     }
   };
 
-  if (!isOpen) return null;
+  const toggleSidebar = () => {
+    const newCollapsed = !sidebarCollapsed;
+    setSidebarCollapsed(newCollapsed);
+    if (onSidebarToggle) {
+      onSidebarToggle(newCollapsed);
+    }
+  };
 
-  const canShowCosts = user?.role === 'admin' || user?.role === 'finance';
+  const renderChassisVisualization = () => {
+    if (chassisSlots.length === 0) return null;
 
-  return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <Card className="w-full max-w-7xl h-[90vh] bg-background">
-        <CardHeader className="border-b">
-          <div className="flex justify-between items-center">
-            <CardTitle>
-              {existingQuoteId ? 'Edit Quote' : 'Create New Quote'}
-            </CardTitle>
-            <Button onClick={onClose} variant="outline">
-              Close
-            </Button>
-          </div>
-        </CardHeader>
-
-        <CardContent className="p-0 h-full">
-          <div className="grid grid-cols-1 lg:grid-cols-3 h-full">
-            {/* Left Panel - Quote Fields */}
-            <div className="border-r bg-muted/20 p-6">
-              <h3 className="text-lg font-semibold mb-4">Quote Information</h3>
-              <QuoteFieldsSection
-                quoteFields={quoteFields}
-                onFieldChange={(fieldId, value) => 
-                  setQuoteFields(prev => ({ ...prev, [fieldId]: value }))
-                }
-              />
-            </div>
-
-            {/* Middle Panel - Product Selection */}
-            <div className="p-6">
-              <div className="flex items-center gap-2 mb-4">
-                <Package className="h-5 w-5" />
-                <h3 className="text-lg font-semibold">Product Configuration</h3>
-              </div>
-
-              <ScrollArea className="h-[calc(100vh-300px)]">
-                {/* Step 1: Level 1 Products */}
-                <div className="space-y-4">
-                  <div className="flex items-center gap-2">
-                    <Badge variant={step >= 1 ? "default" : "secondary"}>1</Badge>
-                    <span className="font-medium">Select Base Product</span>
-                  </div>
-                  
-                  <div className="grid gap-2">
-                    {level1Products.map((product) => (
-                      <Card 
-                        key={product.id}
-                        className={`cursor-pointer transition-all ${
-                          selectedLevel1?.id === product.id 
-                            ? 'ring-2 ring-primary' 
-                            : 'hover:shadow-md'
-                        }`}
-                        onClick={() => handleLevel1Select(product)}
-                      >
-                        <CardContent className="p-3">
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <h4 className="font-semibold">{product.name}</h4>
-                              <p className="text-sm text-muted-foreground">
-                                {product.description}
-                              </p>
-                            </div>
-                            <ChevronRight className="h-4 w-4" />
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
+    return (
+      <div className="space-y-4 mt-6">
+        <h4 className="text-lg font-semibold text-foreground">Chassis Configuration</h4>
+        <div className="bg-muted/30 p-4 rounded-lg border border-border">
+          <div className="grid grid-cols-6 gap-2 max-w-md mx-auto">
+            {chassisSlots.map((slot) => (
+              <div
+                key={slot.id}
+                className={`
+                  aspect-square border-2 rounded-md cursor-pointer transition-all
+                  ${selectedSlot === slot.id ? 'border-primary bg-primary/20' : 'border-border'}
+                  ${slotConfigurations[slot.id] ? 'bg-success/20 border-success' : 'bg-background'}
+                  hover:border-primary/50 hover:bg-primary/10
+                `}
+                onClick={() => handleSlotClick(slot.id)}
+              >
+                <div className="h-full flex flex-col items-center justify-center p-1">
+                  <span className="text-xs font-medium">{slot.id}</span>
+                  {slotConfigurations[slot.id] && (
+                    <>
+                      <div className="text-xs text-center leading-tight">
+                        {slotConfigurations[slot.id].name.split(' ')[0]}
+                      </div>
+                      {slotConfigurations[slot.id].hasAdvancedConfig && (
+                        <Settings className="h-3 w-3 text-primary mt-1" />
+                      )}
+                    </>
+                  )}
                 </div>
-
-                {/* Step 2: Level 2 Products */}
-                {step >= 2 && level2Products.length > 0 && (
-                  <div className="space-y-4 mt-6">
-                    <div className="flex items-center gap-2">
-                      <Badge variant={step >= 2 ? "default" : "secondary"}>2</Badge>
-                      <span className="font-medium">Configure Options</span>
-                    </div>
-                    
-                    <div className="grid gap-2">
-                      {level2Products.map((product) => (
-                        <Card 
-                          key={product.id}
-                          className={`cursor-pointer transition-all ${
-                            selectedLevel2Options.some(p => p.id === product.id)
-                              ? 'ring-2 ring-primary' 
-                              : 'hover:shadow-md'
-                          }`}
-                          onClick={() => handleLevel2Select(product)}
-                        >
-                          <CardContent className="p-3">
-                            <div className="flex items-center justify-between">
-                              <div>
-                                <h4 className="font-semibold">{product.name}</h4>
-                                <p className="text-sm text-muted-foreground">
-                                  {product.description}
-                                </p>
-                                {canShowCosts && (
-                                  <p className="text-sm font-medium">
-                                    ${product.price.toFixed(2)}
-                                  </p>
-                                )}
-                              </div>
-                              {selectedLevel2Options.some(p => p.id === product.id) && (
-                                <Badge variant="secondary">Selected</Badge>
-                              )}
-                            </div>
-                          </CardContent>
-                        </Card>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Step 3: Level 3 Products */}
-                {step >= 3 && level3Products.length > 0 && (
-                  <div className="space-y-4 mt-6">
-                    <div className="flex items-center gap-2">
-                      <Badge variant={step >= 3 ? "default" : "secondary"}>3</Badge>
-                      <span className="font-medium">Select Cards/Components</span>
-                    </div>
-                    
-                    <div className="grid gap-2">
-                      {level3Products.map((product) => (
-                        <Card 
-                          key={product.id}
-                          className={`cursor-pointer transition-all ${
-                            selectedLevel3Options.some(p => p.id === product.id)
-                              ? 'ring-2 ring-primary' 
-                              : 'hover:shadow-md'
-                          }`}
-                          onClick={() => handleLevel3Select(product)}
-                        >
-                          <CardContent className="p-3">
-                            <div className="flex items-center justify-between">
-                              <div>
-                                <h4 className="font-semibold">{product.name}</h4>
-                                <p className="text-sm text-muted-foreground">
-                                  {product.description}
-                                </p>
-                                {canShowCosts && (
-                                  <p className="text-sm font-medium">
-                                    ${product.price.toFixed(2)}
-                                  </p>
-                                )}
-                              </div>
-                              <div className="flex items-center gap-2">
-                                {level4Products.some(p => p.parent_product_id === product.id) && (
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      // Open Level 4 configuration
-                                    }}
-                                  >
-                                    <Settings className="h-3 w-3" />
-                                  </Button>
-                                )}
-                                {selectedLevel3Options.some(p => p.id === product.id) && (
-                                  <Badge variant="secondary">Selected</Badge>
-                                )}
-                              </div>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Action Buttons */}
-                {selectedLevel1 && (
-                  <div className="mt-6 flex gap-2">
-                    <Button onClick={addToBOM} className="flex-1">
-                      <Plus className="h-4 w-4 mr-2" />
-                      Add to BOM
-                    </Button>
-                    {step > 1 && (
-                      <Button 
-                        variant="outline" 
-                        onClick={() => setStep(step - 1)}
-                      >
-                        <ArrowLeft className="h-4 w-4" />
-                      </Button>
-                    )}
-                  </div>
-                )}
-              </ScrollArea>
-            </div>
-
-            {/* Right Panel - BOM Summary */}
-            <div className="border-l bg-muted/20 p-6">
-              <div className="flex items-center gap-2 mb-4">
-                <ShoppingCart className="h-5 w-5" />
-                <h3 className="text-lg font-semibold">Bill of Materials</h3>
               </div>
+            ))}
+          </div>
+          
+          {selectedSlot && (
+            <div className="mt-4 p-3 bg-background rounded-md border border-border">
+              <h5 className="font-medium mb-2">Slot {selectedSlot} - Select Card</h5>
+              <div className="grid gap-2 max-h-40 overflow-y-auto">
+                {level3Products.map((product) => (
+                  <Button
+                    key={product.id}
+                    variant="outline"
+                    size="sm"
+                    className="justify-start"
+                    onClick={() => handleLevel3Select(product, selectedSlot)}
+                  >
+                    <span>{product.name}</span>
+                    {product.hasAdvancedConfig && (
+                      <Settings className="h-3 w-3 ml-auto text-primary" />
+                    )}
+                  </Button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
 
-              <ScrollArea className="h-[calc(100vh-400px)]">
-                <div className="space-y-2">
-                  {bomItems.map((item, index) => (
-                    <Card key={item.id}>
+  const renderStepContent = () => {
+    return (
+      <ScrollArea className="h-[calc(100vh-300px)]">
+        {/* Quote Information Step */}
+        <div className="space-y-4 mb-6">
+          <div className="flex items-center gap-2">
+            <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary text-primary-foreground text-sm font-medium">
+              1
+            </div>
+            <h3 className="text-xl font-semibold text-foreground">Quote Information</h3>
+            <CheckCircle2 className="h-5 w-5 text-success" />
+          </div>
+          
+          <QuoteFieldsSection
+            quoteFields={quoteFields}
+            onFieldChange={(fieldId, value) => 
+              setQuoteFields(prev => ({ ...prev, [fieldId]: value }))
+            }
+          />
+        </div>
+
+        {/* Level 1 Product Selection */}
+        <div className="space-y-4 mb-6">
+          <div className="flex items-center gap-2">
+            <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary text-primary-foreground text-sm font-medium">
+              2
+            </div>
+            <h3 className="text-xl font-semibold text-foreground">Select Product Category</h3>
+            {level1Product && <CheckCircle2 className="h-5 w-5 text-success" />}
+          </div>
+          
+          <div className="grid gap-2">
+            {level1Products.map((product) => (
+              <Card 
+                key={product.id}
+                className={`cursor-pointer transition-all ${
+                  level1Product?.id === product.id 
+                    ? 'ring-2 ring-primary' 
+                    : 'hover:shadow-md'
+                }`}
+                onClick={() => handleLevel1Select(product)}
+              >
+                <CardContent className="p-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="font-semibold">{product.name}</h4>
+                      <p className="text-sm text-muted-foreground">
+                        {product.description}
+                      </p>
+                    </div>
+                    <ChevronRight className="h-4 w-4" />
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+
+        {/* Level 2 Product Selection */}
+        {step >= 2 && level2Products.length > 0 && (
+          <div className="space-y-4 mb-6">
+            <div className="flex items-center gap-2">
+              <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary text-primary-foreground text-sm font-medium">
+                3
+              </div>
+              <h3 className="text-xl font-semibold text-foreground">Select Chassis Configuration</h3>
+              {selectedLevel2Options.length > 0 && <CheckCircle2 className="h-5 w-5 text-success" />}
+            </div>
+            
+            <div className="grid gap-2">
+              {level2Products.map((product) => (
+                <Card 
+                  key={product.id}
+                  className={`cursor-pointer transition-all ${
+                    selectedLevel2Options.some(p => p.id === product.id)
+                      ? 'ring-2 ring-primary' 
+                      : 'hover:shadow-md'
+                  }`}
+                  onClick={() => handleLevel2Select(product)}
+                >
+                  <CardContent className="p-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h4 className="font-semibold">{product.name}</h4>
+                        <p className="text-sm text-muted-foreground">
+                          {product.description}
+                        </p>
+                        {showCosts && (
+                          <p className="text-sm font-medium">
+                            ${product.price.toFixed(2)}
+                          </p>
+                        )}
+                      </div>
+                      {selectedLevel2Options.some(p => p.id === product.id) && (
+                        <Badge variant="secondary">Selected</Badge>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Chassis Visualization & Level 3 Selection */}
+        {step >= 3 && (
+          <div className="space-y-4 mb-6">
+            <div className="flex items-center gap-2">
+              <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary text-primary-foreground text-sm font-medium">
+                4
+              </div>
+              <h3 className="text-xl font-semibold text-foreground">Configure Components & Cards</h3>
+            </div>
+            
+            {renderChassisVisualization()}
+            
+            {level3Products.length > 0 && !selectedSlot && (
+              <div>
+                <h4 className="text-lg font-medium mb-3">Available Cards</h4>
+                <div className="grid gap-2">
+                  {level3Products.map((product) => (
+                    <Card 
+                      key={product.id}
+                      className={`cursor-pointer transition-all ${
+                        selectedLevel3Options.some(p => p.id === product.id)
+                          ? 'ring-2 ring-primary' 
+                          : 'hover:shadow-md'
+                      }`}
+                      onClick={() => handleLevel3Select(product)}
+                    >
                       <CardContent className="p-3">
-                        <div className="flex justify-between items-start">
-                          <div className="flex-1">
-                            <h4 className="font-semibold text-sm">{item.name}</h4>
-                            <p className="text-xs text-muted-foreground">
-                              {item.description}
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <h4 className="font-semibold">{product.name}</h4>
+                            <p className="text-sm text-muted-foreground">
+                              {product.description}
                             </p>
-                            <div className="flex items-center gap-2 mt-1">
-                              <span className="text-xs">Qty: {item.quantity}</span>
-                              {canShowCosts && (
-                                <span className="text-xs font-medium">
-                                  ${item.unitPrice.toFixed(2)}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => setBomItems(prev => 
-                              prev.filter((_, i) => i !== index)
+                            {showCosts && (
+                              <p className="text-sm font-medium">
+                                ${product.price.toFixed(2)}
+                              </p>
                             )}
-                          >
-                            <Trash2 className="h-3 w-3" />
-                          </Button>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {product.hasAdvancedConfig && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  // Open Level 4 configuration
+                                }}
+                              >
+                                <Settings className="h-3 w-3" />
+                              </Button>
+                            )}
+                            {selectedLevel3Options.some(p => p.id === product.id) && (
+                              <Badge variant="secondary">Selected</Badge>
+                            )}
+                          </div>
                         </div>
                       </CardContent>
                     </Card>
                   ))}
                 </div>
-              </ScrollArea>
+              </div>
+            )}
+          </div>
+        )}
 
-              {/* BOM Summary */}
-              {bomItems.length > 0 && (
-                <div className="mt-4 p-4 bg-background rounded-lg border">
-                  <div className="flex justify-between text-sm">
-                    <span>Total Items:</span>
-                    <span>{bomItems.length}</span>
-                  </div>
-                  {canShowCosts && (
-                    <div className="flex justify-between text-sm font-semibold mt-1">
-                      <span>Total Value:</span>
-                      <span>
-                        ${bomItems.reduce((sum, item) => 
-                          sum + (item.unitPrice * item.quantity), 0
-                        ).toFixed(2)}
-                      </span>
-                    </div>
-                  )}
-                </div>
+        {/* Part Number Display */}
+        {partNumber && (
+          <div className="p-4 bg-muted/30 rounded-lg border border-border mb-6">
+            <div className="flex items-center gap-3">
+              <Badge variant="outline" className="font-mono text-sm">
+                {partNumber}
+              </Badge>
+              <span className="text-sm text-muted-foreground">Generated Part Number</span>
+            </div>
+          </div>
+        )}
+
+        {/* Action Buttons */}
+        {level1Product && (
+          <div className="flex gap-2 mb-6">
+            <Button onClick={addToBOM} className="flex-1">
+              <Plus className="h-4 w-4 mr-2" />
+              Add to BOM
+            </Button>
+            {step > 1 && (
+              <Button 
+                variant="outline" 
+                onClick={() => setStep(step - 1)}
+              >
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
+        )}
+      </ScrollArea>
+    );
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <Card className="w-full max-w-7xl h-[90vh] card-modern">
+        <CardHeader className="border-b border-border">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+            <div>
+              <CardTitle className="text-responsive-xl">
+                {mode === 'admin-edit' ? 'Admin Edit Quote' : existingQuoteId ? 'Edit Quote' : 'Build New Quote'}
+              </CardTitle>
+              <p className="text-muted-foreground text-sm">
+                Step-by-step Product Configuration
+              </p>
+            </div>
+            
+            <div className="flex items-center gap-3">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={toggleSidebar}
+              >
+                {sidebarCollapsed ? <PanelLeft className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
+                {sidebarCollapsed ? 'Expand' : 'Collapse'}
+              </Button>
+              
+              {canSeePrices && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowCosts(!showCosts)}
+                >
+                  {showCosts ? <EyeOff className="h-4 w-4 mr-2" /> : <Eye className="h-4 w-4 mr-2" />}
+                  {showCosts ? 'Hide' : 'Show'} Costs
+                </Button>
               )}
+              <Button variant="outline" onClick={onClose}>
+                Close
+              </Button>
+            </div>
+          </div>
+        </CardHeader>
 
-              {/* Save Quote Button */}
+        <CardContent className="flex-1 overflow-hidden p-0">
+          <div className="h-full flex">
+            {/* Main Content */}
+            <div className="flex-1 overflow-hidden">
+              <div className="p-6">
+                {renderStepContent()}
+              </div>
+            </div>
+
+            {/* Sidebar - BOM Summary */}
+            {bomItems.length > 0 && (
+              <>
+                <Separator orientation="vertical" />
+                <div className={`border-l border-border transition-all ${sidebarCollapsed ? 'w-16' : 'w-80'}`}>
+                  <div className="p-4 border-b border-border">
+                    <h4 className={`font-semibold flex items-center gap-2 ${sidebarCollapsed ? 'justify-center' : ''}`}>
+                      <ShoppingCart className="h-4 w-4" />
+                      {!sidebarCollapsed && 'Bill of Materials'}
+                    </h4>
+                  </div>
+                  <ScrollArea className="h-[calc(100%-4rem)]">
+                    <div className="p-4 space-y-3">
+                      {bomItems.map((item, index) => (
+                        <div key={item.id} className="text-sm">
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <p className={`font-medium ${sidebarCollapsed ? 'text-xs' : ''}`}>
+                                {sidebarCollapsed ? item.name.slice(0, 3) : item.name}
+                              </p>
+                              {!sidebarCollapsed && (
+                                <>
+                                  <p className="text-xs text-muted-foreground">Qty: {item.quantity}</p>
+                                  {showCosts && (
+                                    <p className="text-xs font-medium">
+                                      ${item.unitPrice.toFixed(2)}
+                                    </p>
+                                  )}
+                                </>
+                              )}
+                            </div>
+                            {!sidebarCollapsed && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => setBomItems(prev => 
+                                  prev.filter((_, i) => i !== index)
+                                )}
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                      
+                      {/* BOM Summary */}
+                      {showCosts && !sidebarCollapsed && bomItems.length > 0 && (
+                        <div className="border-t border-border pt-3 mt-3 space-y-2">
+                          <div className="flex justify-between text-sm">
+                            <span>Total Items:</span>
+                            <span>{bomItems.length}</span>
+                          </div>
+                          <div className="flex justify-between text-sm font-semibold">
+                            <span>Total Value:</span>
+                            <span>
+                              ${bomItems.reduce((sum, item) => 
+                                sum + (item.unitPrice * item.quantity), 0
+                              ).toFixed(2)}
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </ScrollArea>
+                </div>
+              </>
+            )}
+          </div>
+        </CardContent>
+
+        {/* Footer */}
+        <div className="border-t border-border p-4">
+          <div className="flex justify-between items-center">
+            <div className="flex items-center gap-4">
+              <Badge variant="outline">
+                {bomItems.length} Items Selected
+              </Badge>
+              {showCosts && (
+                <Badge variant="outline">
+                  Total: ${bomItems.reduce((sum, item) => 
+                    sum + (item.unitPrice * item.quantity), 0
+                  ).toFixed(2)}
+                </Badge>
+              )}
+              {partNumber && (
+                <Badge variant="outline" className="font-mono">
+                  {partNumber}
+                </Badge>
+              )}
+            </div>
+            
+            <div className="flex gap-2">
               <Button 
                 onClick={handleSaveQuote}
                 disabled={loading || bomItems.length === 0}
-                className="w-full mt-4"
+                className="btn-gradient-primary"
               >
                 <Save className="h-4 w-4 mr-2" />
                 {loading ? 'Saving...' : (existingQuoteId ? 'Update Quote' : 'Save Quote')}
               </Button>
             </div>
           </div>
-        </CardContent>
+        </div>
       </Card>
     </div>
   );

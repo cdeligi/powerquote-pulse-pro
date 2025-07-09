@@ -37,7 +37,7 @@ function useProvideAuth(): AuthContextType {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const fetchProfile = async (uid: string, timeoutMs: number = 10000): Promise<AppUser | null> => {
+  const fetchProfile = async (uid: string, timeoutMs: number = 15000): Promise<AppUser | null> => {
     console.log('[useAuth] fetchProfile start for:', uid);
     
     const timeoutPromise = new Promise<never>((_, reject) => {
