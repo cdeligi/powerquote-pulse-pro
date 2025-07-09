@@ -619,7 +619,7 @@ const ChassisConfigurationManager = () => {
                             <SelectItem key={product.id} value={product.id}>
                               {product.name} ({product.subcategory})
                             </SelectItem>
-                          )))}
+                          ))}
                         </SelectContent>
                       </Select>
                     </div>

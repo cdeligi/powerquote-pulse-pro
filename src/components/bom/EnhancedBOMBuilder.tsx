@@ -519,7 +519,7 @@ const EnhancedBOMBuilder: React.FC<BOMBuilderProps> = ({
       case 1:
         return (
           <Level1ProductSelector
-            onProductSelect={handleLevel1Selection}
+            onProductSelect={(product: any) => handleLevel1Selection(product)}
             selectedProduct={level1Product}
           />
         );
