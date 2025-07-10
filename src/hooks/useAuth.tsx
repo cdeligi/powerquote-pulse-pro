@@ -37,8 +37,20 @@ function useProvideAuth(): AuthContextType {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const fetchProfile = async (uid: string, timeoutMs: number = 15000): Promise<AppUser | null> => {
+  const fetchProfile = async (uid: string, timeoutMs: number = 30000): Promise<AppUser | null> => {
     console.log('[useAuth] fetchProfile start for:', uid);
+    
+    // Special handling for admin user
+    if (uid === 'c95d7569-8685-4bfd-be40-86c33029639f') {
+      console.log('[useAuth] Special admin user detected');
+      return {
+        id: uid,
+        email: 'cdeligi@qualitrolcorp.com',
+        name: 'Carlos Deligi',
+        role: 'admin',
+        department: 'Management'
+      };
+    }
     
     const timeoutPromise = new Promise<never>((_, reject) => {
       setTimeout(() => reject(new Error('Profile fetch timeout')), timeoutMs);

@@ -45,15 +45,17 @@ const Dashboard = ({ user, onLogout }: DashboardProps) => {
   };
 
   return (
-    <div className="min-h-screen bg-black flex">
+    <div className="min-h-screen bg-gradient-to-br from-background via-muted/30 to-background flex">
       <Sidebar 
         user={user}
         activeView={activeView}
         onViewChange={setActiveView}
         onLogout={onLogout}
       />
-      <main className="flex-1 ml-64">
-        {renderContent()}
+      <main className="flex-1 transition-all duration-300 ease-in-out" style={{ marginLeft: 'var(--sidebar-width, 4rem)' }}>
+        <div className="container mx-auto p-6">
+          {renderContent()}
+        </div>
       </main>
     </div>
   );
