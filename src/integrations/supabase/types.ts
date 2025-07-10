@@ -153,6 +153,44 @@ export type Database = {
           },
         ]
       }
+      chassis_configurations: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          id: string
+          layout_data: Json
+          level2_product_id: string
+          slot_mappings: Json
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          layout_data?: Json
+          level2_product_id: string
+          slot_mappings?: Json
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          layout_data?: Json
+          level2_product_id?: string
+          slot_mappings?: Json
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chassis_configurations_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       level1_level2_relationships: {
         Row: {
           created_at: string
@@ -509,12 +547,15 @@ export type Database = {
           original_margin: number
           original_prices: Json | null
           original_quote_value: number
+          original_submitted_at: string | null
           payment_terms: string
           price_adjustments: Json | null
+          price_override_history: Json | null
           priority: string
           quote_fields: Json | null
           rejection_reason: string | null
           requested_discount: number
+          requires_finance_approval: boolean | null
           reviewed_at: string | null
           reviewed_by: string | null
           sfdc_opportunity: string
@@ -544,12 +585,15 @@ export type Database = {
           original_margin: number
           original_prices?: Json | null
           original_quote_value: number
+          original_submitted_at?: string | null
           payment_terms: string
           price_adjustments?: Json | null
+          price_override_history?: Json | null
           priority?: string
           quote_fields?: Json | null
           rejection_reason?: string | null
           requested_discount: number
+          requires_finance_approval?: boolean | null
           reviewed_at?: string | null
           reviewed_by?: string | null
           sfdc_opportunity: string
@@ -579,12 +623,15 @@ export type Database = {
           original_margin?: number
           original_prices?: Json | null
           original_quote_value?: number
+          original_submitted_at?: string | null
           payment_terms?: string
           price_adjustments?: Json | null
+          price_override_history?: Json | null
           priority?: string
           quote_fields?: Json | null
           rejection_reason?: string | null
           requested_discount?: number
+          requires_finance_approval?: boolean | null
           reviewed_at?: string | null
           reviewed_by?: string | null
           sfdc_opportunity?: string
@@ -755,6 +802,7 @@ export type Database = {
       }
       user_sessions: {
         Row: {
+          browser_fingerprint: string | null
           created_at: string | null
           device_info: Json | null
           id: string
@@ -764,11 +812,14 @@ export type Database = {
           location_data: Json | null
           revoked_at: string | null
           revoked_reason: string | null
+          screen_resolution: string | null
           session_token: string
+          timezone: string | null
           user_agent: string | null
           user_id: string
         }
         Insert: {
+          browser_fingerprint?: string | null
           created_at?: string | null
           device_info?: Json | null
           id?: string
@@ -778,11 +829,14 @@ export type Database = {
           location_data?: Json | null
           revoked_at?: string | null
           revoked_reason?: string | null
+          screen_resolution?: string | null
           session_token: string
+          timezone?: string | null
           user_agent?: string | null
           user_id: string
         }
         Update: {
+          browser_fingerprint?: string | null
           created_at?: string | null
           device_info?: Json | null
           id?: string
@@ -792,7 +846,9 @@ export type Database = {
           location_data?: Json | null
           revoked_at?: string | null
           revoked_reason?: string | null
+          screen_resolution?: string | null
           session_token?: string
+          timezone?: string | null
           user_agent?: string | null
           user_id?: string
         }
@@ -807,6 +863,17 @@ export type Database = {
         Args: { quote_id_param: string }
         Returns: number
       }
+      create_user: {
+        Args: {
+          email: string
+          password: string
+          first_name: string
+          last_name: string
+          role: string
+          department: string
+        }
+        Returns: string
+      }
       deactivate_user: {
         Args: { target_user_id: string }
         Returns: boolean
@@ -818,6 +885,10 @@ export type Database = {
       get_user_role: {
         Args: { user_id: string }
         Returns: string
+      }
+      is_admin: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
       }
       is_admin_user: {
         Args: Record<PropertyKey, never>
