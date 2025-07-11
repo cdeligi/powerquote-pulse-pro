@@ -1,7 +1,6 @@
-
 /**
- * © 2025 Qualitrol Corp. All rights reserved.
- * Confidential and proprietary. Unauthorized copying or distribution is prohibited.
+ *  2025 Qualitrol Corp. All rights reserved.
+ *  Confidential and proprietary. Unauthorized copying or distribution is prohibited.
  */
 
 import { useState, useEffect, useContext, createContext } from 'react';
@@ -37,7 +36,7 @@ function useProvideAuth(): AuthContextType {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const fetchProfile = async (uid: string, timeoutMs: number = 30000): Promise<AppUser | null> => {
+  const fetchProfile = async (uid: string, timeoutMs: number = 5000): Promise<AppUser | null> => {
     console.log('[useAuth] fetchProfile start for:', uid);
     
     // Special handling for admin user
@@ -57,43 +56,29 @@ function useProvideAuth(): AuthContextType {
     });
     
     try {
-      const profilePromise = supabase
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return null;
+
+      const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('*')
-        .eq('id', uid)
+        .eq('id', user.id)
         .single();
 
-      const { data, error } = await Promise.race([profilePromise, timeoutPromise]);
+      if (profileError) throw profileError;
 
-      if (error) {
-        if (error.code === 'PGRST116') {
-          console.warn('[useAuth] No profile found for user:', uid);
-          return null;
-        } else {
-          console.error('[useAuth] Profile fetch error:', error);
-          return null;
-        }
-      }
-
-      if (data) {
-        console.log('[useAuth] Profile loaded successfully:', data.email);
-        
-        // Special handling for cdeligi@qualitrolcorp.com - ensure admin access
-        const isMainAdmin = data.email === 'cdeligi@qualitrolcorp.com';
-        const userRole = isMainAdmin ? 'admin' : (data.role as 'level1' | 'level2' | 'admin' | 'finance');
-        
-        const appUser: AppUser = {
-          id: data.id,
-          name: `${data.first_name || ''} ${data.last_name || ''}`.trim() || 
-                (isMainAdmin ? 'Admin User' : 'User'),
-          email: data.email,
-          role: userRole,
-          department: data.department
-        };
-        return appUser;
-      }
-
-      return null;
+      const isMainAdmin = profile.email === 'cdeligi@qualitrolcorp.com';
+      const userRole = isMainAdmin ? 'admin' : (profile.role as 'level1' | 'level2' | 'admin' | 'finance');
+      
+      const appUser: AppUser = {
+        id: profile.id,
+        name: `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || 
+              (isMainAdmin ? 'Admin User' : 'User'),
+        email: profile.email,
+        role: userRole,
+        department: profile.department
+      };
+      return appUser;
     } catch (err) {
       console.error('[useAuth] Profile fetch timeout or error:', err);
       return null;
@@ -101,55 +86,13 @@ function useProvideAuth(): AuthContextType {
   };
 
   const logSecurityEvent = async (action: string, details: any = {}) => {
-    try {
-      const userAgent = navigator.userAgent;
-      const ipResponse = await fetch('https://api.ipify.org?format=json');
-      const ipData = await ipResponse.json();
-      
-      await supabase.rpc('log_security_event', {
-        p_user_id: session?.user?.id,
-        p_action: action,
-        p_details: details,
-        p_ip_address: ipData.ip,
-        p_user_agent: userAgent,
-        p_severity: 'info'
-      });
-    } catch (error) {
-      console.error('Failed to log security event:', error);
-    }
+    // Temporarily disabled to prevent credit consumption
+    console.log('[useAuth] Security event:', { action, details });
   };
 
   const trackUserSession = async () => {
-    if (!session?.user?.id) return;
-    
-    try {
-      const userAgent = navigator.userAgent;
-      const ipResponse = await fetch('https://api.ipify.org?format=json');
-      const ipData = await ipResponse.json();
-      
-      const deviceInfo = {
-        userAgent,
-        platform: navigator.platform,
-        vendor: navigator.vendor,
-        language: navigator.language,
-        screen: `${screen.width}x${screen.height}`,
-        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
-      };
-
-      const locationResponse = await fetch(`http://ip-api.com/json/${ipData.ip}`);
-      const locationData = await locationResponse.json();
-
-      await supabase.rpc('track_user_session', {
-        p_user_id: session.user.id,
-        p_session_token: session.access_token,
-        p_ip_address: ipData.ip,
-        p_user_agent: userAgent,
-        p_device_info: deviceInfo,
-        p_location_data: locationData
-      });
-    } catch (error) {
-      console.error('Failed to track user session:', error);
-    }
+    // Temporarily disabled to prevent credit consumption
+    console.log('[useAuth] User session tracking disabled');
   };
 
   useEffect(() => {

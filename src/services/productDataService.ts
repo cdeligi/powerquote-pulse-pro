@@ -20,6 +20,7 @@ import {
 import { dataDebugUtils } from "@/utils/dataDebug";
 
 class ProductDataService {
+  private static instance: ProductDataService;
   private level1Products: Level1Product[] = [];
   private level2Products: Level2Product[] = [];
   private level3Products: Level3Product[] = [];
@@ -29,29 +30,40 @@ class ProductDataService {
   private bushingTapModels: BushingTapModelOption[] = [];
   private initialized: boolean = false;
   private initializationPromise: Promise<void> | null = null;
+  private initializationAttempts = 0;
+  private readonly MAX_INITIALIZATION_ATTEMPTS = 3;
 
-  constructor() {
-    // Load defaults immediately to prevent blocking
-    this.loadDefaults();
-    this.initialized = true;
+  private constructor() {
+    // Private constructor to prevent direct instantiation
+  }
+
+  static getInstance(): ProductDataService {
+    if (!ProductDataService.instance) {
+      ProductDataService.instance = new ProductDataService();
+    }
+    return ProductDataService.instance;
   }
 
   async initialize(): Promise<void> {
-    if (this.initialized && this.level1Products.length > 0) {
-      return;
-    }
-    
+    if (this.initialized) return;
+
     if (this.initializationPromise) {
       return this.initializationPromise;
     }
 
     this.initializationPromise = this._performInitialization();
-    return this.initializationPromise;
+    await this.initializationPromise;
+    this.initializationPromise = null;
   }
 
   private async _performInitialization(): Promise<void> {
     try {
-      console.log('ProductDataService: Starting initialization...');
+      if (this.initializationAttempts >= this.MAX_INITIALIZATION_ATTEMPTS) {
+        throw new Error('Max initialization attempts reached');
+      }
+
+      this.initializationAttempts++;
+      console.log('ProductDataService: Starting initialization attempt', this.initializationAttempts);
       
       // Set a timeout to prevent infinite loading
       const initTimeout = setTimeout(() => {
@@ -65,30 +77,19 @@ class ProductDataService {
       
       if (!dbSuccess) {
         console.log('ProductDataService: Database load failed, trying localStorage...');
-        // Step 2: Fallback to localStorage
-        const localSuccess = this.loadFromLocalStorage();
-        
-        if (!localSuccess) {
-          console.log('ProductDataService: localStorage load failed, using defaults...');
-          // Step 3: Final fallback to defaults
+        const lsSuccess = this.loadFromLocalStorage();
+        if (!lsSuccess) {
+          console.log('ProductDataService: Using default data');
           this.loadDefaults();
         }
       }
-
-      // Clear the timeout since we completed successfully
-      clearTimeout(initTimeout);
-
-      // Validate data relationships
-      dataDebugUtils.validateProductRelationships(
-        this.level1Products, 
-        this.level2Products, 
-        this.level3Products
-      );
 
       // Save current state to localStorage for offline access
       this.saveToLocalStorage();
       
       this.initialized = true;
+      clearTimeout(initTimeout);
+      
       console.log('ProductDataService: Initialization complete', {
         level1Count: this.level1Products.length,
         level2Count: this.level2Products.length,
@@ -99,9 +100,7 @@ class ProductDataService {
 
     } catch (error) {
       console.error('ProductDataService: Initialization failed:', error);
-      // Emergency fallback to defaults
-      this.loadDefaults();
-      this.initialized = true;
+      throw error;
     }
   }
 
@@ -791,7 +790,7 @@ class ProductDataService {
   }
 }
 
-export const productDataService = new ProductDataService();
+export const productDataService = ProductDataService.getInstance();
 
 // Expose for debugging
 if (typeof window !== 'undefined') {
