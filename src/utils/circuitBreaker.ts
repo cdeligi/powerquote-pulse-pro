@@ -71,19 +71,39 @@ class CircuitBreaker {
 const circuitBreakers = {
   auth: new CircuitBreaker('Auth', { maxFailures: 3, timeout: 3000 }),
   profile: new CircuitBreaker('Profile', { maxFailures: 3, timeout: 3000 }),
-  products: new CircuitBreaker('Products', { maxFailures: 5, timeout: 5000 }),
+  products: {
+    level1: new CircuitBreaker('Products.Level1', { maxFailures: 3, timeout: 3000 }),
+    level2: new CircuitBreaker('Products.Level2', { maxFailures: 3, timeout: 3000 }),
+    level3: new CircuitBreaker('Products.Level3', { maxFailures: 3, timeout: 3000 }),
+    level4: new CircuitBreaker('Products.Level4', { maxFailures: 3, timeout: 3000 }),
+    chassis: new CircuitBreaker('Products.Chassis', { maxFailures: 3, timeout: 3000 }),
+  },
+  bom: {
+    create: new CircuitBreaker('BOM.Create', { maxFailures: 3, timeout: 3000 }),
+    update: new CircuitBreaker('BOM.Update', { maxFailures: 3, timeout: 3000 }),
+    delete: new CircuitBreaker('BOM.Delete', { maxFailures: 3, timeout: 3000 }),
+  },
   sessions: new CircuitBreaker('Sessions', { maxFailures: 3, timeout: 3000 }),
 };
 
 // Export utility functions
-export const withCircuitBreaker = <T>(
-  operationName: keyof typeof circuitBreakers,
+export const withCircuitBreaker = async <T>(
+  operationName: keyof typeof circuitBreakers | keyof typeof circuitBreakers.products | keyof typeof circuitBreakers.bom,
   operation: () => Promise<T>
 ): Promise<T> => {
-  return circuitBreakers[operationName].execute(operation);
+  const breaker = circuitBreakers.products[operationName as keyof typeof circuitBreakers.products] ||
+                  circuitBreakers.bom[operationName as keyof typeof circuitBreakers.bom] ||
+                  circuitBreakers[operationName as keyof typeof circuitBreakers];
+
+  if (!breaker) {
+    throw new Error(`No circuit breaker configured for operation: ${operationName}`);
+  }
+
+  return breaker.execute(operation);
 };
 
 // Example usage:
+// const level1Products = await withCircuitBreaker('level1', () => supabase.from('products_lvl1').select('*'));
 // const profile = await withCircuitBreaker('profile', () => supabase.from('profiles').select('*').single());
 
 // Expose circuit breakers for debugging

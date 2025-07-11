@@ -1,8 +1,6 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import Level1ProductSelector from './Level1ProductSelector';
@@ -17,6 +15,8 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { Calculator, Package, Server, FileText, Percent } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { useMediaQuery } from 'react-responsive';
 
 interface BOMBuilderProps {
   isOpen: boolean;
@@ -33,7 +33,8 @@ const BOMBuilder: React.FC<BOMBuilderProps> = ({
 }) => {
   const { toast } = useToast();
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState('products');
+  const isMobile = useMediaQuery({ query: '(max-width: 768px)' });
+  const prefersReducedMotion = useMediaQuery({ query: '(prefers-reduced-motion: reduce)' });
   const [bomItems, setBomItems] = useState<any[]>([]);
   const [selectedChassis, setSelectedChassis] = useState<any>(null);
   const [selectedLevel1Product, setSelectedLevel1Product] = useState<any>(null);
@@ -44,347 +45,267 @@ const BOMBuilder: React.FC<BOMBuilderProps> = ({
   const [loading, setLoading] = useState(false);
   const [discountPercentage, setDiscountPercentage] = useState(0);
   const [discountJustification, setDiscountJustification] = useState('');
-
-  // Enhanced tab configuration with responsive design
-  const tabs = [
-    { id: 'products', label: 'Products', icon: Package },
-    { id: 'chassis', label: 'Chassis', icon: Server },
-    { id: 'config', label: 'Config', icon: Calculator },
-    { id: 'quote', label: 'Quote Info', icon: FileText },
-    { id: 'discount', label: 'Discount', icon: Percent },
-  ];
+  const [level1Products, setLevel1Products] = useState<any[]>([]);
+  const [level2Products, setLevel2Products] = useState<any[]>([]);
+  const [level3Products, setLevel3Products] = useState<any[]>([]);
 
   useEffect(() => {
-    if (existingQuoteId && isOpen) {
-      loadExistingQuote();
+    if (isOpen) {
+      fetchProducts();
     }
-  }, [existingQuoteId, isOpen]);
+  }, [isOpen]);
 
-  const loadExistingQuote = async () => {
-    if (!existingQuoteId) return;
-    
-    setLoading(true);
+  const fetchProducts = async () => {
     try {
-      const { data: quote, error: quoteError } = await supabase
-        .from('quotes')
-        .select('*')
-        .eq('id', existingQuoteId)
-        .single();
+      const [l1, l2, l3] = await Promise.all([
+        supabase.from('products_lvl1').select('*').eq('is_active', true),
+        supabase.from('products_lvl2').select('*').eq('is_active', true),
+        supabase.from('products_lvl3').select('*').eq('is_active', true)
+      ]);
 
-      if (quoteError) throw quoteError;
-
-      const { data: items, error: itemsError } = await supabase
-        .from('bom_items')
-        .select('*')
-        .eq('quote_id', existingQuoteId);
-
-      if (itemsError) throw itemsError;
-
-      setBomItems(items || []);
-      setQuoteFields(quote?.quote_fields || {});
+      setLevel1Products(l1.data || []);
+      setLevel2Products(l2.data || []);
+      setLevel3Products(l3.data || []);
     } catch (error) {
-      console.error('Error loading existing quote:', error);
+      console.error('Error fetching products:', error);
       toast({
         title: "Error",
-        description: "Failed to load existing quote data",
+        description: "Failed to load product data",
         variant: "destructive"
       });
-    } finally {
-      setLoading(false);
     }
   };
 
-  const handleLevel2OptionToggle = (option: any) => {
-    setSelectedLevel2Options(prev => {
-      const isSelected = prev.some(item => item.id === option.id);
-      if (isSelected) {
-        return prev.filter(item => item.id !== option.id);
-      } else {
-        return [...prev, option];
-      }
-    });
-
-    // Add to BOM items
-    setBomItems(prev => [...prev, {
-      ...option,
-      id: null,
-      quantity: 1,
-      unit_cost: option.cost || 0,
-      unit_price: option.price || 0
-    }]);
+  const handleLevel1Select = async (product: any) => {
+    setSelectedLevel1Product(product);
+    setSelectedLevel2Options([]);
+    setSelectedSlot(null);
+    setSelectedChassis(null);
+    
+    // Auto-fetch and show Level 2 options
+    const l2Options = level2Products.filter(p => p.parent_product_id === product.id);
+    if (l2Options.length > 0) {
+      setSelectedLevel2Options(l2Options);
+    }
   };
 
-  const handleSlotClick = (slot: number) => {
+  const handleLevel2Select = (option: any) => {
+    setSelectedChassis(option);
+    // Auto-scroll to slot selection
+    const slotsSection = document.getElementById('slots-section');
+    if (slotsSection) {
+      slotsSection.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
+  const handleSlotSelect = (slot: number) => {
     setSelectedSlot(slot);
+    // Auto-scroll to Level 3 selection
+    const level3Section = document.getElementById('level3-section');
+    if (level3Section) {
+      level3Section.scrollIntoView({ behavior: 'smooth' });
+    }
   };
 
-  const handleSlotClear = (slot: number) => {
-    setSlotAssignments(prev => {
-      const newAssignments = { ...prev };
-      delete newAssignments[slot];
-      return newAssignments;
-    });
+  const handleLevel3Select = (product: any) => {
+    if (selectedSlot !== null) {
+      setSlotAssignments(prev => ({
+        ...prev,
+        [selectedSlot]: product
+      }));
+      setSelectedSlot(null);
+    }
   };
 
-  const handleQuoteFieldChange = (fieldId: string, value: any) => {
-    setQuoteFields(prev => ({
-      ...prev,
-      [fieldId]: value
-    }));
-  };
-
-  const handleDiscountChange = (discount: number, justification: string) => {
-    setDiscountPercentage(discount);
-    setDiscountJustification(justification);
-  };
-
-  const handleSaveQuote = async () => {
-    if (!user) {
+  const handlePriceChange = (item: any, newPrice: number) => {
+    if (newPrice < item.original_price) {
       toast({
-        title: "Error",
-        description: "You must be logged in to save a quote",
+        title: "Price Reduction Not Allowed",
+        description: "To reduce a price, please use the Discount section below.",
         variant: "destructive"
       });
       return;
     }
-
-    if (bomItems.length === 0) {
-      toast({
-        title: "Error",
-        description: "Please add at least one item to your BOM",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    // Validate required quote fields
-    const requiredFields = ['customer_name', 'oracle_customer_id', 'sfdc_opportunity'];
-    const missingFields = requiredFields.filter(field => !quoteFields[field]);
     
-    if (missingFields.length > 0) {
-      toast({
-        title: "Error",
-        description: `Please fill in all required fields: ${missingFields.join(', ')}`,
-        variant: "destructive"
-      });
-      setActiveTab('quote');
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const totalCost = bomItems.reduce((sum, item) => sum + (item.unit_cost * item.quantity), 0);
-      const totalPrice = bomItems.reduce((sum, item) => sum + (item.unit_price * item.quantity), 0);
-      const originalMargin = totalPrice > 0 ? ((totalPrice - totalCost) / totalPrice) * 100 : 0;
-
-      const quoteData = {
-        id: existingQuoteId || `QTE-${Date.now()}`,
-        user_id: user.id,
-        customer_name: quoteFields.customer_name,
-        oracle_customer_id: quoteFields.oracle_customer_id,
-        sfdc_opportunity: quoteFields.sfdc_opportunity,
-        status: 'pending',
-        requested_discount: discountPercentage,
-        original_quote_value: totalPrice,
-        discounted_value: totalPrice * (1 - discountPercentage / 100),
-        total_cost: totalCost,
-        original_margin: originalMargin,
-        discounted_margin: totalPrice > 0 ? ((totalPrice * (1 - discountPercentage / 100) - totalCost) / (totalPrice * (1 - discountPercentage / 100))) * 100 : 0,
-        gross_profit: (totalPrice * (1 - discountPercentage / 100)) - totalCost,
-        payment_terms: quoteFields.payment_terms || 'Net 30',
-        shipping_terms: quoteFields.shipping_terms || 'FOB Origin',
-        currency: 'USD',
-        quote_fields: quoteFields,
-        discount_justification: discountJustification,
-        submitted_by_name: user.name,
-        submitted_by_email: user.email
-      };
-
-      if (existingQuoteId) {
-        const { error } = await supabase
-          .from('quotes')
-          .update(quoteData)
-          .eq('id', existingQuoteId);
-        if (error) throw error;
-      } else {
-        const { error } = await supabase
-          .from('quotes')
-          .insert(quoteData);
-        if (error) throw error;
-      }
-
-      // Save BOM items
-      for (const item of bomItems) {
-        const bomData = {
-          ...item,
-          quote_id: quoteData.id,
-          margin: item.unit_price > 0 ? ((item.unit_price - item.unit_cost) / item.unit_price) * 100 : 0,
-          total_cost: item.unit_cost * item.quantity,
-          total_price: item.unit_price * item.quantity
-        };
-
-        if (item.id) {
-          const { error } = await supabase
-            .from('bom_items')
-            .update(bomData)
-            .eq('id', item.id);
-          if (error) throw error;
-        } else {
-          const { error } = await supabase
-            .from('bom_items')
-            .insert(bomData);
-          if (error) throw error;
-        }
-      }
-
-      toast({
-        title: "Success",
-        description: existingQuoteId ? "Quote updated successfully!" : "Quote created successfully!",
-      });
-
-      onClose();
-    } catch (error) {
-      console.error('Error saving quote:', error);
-      toast({
-        title: "Error",
-        description: "Failed to save quote. Please try again.",
-        variant: "destructive"
-      });
-    } finally {
-      setLoading(false);
-    }
+    setBomItems(prev => 
+      prev.map(i => 
+        i.id === item.id ? { ...i, unit_price: newPrice } : i
+      )
+    );
   };
 
-  if (!isOpen) return null;
+  const PriceInput = ({ item, className }: { item: any; className?: string }) => {
+    const isPriceReduced = item.unit_price < item.original_price;
+    return (
+      <div className="flex flex-col gap-1">
+        <div className="flex items-center gap-2">
+          <input
+            type="number"
+            value={item.unit_price}
+            onChange={(e) => handlePriceChange(item, Number(e.target.value))}
+            className={`
+              w-full p-2 border rounded-md
+              ${isPriceReduced ? 'bg-red-50 border-red-300' : 'bg-white border-gray-300'}
+              ${className}
+            `}
+          />
+          {isPriceReduced && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                toast({
+                  title: "Request Discount",
+                  description: "Please provide a justification for the requested discount.",
+                });
+                // Open discount justification modal
+              }}
+            >
+              Request Discount
+            </Button>
+          )}
+        </div>
+        {user?.role === 'admin' && (
+          <div className="flex items-center gap-2 text-sm text-gray-600">
+            <span>Cost: ${item.unit_cost.toFixed(2)}</span>
+            <span>Margin: {(item.margin || 0).toFixed(1)}%</span>
+          </div>
+        )}
+      </div>
+    );
+  };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <Card className="w-full max-w-7xl h-[90vh] bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700">
-        <CardHeader className="border-b border-gray-200 dark:border-gray-700">
-          <div className="flex justify-between items-center">
-            <CardTitle className="text-gray-900 dark:text-white">
-              {mode === 'admin-edit' ? 'Admin Edit Quote' : existingQuoteId ? 'Edit Quote' : 'Build New Quote'}
-            </CardTitle>
-            <Button 
-              onClick={onClose} 
-              variant="outline"
-              className="border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
-            >
-              Close
-            </Button>
-          </div>
+    <div className={`fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 ${isMobile ? 'sm:p-2' : ''}`}>
+      <Card className={`w-full max-w-4xl ${isMobile ? 'sm:max-w-full' : ''}`}>
+        <CardHeader>
+          <CardTitle>BOM Builder</CardTitle>
+          <CardDescription className="text-sm">
+            {mode === 'create' ? 'Create a new quote' : 'Edit existing quote'}
+          </CardDescription>
         </CardHeader>
-
+        
         <CardContent className="p-0 h-full">
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full flex flex-col">
-            {/* Responsive Tab List */}
-            <div className="border-b border-gray-200 dark:border-gray-700 px-6 pt-4">
-              <TabsList className="grid w-full grid-cols-2 md:grid-cols-5 gap-1 bg-gray-100 dark:bg-gray-800 p-1 rounded-lg">
-                {tabs.map((tab) => {
-                  const Icon = tab.icon;
-                  return (
-                    <TabsTrigger
-                      key={tab.id}
-                      value={tab.id}
-                      className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 
-                                data-[state=active]:bg-white dark:data-[state=active]:bg-gray-700 
-                                data-[state=active]:text-gray-900 dark:data-[state=active]:text-white
-                                data-[state=active]:shadow-sm rounded-md transition-all duration-200"
-                    >
-                      <Icon className="w-4 h-4" />
-                      <span className="hidden sm:inline">{tab.label}</span>
-                    </TabsTrigger>
-                  );
-                })}
-              </TabsList>
-            </div>
+          <div className={`space-y-6 h-full overflow-y-auto ${prefersReducedMotion ? '' : 'smooth-scroll'}`}>
+            <Card>
+              <CardHeader>
+                <CardTitle>Level 1 Products</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Level1ProductSelector
+                  products={level1Products}
+                  onSelect={handleLevel1Select}
+                  selected={selectedLevel1Product}
+                />
+              </CardContent>
+            </Card>
 
-            {/* Tab Content with proper scrolling */}
-            <div className="flex-1 overflow-hidden">
-              <ScrollArea className="h-full">
-                <div className="p-6">
-                  <TabsContent value="products" className="mt-0">
-                    <div className="space-y-6">
-                      <Level1ProductSelector
-                        onProductSelect={(product) => {
-                          setSelectedLevel1Product(product);
-                          setBomItems(prev => [...prev, {
-                            ...product,
-                            id: null,
-                            quantity: 1,
-                            unit_cost: product.cost || 0,
-                            unit_price: product.price || 0
-                          }]);
-                        }}
-                      />
-                      {selectedLevel1Product && (
-                        <Level2OptionsSelector
-                          level1Product={selectedLevel1Product}
-                          selectedOptions={selectedLevel2Options}
-                          onOptionToggle={handleLevel2OptionToggle}
-                        />
-                      )}
-                    </div>
-                  </TabsContent>
-
-                  <TabsContent value="chassis" className="mt-0">
-                    <ChassisSelector
-                      selectedChassis={selectedChassis}
-                      onChassisSelect={(chassis) => {
-                        setSelectedChassis(chassis);
-                        setBomItems(prev => [...prev, {
-                          ...chassis,
-                          id: null,
-                          quantity: 1,
-                          unit_cost: chassis.cost || 0,
-                          unit_price: chassis.price || 0
-                        }]);
-                      }}
-                      canSeePrices={user?.role === 'admin' || user?.role === 'finance'}
+            {selectedLevel1Product && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3 }}
+              >
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Level 2 Options</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <Level2OptionsSelector
+                      options={selectedLevel2Options}
+                      onSelect={handleLevel2Select}
+                      selected={selectedChassis}
                     />
-                  </TabsContent>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            )}
 
-                  <TabsContent value="config" className="mt-0">
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                      <BOMDisplay 
-                        items={bomItems}
-                        onItemsChange={setBomItems}
-                        mode={mode}
-                        userRole={user?.role}
-                      />
-                      {selectedChassis && (
-                        <RackVisualizer 
-                          chassis={selectedChassis}
-                          slotAssignments={slotAssignments}
-                          onSlotClick={handleSlotClick}
-                          onSlotClear={handleSlotClear}
-                          selectedSlot={selectedSlot}
-                        />
-                      )}
-                    </div>
-                  </TabsContent>
-
-                  <TabsContent value="quote" className="mt-0">
-                    <QuoteFieldsSection
-                      quoteFields={quoteFields}
-                      onFieldChange={handleQuoteFieldChange}
+            {selectedChassis && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3 }}
+                id="slots-section"
+              >
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Slot Configuration</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <RackVisualizer
+                      chassis={selectedChassis}
+                      slotAssignments={slotAssignments}
+                      onSelectSlot={handleSlotSelect}
                     />
-                  </TabsContent>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            )}
 
-                  <TabsContent value="discount" className="mt-0">
-                    <DiscountSection
-                      bomItems={bomItems}
-                      onDiscountChange={handleDiscountChange}
-                      canSeePrices={user?.role === 'admin' || user?.role === 'finance'}
-                      initialDiscount={discountPercentage}
-                      initialJustification={discountJustification}
+            {selectedSlot !== null && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3 }}
+                id="level3-section"
+              >
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Card Selection</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <SlotCardSelector
+                      slot={selectedSlot}
+                      products={level3Products.filter(p => p.parent_product_id === selectedChassis?.id)}
+                      onSelect={handleLevel3Select}
                     />
-                  </TabsContent>
-                </div>
-              </ScrollArea>
-            </div>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            )}
 
-            {/* Footer with Save Button */}
+            <Card>
+              <CardHeader>
+                <CardTitle>BOM Summary</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <BOMDisplay
+                  bomItems={bomItems}
+                  slotAssignments={slotAssignments}
+                  onAddItem={(item) => setBomItems([...bomItems, item])}
+                  onRemoveItem={(id) => setBomItems(bomItems.filter(i => i.id !== id))}
+                  PriceInput={PriceInput}
+                />
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Quote Information</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <QuoteFieldsSection
+                  fields={quoteFields}
+                  onChange={setQuoteFields}
+                />
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Discount</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <DiscountSection
+                  percentage={discountPercentage}
+                  justification={discountJustification}
+                  onChangePercentage={setDiscountPercentage}
+                  onChangeJustification={setDiscountJustification}
+                />
+              </CardContent>
+            </Card>
+
             <div className="border-t border-gray-200 dark:border-gray-700 p-6">
               <div className="flex justify-between items-center">
                 <div className="flex items-center gap-4">
@@ -396,7 +317,121 @@ const BOMBuilder: React.FC<BOMBuilderProps> = ({
                   </Badge>
                 </div>
                 <Button 
-                  onClick={handleSaveQuote}
+                  onClick={() => {
+                    if (!user) {
+                      toast({
+                        title: "Error",
+                        description: "You must be logged in to save a quote",
+                        variant: "destructive"
+                      });
+                      return;
+                    }
+
+                    if (bomItems.length === 0) {
+                      toast({
+                        title: "Error",
+                        description: "Please add at least one item to your BOM",
+                        variant: "destructive"
+                      });
+                      return;
+                    }
+
+                    // Validate required quote fields
+                    const requiredFields = ['customer_name', 'oracle_customer_id', 'sfdc_opportunity'];
+                    const missingFields = requiredFields.filter(field => !quoteFields[field]);
+                    
+                    if (missingFields.length > 0) {
+                      toast({
+                        title: "Error",
+                        description: `Please fill in all required fields: ${missingFields.join(', ')}`,
+                        variant: "destructive"
+                      });
+                      return;
+                    }
+
+                    setLoading(true);
+                    try {
+                      const totalCost = bomItems.reduce((sum, item) => sum + (item.unit_cost * item.quantity), 0);
+                      const totalPrice = bomItems.reduce((sum, item) => sum + (item.unit_price * item.quantity), 0);
+                      const originalMargin = totalPrice > 0 ? ((totalPrice - totalCost) / totalPrice) * 100 : 0;
+
+                      const quoteData = {
+                        id: existingQuoteId || `QTE-${Date.now()}`,
+                        user_id: user.id,
+                        customer_name: quoteFields.customer_name,
+                        oracle_customer_id: quoteFields.oracle_customer_id,
+                        sfdc_opportunity: quoteFields.sfdc_opportunity,
+                        status: 'pending',
+                        requested_discount: discountPercentage,
+                        original_quote_value: totalPrice,
+                        discounted_value: totalPrice * (1 - discountPercentage / 100),
+                        total_cost: totalCost,
+                        original_margin: originalMargin,
+                        discounted_margin: totalPrice > 0 ? ((totalPrice * (1 - discountPercentage / 100) - totalCost) / (totalPrice * (1 - discountPercentage / 100))) * 100 : 0,
+                        gross_profit: (totalPrice * (1 - discountPercentage / 100)) - totalCost,
+                        payment_terms: quoteFields.payment_terms || 'Net 30',
+                        shipping_terms: quoteFields.shipping_terms || 'FOB Origin',
+                        currency: 'USD',
+                        quote_fields: quoteFields,
+                        discount_justification: discountJustification,
+                        submitted_by_name: user.name,
+                        submitted_by_email: user.email
+                      };
+
+                      if (existingQuoteId) {
+                        const { error } = await supabase
+                          .from('quotes')
+                          .update(quoteData)
+                          .eq('id', existingQuoteId);
+                        if (error) throw error;
+                      } else {
+                        const { error } = await supabase
+                          .from('quotes')
+                          .insert(quoteData);
+                        if (error) throw error;
+                      }
+
+                      // Save BOM items
+                      for (const item of bomItems) {
+                        const bomData = {
+                          ...item,
+                          quote_id: quoteData.id,
+                          margin: item.unit_price > 0 ? ((item.unit_price - item.unit_cost) / item.unit_price) * 100 : 0,
+                          total_cost: item.unit_cost * item.quantity,
+                          total_price: item.unit_price * item.quantity
+                        };
+
+                        if (item.id) {
+                          const { error } = await supabase
+                            .from('bom_items')
+                            .update(bomData)
+                            .eq('id', item.id);
+                          if (error) throw error;
+                        } else {
+                          const { error } = await supabase
+                            .from('bom_items')
+                            .insert(bomData);
+                          if (error) throw error;
+                        }
+                      }
+
+                      toast({
+                        title: "Success",
+                        description: existingQuoteId ? "Quote updated successfully!" : "Quote created successfully!",
+                      });
+
+                      onClose();
+                    } catch (error) {
+                      console.error('Error saving quote:', error);
+                      toast({
+                        title: "Error",
+                        description: "Failed to save quote. Please try again.",
+                        variant: "destructive"
+                      });
+                    } finally {
+                      setLoading(false);
+                    }
+                  }}
                   disabled={loading || bomItems.length === 0}
                   className="bg-blue-600 hover:bg-blue-700 text-white"
                 >
@@ -404,7 +439,7 @@ const BOMBuilder: React.FC<BOMBuilderProps> = ({
                 </Button>
               </div>
             </div>
-          </Tabs>
+          </div>
         </CardContent>
       </Card>
     </div>

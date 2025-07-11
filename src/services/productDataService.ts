@@ -18,6 +18,7 @@ import {
   DEFAULT_BUSHING_TAP_MODELS
 } from "@/data/productDefaults";
 import { dataDebugUtils } from "@/utils/dataDebug";
+import { withCircuitBreaker } from '@/utils/circuitBreaker';
 
 class ProductDataService {
   private static instance: ProductDataService;
@@ -114,12 +115,24 @@ class ProductDataService {
       });
 
       const dbOperations = Promise.all([
-        supabase.from('products').select('*').eq('category', 'level1').eq('is_active', true),
-        supabase.from('products').select('*').eq('category', 'level2').eq('is_active', true),
-        supabase.from('products').select('*').eq('category', 'level3').eq('is_active', true),
-        supabase.from('level4_products').select('*').eq('enabled', true),
-        supabase.from('level1_level2_relationships').select('*'),
-        supabase.from('level2_level3_relationships').select('*')
+        withCircuitBreaker('products.level1', () => 
+          supabase.from('products').select('*').eq('category', 'level1').eq('is_active', true)
+        ),
+        withCircuitBreaker('products.level2', () => 
+          supabase.from('products').select('*').eq('category', 'level2').eq('is_active', true)
+        ),
+        withCircuitBreaker('products.level3', () => 
+          supabase.from('products').select('*').eq('category', 'level3').eq('is_active', true)
+        ),
+        withCircuitBreaker('products.level4', () => 
+          supabase.from('level4_products').select('*').eq('enabled', true)
+        ),
+        withCircuitBreaker('products.l1l2', () => 
+          supabase.from('level1_level2_relationships').select('*')
+        ),
+        withCircuitBreaker('products.l2l3', () => 
+          supabase.from('level2_level3_relationships').select('*')
+        )
       ]);
 
       const [
@@ -462,16 +475,18 @@ class ProductDataService {
     this.saveToLocalStorage();
 
     try {
-      await supabase.from('products').insert({
-        id: newProduct.id,
-        name: newProduct.name,
-        description: newProduct.description,
-        category: 'level1',
-        subcategory: newProduct.type,
-        price: newProduct.price,
-        cost: newProduct.cost ?? null,
-        is_active: newProduct.enabled
-      });
+      await withCircuitBreaker('products.create', () => 
+        supabase.from('products').insert({
+          id: newProduct.id,
+          name: newProduct.name,
+          description: newProduct.description,
+          category: 'level1',
+          subcategory: newProduct.type,
+          price: newProduct.price,
+          cost: newProduct.cost ?? null,
+          is_active: newProduct.enabled
+        })
+      );
     } catch (error) {
       console.error('Failed to persist level1 product', error);
     }
@@ -487,16 +502,18 @@ class ProductDataService {
       this.saveToLocalStorage();
 
       try {
-        await supabase.from('products')
-          .update({
-            name: this.level1Products[index].name,
-            description: this.level1Products[index].description,
-            subcategory: this.level1Products[index].type,
-            price: this.level1Products[index].price,
-            cost: this.level1Products[index].cost ?? null,
-            is_active: this.level1Products[index].enabled
-          })
-          .eq('id', id);
+        await withCircuitBreaker('products.update', () => 
+          supabase.from('products')
+            .update({
+              name: this.level1Products[index].name,
+              description: this.level1Products[index].description,
+              subcategory: this.level1Products[index].type,
+              price: this.level1Products[index].price,
+              cost: this.level1Products[index].cost ?? null,
+              is_active: this.level1Products[index].enabled
+            })
+            .eq('id', id)
+        );
       } catch (error) {
         console.error('Failed to update level1 product', error);
       }
@@ -512,7 +529,9 @@ class ProductDataService {
     this.saveToLocalStorage();
 
     try {
-      await supabase.from('products').delete().eq('id', id);
+      await withCircuitBreaker('products.delete', () => 
+        supabase.from('products').delete().eq('id', id)
+      );
     } catch (error) {
       console.error('Failed to delete level1 product', error);
     }
@@ -529,16 +548,18 @@ class ProductDataService {
     this.saveToLocalStorage();
 
     try {
-      await supabase.from('products').insert({
-        id: newProduct.id,
-        name: newProduct.name,
-        description: newProduct.description,
-        category: 'level2',
-        subcategory: newProduct.type,
-        price: newProduct.price,
-        cost: newProduct.cost ?? null,
-        is_active: newProduct.enabled
-      });
+      await withCircuitBreaker('products.create', () => 
+        supabase.from('products').insert({
+          id: newProduct.id,
+          name: newProduct.name,
+          description: newProduct.description,
+          category: 'level2',
+          subcategory: newProduct.type,
+          price: newProduct.price,
+          cost: newProduct.cost ?? null,
+          is_active: newProduct.enabled
+        })
+      );
     } catch (error) {
       console.error('Failed to persist level2 product', error);
     }
@@ -554,16 +575,18 @@ class ProductDataService {
       this.saveToLocalStorage();
 
       try {
-        await supabase.from('products')
-          .update({
-            name: this.level2Products[index].name,
-            description: this.level2Products[index].description,
-            subcategory: this.level2Products[index].type,
-            price: this.level2Products[index].price,
-            cost: this.level2Products[index].cost ?? null,
-            is_active: this.level2Products[index].enabled
-          })
-          .eq('id', id);
+        await withCircuitBreaker('products.update', () => 
+          supabase.from('products')
+            .update({
+              name: this.level2Products[index].name,
+              description: this.level2Products[index].description,
+              subcategory: this.level2Products[index].type,
+              price: this.level2Products[index].price,
+              cost: this.level2Products[index].cost ?? null,
+              is_active: this.level2Products[index].enabled
+            })
+            .eq('id', id)
+        );
       } catch (error) {
         console.error('Failed to update level2 product', error);
       }
@@ -579,7 +602,9 @@ class ProductDataService {
     this.saveToLocalStorage();
 
     try {
-      await supabase.from('products').delete().eq('id', id);
+      await withCircuitBreaker('products.delete', () => 
+        supabase.from('products').delete().eq('id', id)
+      );
     } catch (error) {
       console.error('Failed to delete level2 product', error);
     }
@@ -596,16 +621,18 @@ class ProductDataService {
     this.saveToLocalStorage();
 
     try {
-      await supabase.from('products').insert({
-        id: newProduct.id,
-        name: newProduct.name,
-        description: newProduct.description,
-        category: 'level3',
-        subcategory: newProduct.type,
-        price: newProduct.price,
-        cost: newProduct.cost ?? null,
-        is_active: newProduct.enabled ?? true
-      });
+      await withCircuitBreaker('products.create', () => 
+        supabase.from('products').insert({
+          id: newProduct.id,
+          name: newProduct.name,
+          description: newProduct.description,
+          category: 'level3',
+          subcategory: newProduct.type,
+          price: newProduct.price,
+          cost: newProduct.cost ?? null,
+          is_active: newProduct.enabled ?? true
+        })
+      );
     } catch (error) {
       console.error('Failed to persist level3 product', error);
     }
@@ -621,16 +648,18 @@ class ProductDataService {
       this.saveToLocalStorage();
 
       try {
-        await supabase.from('products')
-          .update({
-            name: this.level3Products[index].name,
-            description: this.level3Products[index].description,
-            subcategory: this.level3Products[index].type,
-            price: this.level3Products[index].price,
-            cost: this.level3Products[index].cost ?? null,
-            is_active: this.level3Products[index].enabled ?? true
-          })
-          .eq('id', id);
+        await withCircuitBreaker('products.update', () => 
+          supabase.from('products')
+            .update({
+              name: this.level3Products[index].name,
+              description: this.level3Products[index].description,
+              subcategory: this.level3Products[index].type,
+              price: this.level3Products[index].price,
+              cost: this.level3Products[index].cost ?? null,
+              is_active: this.level3Products[index].enabled ?? true
+            })
+            .eq('id', id)
+        );
       } catch (error) {
         console.error('Failed to update level3 product', error);
       }
@@ -646,7 +675,9 @@ class ProductDataService {
     this.saveToLocalStorage();
 
     try {
-      await supabase.from('products').delete().eq('id', id);
+      await withCircuitBreaker('products.delete', () => 
+        supabase.from('products').delete().eq('id', id)
+      );
     } catch (error) {
       console.error('Failed to delete level3 product', error);
     }
@@ -663,16 +694,18 @@ class ProductDataService {
     this.saveToLocalStorage();
 
     try {
-      await supabase.from('level4_products').insert({
-        id: newProduct.id,
-        name: newProduct.name,
-        description: newProduct.description,
-        parent_product_id: newProduct.parentProductId,
-        configuration_type: newProduct.configurationType,
-        price: newProduct.price,
-        cost: newProduct.cost ?? null,
-        enabled: newProduct.enabled
-      });
+      await withCircuitBreaker('products.create', () => 
+        supabase.from('level4_products').insert({
+          id: newProduct.id,
+          name: newProduct.name,
+          description: newProduct.description,
+          parent_product_id: newProduct.parentProductId,
+          configuration_type: newProduct.configurationType,
+          price: newProduct.price,
+          cost: newProduct.cost ?? null,
+          enabled: newProduct.enabled
+        })
+      );
 
       // Insert configuration options if they exist
       if (newProduct.options && newProduct.options.length > 0) {
@@ -685,7 +718,9 @@ class ProductDataService {
           enabled: option.enabled
         }));
         
-        await supabase.from('level4_configuration_options').insert(optionsToInsert);
+        await withCircuitBreaker('products.create', () => 
+          supabase.from('level4_configuration_options').insert(optionsToInsert)
+        );
       }
     } catch (error) {
       console.error('Failed to persist level4 product', error);
@@ -702,22 +737,26 @@ class ProductDataService {
       this.saveToLocalStorage();
 
       try {
-        await supabase.from('level4_products')
-          .update({
-            name: this.level4Products[index].name,
-            description: this.level4Products[index].description,
-            parent_product_id: this.level4Products[index].parentProductId,
-            configuration_type: this.level4Products[index].configurationType,
-            price: this.level4Products[index].price,
-            cost: this.level4Products[index].cost ?? null,
-            enabled: this.level4Products[index].enabled
-          })
-          .eq('id', id);
+        await withCircuitBreaker('products.update', () => 
+          supabase.from('level4_products')
+            .update({
+              name: this.level4Products[index].name,
+              description: this.level4Products[index].description,
+              parent_product_id: this.level4Products[index].parentProductId,
+              configuration_type: this.level4Products[index].configurationType,
+              price: this.level4Products[index].price,
+              cost: this.level4Products[index].cost ?? null,
+              enabled: this.level4Products[index].enabled
+            })
+            .eq('id', id)
+        );
 
         // Update configuration options if they exist
         if (this.level4Products[index].options) {
           // Delete existing options
-          await supabase.from('level4_configuration_options').delete().eq('level4_product_id', id);
+          await withCircuitBreaker('products.delete', () => 
+            supabase.from('level4_configuration_options').delete().eq('level4_product_id', id)
+          );
           
           // Insert new options
           if (this.level4Products[index].options!.length > 0) {
@@ -730,7 +769,9 @@ class ProductDataService {
               enabled: option.enabled
             }));
             
-            await supabase.from('level4_configuration_options').insert(optionsToInsert);
+            await withCircuitBreaker('products.create', () => 
+              supabase.from('level4_configuration_options').insert(optionsToInsert)
+            );
           }
         }
       } catch (error) {
@@ -749,9 +790,13 @@ class ProductDataService {
 
     try {
       // Delete configuration options first
-      await supabase.from('level4_configuration_options').delete().eq('level4_product_id', id);
+      await withCircuitBreaker('products.delete', () => 
+        supabase.from('level4_configuration_options').delete().eq('level4_product_id', id)
+      );
       // Delete the product
-      await supabase.from('level4_products').delete().eq('id', id);
+      await withCircuitBreaker('products.delete', () => 
+        supabase.from('level4_products').delete().eq('id', id)
+      );
     } catch (error) {
       console.error('Failed to delete level4 product', error);
     }
