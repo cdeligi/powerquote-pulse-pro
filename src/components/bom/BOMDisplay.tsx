@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -9,6 +8,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Textarea } from '@/components/ui/textarea';
 import { Trash2, Edit3, Settings, AlertTriangle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useMediaQuery } from 'react-responsive';
+import { motion } from 'framer-motion';
 
 interface BOMDisplayProps {
   items: any[];
@@ -27,6 +28,8 @@ const BOMDisplay: React.FC<BOMDisplayProps> = ({ items, onItemsChange, mode = 'c
     discountPercent: 0,
     justification: ''
   });
+  const isMobile = useMediaQuery({ query: '(max-width: 768px)' });
+  const prefersReducedMotion = useMediaQuery({ query: '(prefers-reduced-motion: reduce)' });
 
   const handleQuantityChange = (index: number, quantity: number) => {
     const updatedItems = [...items];
@@ -112,9 +115,15 @@ const BOMDisplay: React.FC<BOMDisplayProps> = ({ items, onItemsChange, mode = 'c
     onItemsChange(updatedItems);
   };
 
-  const calculateTotal = () => {
-    return items.reduce((sum, item) => sum + (item.unit_price * item.quantity), 0);
+  const calculateTotals = () => {
+    const totalCost = items.reduce((sum, item) => sum + (item.unit_cost * item.quantity), 0);
+    const totalPrice = items.reduce((sum, item) => sum + (item.unit_price * item.quantity), 0);
+    const totalMargin = totalPrice > 0 ? ((totalPrice - totalCost) / totalPrice) * 100 : 0;
+    const grossProfit = totalPrice - totalCost;
+    return { totalCost, totalPrice, totalMargin, grossProfit };
   };
+
+  const { totalCost, totalPrice, totalMargin, grossProfit } = calculateTotals();
 
   const calculateMargin = (item: any) => {
     if (item.unit_price <= 0) return 0;
@@ -138,6 +147,13 @@ const BOMDisplay: React.FC<BOMDisplayProps> = ({ items, onItemsChange, mode = 'c
           <Settings className="w-5 h-5" />
           Bill of Materials
         </CardTitle>
+        {userRole === 'admin' && (
+          <div className="mt-2 flex items-center gap-2 text-sm text-gray-600">
+            <Badge variant="outline">Total Cost: ${totalCost.toFixed(2)}</Badge>
+            <Badge variant="outline">Margin: {totalMargin.toFixed(1)}%</Badge>
+            <Badge variant="outline">Gross Profit: ${grossProfit.toFixed(2)}</Badge>
+          </div>
+        )}
       </CardHeader>
       <CardContent className="space-y-4">
         {items.map((item, index) => {
@@ -180,7 +196,7 @@ const BOMDisplay: React.FC<BOMDisplayProps> = ({ items, onItemsChange, mode = 'c
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className={`grid grid-cols-1 md:grid-cols-4 gap-4 ${isMobile ? 'sm:grid-cols-1' : ''}`}>
                 <div>
                   <Label className="text-gray-700 dark:text-gray-300">Quantity</Label>
                   <Input
@@ -318,7 +334,7 @@ const BOMDisplay: React.FC<BOMDisplayProps> = ({ items, onItemsChange, mode = 'c
               Total BOM Value:
             </span>
             <span className="text-xl font-bold text-blue-600 dark:text-blue-400">
-              ${calculateTotal().toFixed(2)}
+              ${totalPrice.toFixed(2)}
             </span>
           </div>
         </div>

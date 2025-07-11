@@ -1,5 +1,4 @@
-
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -16,6 +15,7 @@ import { Level3ProductList } from "./product-lists/Level3ProductList";
 import { Level1Product, Level2Product, Level3Product, Level4Product } from "@/types/product";
 import { productDataService } from "@/services/productDataService";
 import { useToast } from "@/hooks/use-toast";
+import { motion } from "framer-motion";
 
 export const ProductManagement = () => {
   const { toast } = useToast();
@@ -25,6 +25,10 @@ export const ProductManagement = () => {
   const [level2Products, setLevel2Products] = useState<Level2Product[]>([]);
   const [level3Products, setLevel3Products] = useState<Level3Product[]>([]);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [selectedLevel1, setSelectedLevel1] = useState<Level1Product | null>(null);
+  const [selectedLevel2, setSelectedLevel2] = useState<Level2Product | null>(null);
+  const [selectedSlot, setSelectedSlot] = useState<number | null>(null);
+  const chassisCanvasRef = useRef<HTMLCanvasElement>(null);
 
   // Form visibility state
   const [showLevel1Form, setShowLevel1Form] = useState(false);
@@ -174,6 +178,75 @@ export const ProductManagement = () => {
         variant: "destructive" 
       });
     }
+  };
+
+  const handleLevel1Select = (product: Level1Product) => {
+    setSelectedLevel1(product);
+    setSelectedLevel2(null);
+    const level2 = level2Products.filter(p => p.parent_product_id === product.id);
+    if (level2.length > 0) {
+      setSelectedLevel2(level2[0]);
+    }
+  };
+
+  const handleLevel2Select = (product: Level2Product) => {
+    setSelectedLevel2(product);
+    // Auto-scroll to level 3 section
+    const level3Section = document.getElementById('level3-section');
+    if (level3Section) {
+      level3Section.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
+  const handleChassisSlotClick = (slotId: number) => {
+    setSelectedSlot(slotId);
+    const slot = document.getElementById(`slot-${slotId}`);
+    if (slot) {
+      slot.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
+  const renderChassisCanvas = (chassis: Level2Product) => {
+    if (!chassisCanvasRef.current) return null;
+
+    const canvas = chassisCanvasRef.current;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+
+    const width = canvas.width;
+    const height = canvas.height;
+    const slotHeight = height / (chassis.slot_count || 4);
+
+    // Clear canvas
+    ctx.clearRect(0, 0, width, height);
+
+    // Draw chassis outline
+    ctx.strokeStyle = '#333';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(0, 0, width, height);
+
+    // Draw slots
+    for (let i = 0; i < (chassis.slot_count || 4); i++) {
+      const y = i * slotHeight;
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(width, y);
+      ctx.stroke();
+
+      // Draw slot number
+      ctx.font = '12px Arial';
+      ctx.fillStyle = '#666';
+      ctx.fillText(`Slot ${i + 1}`, 10, y + 15);
+    }
+
+    // Highlight selected slot
+    if (selectedSlot !== null) {
+      const y = selectedSlot * slotHeight;
+      ctx.fillStyle = '#4f46e520';
+      ctx.fillRect(0, y, width, slotHeight);
+    }
+
+    return null;
   };
 
   if (isLoading) {
@@ -457,6 +530,119 @@ export const ProductManagement = () => {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {selectedLevel1 && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3 }}
+          id="level2-section"
+        >
+          <Card className="bg-gray-900 border-gray-800">
+            <CardHeader>
+              <CardTitle>Level 2 Products</CardTitle>
+              <CardDescription>Chassis Configuration</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="relative w-full h-64 bg-gray-100 rounded-lg overflow-hidden">
+                  <canvas 
+                    ref={chassisCanvasRef}
+                    className="w-full h-full cursor-pointer"
+                    onClick={(e) => {
+                      if (!chassisCanvasRef.current) return;
+                      const rect = chassisCanvasRef.current.getBoundingClientRect();
+                      const y = e.clientY - rect.top;
+                      const slotHeight = rect.height / (selectedLevel2?.slot_count || 4);
+                      const slotId = Math.floor(y / slotHeight);
+                      handleChassisSlotClick(slotId);
+                    }}
+                  />
+                  {selectedLevel2?.slot_mapping && (
+                    <div className="absolute top-0 left-0 w-full h-full pointer-events-none">
+                      {JSON.parse(selectedLevel2.slot_mapping).map((slot: any, index: number) => (
+                        <div
+                          key={index}
+                          className="absolute inset-0 flex items-center justify-center"
+                          style={{
+                            top: `${(index * 100) / (selectedLevel2.slot_count || 4)}%`,
+                            height: `${100 / (selectedLevel2.slot_count || 4)}%`
+                          }}
+                        >
+                          <div className="text-sm text-gray-600">
+                            {slot.product_type}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                {level2Products
+                  .filter(p => p.parent_product_id === selectedLevel1.id)
+                  .map((product) => (
+                    <Button
+                      key={product.id}
+                      variant="outline"
+                      onClick={() => setSelectedLevel2(product)}
+                      className={selectedLevel2?.id === product.id ? 'bg-primary text-primary-foreground' : ''}
+                    >
+                      {product.name}
+                    </Button>
+                  ))}
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+      )}
+
+      {selectedLevel2 && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3 }}
+          id="level3-section"
+        >
+          <Card className="bg-gray-900 border-gray-800">
+            <CardHeader>
+              <CardTitle>Level 3 Products</CardTitle>
+              <CardDescription>Card Selection</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {level3Products
+                  .filter(p => p.parent_product_id === selectedLevel2.id)
+                  .map((product) => (
+                    <Card key={product.id}>
+                      <CardHeader>
+                        <CardTitle>{product.name}</CardTitle>
+                        {selectedSlot !== null && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              // Assign product to selected slot
+                              const updatedSlotMapping = JSON.parse(selectedLevel2.slot_mapping || '{}');
+                              updatedSlotMapping[selectedSlot] = {
+                                product_type: product.name,
+                                product_id: product.id
+                              };
+                              
+                              // Update chassis slot mapping
+                              productDataService.updateChassisSlotMapping(selectedLevel2.id, JSON.stringify(updatedSlotMapping));
+                              setSelectedSlot(null);
+                            }}
+                          >
+                            Assign to Slot {selectedSlot + 1}
+                          </Button>
+                        )}
+                      </CardHeader>
+                    </Card>
+                  ))}
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+      )}
     </div>
   );
 };

@@ -98,173 +98,79 @@ function useProvideAuth(): AuthContextType {
   useEffect(() => {
     console.log('[useAuth] Initializing auth state...');
     
-    const maxLoadingTimeout = setTimeout(() => {
-      console.warn('[useAuth] Maximum loading timeout reached, forcing loading to false');
+    const { data: { subscription: authListener } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('[useAuth] Auth state changed:', event);
+      setSession(session);
+      if (session) {
+        const profile = await fetchProfile(session.user.id);
+        setUser(profile);
+      } else {
+        setUser(null);
+      }
       setLoading(false);
-    }, 8000);
-
-    const { data: listener } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        console.log('[useAuth] Auth state change:', event, session?.user?.email || 'no user');
-        
-        clearTimeout(maxLoadingTimeout);
-        setSession(session);
-        
-        if (session?.user) {
-          console.log('[useAuth] User session found, fetching profile...');
-          try {
-            const profile = await fetchProfile(session.user.id, 3000);
-            
-            if (profile) {
-              setUser(profile);
-              
-              if (event === 'SIGNED_IN') {
-                await supabase.rpc('update_user_login', {
-                  p_user_id: session.user.id,
-                  p_success: true
-                });
-                await logSecurityEvent('session_established');
-                await trackUserSession();
-              }
-            } else {
-              console.warn('[useAuth] No profile found, signing out user');
-              await supabase.auth.signOut();
-              setUser(null);
-              setSession(null);
-            }
-          } catch (error) {
-            console.error('[useAuth] Error fetching profile in auth state change:', error);
-            await supabase.auth.signOut();
-            setUser(null);
-            setSession(null);
-          } finally {
-            setLoading(false);
-          }
-        } else {
-          console.log('[useAuth] No user session, clearing user state');
-          if (event === 'SIGNED_OUT') {
-            await logSecurityEvent('session_terminated');
-            setUser(null);
-            setSession(null);
-            localStorage.clear();
-            sessionStorage.clear();
-          }
-          setUser(null);
-          setLoading(false);
-        }
-      }
-    );
-
-    const getInitialSession = async () => {
-      try {
-        const sessionPromise = supabase.auth.getSession();
-        const timeoutPromise = new Promise<never>((_, reject) => {
-          setTimeout(() => reject(new Error('Session fetch timeout')), 5000);
-        });
-
-        const { data: { session }, error } = await Promise.race([sessionPromise, timeoutPromise]);
-        
-        if (error) {
-          console.error('[useAuth] getSession error:', error);
-          clearTimeout(maxLoadingTimeout);
-          setLoading(false);
-          return;
-        }
-        
-        console.log('[useAuth] Initial session check:', session?.user?.email || 'no session');
-        setSession(session);
-        
-        if (session?.user) {
-          const profile = await fetchProfile(session.user.id, 3000);
-          if (profile) {
-            setUser(profile);
-          } else {
-            await supabase.auth.signOut();
-          }
-        }
-      } catch (err) {
-        console.error('[useAuth] getSession timeout or error:', err);
-      } finally {
-        clearTimeout(maxLoadingTimeout);
-        setLoading(false);
-      }
-    };
-
-    getInitialSession();
+    });
 
     return () => {
-      console.log('[useAuth] Cleaning up auth listener...');
-      clearTimeout(maxLoadingTimeout);
-      listener.subscription.unsubscribe();
+      authListener.unsubscribe();
     };
   }, []);
 
   const signIn = async (email: string, password: string) => {
-    console.log('[useAuth] Signing in user:', email);
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      setLoading(true);
+      const { data, error } = await supabase.auth.signInWithPassword({
         email,
-        password
+        password,
       });
-      
-      if (error) {
-        const { data: userData } = await supabase
-          .from('profiles')
-          .select('id')
-          .eq('email', email)
-          .single();
-          
-        if (userData) {
-          await supabase.rpc('update_user_login', {
-            p_user_id: userData.id,
-            p_success: false
-          });
-        }
+
+      if (error) throw error;
+
+      if (data.session) {
+        const profile = await fetchProfile(data.session.user.id);
+        setUser(profile);
+        setSession(data.session);
       }
-      
+
+      return { error: null };
+    } catch (error) {
+      console.error('[useAuth] Sign in error:', error);
       return { error };
-    } catch (err) {
-      console.error('[useAuth] Sign in error:', err);
-      return { error: err };
+    } finally {
+      setLoading(false);
     }
   };
 
   const signOut = async () => {
-    console.log('[useAuth] Signing out user...');
     try {
-      await logSecurityEvent('logout_initiated');
-      
-      // Clear state immediately
-      setUser(null);
-      setSession(null);
-      
-      // Clear browser storage
-      localStorage.clear();
-      sessionStorage.clear();
-      
+      setLoading(true);
       const { error } = await supabase.auth.signOut();
-      
-      // Force redirect to ensure clean state
-      window.location.href = '/';
-      
-      return { error };
-    } catch (err) {
-      console.error('[useAuth] Sign out error:', err);
-      // Force clear state and redirect on error
+      if (error) throw error;
       setUser(null);
       setSession(null);
-      localStorage.clear();
-      sessionStorage.clear();
-      window.location.href = '/';
-      return { error: err };
+      return { error: null };
+    } catch (error) {
+      console.error('[useAuth] Sign out error:', error);
+      return { error };
+    } finally {
+      setLoading(false);
     }
   };
+
+  // Redirect to login if no session
+  useEffect(() => {
+    if (!loading && !session) {
+      const currentPath = window.location.pathname;
+      if (!['/login', '/auth'].includes(currentPath)) {
+        window.location.href = '/login';
+      }
+    }
+  }, [loading, session]);
 
   return {
     user,
     session,
     loading,
     signIn,
-    signOut
+    signOut,
   };
 }
