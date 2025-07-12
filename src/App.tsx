@@ -33,6 +33,8 @@ const App = () => {
                 <Routes>
                   <Route path="/" element={<Index />} />
                   <Route path="/bom-builder" element={<BOMBuilderPage />} />
+                  <Route path="/quotes" element={<Index />} />
+                  <Route path="/admin" element={<Index />} />
                   <Route path="*" element={<NotFound />} />
                 </Routes>
               </BrowserRouter>

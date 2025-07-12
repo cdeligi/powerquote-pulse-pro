@@ -51,10 +51,10 @@ const Sidebar = ({ user, activeView, onViewChange, onLogout }: SidebarProps) => 
   }, []);
 
   const menuItems = [
-    { id: 'overview', label: 'Dashboard', icon: Home, href: '/' },
-    { id: 'bom', label: 'BOM Builder', icon: Calculator, href: '/bom-builder' },
-    { id: 'quotes', label: 'Quotes', icon: FileText, href: '/quotes' },
-    ...(user.role === 'admin' ? [{ id: 'admin' as const, label: 'Admin Panel', icon: Wrench, href: '/admin' }] : [])
+    { id: 'overview', label: 'Dashboard', icon: Home },
+    { id: 'bom', label: 'BOM Builder', icon: Calculator },
+    { id: 'quotes', label: 'Quotes', icon: FileText },
+    ...(user.role === 'admin' ? [{ id: 'admin' as const, label: 'Admin Panel', icon: Wrench }] : [])
   ];
 
   const getRoleBadge = (role: string) => {
