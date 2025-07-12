@@ -99,7 +99,12 @@ export const withCircuitBreaker = async <T>(
     throw new Error(`No circuit breaker configured for operation: ${operationName}`);
   }
 
-  return breaker.execute(operation);
+    if ('execute' in breaker) {
+      return breaker.execute(operation);
+    } else {
+      // For complex breakers, use the auth circuit breaker as fallback
+      return circuitBreakers.auth.execute(operation);
+    }
 };
 
 // Example usage:
