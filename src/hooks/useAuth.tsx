@@ -156,15 +156,7 @@ function useProvideAuth(): AuthContextType {
     }
   };
 
-  // Redirect to login if no session
-  useEffect(() => {
-    if (!loading && !session) {
-      const currentPath = window.location.pathname;
-      if (!['/login', '/auth'].includes(currentPath)) {
-        window.location.href = '/login';
-      }
-    }
-  }, [loading, session]);
+  // No automatic redirects - let the Index component handle authentication state
 
   return {
     user,

@@ -9,13 +9,14 @@ class ProductDataService {
     this.initialized = true;
   }
 
-  // Basic product fetching
+  // Basic product fetching - Fixed to return arrays instead of promises
   async getLevel1Products(): Promise<Level1Product[]> {
     try {
       const { data, error } = await supabase
         .from('products')
         .select('*')
-        .eq('category', 'level1')
+        .eq('category', 'Level1')
+        .eq('is_active', true)
         .limit(50);
 
       if (error) throw error;
@@ -31,7 +32,8 @@ class ProductDataService {
       const { data, error } = await supabase
         .from('products')
         .select('*')
-        .eq('category', 'level2')
+        .eq('category', 'Level2')
+        .eq('is_active', true)
         .limit(50);
 
       if (error) throw error;
@@ -50,7 +52,8 @@ class ProductDataService {
       const { data, error } = await supabase
         .from('products')
         .select('*')
-        .eq('category', 'level3')
+        .eq('category', 'Level3')
+        .eq('is_active', true)
         .limit(50);
 
       if (error) throw error;
