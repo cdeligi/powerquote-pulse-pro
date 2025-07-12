@@ -8,8 +8,8 @@ interface CircuitBreakerConfig {
 
 const defaultConfig: CircuitBreakerConfig = {
   maxFailures: 3,
-  resetTimeout: 5000, // 5 seconds
-  timeout: 3000, // 3 seconds
+  resetTimeout: 10000, // 10 seconds to prevent rapid retries
+  timeout: 1000, // 1 second for faster failure detection
 };
 
 class CircuitBreaker {
@@ -67,23 +67,23 @@ class CircuitBreaker {
   }
 }
 
-// Create circuit breakers for common operations
+// Create circuit breakers for common operations with optimized timeouts
 const circuitBreakers = {
-  auth: new CircuitBreaker('Auth', { maxFailures: 3, timeout: 3000 }),
-  profile: new CircuitBreaker('Profile', { maxFailures: 3, timeout: 3000 }),
+  auth: new CircuitBreaker('Auth', { maxFailures: 2, timeout: 1000, resetTimeout: 10000 }),
+  profile: new CircuitBreaker('Profile', { maxFailures: 2, timeout: 1000, resetTimeout: 10000 }),
   products: {
-    level1: new CircuitBreaker('Products.Level1', { maxFailures: 3, timeout: 3000 }),
-    level2: new CircuitBreaker('Products.Level2', { maxFailures: 3, timeout: 3000 }),
-    level3: new CircuitBreaker('Products.Level3', { maxFailures: 3, timeout: 3000 }),
-    level4: new CircuitBreaker('Products.Level4', { maxFailures: 3, timeout: 3000 }),
-    chassis: new CircuitBreaker('Products.Chassis', { maxFailures: 3, timeout: 3000 }),
+    level1: new CircuitBreaker('Products.Level1', { maxFailures: 2, timeout: 1000, resetTimeout: 10000 }),
+    level2: new CircuitBreaker('Products.Level2', { maxFailures: 2, timeout: 1000, resetTimeout: 10000 }),
+    level3: new CircuitBreaker('Products.Level3', { maxFailures: 2, timeout: 1000, resetTimeout: 10000 }),
+    level4: new CircuitBreaker('Products.Level4', { maxFailures: 2, timeout: 1000, resetTimeout: 10000 }),
+    chassis: new CircuitBreaker('Products.Chassis', { maxFailures: 2, timeout: 1000, resetTimeout: 10000 }),
   },
   bom: {
-    create: new CircuitBreaker('BOM.Create', { maxFailures: 3, timeout: 3000 }),
-    update: new CircuitBreaker('BOM.Update', { maxFailures: 3, timeout: 3000 }),
-    delete: new CircuitBreaker('BOM.Delete', { maxFailures: 3, timeout: 3000 }),
+    create: new CircuitBreaker('BOM.Create', { maxFailures: 2, timeout: 1000, resetTimeout: 10000 }),
+    update: new CircuitBreaker('BOM.Update', { maxFailures: 2, timeout: 1000, resetTimeout: 10000 }),
+    delete: new CircuitBreaker('BOM.Delete', { maxFailures: 2, timeout: 1000, resetTimeout: 10000 }),
   },
-  sessions: new CircuitBreaker('Sessions', { maxFailures: 3, timeout: 3000 }),
+  sessions: new CircuitBreaker('Sessions', { maxFailures: 2, timeout: 1000, resetTimeout: 10000 }),
 };
 
 // Export utility functions
