@@ -72,16 +72,16 @@ class ProductDataService {
   getLevel4ProductsSync(): any[] { return []; }
 
   // Relationship methods
-  async getLevel2ProductsForLevel1(level1Id: string): Promise<Level2Product[]> { return []; }
-  async getLevel3ProductsForLevel2(level2Id: string): Promise<Level3Product[]> { return []; }
+  getLevel2ProductsForLevel1(level1Id: string): Level2Product[] { return []; }
+  getLevel3ProductsForLevel2(level2Id: string): Level3Product[] { return []; }
 
   // CRUD methods
   async saveLevel1Product(product: any): Promise<void> { console.log('Saving level1 product:', product); }
   async saveLevel2Product(product: any): Promise<void> { console.log('Saving level2 product:', product); }
   async saveLevel3Product(product: any): Promise<void> { console.log('Saving level3 product:', product); }
-  async updateLevel1Product(product: any): Promise<void> { console.log('Updating level1 product:', product); }
-  async updateLevel2Product(product: any): Promise<void> { console.log('Updating level2 product:', product); }
-  async updateLevel3Product(product: any): Promise<void> { console.log('Updating level3 product:', product); }
+  async updateLevel1Product(id: string, product: any): Promise<void> { console.log('Updating level1 product:', id, product); }
+  async updateLevel2Product(id: string, product: any): Promise<void> { console.log('Updating level2 product:', id, product); }
+  async updateLevel3Product(id: string, product: any): Promise<void> { console.log('Updating level3 product:', id, product); }
   async deleteLevel1Product(id: string): Promise<void> { console.log('Deleting level1 product:', id); }
   async deleteLevel2Product(id: string): Promise<void> { console.log('Deleting level2 product:', id); }
   async deleteLevel3Product(id: string): Promise<void> { console.log('Deleting level3 product:', id); }
@@ -96,17 +96,19 @@ class ProductDataService {
   getAssetTypesSync(): any[] { return []; }
 
   // Sensor configuration
-  async getAnalogSensorTypes(): Promise<any[]> { return []; }
-  async getBushingTapModels(): Promise<any[]> { return []; }
-  async updateAnalogSensorType(sensorType: any): Promise<void> { console.log('Updating analog sensor type:', sensorType); }
+  getAnalogSensorTypes(): any[] { return []; }
+  getBushingTapModels(): any[] { return []; }
+  async updateAnalogSensorType(id: string, sensorType: any): Promise<void> { console.log('Updating analog sensor type:', id, sensorType); }
   async createAnalogSensorType(sensorType: any): Promise<void> { console.log('Creating analog sensor type:', sensorType); }
   async deleteAnalogSensorType(id: string): Promise<void> { console.log('Deleting analog sensor type:', id); }
-  async updateBushingTapModel(model: any): Promise<void> { console.log('Updating bushing tap model:', model); }
+  async updateBushingTapModel(id: string, model: any): Promise<void> { console.log('Updating bushing tap model:', id, model); }
   async createBushingTapModel(model: any): Promise<void> { console.log('Creating bushing tap model:', model); }
   async deleteBushingTapModel(id: string): Promise<void> { console.log('Deleting bushing tap model:', id); }
 
   // Sync methods
-  async replaceAllProducts(products: any[]): Promise<void> { console.log('Replacing all products:', products.length); }
+  async replaceAllProducts(level1: any[], level2?: any[], level3?: any[], level4?: any[]): Promise<void> { 
+    console.log('Replacing all products:', level1.length, level2?.length, level3?.length, level4?.length); 
+  }
 }
 
 export const productDataService = new ProductDataService();
