@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { User } from "@/types/auth";
 import QuoteApprovalDashboard from "./QuoteApprovalDashboard";
 import UserManagementEnhanced from "./UserManagementEnhanced";
-import { ProductManagement } from "./ProductManagement";
+import ProductManagement from "./ProductManagement";
 import QuoteFieldConfiguration from "./QuoteFieldConfiguration";
 import AdminSettings from "./AdminSettings";
 import AdminMarginDashboard from "./AdminMarginDashboard";
