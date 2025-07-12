@@ -71,7 +71,7 @@ class ProductDataService {
         console.warn('ProductDataService: Initialization timeout, using defaults');
         this.loadDefaults();
         this.initialized = true;
-      }, 5000);
+      }, 2000);
 
       // Step 1: Try to load from database first
       const dbSuccess = await this.loadFromDatabase();
@@ -111,48 +111,47 @@ class ProductDataService {
       
       // Set a timeout for database operations
       const dbTimeout = new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error('Database timeout')), 3000);
+        setTimeout(() => reject(new Error('Database timeout')), 1500);
       });
 
+      // Use unified products table approach to prevent failed queries
       const dbOperations = Promise.all([
         withCircuitBreaker('products.level1', () => 
-          supabase.from('products').select('*').eq('category', 'level1').eq('is_active', true)
-        ),
-        withCircuitBreaker('products.level2', () => 
-          supabase.from('products').select('*').eq('category', 'level2').eq('is_active', true)
-        ),
-        withCircuitBreaker('products.level3', () => 
-          supabase.from('products').select('*').eq('category', 'level3').eq('is_active', true)
+          supabase.from('products').select('*').eq('is_active', true).limit(50)
         ),
         withCircuitBreaker('products.level4', () => 
-          supabase.from('level4_products').select('*').eq('enabled', true)
+          supabase.from('level4_products').select('*').eq('enabled', true).limit(50)
         ),
         withCircuitBreaker('products.l1l2', () => 
-          supabase.from('level1_level2_relationships').select('*')
+          supabase.from('level1_level2_relationships').select('*').limit(50)
         ),
         withCircuitBreaker('products.l2l3', () => 
-          supabase.from('level2_level3_relationships').select('*')
+          supabase.from('level2_level3_relationships').select('*').limit(50)
         )
       ]);
 
       const [
-        { data: level1Data, error: l1Error },
-        { data: level2Data, error: l2Error },
-        { data: level3Data, error: l3Error },
+        { data: productsData, error: productsError },
         { data: level4Data, error: l4Error },
         { data: l1l2Relations, error: l1l2Error },
         { data: l2l3Relations, error: l2l3Error }
       ] = await Promise.race([dbOperations, dbTimeout]);
 
-      if (l1Error || l2Error || l3Error || l4Error || l1l2Error || l2l3Error) {
-        console.warn('ProductDataService: Database errors:', { l1Error, l2Error, l3Error, l4Error, l1l2Error, l2l3Error });
+      if (productsError || l4Error || l1l2Error || l2l3Error) {
+        console.warn('ProductDataService: Database errors:', { productsError, l4Error, l1l2Error, l2l3Error });
         return false;
       }
 
+      // Split products by category from unified table
+      const allProducts = productsData || [];
+      const level1Data = allProducts.filter(p => p.category === 'level1' || !p.category);
+      const level2Data = allProducts.filter(p => p.category === 'level2');
+      const level3Data = allProducts.filter(p => p.category === 'level3');
+
       // Transform database format to our format with proper relationships and ensure cost data flows through
-      this.level1Products = this.transformDbToLevel1(level1Data || []);
-      this.level2Products = this.transformDbToLevel2(level2Data || [], l1l2Relations || []);
-      this.level3Products = this.transformDbToLevel3(level3Data || [], l2l3Relations || []);
+      this.level1Products = this.transformDbToLevel1(level1Data);
+      this.level2Products = this.transformDbToLevel2(level2Data, l1l2Relations || []);
+      this.level3Products = this.transformDbToLevel3(level3Data, l2l3Relations || []);
       this.level4Products = level4Data || [];
 
       // Load other data types (use defaults for now since they're not in DB)

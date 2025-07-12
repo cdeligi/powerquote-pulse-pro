@@ -36,11 +36,11 @@ function useProvideAuth(): AuthContextType {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const fetchProfile = async (uid: string, timeoutMs: number = 5000): Promise<AppUser | null> => {
+  const fetchProfile = async (uid: string, timeoutMs: number = 2000): Promise<AppUser | null> => {
     console.log('[useAuth] fetchProfile start for:', uid);
     
-    // Special handling for admin user
-    if (uid === 'c95d7569-8685-4bfd-be40-86c33029639f') {
+    // Special handling for admin user - Updated to match database
+    if (uid === '7f6234f4-a195-4fae-a4e0-fa30c4026c6f') {
       console.log('[useAuth] Special admin user detected');
       return {
         id: uid,
@@ -86,12 +86,12 @@ function useProvideAuth(): AuthContextType {
   };
 
   const logSecurityEvent = async (action: string, details: any = {}) => {
-    // Temporarily disabled to prevent credit consumption
-    console.log('[useAuth] Security event:', { action, details });
+    // Disabled to prevent credit consumption - only log locally
+    console.log('[useAuth] Security event (disabled):', { action, details });
   };
 
   const trackUserSession = async () => {
-    // Temporarily disabled to prevent credit consumption
+    // Disabled to prevent credit consumption - only log locally
     console.log('[useAuth] User session tracking disabled');
   };
 
