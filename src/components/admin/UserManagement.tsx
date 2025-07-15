@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { User } from "@/types/auth";
 import { UserRegistrationRequest, SecurityAuditLog } from "@/types/user-management";
@@ -75,7 +76,7 @@ const UserManagement = ({ user }: UserManagementProps) => {
         throw new Error('No session found');
       }
 
-      const response = await fetch(`${supabase.supabaseUrl}/functions/v1/admin-users`, {
+      const response = await fetch(`https://cwhmxpitwblqxgrvaigg.supabase.co/functions/v1/admin-users`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${session.access_token}`,
@@ -126,7 +127,7 @@ const UserManagement = ({ user }: UserManagementProps) => {
         throw new Error('No session found');
       }
 
-      const response = await fetch(`${supabase.supabaseUrl}/functions/v1/admin-users`, {
+      const response = await fetch(`https://cwhmxpitwblqxgrvaigg.supabase.co/functions/v1/admin-users`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${session.access_token}`,
@@ -192,7 +193,7 @@ const UserManagement = ({ user }: UserManagementProps) => {
         throw new Error('No session found');
       }
 
-      const response = await fetch(`${supabase.supabaseUrl}/functions/v1/admin-users`, {
+      const response = await fetch(`https://cwhmxpitwblqxgrvaigg.supabase.co/functions/v1/admin-users`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${session.access_token}`,
