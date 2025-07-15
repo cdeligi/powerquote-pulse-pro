@@ -1,7 +1,6 @@
 
 /**
  * © 2025 Qualitrol Corp. All rights reserved.
- * Confidential and proprietary. Unauthorized copying or distribution is prohibited.
  */
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -11,13 +10,11 @@ import { BOMItemWithDetails } from "@/hooks/useQuotes";
 import { QuoteInformation } from "./QuoteInformation";
 import BOMAnalysis from "./BOMAnalysis";
 import ApprovalActions from "./ApprovalActions";
-import { User } from "@/types/auth";
 
 interface QuoteDetailsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   quote: Partial<Quote> | null;
-  user: User;
   bomItems: BOMItemWithDetails[];
   loadingBom: boolean;
   editingPrices: Record<string, string>;
@@ -40,7 +37,6 @@ export const QuoteDetailsDialog = ({
   open,
   onOpenChange,
   quote,
-  user,
   bomItems,
   loadingBom,
   editingPrices,
@@ -105,7 +101,6 @@ export const QuoteDetailsDialog = ({
           {isFullQuote && (
             <ApprovalActions
               quote={quote}
-              user={user}
               approvedDiscount={approvedDiscount}
               approvalNotes={approvalNotes}
               rejectionReason={rejectionReason}

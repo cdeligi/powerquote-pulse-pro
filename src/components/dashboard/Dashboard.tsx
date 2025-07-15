@@ -2,8 +2,8 @@
 import { useState } from "react";
 import { User } from "@/types/auth";
 import Sidebar from "./Sidebar";
-import EnhancedDashboardOverview from "./EnhancedDashboardOverview";
-import HierarchicalBOMBuilder from "../bom/HierarchicalBOMBuilder";
+import DashboardOverview from "./DashboardOverview";
+import BOMBuilder from "../bom/BOMBuilder";
 import QuoteManager from "../quotes/QuoteManager";
 import AdminPanel from "../admin/AdminPanel";
 import { BOMItem } from "@/types/product";
@@ -26,13 +26,12 @@ const Dashboard = ({ user, onLogout }: DashboardProps) => {
   const renderContent = () => {
     switch (activeView) {
       case 'overview':
-        return <EnhancedDashboardOverview user={user} />;
+        return <DashboardOverview user={user} />;
       case 'bom':
         return (
-          <HierarchicalBOMBuilder
-            isOpen={true}
-            onClose={() => setActiveView('overview')}
-            mode="create"
+          <BOMBuilder 
+            onBOMUpdate={handleBOMUpdate}
+            canSeePrices={user.role === 'admin'}
           />
         );
       case 'quotes':
@@ -40,22 +39,20 @@ const Dashboard = ({ user, onLogout }: DashboardProps) => {
       case 'admin':
         return user.role === 'admin' ? <AdminPanel user={user} /> : <div className="text-white">Access Denied</div>;
       default:
-        return <EnhancedDashboardOverview user={user} />;
+        return <DashboardOverview user={user} />;
     }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-muted/30 to-background flex">
+    <div className="min-h-screen bg-black flex">
       <Sidebar 
         user={user}
         activeView={activeView}
         onViewChange={setActiveView}
         onLogout={onLogout}
       />
-      <main className="flex-1 transition-all duration-300 ease-in-out" style={{ marginLeft: 'var(--sidebar-width, 4rem)' }}>
-        <div className="container mx-auto p-6">
-          {renderContent()}
-        </div>
+      <main className="flex-1 ml-64 p-8">
+        {renderContent()}
       </main>
     </div>
   );

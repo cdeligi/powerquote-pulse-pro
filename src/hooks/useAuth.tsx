@@ -1,7 +1,3 @@
-/**
- *  2025 Qualitrol Corp. All rights reserved.
- *  Confidential and proprietary. Unauthorized copying or distribution is prohibited.
- */
 
 import { useState, useEffect, useContext, createContext } from 'react';
 import { Session, User } from '@supabase/supabase-js';
@@ -36,133 +32,199 @@ function useProvideAuth(): AuthContextType {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const fetchProfile = async (uid: string, timeoutMs: number = 2000): Promise<AppUser | null> => {
+  const fetchProfile = async (uid: string, timeoutMs: number = 3000): Promise<void> => {
     console.log('[useAuth] fetchProfile start for:', uid);
     
-    // Special handling for admin user - Updated to match database
-    if (uid === '7f6234f4-a195-4fae-a4e0-fa30c4026c6f') {
-      console.log('[useAuth] Special admin user detected');
-      return {
-        id: uid,
-        email: 'cdeligi@qualitrolcorp.com',
-        name: 'Carlos Deligi',
-        role: 'admin',
-        department: 'Management'
-      };
-    }
-    
+    // Create a timeout promise
     const timeoutPromise = new Promise<never>((_, reject) => {
       setTimeout(() => reject(new Error('Profile fetch timeout')), timeoutMs);
     });
     
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return null;
-
-      const { data: profile, error: profileError } = await supabase
+      const profilePromise = supabase
         .from('profiles')
         .select('*')
-        .eq('id', user.id)
+        .eq('id', uid)
         .single();
 
-      if (profileError) throw profileError;
+      const { data, error } = await Promise.race([profilePromise, timeoutPromise]);
 
-      const isMainAdmin = profile.email === 'cdeligi@qualitrolcorp.com';
-      const userRole = isMainAdmin ? 'admin' : (profile.role as 'level1' | 'level2' | 'admin' | 'finance');
-      
-      const appUser: AppUser = {
-        id: profile.id,
-        name: `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || 
-              (isMainAdmin ? 'Admin User' : 'User'),
-        email: profile.email,
-        role: userRole,
-        department: profile.department
-      };
-      return appUser;
+      if (error) {
+        if (error.code === 'PGRST116') {
+          console.warn('[useAuth] No profile found for user:', uid);
+          // Create a default user profile if none exists
+          const defaultUser: AppUser = {
+            id: uid,
+            name: 'User',
+            email: session?.user?.email || 'unknown@example.com',
+            role: 'level1',
+            department: undefined
+          };
+          setUser(defaultUser);
+        } else {
+          console.error('[useAuth] Profile fetch error:', error);
+          // Create fallback user even on error
+          const fallbackUser: AppUser = {
+            id: uid,
+            name: 'User',
+            email: session?.user?.email || 'unknown@example.com',
+            role: 'level1',
+            department: undefined
+          };
+          setUser(fallbackUser);
+        }
+        return;
+      }
+
+      if (data) {
+        console.log('[useAuth] Profile loaded successfully:', data.email);
+        const appUser: AppUser = {
+          id: data.id,
+          name: `${data.first_name || ''} ${data.last_name || ''}`.trim() || 'User',
+          email: data.email,
+          role: data.role as 'level1' | 'level2' | 'admin',
+          department: data.department
+        };
+        setUser(appUser);
+      } else {
+        console.warn('[useAuth] Profile data is null for user:', uid);
+        // Create fallback user
+        const fallbackUser: AppUser = {
+          id: uid,
+          name: 'User',
+          email: session?.user?.email || 'unknown@example.com',
+          role: 'level1',
+          department: undefined
+        };
+        setUser(fallbackUser);
+      }
     } catch (err) {
       console.error('[useAuth] Profile fetch timeout or error:', err);
-      return null;
+      // Always create a fallback user to prevent loading hang
+      const fallbackUser: AppUser = {
+        id: uid,
+        name: 'User',
+        email: session?.user?.email || 'unknown@example.com',
+        role: 'level1',
+        department: undefined
+      };
+      setUser(fallbackUser);
     }
-  };
-
-  const logSecurityEvent = async (action: string, details: any = {}) => {
-    // Disabled to prevent credit consumption - only log locally
-    console.log('[useAuth] Security event (disabled):', { action, details });
-  };
-
-  const trackUserSession = async () => {
-    // Disabled to prevent credit consumption - only log locally
-    console.log('[useAuth] User session tracking disabled');
   };
 
   useEffect(() => {
     console.log('[useAuth] Initializing auth state...');
     
-    const { data: { subscription: authListener } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('[useAuth] Auth state changed:', event);
-      setSession(session);
-      if (session) {
-        const profile = await fetchProfile(session.user.id);
-        setUser(profile);
-      } else {
-        setUser(null);
-      }
+    // Force loading to false after maximum timeout
+    const maxLoadingTimeout = setTimeout(() => {
+      console.warn('[useAuth] Maximum loading timeout reached, forcing loading to false');
       setLoading(false);
-    });
+    }, 8000);
+
+    // Setup auth state listener first
+    const { data: listener } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        console.log('[useAuth] Auth state change:', event, session?.user?.email || 'no user');
+        
+        clearTimeout(maxLoadingTimeout);
+        setSession(session);
+        
+        if (session?.user) {
+          console.log('[useAuth] User session found, fetching profile...');
+          try {
+            await fetchProfile(session.user.id, 3000);
+          } catch (error) {
+            console.error('[useAuth] Error fetching profile in auth state change:', error);
+            // Create fallback user
+            const fallbackUser: AppUser = {
+              id: session.user.id,
+              name: 'User',
+              email: session.user.email || 'unknown@example.com',
+              role: 'level1',
+              department: undefined
+            };
+            setUser(fallbackUser);
+          } finally {
+            setLoading(false);
+          }
+        } else {
+          console.log('[useAuth] No user session, clearing user state');
+          setUser(null);
+          setLoading(false);
+        }
+      }
+    );
+
+    // Get initial session with timeout
+    const getInitialSession = async () => {
+      try {
+        const sessionPromise = supabase.auth.getSession();
+        const timeoutPromise = new Promise<never>((_, reject) => {
+          setTimeout(() => reject(new Error('Session fetch timeout')), 5000);
+        });
+
+        const { data: { session }, error } = await Promise.race([sessionPromise, timeoutPromise]);
+        
+        if (error) {
+          console.error('[useAuth] getSession error:', error);
+          clearTimeout(maxLoadingTimeout);
+          setLoading(false);
+          return;
+        }
+        
+        console.log('[useAuth] Initial session check:', session?.user?.email || 'no session');
+        setSession(session);
+        
+        if (session?.user) {
+          await fetchProfile(session.user.id, 3000);
+        }
+      } catch (err) {
+        console.error('[useAuth] getSession timeout or error:', err);
+      } finally {
+        clearTimeout(maxLoadingTimeout);
+        setLoading(false);
+      }
+    };
+
+    getInitialSession();
 
     return () => {
-      authListener.unsubscribe();
+      console.log('[useAuth] Cleaning up auth listener...');
+      clearTimeout(maxLoadingTimeout);
+      listener.subscription.unsubscribe();
     };
   }, []);
 
   const signIn = async (email: string, password: string) => {
+    console.log('[useAuth] Signing in user:', email);
     try {
-      setLoading(true);
-      const { data, error } = await supabase.auth.signInWithPassword({
+      const { error } = await supabase.auth.signInWithPassword({
         email,
-        password,
+        password
       });
-
-      if (error) throw error;
-
-      if (data.session) {
-        const profile = await fetchProfile(data.session.user.id);
-        setUser(profile);
-        setSession(data.session);
-      }
-
-      return { error: null };
-    } catch (error) {
-      console.error('[useAuth] Sign in error:', error);
       return { error };
-    } finally {
-      setLoading(false);
+    } catch (err) {
+      console.error('[useAuth] Sign in error:', err);
+      return { error: err };
     }
   };
 
   const signOut = async () => {
+    console.log('[useAuth] Signing out user...');
     try {
-      setLoading(true);
       const { error } = await supabase.auth.signOut();
-      if (error) throw error;
-      setUser(null);
-      setSession(null);
-      return { error: null };
-    } catch (error) {
-      console.error('[useAuth] Sign out error:', error);
       return { error };
-    } finally {
-      setLoading(false);
+    } catch (err) {
+      console.error('[useAuth] Sign out error:', err);
+      return { error: err };
     }
   };
-
-  // No automatic redirects - let the Index component handle authentication state
 
   return {
     user,
     session,
     loading,
     signIn,
-    signOut,
+    signOut
   };
 }

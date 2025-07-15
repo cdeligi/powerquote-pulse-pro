@@ -11,7 +11,6 @@ import { consolidateQTMSConfiguration, QTMSConfiguration, ConsolidatedQTMS } fro
 import { useState, useEffect } from "react";
 import { Quote, BOMItemWithDetails } from "@/types/quote";
 import { User } from "@/types/auth";
-import { supabase } from "@/integrations/supabase/client";
 
 interface QuoteDetailsProps {
   quote: Quote;
@@ -32,7 +31,6 @@ const QuoteDetails = ({
   const [rejectionReason, setRejectionReason] = useState('');
   const [selectedAction, setSelectedAction] = useState<'approve' | 'reject' | null>(null);
   const [editingPrices, setEditingPrices] = useState<Record<string, string>>({});
-  const [quoteFieldLabels, setQuoteFieldLabels] = useState<Record<string, string>>({});
   const [bomItems, setBomItems] = useState<BOMItemWithDetails[]>(
     (quote.bom_items || []).map(item => ({
       ...item,
@@ -52,10 +50,6 @@ const QuoteDetails = ({
   const [editingQTMS, setEditingQTMS] = useState(false);
 
   useEffect(() => {
-    fetchQuoteFieldLabels();
-  }, []);
-
-  useEffect(() => {
     const item = bomItems.find(i => i.product.type === 'QTMS' && i.configuration);
     if (item && item.configuration) {
       const config = item.configuration as QTMSConfiguration;
@@ -71,28 +65,6 @@ const QuoteDetails = ({
       setQtmsConfig(null);
     }
   }, [bomItems]);
-
-  const fetchQuoteFieldLabels = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('quote_fields')
-        .select('id, label')
-        .eq('enabled', true);
-
-      if (error) {
-        console.error('Error fetching quote field labels:', error);
-        return;
-      }
-
-      const labelMap: Record<string, string> = {};
-      data?.forEach(field => {
-        labelMap[field.id] = field.label;
-      });
-      setQuoteFieldLabels(labelMap);
-    } catch (error) {
-      console.error('Failed to fetch quote field labels:', error);
-    }
-  };
 
   const handleApprove = () => {
     onApprove(approvalNotes, bomItems);
@@ -188,17 +160,17 @@ const QuoteDetails = ({
     }
   };
 
-  // Prepare consolidated quote information - remove duplicates and format properly
+  // Prepare basic quote info to avoid duplication
   const basicQuoteFields = ['customer_name', 'oracle_customer_id', 'sfdc_opportunity', 'is_rep_involved', 'payment_terms', 'shipping_terms'];
   const additionalFields = quote.quote_fields ? Object.keys(quote.quote_fields).filter(key => !basicQuoteFields.includes(key)) : [];
 
   return (
     <div className="space-y-6">
-      {/* Consolidated Quote Information */}
+      {/* Quote Header */}
       <Card className="bg-gray-900 border-gray-800">
         <CardHeader>
           <CardTitle className="text-white flex items-center justify-between">
-            Quote Information - {quote.id}
+            Quote Details - {quote.id}
             <div className="flex items-center space-x-2">
               {getStatusBadge()}
               <Badge className={`${
@@ -212,7 +184,6 @@ const QuoteDetails = ({
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* Basic Quote Fields */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
             <div>
               <Label className="text-gray-400">Customer</Label>
@@ -238,37 +209,33 @@ const QuoteDetails = ({
               <Label className="text-gray-400">Shipping Terms</Label>
               <p className="text-white font-medium">{quote.shipping_terms}</p>
             </div>
-            <div>
-              <Label className="text-gray-400">Currency</Label>
-              <p className="text-white font-medium">{quote.currency}</p>
-            </div>
           </div>
 
-          {/* Additional Quote Fields with Proper Labels */}
-          {additionalFields.length > 0 && (
-            <div className="mt-6 pt-4 border-t border-gray-700">
-              <h4 className="text-white font-medium mb-3">Additional Information</h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                {additionalFields.map((key) => (
-                  <div key={key}>
-                    <Label className="text-gray-400">
-                      {quoteFieldLabels[key] || key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                    </Label>
-                    <p className="text-white font-medium">{String(quote.quote_fields![key])}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
           {quote.discount_justification && (
-            <div className="mt-4 pt-4 border-t border-gray-700">
+            <div>
               <Label className="text-gray-400">Discount Justification</Label>
               <p className="text-gray-300 bg-gray-800 p-3 rounded mt-1">{quote.discount_justification}</p>
             </div>
           )}
         </CardContent>
       </Card>
+
+      {/* Additional Quote Fields - Only show fields not already displayed */}
+      {additionalFields.length > 0 && (
+        <Card className="bg-gray-900 border-gray-800">
+          <CardHeader>
+            <CardTitle className="text-white">Additional Quote Information</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {additionalFields.map((key) => (
+              <div key={key} className="grid grid-cols-2 gap-4">
+                <Label className="text-gray-400 capitalize">{key.replace(/_/g, ' ')}</Label>
+                <p className="text-white">{String(quote.quote_fields![key])}</p>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Financial Summary */}
       <Card className="bg-gray-900 border-gray-800">
