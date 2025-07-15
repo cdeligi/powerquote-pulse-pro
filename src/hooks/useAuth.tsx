@@ -32,6 +32,32 @@ function useProvideAuth(): AuthContextType {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Function to log user sessions
+  const logUserSession = async (userId: string, event: 'login' | 'logout' | 'session_refresh') => {
+    try {
+      const { error } = await supabase
+        .from('user_sessions')
+        .insert({
+          user_id: userId,
+          event,
+          ip_address: 'unknown', // Could be enhanced with IP detection
+          user_agent: navigator.userAgent,
+          device_info: {
+            platform: navigator.platform,
+            language: navigator.language,
+            screen_resolution: `${screen.width}x${screen.height}`
+          },
+          location: {} // Could be enhanced with geolocation
+        });
+
+      if (error) {
+        console.error('Error logging user session:', error);
+      }
+    } catch (error) {
+      console.error('Error logging user session:', error);
+    }
+  };
+
   const fetchProfile = async (uid: string, timeoutMs: number = 3000): Promise<void> => {
     console.log('[useAuth] fetchProfile start for:', uid);
     
@@ -133,6 +159,13 @@ function useProvideAuth(): AuthContextType {
           console.log('[useAuth] User session found, fetching profile...');
           try {
             await fetchProfile(session.user.id, 3000);
+            
+            // Log session events
+            if (event === 'SIGNED_IN') {
+              await logUserSession(session.user.id, 'login');
+            } else if (event === 'TOKEN_REFRESHED') {
+              await logUserSession(session.user.id, 'session_refresh');
+            }
           } catch (error) {
             console.error('[useAuth] Error fetching profile in auth state change:', error);
             // Create fallback user
@@ -149,6 +182,9 @@ function useProvideAuth(): AuthContextType {
           }
         } else {
           console.log('[useAuth] No user session, clearing user state');
+          if (event === 'SIGNED_OUT' && user) {
+            await logUserSession(user.id, 'logout');
+          }
           setUser(null);
           setLoading(false);
         }
