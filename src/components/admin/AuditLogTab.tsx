@@ -30,24 +30,24 @@ export default function AuditLogTab() {
   const fetchAuditLogs = async () => {
     try {
       setLoading(true);
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error('No session found');
+      
+      // Fetch directly from user_sessions table with profile relationship
+      const { data: sessionsData, error } = await supabase
+        .from('user_sessions')
+        .select(`
+          *,
+          profiles!user_sessions_user_id_fkey(first_name, last_name, email)
+        `)
+        .order('created_at', { ascending: false })
+        .limit(100);
 
-      const response = await fetch(`https://cwhmxpitwblqxgrvaigg.supabase.co/functions/v1/admin-users/audit-logs`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to fetch audit logs');
+      if (error) {
+        console.error('Error fetching audit logs:', error);
+        throw error;
       }
-
-      const { sessions } = await response.json();
-      setSessions(sessions);
+      
+      console.log('Fetched audit logs:', sessionsData);
+      setSessions(sessionsData || []);
     } catch (error: any) {
       console.error('Error fetching audit logs:', error);
       toast({

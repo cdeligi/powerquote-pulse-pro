@@ -46,24 +46,23 @@ export default function UserRequestsTab() {
   const fetchRequests = async () => {
     try {
       setLoading(true);
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error('No session found');
+      
+      // Fetch directly from user_requests table
+      const { data: requestsData, error } = await supabase
+        .from('user_requests')
+        .select(`
+          *,
+          processed_by_profile:profiles!user_requests_processed_by_fkey(first_name, last_name)
+        `)
+        .order('requested_at', { ascending: false });
 
-      const response = await fetch(`https://cwhmxpitwblqxgrvaigg.supabase.co/functions/v1/admin-users/user-requests`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to fetch requests');
+      if (error) {
+        console.error('Error fetching user requests:', error);
+        throw error;
       }
-
-      const { requests } = await response.json();
-      setRequests(requests);
+      
+      console.log('Fetched user requests:', requestsData);
+      setRequests(requestsData || []);
     } catch (error: any) {
       console.error('Error fetching requests:', error);
       toast({

@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { UserRegistrationRequest } from "@/types/user-management";
 import { Shield, User, Mail, Phone, Building, FileText, ArrowLeft } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 
 interface UserRegistrationFormProps {
   onSubmit?: (data: Partial<UserRegistrationRequest>) => void;
@@ -48,23 +49,31 @@ const UserRegistrationForm = ({ onSubmit, onBack }: UserRegistrationFormProps) =
     setIsSubmitting(true);
     
     try {
-      const registrationData: Partial<UserRegistrationRequest> = {
-        ...formData,
-        id: `REQ-${Date.now()}`,
-        status: 'pending',
-        createdAt: new Date().toISOString(),
-        ipAddress: '192.168.1.1',
-        userAgent: navigator.userAgent,
-        loginAttempts: 0,
-        isLocked: false,
-        twoFactorEnabled: false
-      };
+      // Insert into real database
+      const { error } = await supabase
+        .from('user_requests')
+        .insert({
+          email: formData.email,
+          first_name: formData.firstName,
+          last_name: formData.lastName,
+          full_name: `${formData.firstName} ${formData.lastName}`,
+          requested_role: formData.requestedRole,
+          department: formData.department,
+          job_title: formData.jobTitle,
+          phone_number: formData.phoneNumber,
+          manager_email: formData.managerEmail,
+          company_name: formData.companyName,
+          business_justification: formData.businessJustification,
+          ip_address: '127.0.0.1', // In a real app, get actual IP
+          user_agent: navigator.userAgent
+        });
 
-      if (onSubmit) {
-        onSubmit(registrationData);
+      if (error) {
+        console.error('Database error:', error);
+        throw error;
       }
 
-      console.log('Registration request submitted:', registrationData);
+      console.log('Registration request submitted to database');
       
       alert('Registration request submitted successfully! You will receive an email once your request has been reviewed.');
       
