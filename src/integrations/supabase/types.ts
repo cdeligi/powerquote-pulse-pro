@@ -924,15 +924,91 @@ export type Database = {
           },
         ]
       }
+      user_requests: {
+        Row: {
+          business_justification: string | null
+          company_name: string | null
+          department: string | null
+          email: string
+          first_name: string | null
+          full_name: string | null
+          id: string
+          ip_address: string | null
+          job_title: string | null
+          last_name: string | null
+          manager_email: string | null
+          phone_number: string | null
+          processed_at: string | null
+          processed_by: string | null
+          rejection_reason: string | null
+          requested_at: string | null
+          requested_role: string
+          status: string | null
+          user_agent: string | null
+        }
+        Insert: {
+          business_justification?: string | null
+          company_name?: string | null
+          department?: string | null
+          email: string
+          first_name?: string | null
+          full_name?: string | null
+          id?: string
+          ip_address?: string | null
+          job_title?: string | null
+          last_name?: string | null
+          manager_email?: string | null
+          phone_number?: string | null
+          processed_at?: string | null
+          processed_by?: string | null
+          rejection_reason?: string | null
+          requested_at?: string | null
+          requested_role?: string
+          status?: string | null
+          user_agent?: string | null
+        }
+        Update: {
+          business_justification?: string | null
+          company_name?: string | null
+          department?: string | null
+          email?: string
+          first_name?: string | null
+          full_name?: string | null
+          id?: string
+          ip_address?: string | null
+          job_title?: string | null
+          last_name?: string | null
+          manager_email?: string | null
+          phone_number?: string | null
+          processed_at?: string | null
+          processed_by?: string | null
+          rejection_reason?: string | null
+          requested_at?: string | null
+          requested_role?: string
+          status?: string | null
+          user_agent?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_requests_processed_by_fkey"
+            columns: ["processed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_sessions: {
         Row: {
           browser_fingerprint: string | null
           created_at: string | null
           device_info: Json | null
+          event: string | null
           id: string
           ip_address: string | null
           is_active: boolean | null
           last_activity: string | null
+          location: Json | null
           location_data: Json | null
           revoked_at: string | null
           revoked_reason: string | null
@@ -946,10 +1022,12 @@ export type Database = {
           browser_fingerprint?: string | null
           created_at?: string | null
           device_info?: Json | null
+          event?: string | null
           id?: string
           ip_address?: string | null
           is_active?: boolean | null
           last_activity?: string | null
+          location?: Json | null
           location_data?: Json | null
           revoked_at?: string | null
           revoked_reason?: string | null
@@ -963,10 +1041,12 @@ export type Database = {
           browser_fingerprint?: string | null
           created_at?: string | null
           device_info?: Json | null
+          event?: string | null
           id?: string
           ip_address?: string | null
           is_active?: boolean | null
           last_activity?: string | null
+          location?: Json | null
           location_data?: Json | null
           revoked_at?: string | null
           revoked_reason?: string | null
@@ -976,7 +1056,15 @@ export type Database = {
           user_agent?: string | null
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "user_sessions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {

@@ -68,31 +68,44 @@ const UserManagement = ({ user }: UserManagementProps) => {
     password: ''
   });
 
-  // Load real users from edge function
+  // Load real users directly from database
   const loadUsers = async () => {
     try {
       setLoadingUsers(true);
+      console.log('Fetching users from profiles table...');
       
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        throw new Error('No session found');
+      // Fetch directly from profiles table with all fields
+      const { data: profilesData, error: profilesError } = await supabase
+        .from('profiles')
+        .select('*');
+
+      if (profilesError) {
+        console.error('Error fetching profiles:', profilesError);
+        throw profilesError;
       }
 
-      const response = await fetch(`https://cwhmxpitwblqxgrvaigg.supabase.co/functions/v1/admin-users`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json',
-        },
-      });
+      console.log('Profiles data:', profilesData);
+      
+      // Transform profiles data to match expected format
+      const transformedUsers = profilesData?.map(profile => ({
+        id: profile.id,
+        email: profile.email,
+        fullName: `${profile.first_name || ''} ${profile.last_name || ''}`.trim(),
+        role: profile.role,
+        department: profile.department,
+        userStatus: profile.user_status || 'active',
+        jobTitle: profile.job_title,
+        phoneNumber: profile.phone_number,
+        managerEmail: profile.manager_email,
+        companyName: profile.company_name,
+        businessJustification: profile.business_justification,
+        confirmedAt: null,
+        lastSignInAt: null,
+        createdAt: profile.created_at
+      })) || [];
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to load users');
-      }
-
-      const { users: fetchedUsers } = await response.json();
-      setUsers(fetchedUsers);
+      console.log('Transformed users:', transformedUsers);
+      setUsers(transformedUsers);
     } catch (error: any) {
       console.error('Error loading users:', error);
       toast({
