@@ -7,6 +7,11 @@ export type Json =
   | Json[]
 
 export type Database = {
+  // Allows to automatically instanciate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
+  __InternalSupabase: {
+    PostgrestVersion: "12.2.3 (519615d)"
+  }
   public: {
     Tables: {
       admin_notifications: {
@@ -144,6 +149,44 @@ export type Database = {
             columns: ["quote_id"]
             isOneToOne: false
             referencedRelation: "quotes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      chassis_configurations: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          id: string
+          layout_data: Json
+          level2_product_id: string
+          slot_mappings: Json
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          layout_data?: Json
+          level2_product_id: string
+          slot_mappings?: Json
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          layout_data?: Json
+          level2_product_id?: string
+          slot_mappings?: Json
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chassis_configurations_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -380,6 +423,130 @@ export type Database = {
         }
         Relationships: []
       }
+      products_lvl1: {
+        Row: {
+          cost: number | null
+          created_at: string | null
+          description: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          price: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          cost?: number | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          price?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          cost?: number | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          price?: number | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      products_lvl2: {
+        Row: {
+          cost: number | null
+          created_at: string | null
+          description: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          parent_product_id: string | null
+          price: number | null
+          slot_mapping: Json | null
+          updated_at: string | null
+        }
+        Insert: {
+          cost?: number | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          parent_product_id?: string | null
+          price?: number | null
+          slot_mapping?: Json | null
+          updated_at?: string | null
+        }
+        Update: {
+          cost?: number | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          parent_product_id?: string | null
+          price?: number | null
+          slot_mapping?: Json | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "products_lvl2_parent_product_id_fkey"
+            columns: ["parent_product_id"]
+            isOneToOne: false
+            referencedRelation: "products_lvl1"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      products_lvl3: {
+        Row: {
+          cost: number | null
+          created_at: string | null
+          description: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          parent_product_id: string | null
+          price: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          cost?: number | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          parent_product_id?: string | null
+          price?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          cost?: number | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          parent_product_id?: string | null
+          price?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "products_lvl3_parent_product_id_fkey"
+            columns: ["parent_product_id"]
+            isOneToOne: false
+            referencedRelation: "products_lvl2"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           created_at: string
@@ -413,6 +580,39 @@ export type Database = {
           role?: string
           updated_at?: string
           user_status?: string | null
+        }
+        Relationships: []
+      }
+      quote_analytics: {
+        Row: {
+          created_at: string | null
+          id: string
+          month: string
+          quote_count: number
+          status: string
+          total_cost: number | null
+          total_value: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          month: string
+          quote_count?: number
+          status: string
+          total_cost?: number | null
+          total_value?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          month?: string
+          quote_count?: number
+          status?: string
+          total_cost?: number | null
+          total_value?: number | null
+          updated_at?: string | null
         }
         Relationships: []
       }
@@ -471,12 +671,15 @@ export type Database = {
           original_margin: number
           original_prices: Json | null
           original_quote_value: number
+          original_submitted_at: string | null
           payment_terms: string
           price_adjustments: Json | null
+          price_override_history: Json | null
           priority: string
           quote_fields: Json | null
           rejection_reason: string | null
           requested_discount: number
+          requires_finance_approval: boolean | null
           reviewed_at: string | null
           reviewed_by: string | null
           sfdc_opportunity: string
@@ -506,12 +709,15 @@ export type Database = {
           original_margin: number
           original_prices?: Json | null
           original_quote_value: number
+          original_submitted_at?: string | null
           payment_terms: string
           price_adjustments?: Json | null
+          price_override_history?: Json | null
           priority?: string
           quote_fields?: Json | null
           rejection_reason?: string | null
           requested_discount: number
+          requires_finance_approval?: boolean | null
           reviewed_at?: string | null
           reviewed_by?: string | null
           sfdc_opportunity: string
@@ -541,12 +747,15 @@ export type Database = {
           original_margin?: number
           original_prices?: Json | null
           original_quote_value?: number
+          original_submitted_at?: string | null
           payment_terms?: string
           price_adjustments?: Json | null
+          price_override_history?: Json | null
           priority?: string
           quote_fields?: Json | null
           rejection_reason?: string | null
           requested_discount?: number
+          requires_finance_approval?: boolean | null
           reviewed_at?: string | null
           reviewed_by?: string | null
           sfdc_opportunity?: string
@@ -574,6 +783,69 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      security_events: {
+        Row: {
+          action: string
+          created_at: string | null
+          details: Json | null
+          id: string
+          ip_address: string | null
+          severity: string | null
+          user_agent: string | null
+          user_id: string | null
+        }
+        Insert: {
+          action: string
+          created_at?: string | null
+          details?: Json | null
+          id?: string
+          ip_address?: string | null
+          severity?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          action?: string
+          created_at?: string | null
+          details?: Json | null
+          id?: string
+          ip_address?: string | null
+          severity?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      user_login_attempts: {
+        Row: {
+          created_at: string | null
+          email: string
+          id: string
+          ip_address: string | null
+          success: boolean | null
+          user_agent: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          email: string
+          id?: string
+          ip_address?: string | null
+          success?: boolean | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          email?: string
+          id?: string
+          ip_address?: string | null
+          success?: boolean | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
       }
       user_registration_requests: {
         Row: {
@@ -652,11 +924,109 @@ export type Database = {
           },
         ]
       }
+      user_sessions: {
+        Row: {
+          browser_fingerprint: string | null
+          created_at: string | null
+          device_info: Json | null
+          id: string
+          ip_address: string | null
+          is_active: boolean | null
+          last_activity: string | null
+          location_data: Json | null
+          revoked_at: string | null
+          revoked_reason: string | null
+          screen_resolution: string | null
+          session_token: string
+          timezone: string | null
+          user_agent: string | null
+          user_id: string
+        }
+        Insert: {
+          browser_fingerprint?: string | null
+          created_at?: string | null
+          device_info?: Json | null
+          id?: string
+          ip_address?: string | null
+          is_active?: boolean | null
+          last_activity?: string | null
+          location_data?: Json | null
+          revoked_at?: string | null
+          revoked_reason?: string | null
+          screen_resolution?: string | null
+          session_token: string
+          timezone?: string | null
+          user_agent?: string | null
+          user_id: string
+        }
+        Update: {
+          browser_fingerprint?: string | null
+          created_at?: string | null
+          device_info?: Json | null
+          id?: string
+          ip_address?: string | null
+          is_active?: boolean | null
+          last_activity?: string | null
+          location_data?: Json | null
+          revoked_at?: string | null
+          revoked_reason?: string | null
+          screen_resolution?: string | null
+          session_token?: string
+          timezone?: string | null
+          user_agent?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
+      admin_create_user: {
+        Args: {
+          p_email: string
+          p_password: string
+          p_first_name: string
+          p_last_name: string
+          p_role: string
+          p_department?: string
+        }
+        Returns: Json
+      }
+      admin_list_users: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          id: string
+          email: string
+          first_name: string
+          last_name: string
+          role: string
+          department: string
+          user_status: string
+          created_at: string
+          updated_at: string
+        }[]
+      }
+      admin_update_user_status: {
+        Args: { p_user_id: string; p_status: string }
+        Returns: Json
+      }
+      calculate_bom_total_cost: {
+        Args: { quote_id_param: string }
+        Returns: number
+      }
+      create_user: {
+        Args: {
+          email: string
+          password: string
+          first_name: string
+          last_name: string
+          role: string
+          department: string
+        }
+        Returns: string
+      }
       deactivate_user: {
         Args: { target_user_id: string }
         Returns: boolean
@@ -669,9 +1039,76 @@ export type Database = {
         Args: { user_id: string }
         Returns: string
       }
+      is_admin: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
+      }
       is_admin_user: {
         Args: Record<PropertyKey, never>
         Returns: boolean
+      }
+      log_security_event: {
+        Args:
+          | {
+              p_user_id: string
+              p_action: string
+              p_details: string
+              p_ip_address: string
+              p_user_agent: string
+              p_severity?: string
+            }
+          | {
+              p_user_id: string
+              p_action: string
+              p_details?: Json
+              p_ip_address?: string
+              p_user_agent?: string
+              p_severity?: string
+            }
+        Returns: undefined
+      }
+      log_user_security_event: {
+        Args: {
+          p_user_id: string
+          p_action: string
+          p_details: string
+          p_ip_address: string
+          p_user_agent: string
+          p_severity?: string
+        }
+        Returns: undefined
+      }
+      revoke_user_access: {
+        Args: { p_target_user_id: string; p_reason?: string }
+        Returns: boolean
+      }
+      track_user_session: {
+        Args: {
+          p_user_id: string
+          p_session_token: string
+          p_ip_address?: string
+          p_user_agent?: string
+          p_device_info?: Json
+          p_location_data?: Json
+        }
+        Returns: string
+      }
+      update_quote_analytics: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
+      update_session_activity: {
+        Args: { p_session_token: string }
+        Returns: boolean
+      }
+      update_user_login: {
+        Args: {
+          p_user_id: string
+          p_success: boolean
+          p_ip_address?: string
+          p_user_agent?: string
+        }
+        Returns: string
       }
     }
     Enums: {
@@ -683,21 +1120,25 @@ export type Database = {
   }
 }
 
-type DefaultSchema = Database[Extract<keyof Database, "public">]
+type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
+
+type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
 
 export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
-    | { schema: keyof Database },
+    | { schema: keyof DatabaseWithoutInternals },
   TableName extends DefaultSchemaTableNameOrOptions extends {
-    schema: keyof Database
+    schema: keyof DatabaseWithoutInternals
   }
-    ? keyof (Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
-        Database[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
+    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
     : never = never,
-> = DefaultSchemaTableNameOrOptions extends { schema: keyof Database }
-  ? (Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
-      Database[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
       Row: infer R
     }
     ? R
@@ -715,14 +1156,16 @@ export type Tables<
 export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
-    | { schema: keyof Database },
+    | { schema: keyof DatabaseWithoutInternals },
   TableName extends DefaultSchemaTableNameOrOptions extends {
-    schema: keyof Database
+    schema: keyof DatabaseWithoutInternals
   }
-    ? keyof Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
     : never = never,
-> = DefaultSchemaTableNameOrOptions extends { schema: keyof Database }
-  ? Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
       Insert: infer I
     }
     ? I
@@ -738,14 +1181,16 @@ export type TablesInsert<
 export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
-    | { schema: keyof Database },
+    | { schema: keyof DatabaseWithoutInternals },
   TableName extends DefaultSchemaTableNameOrOptions extends {
-    schema: keyof Database
+    schema: keyof DatabaseWithoutInternals
   }
-    ? keyof Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
     : never = never,
-> = DefaultSchemaTableNameOrOptions extends { schema: keyof Database }
-  ? Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
       Update: infer U
     }
     ? U
@@ -761,14 +1206,16 @@ export type TablesUpdate<
 export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
-    | { schema: keyof Database },
+    | { schema: keyof DatabaseWithoutInternals },
   EnumName extends DefaultSchemaEnumNameOrOptions extends {
-    schema: keyof Database
+    schema: keyof DatabaseWithoutInternals
   }
-    ? keyof Database[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
+    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
     : never = never,
-> = DefaultSchemaEnumNameOrOptions extends { schema: keyof Database }
-  ? Database[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
+> = DefaultSchemaEnumNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
   : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
     ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
     : never
@@ -776,14 +1223,16 @@ export type Enums<
 export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
-    | { schema: keyof Database },
+    | { schema: keyof DatabaseWithoutInternals },
   CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
-    schema: keyof Database
+    schema: keyof DatabaseWithoutInternals
   }
-    ? keyof Database[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
+    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
     : never = never,
-> = PublicCompositeTypeNameOrOptions extends { schema: keyof Database }
-  ? Database[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
+> = PublicCompositeTypeNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
   : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
     ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
     : never

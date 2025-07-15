@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { User } from "@/types/auth";
 import { UserRegistrationRequest, SecurityAuditLog } from "@/types/user-management";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,9 +8,13 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 import { 
   Users, 
   Shield, 
@@ -23,19 +27,202 @@ import {
   Unlock,
   UserCheck,
   UserX,
-  Activity
+  Activity,
+  UserPlus,
+  Trash2
 } from "lucide-react";
+
+interface ManagementUser {
+  id: string;
+  email: string;
+  first_name: string | null;
+  last_name: string | null;
+  role: string;
+  department: string | null;
+  user_status: string;
+  created_at: string;
+  updated_at: string;
+}
 
 interface UserManagementProps {
   user: User;
 }
 
 const UserManagement = ({ user }: UserManagementProps) => {
+  const { toast } = useToast();
   const [selectedRequest, setSelectedRequest] = useState<UserRegistrationRequest | null>(null);
   const [rejectionReason, setRejectionReason] = useState('');
   const [isReviewDialogOpen, setIsReviewDialogOpen] = useState(false);
+  const [isCreateUserDialogOpen, setIsCreateUserDialogOpen] = useState(false);
+  const [users, setUsers] = useState<ManagementUser[]>([]);
+  const [loadingUsers, setLoadingUsers] = useState(true);
+  
+  // Create user form state
+  const [createUserForm, setCreateUserForm] = useState({
+    email: '',
+    firstName: '',
+    lastName: '',
+    role: 'level1',
+    department: '',
+    password: ''
+  });
 
-  // Mock data - in real app this would come from API
+  // Load users from database
+  const fetchUsers = async () => {
+    try {
+      setLoadingUsers(true);
+      const { data, error } = await supabase.rpc('admin_list_users');
+      
+      if (error) {
+        console.error('Error fetching users:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load users. Please try again.",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      setUsers(data || []);
+    } catch (error) {
+      console.error('Error fetching users:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load users. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingUsers(false);
+    }
+  };
+
+  useEffect(() => {
+    if (user?.role === 'admin') {
+      fetchUsers();
+    }
+  }, [user]);
+
+  // Create new user
+  const handleCreateUser = async () => {
+    try {
+      // Validate form
+      if (!createUserForm.email || !createUserForm.firstName || !createUserForm.lastName) {
+        toast({
+          title: "Validation Error",
+          description: "Please fill in all required fields.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Generate temporary password if not provided
+      const tempPassword = createUserForm.password || `temp${Math.random().toString(36).substring(7)}`;
+
+      const { data, error } = await supabase.rpc('admin_create_user', {
+        p_email: createUserForm.email,
+        p_password: tempPassword,
+        p_first_name: createUserForm.firstName,
+        p_last_name: createUserForm.lastName,
+        p_role: createUserForm.role,
+        p_department: createUserForm.department || null
+      });
+
+      if (error) {
+        console.error('Error creating user:', error);
+        toast({
+          title: "Error",
+          description: error.message || "Failed to create user. Please try again.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const result = typeof data === 'string' ? JSON.parse(data) : data;
+      
+      if (!result.success) {
+        toast({
+          title: "Error",
+          description: result.error || "Failed to create user.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      toast({
+        title: "Success",
+        description: `User created successfully! Temporary password: ${tempPassword}`,
+      });
+
+      // Reset form and close dialog
+      setCreateUserForm({
+        email: '',
+        firstName: '',
+        lastName: '',
+        role: 'level1',
+        department: '',
+        password: ''
+      });
+      setIsCreateUserDialogOpen(false);
+      
+      // Refresh users list
+      fetchUsers();
+    } catch (error) {
+      console.error('Error creating user:', error);
+      toast({
+        title: "Error",
+        description: "Failed to create user. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Update user status
+  const handleUpdateUserStatus = async (userId: string, status: string) => {
+    try {
+      const { data, error } = await supabase.rpc('admin_update_user_status', {
+        p_user_id: userId,
+        p_status: status
+      });
+
+      if (error) {
+        console.error('Error updating user status:', error);
+        toast({
+          title: "Error",
+          description: "Failed to update user status. Please try again.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const result = typeof data === 'string' ? JSON.parse(data) : data;
+      
+      if (!result.success) {
+        toast({
+          title: "Error",
+          description: result.error || "Failed to update user status.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      toast({
+        title: "Success",
+        description: "User status updated successfully!",
+      });
+
+      // Refresh users list
+      fetchUsers();
+    } catch (error) {
+      console.error('Error updating user status:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update user status. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Mock data for registration requests (keeping for now)
   const [pendingRequests, setPendingRequests] = useState<UserRegistrationRequest[]>([
     {
       id: 'REG-2024-001',
@@ -53,30 +240,6 @@ const UserManagement = ({ user }: UserManagementProps) => {
       createdAt: '2024-01-16T10:30:00Z',
       ipAddress: '192.168.1.100',
       userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-      loginAttempts: 0,
-      isLocked: false,
-      twoFactorEnabled: false,
-      agreedToTerms: true,
-      agreedToPrivacyPolicy: true
-    },
-    {
-      id: 'REG-2024-002',
-      email: 'sarah.jones@gridtech.com',
-      firstName: 'Sarah',
-      lastName: 'Jones',
-      department: 'engineering',
-      jobTitle: 'Application Engineer',
-      phoneNumber: '+1 (555) 987-6543',
-      businessJustification: 'As an application engineer, I require access to create detailed technical quotes and BOMs for our transformer monitoring projects. This access is essential for my daily responsibilities.',
-      requestedRole: 'level1',
-      managerEmail: 'eng.manager@gridtech.com',
-      companyName: 'GridTech Engineering',
-      status: 'under_review',
-      createdAt: '2024-01-15T14:15:00Z',
-      reviewedAt: '2024-01-16T09:00:00Z',
-      reviewedBy: user.id,
-      ipAddress: '10.0.1.50',
-      userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)',
       loginAttempts: 0,
       isLocked: false,
       twoFactorEnabled: false,
@@ -191,18 +354,134 @@ const UserManagement = ({ user }: UserManagementProps) => {
     );
   };
 
+  const getRoleBadge = (role: string) => {
+    const colors = {
+      admin: 'bg-red-600',
+      finance: 'bg-purple-600',
+      level2: 'bg-blue-600',
+      level1: 'bg-green-600'
+    };
+    return (
+      <Badge className={`${colors[role as keyof typeof colors] || 'bg-gray-600'} text-white`}>
+        {role.toUpperCase()}
+      </Badge>
+    );
+  };
+
+  const getUserStatusBadge = (status: string) => {
+    const colors = {
+      active: 'bg-green-600',
+      inactive: 'bg-red-600',
+      suspended: 'bg-yellow-600'
+    };
+    return (
+      <Badge className={`${colors[status as keyof typeof colors] || 'bg-gray-600'} text-white`}>
+        {status.toUpperCase()}
+      </Badge>
+    );
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
           <h2 className="text-2xl font-bold text-white mb-2">User Management</h2>
-          <p className="text-gray-400">Manage user registration requests and security auditing</p>
+          <p className="text-gray-400">Manage users and registration requests</p>
         </div>
         <div className="flex items-center space-x-4">
+          <Dialog open={isCreateUserDialogOpen} onOpenChange={setIsCreateUserDialogOpen}>
+            <DialogTrigger asChild>
+              <Button className="bg-green-600 hover:bg-green-700">
+                <UserPlus className="h-4 w-4 mr-2" />
+                Create New User
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="bg-gray-900 border-gray-800 max-w-md">
+              <DialogHeader>
+                <DialogTitle className="text-white">Create New User</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="email" className="text-gray-400">Email *</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    value={createUserForm.email}
+                    onChange={(e) => setCreateUserForm({...createUserForm, email: e.target.value})}
+                    className="bg-gray-800 border-gray-700 text-white"
+                    placeholder="user@company.com"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="firstName" className="text-gray-400">First Name *</Label>
+                    <Input
+                      id="firstName"
+                      value={createUserForm.firstName}
+                      onChange={(e) => setCreateUserForm({...createUserForm, firstName: e.target.value})}
+                      className="bg-gray-800 border-gray-700 text-white"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="lastName" className="text-gray-400">Last Name *</Label>
+                    <Input
+                      id="lastName"
+                      value={createUserForm.lastName}
+                      onChange={(e) => setCreateUserForm({...createUserForm, lastName: e.target.value})}
+                      className="bg-gray-800 border-gray-700 text-white"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <Label htmlFor="role" className="text-gray-400">Role</Label>
+                  <Select value={createUserForm.role} onValueChange={(value) => setCreateUserForm({...createUserForm, role: value})}>
+                    <SelectTrigger className="bg-gray-800 border-gray-700 text-white">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-gray-800 border-gray-700">
+                      <SelectItem value="level1">Level 1</SelectItem>
+                      <SelectItem value="level2">Level 2</SelectItem>
+                      <SelectItem value="admin">Admin</SelectItem>
+                      <SelectItem value="finance">Finance</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label htmlFor="department" className="text-gray-400">Department</Label>
+                  <Input
+                    id="department"
+                    value={createUserForm.department}
+                    onChange={(e) => setCreateUserForm({...createUserForm, department: e.target.value})}
+                    className="bg-gray-800 border-gray-700 text-white"
+                    placeholder="Optional"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="password" className="text-gray-400">Temporary Password</Label>
+                  <Input
+                    id="password"
+                    type="password"
+                    value={createUserForm.password}
+                    onChange={(e) => setCreateUserForm({...createUserForm, password: e.target.value})}
+                    className="bg-gray-800 border-gray-700 text-white"
+                    placeholder="Leave blank to auto-generate"
+                  />
+                </div>
+                <div className="flex justify-end space-x-2 pt-4">
+                  <Button variant="outline" onClick={() => setIsCreateUserDialogOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button onClick={handleCreateUser} className="bg-green-600 hover:bg-green-700">
+                    Create User
+                  </Button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
           <div className="text-right">
-            <p className="text-sm text-gray-400">Pending Requests</p>
-            <p className="text-2xl font-bold text-yellow-500">
-              {pendingRequests.filter(r => r.status === 'pending').length}
+            <p className="text-sm text-gray-400">Total Users</p>
+            <p className="text-2xl font-bold text-blue-500">
+              {users.length}
             </p>
           </div>
         </div>
@@ -267,8 +546,11 @@ const UserManagement = ({ user }: UserManagementProps) => {
         </Card>
       </div>
 
-      <Tabs defaultValue="requests" className="w-full">
-        <TabsList className="grid w-full grid-cols-2 bg-gray-800">
+      <Tabs defaultValue="users" className="w-full">
+        <TabsList className="grid w-full grid-cols-3 bg-gray-800">
+          <TabsTrigger value="users" className="text-white data-[state=active]:bg-red-600">
+            Active Users
+          </TabsTrigger>
           <TabsTrigger value="requests" className="text-white data-[state=active]:bg-red-600">
             Registration Requests
           </TabsTrigger>
@@ -276,6 +558,94 @@ const UserManagement = ({ user }: UserManagementProps) => {
             Security Audit Log
           </TabsTrigger>
         </TabsList>
+
+        <TabsContent value="users">
+          <Card className="bg-gray-900 border-gray-800">
+            <CardHeader>
+              <CardTitle className="text-white flex items-center">
+                <Users className="h-5 w-5 mr-2" />
+                Active Users
+              </CardTitle>
+              <CardDescription className="text-gray-400">
+                Manage existing users and their permissions
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {loadingUsers ? (
+                <div className="flex justify-center py-8">
+                  <div className="text-gray-400">Loading users...</div>
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow className="border-gray-800">
+                      <TableHead className="text-gray-300">User</TableHead>
+                      <TableHead className="text-gray-300">Email</TableHead>
+                      <TableHead className="text-gray-300">Role</TableHead>
+                      <TableHead className="text-gray-300">Department</TableHead>
+                      <TableHead className="text-gray-300">Status</TableHead>
+                      <TableHead className="text-gray-300">Created</TableHead>
+                      <TableHead className="text-gray-300">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {users.map((mgmtUser) => (
+                      <TableRow key={mgmtUser.id} className="border-gray-800">
+                        <TableCell>
+                          <div>
+                            <p className="font-medium text-white">
+                              {mgmtUser.first_name} {mgmtUser.last_name}
+                            </p>
+                            <p className="text-xs text-gray-500">{mgmtUser.id}</p>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-gray-300">
+                          {mgmtUser.email}
+                        </TableCell>
+                        <TableCell>
+                          {getRoleBadge(mgmtUser.role)}
+                        </TableCell>
+                        <TableCell className="text-gray-300">
+                          {mgmtUser.department || 'N/A'}
+                        </TableCell>
+                         <TableCell>
+                           {getUserStatusBadge(mgmtUser.user_status)}
+                        </TableCell>
+                        <TableCell className="text-gray-300">
+                          {new Date(mgmtUser.created_at).toLocaleDateString()}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex space-x-2">
+                            {mgmtUser.user_status === 'active' ? (
+                              <Button
+                                onClick={() => handleUpdateUserStatus(mgmtUser.id, 'inactive')}
+                                size="sm"
+                                variant="outline"
+                                className="text-red-400 border-red-400 hover:bg-red-400 hover:text-white"
+                                disabled={mgmtUser.role === 'admin'}
+                              >
+                                <Lock className="h-4 w-4" />
+                              </Button>
+                            ) : (
+                              <Button
+                                onClick={() => handleUpdateUserStatus(mgmtUser.id, 'active')}
+                                size="sm"
+                                variant="outline"
+                                className="text-green-400 border-green-400 hover:bg-green-400 hover:text-white"
+                              >
+                                <Unlock className="h-4 w-4" />
+                              </Button>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
 
         <TabsContent value="requests">
           <Card className="bg-gray-900 border-gray-800">
