@@ -19,6 +19,11 @@ interface Database {
           role: string;
           department: string | null;
           user_status: string;
+          job_title: string | null;
+          phone_number: string | null;
+          manager_email: string | null;
+          company_name: string | null;
+          business_justification: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -32,6 +37,10 @@ interface Database {
           full_name: string | null;
           requested_role: string;
           department: string | null;
+          job_title: string | null;
+          phone_number: string | null;
+          manager_email: string | null;
+          company_name: string | null;
           business_justification: string | null;
           requested_at: string;
           status: string;
@@ -143,10 +152,17 @@ async function handleListUsers(supabase: any) {
   const { data: authUsers, error: authError } = await supabase.auth.admin.listUsers();
   if (authError) throw authError;
 
-  // Get profiles
+  // Get profiles with all fields
   const { data: profiles, error: profilesError } = await supabase
     .from('profiles')
-    .select('*');
+    .select(`
+      *,
+      job_title,
+      phone_number,
+      manager_email,
+      company_name,
+      business_justification
+    `);
   
   if (profilesError) throw profilesError;
 
@@ -160,6 +176,11 @@ async function handleListUsers(supabase: any) {
       role: profile?.role || 'level1',
       department: profile?.department || null,
       userStatus: profile?.user_status || 'active',
+      jobTitle: profile?.job_title || null,
+      phoneNumber: profile?.phone_number || null,
+      managerEmail: profile?.manager_email || null,
+      companyName: profile?.company_name || null,
+      businessJustification: profile?.business_justification || null,
       confirmedAt: authUser.confirmed_at,
       lastSignInAt: authUser.last_sign_in_at,
       createdAt: authUser.created_at
@@ -172,7 +193,19 @@ async function handleListUsers(supabase: any) {
 }
 
 async function handleCreateUser(req: Request, supabase: any, adminId: string) {
-  const { email, firstName, lastName, role, department, password } = await req.json();
+  const { 
+    email, 
+    firstName, 
+    lastName, 
+    role, 
+    department, 
+    password,
+    jobTitle,
+    phoneNumber,
+    managerEmail,
+    companyName,
+    businessJustification
+  } = await req.json();
   
   const tempPassword = password || Math.random().toString(36).slice(-8) + 'A1!';
   
@@ -191,7 +224,7 @@ async function handleCreateUser(req: Request, supabase: any, adminId: string) {
 
   if (authError) throw authError;
 
-  // Create profile
+  // Create profile with all fields
   const { error: profileError } = await supabase
     .from('profiles')
     .insert({
@@ -201,6 +234,11 @@ async function handleCreateUser(req: Request, supabase: any, adminId: string) {
       last_name: lastName,
       role,
       department,
+      job_title: jobTitle,
+      phone_number: phoneNumber,
+      manager_email: managerEmail,
+      company_name: companyName,
+      business_justification: businessJustification,
       user_status: 'active'
     });
 
@@ -216,7 +254,20 @@ async function handleCreateUser(req: Request, supabase: any, adminId: string) {
 }
 
 async function handleUpdateUser(req: Request, supabase: any, adminId: string) {
-  const { userId, firstName, lastName, role, userStatus, email } = await req.json();
+  const { 
+    userId, 
+    firstName, 
+    lastName, 
+    role, 
+    userStatus, 
+    department,
+    jobTitle,
+    phoneNumber,
+    managerEmail,
+    companyName,
+    businessJustification,
+    email 
+  } = await req.json();
 
   // Update auth user metadata
   const { error: authError } = await supabase.auth.admin.updateUserById(userId, {
@@ -230,7 +281,7 @@ async function handleUpdateUser(req: Request, supabase: any, adminId: string) {
 
   if (authError) throw authError;
 
-  // Update profile
+  // Update profile with all fields
   const { error: profileError } = await supabase
     .from('profiles')
     .update({
@@ -238,6 +289,12 @@ async function handleUpdateUser(req: Request, supabase: any, adminId: string) {
       last_name: lastName,
       role,
       user_status: userStatus,
+      department,
+      job_title: jobTitle,
+      phone_number: phoneNumber,
+      manager_email: managerEmail,
+      company_name: companyName,
+      business_justification: businessJustification,
       updated_at: new Date().toISOString()
     })
     .eq('id', userId);
@@ -294,7 +351,7 @@ async function handleApproveRequest(req: Request, supabase: any, adminId: string
 
   if (authError) throw authError;
 
-  // Create profile
+  // Create profile with all fields from request
   const { error: profileError } = await supabase
     .from('profiles')
     .insert({
@@ -304,6 +361,11 @@ async function handleApproveRequest(req: Request, supabase: any, adminId: string
       last_name: request.last_name,
       role: request.requested_role,
       department: request.department,
+      job_title: request.job_title,
+      phone_number: request.phone_number,
+      manager_email: request.manager_email,
+      company_name: request.company_name,
+      business_justification: request.business_justification,
       user_status: 'active'
     });
 

@@ -6,10 +6,10 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { 
   Users, 
   UserCheck,
@@ -33,6 +33,11 @@ interface MergedUser {
   role: string;
   department: string | null;
   userStatus: string;
+  jobTitle?: string | null;
+  phoneNumber?: string | null;
+  managerEmail?: string | null;
+  companyName?: string | null;
+  businessJustification?: string | null;
   confirmedAt: string | null;
   lastSignInAt: string | null;
   createdAt: string;
@@ -45,7 +50,6 @@ interface UserManagementProps {
 const UserManagement = ({ user }: UserManagementProps) => {
   const [users, setUsers] = useState<MergedUser[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(true);
-  const [isCreateUserDialogOpen, setIsCreateUserDialogOpen] = useState(false);
   const [selectedUserToEdit, setSelectedUserToEdit] = useState<MergedUser | null>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   
@@ -56,6 +60,11 @@ const UserManagement = ({ user }: UserManagementProps) => {
     lastName: '',
     role: 'level1',
     department: '',
+    jobTitle: '',
+    phoneNumber: '',
+    managerEmail: '',
+    companyName: '',
+    businessJustification: '',
     password: ''
   });
 
@@ -132,6 +141,11 @@ const UserManagement = ({ user }: UserManagementProps) => {
           lastName: createUserForm.lastName,
           role: createUserForm.role,
           department: createUserForm.department || null,
+          jobTitle: createUserForm.jobTitle || null,
+          phoneNumber: createUserForm.phoneNumber || null,
+          managerEmail: createUserForm.managerEmail || null,
+          companyName: createUserForm.companyName || null,
+          businessJustification: createUserForm.businessJustification || null,
           password: createUserForm.password || undefined
         }),
       });
@@ -154,9 +168,13 @@ const UserManagement = ({ user }: UserManagementProps) => {
         lastName: '',
         role: 'level1',
         department: '',
+        jobTitle: '',
+        phoneNumber: '',
+        managerEmail: '',
+        companyName: '',
+        businessJustification: '',
         password: ''
       });
-      setIsCreateUserDialogOpen(false);
       
       // Refresh users list
       loadUsers();
@@ -354,6 +372,7 @@ const UserManagement = ({ user }: UserManagementProps) => {
                       <TableHead className="text-gray-300">Email</TableHead>
                       <TableHead className="text-gray-300">Role</TableHead>
                       <TableHead className="text-gray-300">Status</TableHead>
+                      <TableHead className="text-gray-300">Company</TableHead>
                       <TableHead className="text-gray-300">Last Sign In</TableHead>
                       <TableHead className="text-gray-300">Actions</TableHead>
                     </TableRow>
@@ -366,7 +385,12 @@ const UserManagement = ({ user }: UserManagementProps) => {
                             <p className="font-medium text-white">
                               {mergedUser.fullName || 'Unnamed User'}
                             </p>
-                            <p className="text-xs text-gray-500">{mergedUser.id}</p>
+                            {mergedUser.jobTitle && (
+                              <p className="text-xs text-gray-400">{mergedUser.jobTitle}</p>
+                            )}
+                            {mergedUser.department && (
+                              <p className="text-xs text-gray-500">{mergedUser.department}</p>
+                            )}
                           </div>
                         </TableCell>
                         <TableCell className="text-gray-300">
@@ -377,6 +401,9 @@ const UserManagement = ({ user }: UserManagementProps) => {
                         </TableCell>
                         <TableCell>
                           {getUserStatusBadge(mergedUser.userStatus)}
+                        </TableCell>
+                        <TableCell className="text-gray-300">
+                          {mergedUser.companyName || 'N/A'}
                         </TableCell>
                         <TableCell className="text-gray-300">
                           {mergedUser.lastSignInAt ? 
@@ -497,14 +524,73 @@ const UserManagement = ({ user }: UserManagementProps) => {
                 </div>
               </div>
               
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="department" className="text-gray-400">Department</Label>
+                  <Input
+                    id="department"
+                    value={createUserForm.department}
+                    onChange={(e) => setCreateUserForm({...createUserForm, department: e.target.value})}
+                    className="bg-gray-800 border-gray-700 text-white"
+                    placeholder="e.g. Engineering"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="jobTitle" className="text-gray-400">Job Title</Label>
+                  <Input
+                    id="jobTitle"
+                    value={createUserForm.jobTitle}
+                    onChange={(e) => setCreateUserForm({...createUserForm, jobTitle: e.target.value})}
+                    className="bg-gray-800 border-gray-700 text-white"
+                    placeholder="e.g. Software Engineer"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="phoneNumber" className="text-gray-400">Phone Number</Label>
+                  <Input
+                    id="phoneNumber"
+                    value={createUserForm.phoneNumber}
+                    onChange={(e) => setCreateUserForm({...createUserForm, phoneNumber: e.target.value})}
+                    className="bg-gray-800 border-gray-700 text-white"
+                    placeholder="+1 (555) 123-4567"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="companyName" className="text-gray-400">Company Name</Label>
+                  <Input
+                    id="companyName"
+                    value={createUserForm.companyName}
+                    onChange={(e) => setCreateUserForm({...createUserForm, companyName: e.target.value})}
+                    className="bg-gray-800 border-gray-700 text-white"
+                    placeholder="Company name"
+                  />
+                </div>
+              </div>
+
               <div>
-                <Label htmlFor="department" className="text-gray-400">Department</Label>
+                <Label htmlFor="managerEmail" className="text-gray-400">Manager Email</Label>
                 <Input
-                  id="department"
-                  value={createUserForm.department}
-                  onChange={(e) => setCreateUserForm({...createUserForm, department: e.target.value})}
+                  id="managerEmail"
+                  type="email"
+                  value={createUserForm.managerEmail}
+                  onChange={(e) => setCreateUserForm({...createUserForm, managerEmail: e.target.value})}
                   className="bg-gray-800 border-gray-700 text-white"
-                  placeholder="Optional"
+                  placeholder="manager@company.com"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="businessJustification" className="text-gray-400">Business Justification</Label>
+                <Textarea
+                  id="businessJustification"
+                  value={createUserForm.businessJustification}
+                  onChange={(e) => setCreateUserForm({...createUserForm, businessJustification: e.target.value})}
+                  className="bg-gray-800 border-gray-700 text-white"
+                  placeholder="Business justification for access..."
+                  rows={3}
                 />
               </div>
               

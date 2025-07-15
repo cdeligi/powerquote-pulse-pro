@@ -18,6 +18,10 @@ interface UserRequest {
   full_name: string | null;
   requested_role: string;
   department: string | null;
+  job_title: string | null;
+  phone_number: string | null;
+  manager_email: string | null;
+  company_name: string | null;
   business_justification: string | null;
   requested_at: string;
   status: string;
@@ -195,6 +199,7 @@ export default function UserRequestsTab() {
             <TableHead className="text-gray-300">User</TableHead>
             <TableHead className="text-gray-300">Email</TableHead>
             <TableHead className="text-gray-300">Role</TableHead>
+            <TableHead className="text-gray-300">Company</TableHead>
             <TableHead className="text-gray-300">Status</TableHead>
             <TableHead className="text-gray-300">Requested</TableHead>
             <TableHead className="text-gray-300">Actions</TableHead>
@@ -208,6 +213,9 @@ export default function UserRequestsTab() {
                   <p className="font-medium text-white">
                     {request.first_name} {request.last_name}
                   </p>
+                  {request.job_title && (
+                    <p className="text-sm text-gray-400">{request.job_title}</p>
+                  )}
                   {request.department && (
                     <p className="text-sm text-gray-400">{request.department}</p>
                   )}
@@ -219,6 +227,7 @@ export default function UserRequestsTab() {
                   {request.requested_role}
                 </Badge>
               </TableCell>
+              <TableCell className="text-gray-300">{request.company_name || 'N/A'}</TableCell>
               <TableCell>{getStatusBadge(request.status)}</TableCell>
               <TableCell className="text-gray-300">
                 {new Date(request.requested_at).toLocaleDateString()}
@@ -269,12 +278,12 @@ export default function UserRequestsTab() {
 
       {/* Detail Dialog */}
       <Dialog open={isDetailDialogOpen} onOpenChange={setIsDetailDialogOpen}>
-        <DialogContent className="bg-gray-900 border-gray-800 max-w-2xl">
+        <DialogContent className="bg-gray-900 border-gray-800 max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-white">User Request Details</DialogTitle>
           </DialogHeader>
           {selectedRequest && (
-            <div className="space-y-4">
+            <div className="space-y-6">
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label className="text-gray-400">Name</Label>
@@ -292,7 +301,24 @@ export default function UserRequestsTab() {
                   <Label className="text-gray-400">Department</Label>
                   <p className="text-white">{selectedRequest.department || 'N/A'}</p>
                 </div>
+                <div>
+                  <Label className="text-gray-400">Job Title</Label>
+                  <p className="text-white">{selectedRequest.job_title || 'N/A'}</p>
+                </div>
+                <div>
+                  <Label className="text-gray-400">Phone Number</Label>
+                  <p className="text-white">{selectedRequest.phone_number || 'N/A'}</p>
+                </div>
+                <div>
+                  <Label className="text-gray-400">Manager Email</Label>
+                  <p className="text-white">{selectedRequest.manager_email || 'N/A'}</p>
+                </div>
+                <div>
+                  <Label className="text-gray-400">Company Name</Label>
+                  <p className="text-white">{selectedRequest.company_name || 'N/A'}</p>
+                </div>
               </div>
+              
               {selectedRequest.business_justification && (
                 <div>
                   <Label className="text-gray-400">Business Justification</Label>
@@ -301,6 +327,7 @@ export default function UserRequestsTab() {
                   </p>
                 </div>
               )}
+              
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
                   <Label className="text-gray-400">Status</Label>
@@ -313,6 +340,7 @@ export default function UserRequestsTab() {
                   </p>
                 </div>
               </div>
+              
               {selectedRequest.processed_at && (
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div>
@@ -332,6 +360,7 @@ export default function UserRequestsTab() {
                   </div>
                 </div>
               )}
+              
               {selectedRequest.rejection_reason && (
                 <div>
                   <Label className="text-gray-400">Rejection Reason</Label>
