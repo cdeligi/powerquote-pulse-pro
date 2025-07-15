@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { User } from "@/types/auth";
 import { UserRegistrationRequest, SecurityAuditLog } from "@/types/user-management";
@@ -17,7 +16,6 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { 
   Users, 
-  Shield, 
   CheckCircle, 
   XCircle, 
   Clock, 
@@ -29,7 +27,7 @@ import {
   UserX,
   Activity,
   UserPlus,
-  Trash2
+  RefreshCw
 } from "lucide-react";
 
 interface MergedUser {
@@ -67,60 +65,36 @@ const UserManagement = ({ user }: UserManagementProps) => {
     password: ''
   });
 
-  // Load real users from auth and profiles
+  // Load real users from edge function
   const loadUsers = async () => {
     try {
       setLoadingUsers(true);
       
-      // 1) Fetch auth users using admin API
-      const { data: authData, error: authError } = await supabase.auth.admin.listUsers();
-      if (authError) {
-        console.error('Error fetching auth users:', authError);
-        toast({
-          title: "Error",
-          description: "Failed to load users from auth. Please try again.",
-          variant: "destructive",
-        });
-        return;
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        throw new Error('No session found');
       }
 
-      // 2) Fetch profiles metadata
-      const { data: profiles, error: profilesError } = await supabase
-        .from('profiles')
-        .select('id, first_name, last_name, role, email, department, user_status');
-      
-      if (profilesError) {
-        console.error('Error fetching profiles:', profilesError);
-        toast({
-          title: "Error", 
-          description: "Failed to load user profiles. Please try again.",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      // 3) Merge auth users with profiles by id
-      const merged = authData.users.map(authUser => {
-        const profile = profiles?.find(p => p.id === authUser.id);
-        return {
-          id: authUser.id,
-          email: authUser.email || '',
-          fullName: profile ? `${profile.first_name || ''} ${profile.last_name || ''}`.trim() : 'Unknown User',
-          role: profile?.role || 'level1',
-          department: profile?.department || null,
-          confirmedAt: authUser.confirmed_at,
-          lastSignInAt: authUser.last_sign_in_at,
-          createdAt: authUser.created_at,
-          userStatus: profile?.user_status || 'active'
-        };
+      const response = await fetch(`${supabase.supabaseUrl}/functions/v1/admin-users`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+        },
       });
 
-      setUsers(merged);
-    } catch (error) {
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to load users');
+      }
+
+      const { users: fetchedUsers } = await response.json();
+      setUsers(fetchedUsers);
+    } catch (error: any) {
       console.error('Error loading users:', error);
       toast({
         title: "Error",
-        description: "Failed to load users. Please try again.",
+        description: error.message || "Failed to load users. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -134,7 +108,7 @@ const UserManagement = ({ user }: UserManagementProps) => {
     }
   }, [user]);
 
-  // Create new user using Supabase Auth Admin API
+  // Create new user using edge function
   const handleCreateUser = async () => {
     try {
       // Validate form
@@ -147,57 +121,43 @@ const UserManagement = ({ user }: UserManagementProps) => {
         return;
       }
 
-      // Generate temporary password if not provided
-      const tempPassword = createUserForm.password || `Temp${Math.random().toString(36).substring(2, 8)}!`;
-
-      // 1) Create user in auth using admin API
-      const { data: authData, error: authError } = await supabase.auth.admin.createUser({
-        email: createUserForm.email,
-        password: tempPassword,
-        email_confirm: true,
-        user_metadata: {
-          first_name: createUserForm.firstName,
-          last_name: createUserForm.lastName,
-          role: createUserForm.role,
-          department: createUserForm.department
-        }
-      });
-
-      if (authError) {
-        console.error('Error creating auth user:', authError);
-        toast({
-          title: "Error",
-          description: authError.message || "Failed to create user account.",
-          variant: "destructive",
-        });
-        return;
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        throw new Error('No session found');
       }
 
-      // 2) Create/update profile record to sync metadata
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .upsert({
-          id: authData.user.id,
+      const response = await fetch(`${supabase.supabaseUrl}/functions/v1/admin-users`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
           email: createUserForm.email,
-          first_name: createUserForm.firstName,
-          last_name: createUserForm.lastName,
+          firstName: createUserForm.firstName,
+          lastName: createUserForm.lastName,
           role: createUserForm.role,
           department: createUserForm.department || null,
-          user_status: 'active'
-        });
+          password: createUserForm.password || undefined
+        }),
+      });
 
-      if (profileError) {
-        console.error('Error creating profile:', profileError);
-        // User was created in auth but profile failed - still show success with warning
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to create user');
+      }
+
+      if (result.warning) {
         toast({
           title: "Warning",
-          description: "User created but profile sync failed. User may need manual setup.",
+          description: `${result.warning}. Temporary password: ${result.tempPassword}`,
           variant: "destructive",
         });
       } else {
         toast({
           title: "Success",
-          description: `User created successfully! Temporary password: ${tempPassword}`,
+          description: `User created successfully! Temporary password: ${result.tempPassword}`,
         });
       }
 
@@ -214,35 +174,40 @@ const UserManagement = ({ user }: UserManagementProps) => {
       
       // Refresh users list
       loadUsers();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creating user:', error);
       toast({
         title: "Error",
-        description: "Failed to create user. Please try again.",
+        description: error.message || "Failed to create user. Please try again.",
         variant: "destructive",
       });
     }
   };
 
-  // Update user status in profiles table
+  // Update user status using edge function
   const handleUpdateUserStatus = async (userId: string, status: string) => {
     try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({ 
-          user_status: status,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', userId);
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        throw new Error('No session found');
+      }
 
-      if (error) {
-        console.error('Error updating user status:', error);
-        toast({
-          title: "Error",
-          description: "Failed to update user status. Please try again.",
-          variant: "destructive",
-        });
-        return;
+      const response = await fetch(`${supabase.supabaseUrl}/functions/v1/admin-users`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId,
+          status
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to update user status');
       }
 
       toast({
@@ -252,29 +217,24 @@ const UserManagement = ({ user }: UserManagementProps) => {
 
       // Refresh users list
       loadUsers();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error updating user status:', error);
       toast({
         title: "Error",
-        description: "Failed to update user status. Please try again.",
+        description: error.message || "Failed to update user status. Please try again.",
         variant: "destructive",
       });
     }
   };
 
-  // Remove mock registration requests - replace with real data or remove entirely
   const [pendingRequests] = useState<UserRegistrationRequest[]>([]);
-
-  // Remove mock audit logs - replace with real data or remove entirely  
   const auditLogs: SecurityAuditLog[] = [];
 
   const handleApproveRequest = (requestId: string) => {
-    // Implementation for approving requests when real data is connected
     console.log(`Approved registration request: ${requestId}`);
   };
 
   const handleRejectRequest = () => {
-    // Implementation for rejecting requests when real data is connected
     if (!selectedRequest || !rejectionReason.trim()) return;
     setIsReviewDialogOpen(false);
     setSelectedRequest(null);
@@ -350,6 +310,16 @@ const UserManagement = ({ user }: UserManagementProps) => {
           <p className="text-gray-400">Manage users and registration requests</p>
         </div>
         <div className="flex items-center space-x-4">
+          <Button
+            onClick={loadUsers}
+            variant="outline"
+            size="sm"
+            disabled={loadingUsers}
+            className="border-gray-600 text-white hover:bg-gray-800"
+          >
+            <RefreshCw className={`h-4 w-4 mr-2 ${loadingUsers ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
           <Dialog open={isCreateUserDialogOpen} onOpenChange={setIsCreateUserDialogOpen}>
             <DialogTrigger asChild>
               <Button className="bg-green-600 hover:bg-green-700">
@@ -454,6 +424,20 @@ const UserManagement = ({ user }: UserManagementProps) => {
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
+                <p className="text-sm text-gray-400">Active Users</p>
+                <p className="text-2xl font-bold text-green-500">
+                  {users.filter(u => u.userStatus === 'active').length}
+                </p>
+              </div>
+              <UserCheck className="h-8 w-8 text-green-500" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-gray-900 border-gray-800">
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
                 <p className="text-sm text-gray-400">Pending</p>
                 <p className="text-2xl font-bold text-yellow-500">
                   {pendingRequests.filter(r => r.status === 'pending').length}
@@ -468,40 +452,26 @@ const UserManagement = ({ user }: UserManagementProps) => {
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-400">Under Review</p>
-                <p className="text-2xl font-bold text-blue-500">
-                  {pendingRequests.filter(r => r.status === 'under_review').length}
-                </p>
-              </div>
-              <Eye className="h-8 w-8 text-blue-500" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-gray-900 border-gray-800">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-400">Approved</p>
-                <p className="text-2xl font-bold text-green-500">
-                  {pendingRequests.filter(r => r.status === 'approved').length}
-                </p>
-              </div>
-              <UserCheck className="h-8 w-8 text-green-500" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-gray-900 border-gray-800">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-400">Rejected</p>
+                <p className="text-sm text-gray-400">Inactive</p>
                 <p className="text-2xl font-bold text-red-500">
-                  {pendingRequests.filter(r => r.status === 'rejected').length}
+                  {users.filter(u => u.userStatus === 'inactive').length}
                 </p>
               </div>
               <UserX className="h-8 w-8 text-red-500" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-gray-900 border-gray-800">
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-400">Total Users</p>
+                <p className="text-2xl font-bold text-blue-500">
+                  {users.length}
+                </p>
+              </div>
+              <Users className="h-8 w-8 text-blue-500" />
             </div>
           </CardContent>
         </Card>
