@@ -32,16 +32,16 @@ import {
   Trash2
 } from "lucide-react";
 
-interface ManagementUser {
+interface MergedUser {
   id: string;
   email: string;
-  first_name: string | null;
-  last_name: string | null;
+  fullName: string;
   role: string;
   department: string | null;
-  user_status: string;
-  created_at: string;
-  updated_at: string;
+  confirmedAt: string | null;
+  lastSignInAt: string | null;
+  createdAt: string;
+  userStatus: string;
 }
 
 interface UserManagementProps {
@@ -54,7 +54,7 @@ const UserManagement = ({ user }: UserManagementProps) => {
   const [rejectionReason, setRejectionReason] = useState('');
   const [isReviewDialogOpen, setIsReviewDialogOpen] = useState(false);
   const [isCreateUserDialogOpen, setIsCreateUserDialogOpen] = useState(false);
-  const [users, setUsers] = useState<ManagementUser[]>([]);
+  const [users, setUsers] = useState<MergedUser[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(true);
   
   // Create user form state
@@ -67,25 +67,57 @@ const UserManagement = ({ user }: UserManagementProps) => {
     password: ''
   });
 
-  // Load users from database
-  const fetchUsers = async () => {
+  // Load real users from auth and profiles
+  const loadUsers = async () => {
     try {
       setLoadingUsers(true);
-      const { data, error } = await supabase.rpc('admin_list_users');
       
-      if (error) {
-        console.error('Error fetching users:', error);
+      // 1) Fetch auth users using admin API
+      const { data: authData, error: authError } = await supabase.auth.admin.listUsers();
+      if (authError) {
+        console.error('Error fetching auth users:', authError);
         toast({
           title: "Error",
-          description: "Failed to load users. Please try again.",
+          description: "Failed to load users from auth. Please try again.",
           variant: "destructive",
         });
         return;
       }
+
+      // 2) Fetch profiles metadata
+      const { data: profiles, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, first_name, last_name, role, email, department, user_status');
       
-      setUsers(data || []);
+      if (profilesError) {
+        console.error('Error fetching profiles:', profilesError);
+        toast({
+          title: "Error", 
+          description: "Failed to load user profiles. Please try again.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // 3) Merge auth users with profiles by id
+      const merged = authData.users.map(authUser => {
+        const profile = profiles?.find(p => p.id === authUser.id);
+        return {
+          id: authUser.id,
+          email: authUser.email || '',
+          fullName: profile ? `${profile.first_name || ''} ${profile.last_name || ''}`.trim() : 'Unknown User',
+          role: profile?.role || 'level1',
+          department: profile?.department || null,
+          confirmedAt: authUser.confirmed_at,
+          lastSignInAt: authUser.last_sign_in_at,
+          createdAt: authUser.created_at,
+          userStatus: profile?.user_status || 'active'
+        };
+      });
+
+      setUsers(merged);
     } catch (error) {
-      console.error('Error fetching users:', error);
+      console.error('Error loading users:', error);
       toast({
         title: "Error",
         description: "Failed to load users. Please try again.",
@@ -98,11 +130,11 @@ const UserManagement = ({ user }: UserManagementProps) => {
 
   useEffect(() => {
     if (user?.role === 'admin') {
-      fetchUsers();
+      loadUsers();
     }
   }, [user]);
 
-  // Create new user
+  // Create new user using Supabase Auth Admin API
   const handleCreateUser = async () => {
     try {
       // Validate form
@@ -116,42 +148,58 @@ const UserManagement = ({ user }: UserManagementProps) => {
       }
 
       // Generate temporary password if not provided
-      const tempPassword = createUserForm.password || `temp${Math.random().toString(36).substring(7)}`;
+      const tempPassword = createUserForm.password || `Temp${Math.random().toString(36).substring(2, 8)}!`;
 
-      const { data, error } = await supabase.rpc('admin_create_user', {
-        p_email: createUserForm.email,
-        p_password: tempPassword,
-        p_first_name: createUserForm.firstName,
-        p_last_name: createUserForm.lastName,
-        p_role: createUserForm.role,
-        p_department: createUserForm.department || null
+      // 1) Create user in auth using admin API
+      const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+        email: createUserForm.email,
+        password: tempPassword,
+        email_confirm: true,
+        user_metadata: {
+          first_name: createUserForm.firstName,
+          last_name: createUserForm.lastName,
+          role: createUserForm.role,
+          department: createUserForm.department
+        }
       });
 
-      if (error) {
-        console.error('Error creating user:', error);
+      if (authError) {
+        console.error('Error creating auth user:', authError);
         toast({
           title: "Error",
-          description: error.message || "Failed to create user. Please try again.",
+          description: authError.message || "Failed to create user account.",
           variant: "destructive",
         });
         return;
       }
 
-      const result = typeof data === 'string' ? JSON.parse(data) : data;
-      
-      if (!result.success) {
+      // 2) Create/update profile record to sync metadata
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .upsert({
+          id: authData.user.id,
+          email: createUserForm.email,
+          first_name: createUserForm.firstName,
+          last_name: createUserForm.lastName,
+          role: createUserForm.role,
+          department: createUserForm.department || null,
+          user_status: 'active'
+        });
+
+      if (profileError) {
+        console.error('Error creating profile:', profileError);
+        // User was created in auth but profile failed - still show success with warning
         toast({
-          title: "Error",
-          description: result.error || "Failed to create user.",
+          title: "Warning",
+          description: "User created but profile sync failed. User may need manual setup.",
           variant: "destructive",
         });
-        return;
+      } else {
+        toast({
+          title: "Success",
+          description: `User created successfully! Temporary password: ${tempPassword}`,
+        });
       }
-
-      toast({
-        title: "Success",
-        description: `User created successfully! Temporary password: ${tempPassword}`,
-      });
 
       // Reset form and close dialog
       setCreateUserForm({
@@ -165,7 +213,7 @@ const UserManagement = ({ user }: UserManagementProps) => {
       setIsCreateUserDialogOpen(false);
       
       // Refresh users list
-      fetchUsers();
+      loadUsers();
     } catch (error) {
       console.error('Error creating user:', error);
       toast({
@@ -176,13 +224,16 @@ const UserManagement = ({ user }: UserManagementProps) => {
     }
   };
 
-  // Update user status
+  // Update user status in profiles table
   const handleUpdateUserStatus = async (userId: string, status: string) => {
     try {
-      const { data, error } = await supabase.rpc('admin_update_user_status', {
-        p_user_id: userId,
-        p_status: status
-      });
+      const { error } = await supabase
+        .from('profiles')
+        .update({ 
+          user_status: status,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', userId);
 
       if (error) {
         console.error('Error updating user status:', error);
@@ -194,24 +245,13 @@ const UserManagement = ({ user }: UserManagementProps) => {
         return;
       }
 
-      const result = typeof data === 'string' ? JSON.parse(data) : data;
-      
-      if (!result.success) {
-        toast({
-          title: "Error",
-          description: result.error || "Failed to update user status.",
-          variant: "destructive",
-        });
-        return;
-      }
-
       toast({
         title: "Success",
         description: "User status updated successfully!",
       });
 
       // Refresh users list
-      fetchUsers();
+      loadUsers();
     } catch (error) {
       console.error('Error updating user status:', error);
       toast({
@@ -222,105 +262,26 @@ const UserManagement = ({ user }: UserManagementProps) => {
     }
   };
 
-  // Mock data for registration requests (keeping for now)
-  const [pendingRequests, setPendingRequests] = useState<UserRegistrationRequest[]>([
-    {
-      id: 'REG-2024-001',
-      email: 'john.smith@acmepower.com',
-      firstName: 'John',
-      lastName: 'Smith',
-      department: 'sales',
-      jobTitle: 'Senior Sales Engineer',
-      phoneNumber: '+1 (555) 123-4567',
-      businessJustification: 'I need access to the PowerQuotePro system to generate quotes for our utility customers. My role involves creating technical proposals and pricing for transformer monitoring solutions.',
-      requestedRole: 'level2',
-      managerEmail: 'manager@acmepower.com',
-      companyName: 'ACME Power Solutions',
-      status: 'pending',
-      createdAt: '2024-01-16T10:30:00Z',
-      ipAddress: '192.168.1.100',
-      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-      loginAttempts: 0,
-      isLocked: false,
-      twoFactorEnabled: false,
-      agreedToTerms: true,
-      agreedToPrivacyPolicy: true
-    }
-  ]);
+  // Remove mock registration requests - replace with real data or remove entirely
+  const [pendingRequests] = useState<UserRegistrationRequest[]>([]);
 
-  const auditLogs: SecurityAuditLog[] = [
-    {
-      id: 'AUDIT-001',
-      userId: 'REG-2024-001',
-      action: 'Registration Request Submitted',
-      details: 'New user registration request for Level 2 access',
-      ipAddress: '192.168.1.100',
-      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
-      timestamp: '2024-01-16T10:30:00Z',
-      severity: 'low'
-    },
-    {
-      id: 'AUDIT-002',
-      action: 'Admin Login',
-      details: 'Administrator accessed user management panel',
-      ipAddress: '192.168.1.10',
-      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
-      timestamp: '2024-01-16T09:00:00Z',
-      severity: 'medium'
-    },
-    {
-      id: 'AUDIT-003',
-      userId: 'REG-2024-002',
-      action: 'Request Status Changed',
-      details: 'Registration request moved to under review',
-      ipAddress: '192.168.1.10',
-      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
-      timestamp: '2024-01-16T09:05:00Z',
-      severity: 'low'
-    }
-  ];
+  // Remove mock audit logs - replace with real data or remove entirely  
+  const auditLogs: SecurityAuditLog[] = [];
 
   const handleApproveRequest = (requestId: string) => {
-    setPendingRequests(prev => 
-      prev.map(req => 
-        req.id === requestId 
-          ? { 
-              ...req, 
-              status: 'approved', 
-              reviewedAt: new Date().toISOString(),
-              reviewedBy: user.id 
-            }
-          : req
-      )
-    );
+    // Implementation for approving requests when real data is connected
     console.log(`Approved registration request: ${requestId}`);
-    // In real app, would create user account and send welcome email
   };
 
   const handleRejectRequest = () => {
+    // Implementation for rejecting requests when real data is connected
     if (!selectedRequest || !rejectionReason.trim()) return;
-
-    setPendingRequests(prev => 
-      prev.map(req => 
-        req.id === selectedRequest.id 
-          ? { 
-              ...req, 
-              status: 'rejected', 
-              reviewedAt: new Date().toISOString(),
-              reviewedBy: user.id,
-              rejectionReason: rejectionReason.trim()
-            }
-          : req
-      )
-    );
-    
     setIsReviewDialogOpen(false);
     setSelectedRequest(null);
     setRejectionReason('');
-    console.log(`Rejected registration request: ${selectedRequest.id}`);
   };
 
-  const getStatusBadge = (status: UserRegistrationRequest['status']) => {
+  const getRequestStatusBadge = (status: UserRegistrationRequest['status']) => {
     const badges = {
       pending: { color: 'bg-yellow-600', icon: Clock, text: 'Pending' },
       under_review: { color: 'bg-blue-600', icon: Eye, text: 'Under Review' },
@@ -589,46 +550,46 @@ const UserManagement = ({ user }: UserManagementProps) => {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {users.map((mgmtUser) => (
-                      <TableRow key={mgmtUser.id} className="border-gray-800">
+                    {users.map((mergedUser) => (
+                      <TableRow key={mergedUser.id} className="border-gray-800">
                         <TableCell>
                           <div>
                             <p className="font-medium text-white">
-                              {mgmtUser.first_name} {mgmtUser.last_name}
+                              {mergedUser.fullName}
                             </p>
-                            <p className="text-xs text-gray-500">{mgmtUser.id}</p>
+                            <p className="text-xs text-gray-500">{mergedUser.id}</p>
                           </div>
                         </TableCell>
                         <TableCell className="text-gray-300">
-                          {mgmtUser.email}
+                          {mergedUser.email}
                         </TableCell>
                         <TableCell>
-                          {getRoleBadge(mgmtUser.role)}
+                          {getRoleBadge(mergedUser.role)}
                         </TableCell>
                         <TableCell className="text-gray-300">
-                          {mgmtUser.department || 'N/A'}
+                          {mergedUser.department || 'N/A'}
                         </TableCell>
-                         <TableCell>
-                           {getUserStatusBadge(mgmtUser.user_status)}
+                        <TableCell>
+                          {getUserStatusBadge(mergedUser.userStatus)}
                         </TableCell>
                         <TableCell className="text-gray-300">
-                          {new Date(mgmtUser.created_at).toLocaleDateString()}
+                          {new Date(mergedUser.createdAt).toLocaleDateString()}
                         </TableCell>
                         <TableCell>
                           <div className="flex space-x-2">
-                            {mgmtUser.user_status === 'active' ? (
+                            {mergedUser.userStatus === 'active' ? (
                               <Button
-                                onClick={() => handleUpdateUserStatus(mgmtUser.id, 'inactive')}
+                                onClick={() => handleUpdateUserStatus(mergedUser.id, 'inactive')}
                                 size="sm"
                                 variant="outline"
                                 className="text-red-400 border-red-400 hover:bg-red-400 hover:text-white"
-                                disabled={mgmtUser.role === 'admin'}
+                                disabled={mergedUser.role === 'admin'}
                               >
                                 <Lock className="h-4 w-4" />
                               </Button>
                             ) : (
                               <Button
-                                onClick={() => handleUpdateUserStatus(mgmtUser.id, 'active')}
+                                onClick={() => handleUpdateUserStatus(mergedUser.id, 'active')}
                                 size="sm"
                                 variant="outline"
                                 className="text-green-400 border-green-400 hover:bg-green-400 hover:text-white"
@@ -691,7 +652,7 @@ const UserManagement = ({ user }: UserManagementProps) => {
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        {getStatusBadge(request.status)}
+                        {getRequestStatusBadge(request.status)}
                       </TableCell>
                       <TableCell className="text-gray-300">
                         {new Date(request.createdAt).toLocaleDateString()}
