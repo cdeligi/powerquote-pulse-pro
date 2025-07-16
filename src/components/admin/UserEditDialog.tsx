@@ -65,7 +65,7 @@ export default function UserEditDialog({ user, isOpen, onClose, onSave }: UserEd
     setIsLoading(true);
     try {
       await onSave({
-        userId: user.id,
+        id: user.id,
         firstName,
         lastName,
         role,
