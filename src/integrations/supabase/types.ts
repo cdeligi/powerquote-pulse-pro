@@ -1013,7 +1013,7 @@ export type Database = {
           revoked_at: string | null
           revoked_reason: string | null
           screen_resolution: string | null
-          session_token: string
+          session_token: string | null
           timezone: string | null
           user_agent: string | null
           user_id: string
@@ -1032,7 +1032,7 @@ export type Database = {
           revoked_at?: string | null
           revoked_reason?: string | null
           screen_resolution?: string | null
-          session_token: string
+          session_token?: string | null
           timezone?: string | null
           user_agent?: string | null
           user_id: string
@@ -1051,7 +1051,7 @@ export type Database = {
           revoked_at?: string | null
           revoked_reason?: string | null
           screen_resolution?: string | null
-          session_token?: string
+          session_token?: string | null
           timezone?: string | null
           user_agent?: string | null
           user_id?: string

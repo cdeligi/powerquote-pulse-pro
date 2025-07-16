@@ -124,7 +124,7 @@ const UserManagement = ({ user }: UserManagementProps) => {
     }
   }, [user]);
 
-  // Create new user using edge function
+  // Create new user directly with Supabase
   const handleCreateUser = async () => {
     try {
       // Validate form
@@ -137,41 +137,33 @@ const UserManagement = ({ user }: UserManagementProps) => {
         return;
       }
 
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        throw new Error('No session found');
-      }
+      const userId = crypto.randomUUID();
 
-      const response = await fetch(`https://cwhmxpitwblqxgrvaigg.supabase.co/functions/v1/admin-users`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
+      // Create profile record directly
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .insert({
+          id: userId,
           email: createUserForm.email,
-          firstName: createUserForm.firstName,
-          lastName: createUserForm.lastName,
+          first_name: createUserForm.firstName,
+          last_name: createUserForm.lastName,
           role: createUserForm.role,
           department: createUserForm.department || null,
-          jobTitle: createUserForm.jobTitle || null,
-          phoneNumber: createUserForm.phoneNumber || null,
-          managerEmail: createUserForm.managerEmail || null,
-          companyName: createUserForm.companyName || null,
-          businessJustification: createUserForm.businessJustification || null,
-          password: createUserForm.password || undefined
-        }),
-      });
+          job_title: createUserForm.jobTitle || null,
+          phone_number: createUserForm.phoneNumber || null,
+          manager_email: createUserForm.managerEmail || null,
+          company_name: createUserForm.companyName || null,
+          business_justification: createUserForm.businessJustification || null,
+          user_status: 'active'
+        });
 
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.error || 'Failed to create user');
+      if (profileError) {
+        throw profileError;
       }
 
       toast({
         title: "Success",
-        description: `User created successfully! Temporary password: ${result.tempPassword}`,
+        description: "User profile created successfully!",
       });
 
       // Reset form and close dialog
@@ -188,6 +180,7 @@ const UserManagement = ({ user }: UserManagementProps) => {
         businessJustification: '',
         password: ''
       });
+      // Dialog will remain open in tab format
       
       // Refresh users list
       loadUsers();
@@ -201,34 +194,44 @@ const UserManagement = ({ user }: UserManagementProps) => {
     }
   };
 
-  // Update user using edge function
+  // Update user directly with Supabase
   const handleUpdateUser = async (userData: any) => {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        throw new Error('No session found');
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update({
+          first_name: userData.firstName,
+          last_name: userData.lastName,
+          role: userData.role,
+          user_status: userData.userStatus,
+          department: userData.department,
+          job_title: userData.jobTitle,
+          phone_number: userData.phoneNumber,
+          manager_email: userData.managerEmail,
+          company_name: userData.companyName,
+          business_justification: userData.businessJustification,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', userData.id);
+
+      if (profileError) {
+        throw profileError;
       }
 
-      const response = await fetch(`https://cwhmxpitwblqxgrvaigg.supabase.co/functions/v1/admin-users`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(userData),
+      toast({
+        title: "Success",
+        description: "User updated successfully",
       });
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.error || 'Failed to update user');
-      }
 
       // Refresh users list
       loadUsers();
     } catch (error: any) {
       console.error('Error updating user:', error);
-      throw error;
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update user",
+        variant: "destructive",
+      });
     }
   };
 
