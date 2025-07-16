@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { User } from "@/types/auth";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -144,10 +143,7 @@ const UserManagement = ({ user }: UserManagementProps) => {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${session.access_token}`,
-        mshxif-codex/fix-user-account-update-errors
           'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
-
-        main
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
@@ -215,10 +211,7 @@ const UserManagement = ({ user }: UserManagementProps) => {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${session.access_token}`,
-        mshxif-codex/fix-user-account-update-errors
           'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
-
-        main
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
