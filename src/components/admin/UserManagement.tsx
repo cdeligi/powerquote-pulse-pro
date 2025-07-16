@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { User } from "@/types/auth";
 import { UserRegistrationRequest, SecurityAuditLog } from "@/types/user-management";
@@ -25,6 +24,7 @@ import {
   UserX,
   Activity
 } from "lucide-react";
+import UserActivity from './UserActivity';
 
 interface UserManagementProps {
   user: User;
@@ -196,7 +196,7 @@ const UserManagement = ({ user }: UserManagementProps) => {
       <div className="flex justify-between items-center">
         <div>
           <h2 className="text-2xl font-bold text-white mb-2">User Management</h2>
-          <p className="text-gray-400">Manage user registration requests and security auditing</p>
+          <p className="text-gray-400">Manage user registration and activity</p>
         </div>
         <div className="flex items-center space-x-4">
           <div className="text-right">
@@ -268,12 +268,15 @@ const UserManagement = ({ user }: UserManagementProps) => {
       </div>
 
       <Tabs defaultValue="requests" className="w-full">
-        <TabsList className="grid w-full grid-cols-2 bg-gray-800">
+        <TabsList className="grid w-full grid-cols-3 bg-gray-800">
           <TabsTrigger value="requests" className="text-white data-[state=active]:bg-red-600">
             Registration Requests
           </TabsTrigger>
-          <TabsTrigger value="audit" className="text-white data-[state=active]:bg-red-600">
-            Security Audit Log
+          <TabsTrigger value="users" className="text-white data-[state=active]:bg-red-600">
+            Active Users
+          </TabsTrigger>
+          <TabsTrigger value="activity" className="text-white data-[state=active]:bg-red-600">
+            User Activity
           </TabsTrigger>
         </TabsList>
 
@@ -422,52 +425,37 @@ const UserManagement = ({ user }: UserManagementProps) => {
           </Card>
         </TabsContent>
 
-        <TabsContent value="audit">
+        <TabsContent value="users">
           <Card className="bg-gray-900 border-gray-800">
             <CardHeader>
               <CardTitle className="text-white flex items-center">
-                <Activity className="h-5 w-5 mr-2" />
-                Security Audit Log
+                <Users className="h-5 w-5 mr-2" />
+                Active Users
               </CardTitle>
               <CardDescription className="text-gray-400">
-                System security events and user activity monitoring
+                View and manage active user accounts
               </CardDescription>
             </CardHeader>
             <CardContent>
               <Table>
                 <TableHeader>
                   <TableRow className="border-gray-800">
-                    <TableHead className="text-gray-300">Timestamp</TableHead>
-                    <TableHead className="text-gray-300">Action</TableHead>
-                    <TableHead className="text-gray-300">Details</TableHead>
-                    <TableHead className="text-gray-300">IP Address</TableHead>
-                    <TableHead className="text-gray-300">Severity</TableHead>
+                    <TableHead className="text-gray-300">User</TableHead>
+                    <TableHead className="text-gray-300">Role</TableHead>
+                    <TableHead className="text-gray-300">Last Login</TableHead>
+                    <TableHead className="text-gray-300">Status</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {auditLogs.map((log) => (
-                    <TableRow key={log.id} className="border-gray-800">
-                      <TableCell className="text-gray-300">
-                        {new Date(log.timestamp).toLocaleString()}
-                      </TableCell>
-                      <TableCell className="text-white font-medium">
-                        {log.action}
-                      </TableCell>
-                      <TableCell className="text-gray-300">
-                        {log.details}
-                      </TableCell>
-                      <TableCell className="text-gray-300 font-mono text-sm">
-                        {log.ipAddress}
-                      </TableCell>
-                      <TableCell>
-                        {getSeverityBadge(log.severity)}
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {/* Add user list here */}
                 </TableBody>
               </Table>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="activity">
+          <UserActivity auditLogs={auditLogs} />
         </TabsContent>
       </Tabs>
 

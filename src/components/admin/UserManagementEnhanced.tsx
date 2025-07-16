@@ -1,5 +1,5 @@
 /**
- * © 2025 Qualitrol Corp. All rights reserved.
+ * 2025 Qualitrol Corp. All rights reserved.
  */
 
 import { useState, useEffect } from "react";
@@ -54,6 +54,22 @@ const UserManagementEnhanced = ({ user }: UserManagementEnhancedProps) => {
   const [loading, setLoading] = useState(true);
   const [selectedUserToRemove, setSelectedUserToRemove] = useState<UserProfile | null>(null);
   const [isRemoveDialogOpen, setIsRemoveDialogOpen] = useState(false);
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [createUserData, setCreateUserData] = useState<{
+    email: string;
+    password: string;
+    firstName: string;
+    lastName: string;
+    role: string;
+    department: string;
+  }>({
+    email: '',
+    password: '',
+    firstName: '',
+    lastName: '',
+    role: 'level1',
+    department: ''
+  });
 
   // Mock data for registration requests - in real app this would come from API
   const [pendingRequests, setPendingRequests] = useState<UserRegistrationRequest[]>([
@@ -237,6 +253,68 @@ const UserManagementEnhanced = ({ user }: UserManagementEnhancedProps) => {
     );
   };
 
+  const createUser = async () => {
+    try {
+      // First create the auth user
+      const { data: { user }, error: authError } = await supabase.auth.admin.createUser({
+        email: createUserData.email,
+        password: createUserData.password,
+        user_metadata: {
+          first_name: createUserData.firstName,
+          last_name: createUserData.lastName,
+          role: createUserData.role,
+          department: createUserData.department
+        }
+      });
+
+      if (authError) throw authError;
+
+      // Then create the profile
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .insert({
+          id: user.id,
+          email: createUserData.email,
+          first_name: createUserData.firstName,
+          last_name: createUserData.lastName,
+          role: createUserData.role,
+          department: createUserData.department,
+          user_status: 'active'
+        });
+
+      if (profileError) throw profileError;
+
+      toast({
+        title: "User Created",
+        description: "New user has been successfully created and an email has been sent to them.",
+      });
+
+      // Reset form and close dialog
+      setCreateUserData({
+        email: '',
+        password: '',
+        firstName: '',
+        lastName: '',
+        role: 'level1',
+        department: ''
+      });
+      setIsCreateDialogOpen(false);
+
+      // Refresh the user list
+      await fetchUserProfiles();
+    } catch (error: any) {
+      console.error('Error creating user:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create user.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Check if current user is admin
+  const isAdmin = user?.role === 'admin';
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -255,6 +333,17 @@ const UserManagementEnhanced = ({ user }: UserManagementEnhancedProps) => {
             <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
             Refresh
           </Button>
+          {isAdmin && (
+            <Button
+              onClick={() => setIsCreateDialogOpen(true)}
+              variant="outline"
+              size="sm"
+              className="border-gray-600 text-white hover:bg-gray-800"
+            >
+              <User className="h-4 w-4 mr-2" />
+              Create User
+            </Button>
+          )}
           <div className="text-right">
             <p className="text-sm text-gray-400">Pending Requests</p>
             <p className="text-2xl font-bold text-yellow-500">
@@ -688,6 +777,86 @@ const UserManagementEnhanced = ({ user }: UserManagementEnhancedProps) => {
                 Reject Request
               </Button>
             </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Create User Dialog */}
+      <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create New User</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="email">Email</Label>
+              <input
+                id="email"
+                type="email"
+                value={createUserData.email}
+                onChange={(e) => setCreateUserData(prev => ({ ...prev, email: e.target.value }))}
+                className="rounded-md border border-gray-600 bg-gray-800 px-3 py-2 text-sm text-white focus:border-red-600 focus:outline-none focus:ring-2 focus:ring-red-600"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="password">Password</Label>
+              <input
+                id="password"
+                type="password"
+                value={createUserData.password}
+                onChange={(e) => setCreateUserData(prev => ({ ...prev, password: e.target.value }))}
+                className="rounded-md border border-gray-600 bg-gray-800 px-3 py-2 text-sm text-white focus:border-red-600 focus:outline-none focus:ring-2 focus:ring-red-600"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="firstName">First Name</Label>
+              <input
+                id="firstName"
+                type="text"
+                value={createUserData.firstName}
+                onChange={(e) => setCreateUserData(prev => ({ ...prev, firstName: e.target.value }))}
+                className="rounded-md border border-gray-600 bg-gray-800 px-3 py-2 text-sm text-white focus:border-red-600 focus:outline-none focus:ring-2 focus:ring-red-600"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="lastName">Last Name</Label>
+              <input
+                id="lastName"
+                type="text"
+                value={createUserData.lastName}
+                onChange={(e) => setCreateUserData(prev => ({ ...prev, lastName: e.target.value }))}
+                className="rounded-md border border-gray-600 bg-gray-800 px-3 py-2 text-sm text-white focus:border-red-600 focus:outline-none focus:ring-2 focus:ring-red-600"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="role">Role</Label>
+              <select
+                id="role"
+                value={createUserData.role}
+                onChange={(e) => setCreateUserData(prev => ({ ...prev, role: e.target.value }))}
+                className="rounded-md border border-gray-600 bg-gray-800 px-3 py-2 text-sm text-white focus:border-red-600 focus:outline-none focus:ring-2 focus:ring-red-600"
+              >
+                <option value="level1">Level 1</option>
+                <option value="level2">Level 2</option>
+                <option value="admin">Admin</option>
+              </select>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="department">Department</Label>
+              <input
+                id="department"
+                type="text"
+                value={createUserData.department}
+                onChange={(e) => setCreateUserData(prev => ({ ...prev, department: e.target.value }))}
+                className="rounded-md border border-gray-600 bg-gray-800 px-3 py-2 text-sm text-white focus:border-red-600 focus:outline-none focus:ring-2 focus:ring-red-600"
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={createUser}>Create User</Button>
           </div>
         </DialogContent>
       </Dialog>

@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useContext, createContext } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
@@ -32,43 +31,91 @@ function useProvideAuth(): AuthContextType {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const fetchProfile = async (uid: string): Promise<void> => {
+  const fetchProfile = async (uid: string, email: string): Promise<void> => {
     console.log('[useAuth] fetchProfile start for:', uid);
     
     try {
-      const { data, error } = await supabase
+      // First check if user exists in auth
+      const { data: authUser, error: authError } = await supabase
+        .from('auth.users')
+        .select('*')
+        .eq('id', uid)
+        .single();
+
+      if (authError) {
+        console.error('[useAuth] Auth user fetch error:', authError);
+        setUser(null);
+        return;
+      }
+
+      // Get user metadata
+      const userMetadata = authUser?.raw_user_meta_data || {};
+      
+      // Check if profile exists
+      const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', uid)
         .single();
 
-      if (error) {
-        if (error.code === 'PGRST116') {
-          console.warn('[useAuth] No profile found for user:', uid);
-          setUser(null);
-        } else {
-          console.error('[useAuth] Profile fetch error:', error);
-          setUser(null);
-        }
+      if (profileError && !profileError.code.includes('PGRST107')) { // PGRST107 means no rows found
+        console.error('[useAuth] Profile fetch error:', profileError);
+        setUser(null);
         return;
       }
 
-      if (data) {
-        console.log('[useAuth] Profile loaded successfully:', data.email);
-        const appUser: AppUser = {
-          id: data.id,
-          name: `${data.first_name || ''} ${data.last_name || ''}`.trim() || 'User',
-          email: data.email,
-          role: data.role as 'level1' | 'level2' | 'admin',
-          department: data.department
-        };
-        setUser(appUser);
-      } else {
-        console.warn('[useAuth] Profile data is null for user:', uid);
-        setUser(null);
+      // If profile doesn't exist, create one
+      if (!profile) {
+        console.log('[useAuth] Creating new profile for user:', uid);
+        
+        // For admin user, we need to bypass the policy check
+        const isAdmin = email === 'cdeligi@qualitrolcorp.com';
+        const { error: createError } = await supabase
+          .from('profiles')
+          .insert({
+            id: uid,
+            email: email,
+            first_name: userMetadata.first_name || (isAdmin ? 'Carlos' : 'User'),
+            last_name: userMetadata.last_name || (isAdmin ? 'Deligi' : 'User'),
+            role: isAdmin ? 'admin' : 'level1',
+            department: isAdmin ? 'Admin' : '',
+            user_status: 'active'
+          })
+          .select()  // This will return the created profile
+          .single();
+
+        if (createError) {
+          console.error('[useAuth] Error creating profile:', createError);
+          setUser(null);
+          return;
+        }
       }
+
+      // Get the profile data (either existing or newly created)
+      const { data: finalProfile, error: finalError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', uid)
+        .single();
+
+      if (finalError) {
+        console.error('[useAuth] Final profile fetch error:', finalError);
+        setUser(null);
+        return;
+      }
+
+      // Set up user object
+      const appUser: AppUser = {
+        id: uid,
+        name: `${finalProfile?.first_name || ''} ${finalProfile?.last_name || ''}`.trim() || 'User',
+        email: email,
+        role: finalProfile?.role || 'level1',
+        department: finalProfile?.department || ''
+      };
+
+      setUser(appUser);
     } catch (err) {
-      console.error('[useAuth] Unexpected profile fetch error:', err);
+      console.error('[useAuth] Unexpected error in fetchProfile:', err);
       setUser(null);
     }
   };
@@ -93,7 +140,7 @@ function useProvideAuth(): AuthContextType {
         if (session?.user) {
           console.log('[useAuth] User session found, fetching profile...');
           try {
-            await fetchProfile(session.user.id);
+            await fetchProfile(session.user.id, session.user.email);
           } catch (error) {
             console.error('[useAuth] Error fetching profile in auth state change:', error);
             setUser(null);
@@ -122,7 +169,7 @@ function useProvideAuth(): AuthContextType {
         setSession(session);
         
         if (session?.user) {
-          fetchProfile(session.user.id)
+          fetchProfile(session.user.id, session.user.email)
             .finally(() => {
               clearTimeout(loadingTimeout);
               setLoading(false);
@@ -152,9 +199,40 @@ function useProvideAuth(): AuthContextType {
         email,
         password
       });
-      return { error };
+
+      if (error) {
+        console.error('[useAuth] Sign in error:', error);
+        return { error };
+      }
+
+      // Skip security logging in development mode
+      if (import.meta.env.MODE === 'development') {
+        console.log('[useAuth] Skipping security logging in development mode');
+        return { error: null };
+      }
+
+      // Log security event - wrap in try/catch to prevent blocking
+      try {
+        await supabase
+          .from('security_events')
+          .insert({
+            user_id: email,
+            action: 'login',
+            details: 'User successfully logged in',
+            ip_address: window.location.hostname,
+            user_agent: navigator.userAgent,
+            severity: 'low',
+            created_at: new Date().toISOString()
+          });
+        console.log('[useAuth] Security event logged successfully');
+      } catch (logError) {
+        console.warn('[useAuth] Security event logging failed:', logError);
+        // Don't block sign-in if logging fails
+      }
+
+      return { error: null };
     } catch (err) {
-      console.error('[useAuth] Sign in error:', err);
+      console.error('[useAuth] Sign in unexpected error:', err);
       return { error: err };
     }
   };
