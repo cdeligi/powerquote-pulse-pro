@@ -549,34 +549,49 @@ export type Database = {
       }
       profiles: {
         Row: {
+          business_justification: string | null
+          company_name: string | null
           created_at: string
           department: string | null
           email: string
           first_name: string | null
           id: string
+          job_title: string | null
           last_name: string | null
+          manager_email: string | null
+          phone_number: string | null
           role: string
           updated_at: string
           user_status: string | null
         }
         Insert: {
+          business_justification?: string | null
+          company_name?: string | null
           created_at?: string
           department?: string | null
           email: string
           first_name?: string | null
           id: string
+          job_title?: string | null
           last_name?: string | null
+          manager_email?: string | null
+          phone_number?: string | null
           role?: string
           updated_at?: string
           user_status?: string | null
         }
         Update: {
+          business_justification?: string | null
+          company_name?: string | null
           created_at?: string
           department?: string | null
           email?: string
           first_name?: string | null
           id?: string
+          job_title?: string | null
           last_name?: string | null
+          manager_email?: string | null
+          phone_number?: string | null
           role?: string
           updated_at?: string
           user_status?: string | null
