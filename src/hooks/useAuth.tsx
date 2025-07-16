@@ -1,10 +1,5 @@
-<<<<<<< HEAD
-import { useState, useEffect, useContext, createContext } from 'react';
-import { Session, User } from '@supabase/supabase-js';
-=======
 import { createContext, useContext, useEffect, useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
->>>>>>> abc0e592a4f6533549aa5a0fd7bef19dc6c05a98
 import { supabase } from '@/integrations/supabase/client';
 import { User, AuthError } from '@/types/auth';
 import { toast } from '@/hooks/use-toast';
@@ -33,99 +28,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
-<<<<<<< HEAD
-
-  const fetchProfile = async (uid: string, email: string): Promise<void> => {
-    console.log('[useAuth] fetchProfile start for:', uid);
-    
-    try {
-      // First check if user exists in auth
-      const { data: authUser, error: authError } = await supabase
-        .from('auth.users')
-        .select('*')
-        .eq('id', uid)
-        .single();
-
-      if (authError) {
-        console.error('[useAuth] Auth user fetch error:', authError);
-        setUser(null);
-        return;
-      }
-
-      // Get user metadata
-      const userMetadata = authUser?.raw_user_meta_data || {};
-      
-      // Check if profile exists
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', uid)
-        .single();
-
-      if (profileError && !profileError.code.includes('PGRST107')) { // PGRST107 means no rows found
-        console.error('[useAuth] Profile fetch error:', profileError);
-        setUser(null);
-        return;
-      }
-
-      // If profile doesn't exist, create one
-      if (!profile) {
-        console.log('[useAuth] Creating new profile for user:', uid);
-        
-        // For admin user, we need to bypass the policy check
-        const isAdmin = email === 'cdeligi@qualitrolcorp.com';
-        const { error: createError } = await supabase
-          .from('profiles')
-          .insert({
-            id: uid,
-            email: email,
-            first_name: userMetadata.first_name || (isAdmin ? 'Carlos' : 'User'),
-            last_name: userMetadata.last_name || (isAdmin ? 'Deligi' : 'User'),
-            role: isAdmin ? 'admin' : 'level1',
-            department: isAdmin ? 'Admin' : '',
-            user_status: 'active'
-          })
-          .select()  // This will return the created profile
-          .single();
-
-        if (createError) {
-          console.error('[useAuth] Error creating profile:', createError);
-          setUser(null);
-          return;
-        }
-      }
-
-      // Get the profile data (either existing or newly created)
-      const { data: finalProfile, error: finalError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', uid)
-        .single();
-
-      if (finalError) {
-        console.error('[useAuth] Final profile fetch error:', finalError);
-        setUser(null);
-        return;
-      }
-
-      // Set up user object
-      const appUser: AppUser = {
-        id: uid,
-        name: `${finalProfile?.first_name || ''} ${finalProfile?.last_name || ''}`.trim() || 'User',
-        email: email,
-        role: finalProfile?.role || 'level1',
-        department: finalProfile?.department || ''
-      };
-
-      setUser(appUser);
-    } catch (err) {
-      console.error('[useAuth] Unexpected error in fetchProfile:', err);
-      setUser(null);
-    }
-  };
-=======
   const [error, setError] = useState<AuthError | null>(null);
->>>>>>> abc0e592a4f6533549aa5a0fd7bef19dc6c05a98
 
   useEffect(() => {
     console.log('[AuthProvider] Initializing auth state...');
@@ -158,9 +61,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             userEmail: session.user.email
           });
           try {
-<<<<<<< HEAD
-            await fetchProfile(session.user.id, session.user.email);
-=======
             await fetchProfile(session.user.id, 3000);
             
             // Log session events
@@ -169,7 +69,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             } else if (event === 'TOKEN_REFRESHED') {
               await logUserSession(session.user.id, 'session_refresh');
             }
->>>>>>> abc0e592a4f6533549aa5a0fd7bef19dc6c05a98
           } catch (error) {
             console.error('[AuthProvider] Error fetching profile in auth state change:', error);
             setUser(null);
@@ -223,18 +122,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         setSession(session);
 
         if (session?.user) {
-<<<<<<< HEAD
-          fetchProfile(session.user.id, session.user.email)
-            .finally(() => {
-              clearTimeout(loadingTimeout);
-              setLoading(false);
-            });
-        } else {
-          clearTimeout(loadingTimeout);
-          setLoading(false);
-=======
           await fetchProfile(session.user.id, 3000);
->>>>>>> abc0e592a4f6533549aa5a0fd7bef19dc6c05a98
         }
       } catch (err) {
         console.error('[AuthProvider] Initial session timeout or error:', err);
@@ -272,41 +160,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         password
       });
 
-<<<<<<< HEAD
-      if (error) {
-        console.error('[useAuth] Sign in error:', error);
-        return { error };
-      }
-
-      // Skip security logging in development mode
-      if (import.meta.env.MODE === 'development') {
-        console.log('[useAuth] Skipping security logging in development mode');
-        return { error: null };
-      }
-
-      // Log security event - wrap in try/catch to prevent blocking
-      try {
-        await supabase
-          .from('security_events')
-          .insert({
-            user_id: email,
-            action: 'login',
-            details: 'User successfully logged in',
-            ip_address: window.location.hostname,
-            user_agent: navigator.userAgent,
-            severity: 'low',
-            created_at: new Date().toISOString()
-          });
-        console.log('[useAuth] Security event logged successfully');
-      } catch (logError) {
-        console.warn('[useAuth] Security event logging failed:', logError);
-        // Don't block sign-in if logging fails
-      }
-
-      return { error: null };
-    } catch (err) {
-      console.error('[useAuth] Sign in unexpected error:', err);
-=======
       if (authError) {
         console.error('[AuthProvider] Sign in error:', {
           errorCode: authError.code,
@@ -336,7 +189,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         message: 'An unexpected error occurred during sign in',
         type: 'auth'
       });
->>>>>>> abc0e592a4f6533549aa5a0fd7bef19dc6c05a98
       return { error: err };
     } finally {
       setLoading(false);

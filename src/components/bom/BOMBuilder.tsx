@@ -721,13 +721,10 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
           {/* Discount Section with Submit Quote Button */}
           <DiscountSection
             bomItems={bomItems}
-            onDiscountChange={(discount, justification) => {
-              // Handle discount change here
-              console.log('Discount changed:', discount, justification);
-            }}
-            canSeePrices={user?.role === 'admin' || user?.role === 'finance'}
-            initialDiscount={0}
-            initialJustification=""
+            onDiscountChange={handleDiscountChange}
+            canSeePrices={canSeePrices}
+            initialDiscount={discountPercentage}
+            initialJustification={discountJustification}
           />
 
           {/* Submit Quote Button - Moved here to bottom of discount section */}
