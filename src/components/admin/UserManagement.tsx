@@ -1,8 +1,4 @@
-<<<<<<< HEAD
-import { useState } from "react";
-=======
 import { useState, useEffect } from "react";
->>>>>>> abc0e592a4f6533549aa5a0fd7bef19dc6c05a98
 import { User } from "@/types/auth";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -23,9 +19,6 @@ import {
   Edit,
   Trash2
 } from "lucide-react";
-<<<<<<< HEAD
-import UserActivity from './UserActivity';
-=======
 import { supabase, supabaseAdmin, isAdminAvailable } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import UserEditDialog from "./UserEditDialog";
@@ -48,7 +41,6 @@ interface MergedUser {
   lastSignInAt: string | null;
   createdAt: string;
 }
->>>>>>> abc0e592a4f6533549aa5a0fd7bef19dc6c05a98
 
 interface UserManagementProps {
   user: User;
@@ -698,11 +690,7 @@ const UserManagement = ({ user }: UserManagementProps) => {
       <div className="flex justify-between items-center">
         <div>
           <h2 className="text-2xl font-bold text-white mb-2">User Management</h2>
-<<<<<<< HEAD
-          <p className="text-gray-400">Manage user registration and activity</p>
-=======
           <p className="text-gray-400">Manage users, requests, and security auditing</p>
->>>>>>> abc0e592a4f6533549aa5a0fd7bef19dc6c05a98
         </div>
         <div className="flex items-center space-x-4">
           <Button
@@ -783,32 +771,19 @@ const UserManagement = ({ user }: UserManagementProps) => {
         </Card>
       </div>
 
-<<<<<<< HEAD
-      <Tabs defaultValue="requests" className="w-full">
-        <TabsList className="grid w-full grid-cols-3 bg-gray-800">
-=======
       <Tabs defaultValue="users" className="w-full">
         <TabsList className="grid w-full grid-cols-4 bg-gray-800">
           <TabsTrigger value="users" className="text-white data-[state=active]:bg-red-600">
             Users
           </TabsTrigger>
->>>>>>> abc0e592a4f6533549aa5a0fd7bef19dc6c05a98
           <TabsTrigger value="requests" className="text-white data-[state=active]:bg-red-600">
             User Requests
           </TabsTrigger>
-<<<<<<< HEAD
-          <TabsTrigger value="users" className="text-white data-[state=active]:bg-red-600">
-            Active Users
-          </TabsTrigger>
-          <TabsTrigger value="activity" className="text-white data-[state=active]:bg-red-600">
-            User Activity
-=======
           <TabsTrigger value="audit" className="text-white data-[state=active]:bg-red-600">
             Audit Log
           </TabsTrigger>
           <TabsTrigger value="create" className="text-white data-[state=active]:bg-red-600">
             Create User
->>>>>>> abc0e592a4f6533549aa5a0fd7bef19dc6c05a98
           </TabsTrigger>
         </TabsList>
 
@@ -913,37 +888,15 @@ const UserManagement = ({ user }: UserManagementProps) => {
           </Card>
         </TabsContent>
 
-        <TabsContent value="users">
+        <TabsContent value="audit">
           <Card className="bg-gray-900 border-gray-800">
             <CardHeader>
-<<<<<<< HEAD
-              <CardTitle className="text-white flex items-center">
-                <Users className="h-5 w-5 mr-2" />
-                Active Users
-              </CardTitle>
-=======
               <CardTitle className="text-white">Security Audit Log</CardTitle>
->>>>>>> abc0e592a4f6533549aa5a0fd7bef19dc6c05a98
               <CardDescription className="text-gray-400">
-                View and manage active user accounts
+                System security events and user activity monitoring
               </CardDescription>
             </CardHeader>
             <CardContent>
-<<<<<<< HEAD
-              <Table>
-                <TableHeader>
-                  <TableRow className="border-gray-800">
-                    <TableHead className="text-gray-300">User</TableHead>
-                    <TableHead className="text-gray-300">Role</TableHead>
-                    <TableHead className="text-gray-300">Last Login</TableHead>
-                    <TableHead className="text-gray-300">Status</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {/* Add user list here */}
-                </TableBody>
-              </Table>
-=======
               <AuditLogTab />
             </CardContent>
           </Card>
@@ -962,13 +915,8 @@ const UserManagement = ({ user }: UserManagementProps) => {
             </CardHeader>
             <CardContent>
               {renderCreateUserForm()}
->>>>>>> abc0e592a4f6533549aa5a0fd7bef19dc6c05a98
             </CardContent>
           </Card>
-        </TabsContent>
-
-        <TabsContent value="activity">
-          <UserActivity auditLogs={auditLogs} />
         </TabsContent>
       </Tabs>
 
