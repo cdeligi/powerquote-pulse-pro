@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -63,7 +62,7 @@ const QuoteFieldsSection = ({ quoteFields, onFieldChange }: QuoteFieldsSectionPr
     const isRequired = field.required;
 
     const commonProps = {
-      className: `bg-gray-700 border-gray-600 text-white ${isRequired ? 'border-red-500' : ''}`,
+      className: `bg-gray-700 border-gray-600 text-white ${isRequired && !value ? 'border-red-500' : ''}`,
       value,
       onChange: (e: any) => onFieldChange(field.id, e.target?.value || e)
     };
@@ -89,7 +88,7 @@ const QuoteFieldsSection = ({ quoteFields, onFieldChange }: QuoteFieldsSectionPr
       case 'select':
         return (
           <Select value={value} onValueChange={(newValue) => onFieldChange(field.id, newValue)}>
-            <SelectTrigger className={`bg-gray-700 border-gray-600 text-white ${isRequired ? 'border-red-500' : ''}`}>
+            <SelectTrigger className={`bg-gray-700 border-gray-600 text-white ${isRequired && !value ? 'border-red-500' : ''}`}>
               <SelectValue placeholder={`Select ${field.label.toLowerCase()}...`} />
             </SelectTrigger>
             <SelectContent className="bg-gray-700 border-gray-600">

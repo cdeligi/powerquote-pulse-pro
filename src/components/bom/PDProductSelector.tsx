@@ -20,20 +20,39 @@ const PDProductSelector = ({ onProductSelect, canSeePrices }: PDProductSelectorP
   const [selectedProducts, setSelectedProducts] = useState<Set<string>>(new Set());
   const [standaloneLevel2Options, setStandaloneLevel2Options] = useState<Level2Product[]>([]);
   const [productConfigurations, setProductConfigurations] = useState<Record<string, Record<string, any>>>({});
+  const [loading, setLoading] = useState(true);
 
   const [pdProducts, setPdProducts] = useState<Level1Product[]>([]);
   const [level2Options, setLevel2Options] = useState<Level2Product[]>([]);
 
   useEffect(() => {
-    const l1 = productDataService
-      .getLevel1Products()
-      .filter((p) => p.type === 'QPDM' && p.enabled);
-    setPdProducts(l1);
+    const loadProducts = async () => {
+      try {
+        const l1Products = await productDataService.getLevel1Products();
+        const l1Filtered = l1Products.filter((p) => p.type === 'QPDM' && p.enabled);
+        setPdProducts(l1Filtered);
 
-    const l2 = productDataService
-      .getLevel2Products()
-      .filter((p) => p.enabled && p.parentProductId === 'qpdm');
-    setLevel2Options(l2);
+        const l2Products = await productDataService.getLevel2Products();
+        const l2Filtered = l2Products.filter(
+          (p) => p.enabled && p.parentProductId === 'qpdm'
+        );
+        setLevel2Options(l2Filtered);
+      } catch (error) {
+        console.error('Error loading PD products:', error);
+        // Fallback to sync methods
+        const l1Sync = productDataService.getLevel1ProductsSync();
+        setPdProducts(l1Sync.filter((p) => p.type === 'QPDM' && p.enabled));
+        
+        const l2Sync = productDataService.getLevel2ProductsSync();
+        setLevel2Options(l2Sync.filter(
+          (p) => p.enabled && p.parentProductId === 'qpdm'
+        ));
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadProducts();
   }, []);
 
   const handleProductToggle = (productId: string) => {
@@ -163,6 +182,10 @@ const PDProductSelector = ({ onProductSelect, canSeePrices }: PDProductSelectorP
   };
 
   const hasSelections = selectedProducts.size > 0 || standaloneLevel2Options.some(opt => opt.enabled);
+
+  if (loading) {
+    return <div className="text-white">Loading PD products...</div>;
+  }
 
   return (
     <div className="space-y-8 max-w-6xl mx-auto">

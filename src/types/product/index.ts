@@ -10,12 +10,17 @@ export * from './type-guards';
 export * from './sensor-config';
 export * from './part-number-utils';
 
-// Explicit re-exports to ensure availability
-export type { 
-  AnalogSensorType, 
-  AnalogSensorOption, 
-  BushingTapModelOption 
+// Explicit re-exports to ensure availability including Level 4
+export type {
+  AnalogSensorType,
+  AnalogSensorOption,
+  BushingTapModelOption,
 } from './sensor-config';
+
+export type {
+  Level4Product,
+  Level4ConfigurationOption
+} from './interfaces';
 
 export { 
   ANALOG_SENSOR_TYPES, 

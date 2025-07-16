@@ -1,5 +1,5 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -14,20 +14,46 @@ interface AdditionalConfigTabProps {
 
 const AdditionalConfigTab = ({ onCardSelect, canSeePrices }: AdditionalConfigTabProps) => {
   const [selectedCardType, setSelectedCardType] = useState<'analog' | 'bushing' | null>(null);
+  const [analogCards, setAnalogCards] = useState<Level3Product[]>([]);
+  const [bushingCards, setBushingCards] = useState<Level3Product[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  // Get analog and bushing cards from the product service
-  const allCards = productDataService.getLevel3Products();
-  const analogCards = allCards.filter(card => 
-    card.name.toLowerCase().includes('analog') && card.enabled
-  );
-  const bushingCards = allCards.filter(card => 
-    card.name.toLowerCase().includes('bushing') && card.enabled
-  );
+  useEffect(() => {
+    const loadCards = async () => {
+      try {
+        const allCards = await productDataService.getLevel3Products();
+        setAnalogCards(allCards.filter(card => 
+          card.name.toLowerCase().includes('analog') && card.enabled
+        ));
+        setBushingCards(allCards.filter(card => 
+          card.name.toLowerCase().includes('bushing') && card.enabled
+        ));
+      } catch (error) {
+        console.error('Error loading cards:', error);
+        // Fallback to sync method
+        const syncCards = productDataService.getLevel3ProductsSync();
+        setAnalogCards(syncCards.filter(card => 
+          card.name.toLowerCase().includes('analog') && card.enabled
+        ));
+        setBushingCards(syncCards.filter(card => 
+          card.name.toLowerCase().includes('bushing') && card.enabled
+        ));
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadCards();
+  }, []);
 
   const handleCardSelect = (card: Level3Product) => {
     onCardSelect(card);
     setSelectedCardType(null);
   };
+
+  if (loading) {
+    return <div className="text-white">Loading configuration cards...</div>;
+  }
 
   return (
     <div className="space-y-6">

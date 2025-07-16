@@ -80,8 +80,27 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
     setQuoteFields(prev => ({ ...prev, [fieldId]: value }));
   };
 
-  // Get all Level 1 products for dynamic tabs (excluding analog and bushing cards)
-  const level1Products = productDataService.getLevel1Products().filter(p => p.enabled);
+  // Load Level 1 products for dynamic tabs
+  const [level1Products, setLevel1Products] = useState<Level1Product[]>([]);
+  const [level1Loading, setLevel1Loading] = useState(true);
+
+  useEffect(() => {
+    const loadLevel1Products = async () => {
+      try {
+        const products = await productDataService.getLevel1Products();
+        setLevel1Products(products.filter(p => p.enabled));
+      } catch (error) {
+        console.error('Error loading Level 1 products:', error);
+        // Fallback to sync method
+        const syncProducts = productDataService.getLevel1ProductsSync();
+        setLevel1Products(syncProducts.filter(p => p.enabled));
+      } finally {
+        setLevel1Loading(false);
+      }
+    };
+
+    loadLevel1Products();
+  }, []);
 
   // Set default active tab when products are loaded
   useEffect(() => {
@@ -623,6 +642,10 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
         </div>
       </div>
     );
+  }
+
+  if (level1Loading) {
+    return <div className="text-white">Loading products...</div>;
   }
 
   return (

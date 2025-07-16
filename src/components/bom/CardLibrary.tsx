@@ -1,4 +1,5 @@
 
+import { useState, useEffect } from "react";
 import { Level2Product, Level3Product } from "@/types/product";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -15,29 +16,79 @@ interface CardLibraryProps {
 }
 
 const CardLibrary = ({ chassis, onCardSelect, canSeePrices }: CardLibraryProps) => {
-  // Get all cards for this chassis from productDataService
-  const allCards = productDataService.getLevel3ProductsForLevel2(chassis.id);
+  const [allCards, setAllCards] = useState<Level3Product[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const loadCards = async () => {
+      try {
+        setLoading(true);
+        
+        // Initialize the service first
+        await productDataService.initialize();
+        
+        // Get all cards for this chassis from productDataService using proper relationships
+        const cardsForChassis = productDataService.getLevel3ProductsForLevel2(chassis.id);
+        
+        console.log('CardLibrary: Loaded cards for chassis', chassis.id, ':', cardsForChassis);
+        setAllCards(cardsForChassis.filter(card => card.enabled !== false));
+      } catch (error) {
+        console.error('Error loading cards:', error);
+        // Fallback to sync method
+        try {
+          const syncCards = productDataService.getLevel3ProductsForLevel2(chassis.id);
+          setAllCards(syncCards.filter(card => card.enabled !== false));
+        } catch (syncError) {
+          console.error('Sync fallback failed:', syncError);
+          setAllCards([]);
+        }
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadCards();
+  }, [chassis.id]);
 
   // Group cards by type
   const cardsByType = {
     relay: allCards.filter(card => card.type === 'relay'),
-    analog: allCards.filter(card => card.type === 'analog'),
-    bushing: allCards.filter(card => card.type === 'bushing'),
+    analog: allCards.filter(card => card.type === 'analog' || card.name.toLowerCase().includes('analog')),
+    bushing: allCards.filter(card => card.type === 'bushing' || card.name.toLowerCase().includes('bushing')),
     fiber: allCards.filter(card => card.type === 'fiber'),
     display: allCards.filter(card => card.type === 'display'),
-    communication: allCards.filter(card => card.type === 'communication'),
-    digital: allCards.filter(card => card.type === 'digital')
+    communication: allCards.filter(card => card.type === 'communication' || card.name.toLowerCase().includes('communication')),
+    digital: allCards.filter(card => card.type === 'digital' || card.name.toLowerCase().includes('digital'))
   };
 
   const needsConfiguration = (card: Level3Product) => {
     return card.name.toLowerCase().includes('analog') || card.name.toLowerCase().includes('bushing');
   };
 
+  if (loading) {
+    return (
+      <Card className="bg-gray-900 border-gray-800">
+        <CardHeader>
+          <CardTitle className="text-white">Card Library</CardTitle>
+          <CardDescription className="text-gray-400">
+            Loading cards for your {chassis.name}...
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="text-center py-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-600 mx-auto mb-4"></div>
+            <p className="text-gray-400">Loading available cards...</p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
   const renderCardGrid = (cards: Level3Product[]) => {
     if (cards.length === 0) {
       return (
         <div className="text-center py-8 text-gray-400">
-          No cards available for this chassis type
+          No cards available for this chassis type. Please create Level 3 products in the Admin Panel.
         </div>
       );
     }
@@ -105,7 +156,7 @@ const CardLibrary = ({ chassis, onCardSelect, canSeePrices }: CardLibraryProps) 
               
               <div className="flex justify-between items-center mb-4">
                 <span className="text-white font-bold">
-                  {canSeePrices ? `$${card.price?.toLocaleString() || '—'}` : '—'}
+                  {canSeePrices ? `$${card.price?.toLocaleString() || '0'}` : '—'}
                 </span>
                 <span className="text-gray-400 text-xs">{card.partNumber}</span>
               </div>
@@ -133,6 +184,7 @@ const CardLibrary = ({ chassis, onCardSelect, canSeePrices }: CardLibraryProps) 
         <CardTitle className="text-white">Card Library</CardTitle>
         <CardDescription className="text-gray-400">
           Browse and select cards for your {chassis.name}
+          {allCards.length > 0 ? ` (${allCards.length} available)` : ' (No cards available)'}
         </CardDescription>
       </CardHeader>
       <CardContent>

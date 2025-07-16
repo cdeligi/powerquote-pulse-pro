@@ -3,7 +3,7 @@ import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { User } from "@/types/auth";
 import { BOMItem, Level1Product } from "@/types/product";
-import ProductManagement from "./ProductManagement";
+import { ProductManagement } from "./ProductManagement";
 import UserManagement from "./UserManagement";
 import QuoteFieldConfiguration from "./QuoteFieldConfiguration";
 import AdminSettings from "./AdminSettings";
@@ -46,9 +46,9 @@ const AdminPanel = ({ user }: AdminPanelProps) => {
     }
   };
 
-  // Get mock BOM items from actual product data
+  // Get mock BOM items from actual product data - use sync method for mock data
   const getMockBomItems = (): BOMItem[] => {
-    const level1Products = productDataService.getLevel1Products();
+    const level1Products = productDataService.getLevel1ProductsSync();
     return level1Products.slice(0, 2).map((product, index) => ({
       id: `${index + 1}`,
       product,
@@ -120,7 +120,7 @@ const AdminPanel = ({ user }: AdminPanelProps) => {
         </TabsList>
 
         <TabsContent value="products" className="mt-6">
-          <ProductManagement user={user} />
+          <ProductManagement />
         </TabsContent>
 
         <TabsContent value="quote-fields" className="mt-6">
