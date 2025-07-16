@@ -40,6 +40,7 @@ function useProvideAuth(): AuthContextType {
         .insert({
           user_id: userId,
           event,
+          session_token: `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
           ip_address: 'unknown', // Could be enhanced with IP detection
           user_agent: navigator.userAgent,
           device_info: {
