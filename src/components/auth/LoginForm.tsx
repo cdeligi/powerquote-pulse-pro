@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,21 +30,35 @@ const LoginForm = ({ onLogin }: LoginFormProps) => {
     setError(null);
     
     try {
-      const { error } = await signIn(credentials.email, credentials.password);
+      const { error: authError } = await signIn(credentials.email, credentials.password);
       
-      if (error) {
-        console.error('Login error:', error);
-        if (error.message?.includes('Invalid login credentials')) {
-          setError('Invalid email or password. Please check your credentials and try again.');
-        } else if (error.message?.includes('Email not confirmed')) {
-          setError('Please check your email and click the confirmation link before signing in.');
-        } else {
-          setError(error.message || 'An error occurred during sign in. Please try again.');
+      if (authError) {
+        console.error('[LoginForm] Sign in error:', {
+          errorCode: authError.code,
+          errorMessage: authError.message,
+          email: credentials.email
+        });
+        
+        let errorMessage: string;
+        switch (authError.code) {
+          case 'PGRST116':
+            errorMessage = 'User not found. Please check your email address.';
+            break;
+          case 'PGRST117':
+            errorMessage = 'Incorrect password. Please try again.';
+            break;
+          case 'PGRST118':
+            errorMessage = 'Email not confirmed. Please check your inbox for the confirmation email.';
+            break;
+          default:
+            errorMessage = authError.message || 'An error occurred during sign in. Please try again.';
         }
+        
+        setError(errorMessage);
       }
       // Success will be handled by the auth hook in the parent component
-    } catch (error) {
-      console.error('Unexpected error:', error);
+    } catch (error: any) {
+      console.error('[LoginForm] Unexpected error:', error);
       setError('An unexpected error occurred. Please try again.');
     } finally {
       setIsLoading(false);

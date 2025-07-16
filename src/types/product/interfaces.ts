@@ -61,7 +61,7 @@ export interface Level3Product {
   specifications?: {
     slotRequirement?: number;
     inputs?: number;
-    outputs?: number;
+    outputs?: string[];
     protocols?: string[];
     channels?: number;
     inputTypes?: string[];
@@ -72,6 +72,29 @@ export interface Level3Product {
   productInfoUrl?: string;
 }
 
+// Level 4: Product Configurations (Sensor configs, specific customizations)
+export interface Level4Product {
+  id: string;
+  name: string;
+  parentProductId: string; // Links to Level3Product
+  type?: string;
+  description: string;
+  configurationType: 'dropdown' | 'multiline';
+  price: number;
+  cost?: number;
+  enabled: boolean;
+  options: Level4ConfigurationOption[];
+  partNumber?: string;
+}
+
+export interface Level4ConfigurationOption {
+  id: string;
+  level4ProductId: string;
+  optionKey: string; // For dropdown: the value; For multiline: the field name
+  optionValue: string; // For dropdown: display name; For multiline: the description
+  displayOrder: number;
+  enabled: boolean;
+}
 
 // Type unions for backward compatibility
 export type ProductType = 'QTMS' | 'TM8' | 'TM3' | 'TM1' | 'QPDM';
@@ -81,7 +104,7 @@ export type Level2ProductType = 'LTX' | 'MTX' | 'STX' | 'CalGas' | 'Standard' | 
 export interface ProductTypeConfig {
   id: string;
   name: string;
-  level: 1 | 2 | 3;
+  level: 1 | 2 | 3 | 4;
   description?: string;
   enabled: boolean;
 }
@@ -125,6 +148,7 @@ export interface BOMItem {
   configuration?: Record<string, any>;
   level2Options?: Level2Product[];
   level3Customizations?: Level3Customization[];
+  level4Configurations?: Level4Product[];
   
   // Additional properties for admin quote management
   name?: string;
@@ -139,4 +163,4 @@ export interface BOMItem {
   price_adjustment_history?: any[];
 }
 
-export type Product = Level1Product | Level2Product | Level3Product;
+export type Product = Level1Product | Level2Product | Level3Product | Level4Product;

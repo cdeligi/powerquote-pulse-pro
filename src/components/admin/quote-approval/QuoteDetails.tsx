@@ -5,7 +5,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { CheckCircle, XCircle, MessageSquare, DollarSign, Edit3, Save, X, Settings } from "lucide-react";
+import { CheckCircle, XCircle, DollarSign, Edit3, Save, X, Settings } from "lucide-react";
 import QTMSConfigurationEditor from "@/components/bom/QTMSConfigurationEditor";
 import { consolidateQTMSConfiguration, QTMSConfiguration, ConsolidatedQTMS } from "@/utils/qtmsConsolidation";
 import { useState, useEffect } from "react";
@@ -16,7 +16,6 @@ interface QuoteDetailsProps {
   quote: Quote;
   onApprove: (notes?: string, updatedBOMItems?: any[]) => void;
   onReject: (notes?: string) => void;
-  onCounterOffer: (notes?: string) => void;
   isLoading: boolean;
   user: User | null;
 }
@@ -25,7 +24,6 @@ const QuoteDetails = ({
   quote, 
   onApprove, 
   onReject, 
-  onCounterOffer, 
   isLoading,
   user 
 }: QuoteDetailsProps) => {
@@ -162,6 +160,10 @@ const QuoteDetails = ({
     }
   };
 
+  // Prepare basic quote info to avoid duplication
+  const basicQuoteFields = ['customer_name', 'oracle_customer_id', 'sfdc_opportunity', 'is_rep_involved', 'payment_terms', 'shipping_terms'];
+  const additionalFields = quote.quote_fields ? Object.keys(quote.quote_fields).filter(key => !basicQuoteFields.includes(key)) : [];
+
   return (
     <div className="space-y-6">
       {/* Quote Header */}
@@ -218,17 +220,17 @@ const QuoteDetails = ({
         </CardContent>
       </Card>
 
-      {/* Quote Fields */}
-      {quote.quote_fields && Object.keys(quote.quote_fields).length > 0 && (
+      {/* Additional Quote Fields - Only show fields not already displayed */}
+      {additionalFields.length > 0 && (
         <Card className="bg-gray-900 border-gray-800">
           <CardHeader>
-            <CardTitle className="text-white">Additional Quote Fields</CardTitle>
+            <CardTitle className="text-white">Additional Quote Information</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            {Object.entries(quote.quote_fields).map(([key, value]) => (
+            {additionalFields.map((key) => (
               <div key={key} className="grid grid-cols-2 gap-4">
                 <Label className="text-gray-400 capitalize">{key.replace(/_/g, ' ')}</Label>
-                <p className="text-white">{String(value)}</p>
+                <p className="text-white">{String(quote.quote_fields![key])}</p>
               </div>
             ))}
           </CardContent>
@@ -301,7 +303,7 @@ const QuoteDetails = ({
                       )}
                     </div>
                     <div className="flex space-x-1">
-                      {item.product.type === 'QTMS' && item.configuration && (
+                      {item.product?.type === 'QTMS' && item.configuration && (
                         <Button
                           size="sm"
                           variant="ghost"

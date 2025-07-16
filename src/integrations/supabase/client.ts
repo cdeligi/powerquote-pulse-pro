@@ -1,30 +1,61 @@
 import { createClient } from '@supabase/supabase-js'
 
+<<<<<<< HEAD
 // Log the actual values of the environment variables
 console.log('Supabase environment variables:', {
   VITE_SUPABASE_URL: import.meta.env.VITE_SUPABASE_URL,
   VITE_SUPABASE_ANON_KEY: import.meta.env.VITE_SUPABASE_ANON_KEY
 });
 
+=======
+// Get environment variables
+>>>>>>> abc0e592a4f6533549aa5a0fd7bef19dc6c05a98
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string
+const supabaseAdminKey = import.meta.env.VITE_SUPABASE_ADMIN_KEY as string
 
+<<<<<<< HEAD
 // Add detailed initialization check
+=======
+// Log raw environment variables
+console.log('Raw environment variables:', {
+  url: supabaseUrl,
+  anonKey: supabaseAnonKey,
+  adminKey: supabaseAdminKey
+});
+
+// Log environment variable status with type information
+console.log('Environment variable types:', {
+  urlType: typeof supabaseUrl,
+  anonKeyType: typeof supabaseAnonKey,
+  adminKeyType: typeof supabaseAdminKey
+});
+
+// Validate required environment variables
+>>>>>>> abc0e592a4f6533549aa5a0fd7bef19dc6c05a98
 if (!supabaseUrl || !supabaseAnonKey) {
-  console.error('Missing Supabase environment variables:', {
+  console.error('Missing required Supabase environment variables:', {
     VITE_SUPABASE_URL: !!supabaseUrl,
     VITE_SUPABASE_ANON_KEY: !!supabaseAnonKey,
+<<<<<<< HEAD
     urlValue: supabaseUrl,
     keyValue: supabaseAnonKey
+=======
+    VITE_SUPABASE_ADMIN_KEY: !!supabaseAdminKey
+>>>>>>> abc0e592a4f6533549aa5a0fd7bef19dc6c05a98
   });
   throw new Error('Missing required Supabase environment variables');
 }
 
+<<<<<<< HEAD
 // Retry logic configuration
 const MAX_RETRIES = 3;
 const RETRY_DELAY = 1000; // 1 second
 
 // Create a wrapped client that handles errors gracefully
+=======
+// Create base client with anon key (for auth operations)
+>>>>>>> abc0e592a4f6533549aa5a0fd7bef19dc6c05a98
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     storage: localStorage,
@@ -163,6 +194,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   }
 });
 
+<<<<<<< HEAD
 // Test endpoint to verify Supabase connection
 export const testSupabaseConnection = async () => {
   try {
@@ -205,3 +237,26 @@ if (import.meta.env.MODE !== 'development') {
 }
 
 export default supabase;
+=======
+// Create admin client if admin key is available (for admin operations)
+export const supabaseAdmin = supabaseAdminKey 
+  ? createClient(supabaseUrl, supabaseAdminKey, {
+      auth: {
+        storage: localStorage,
+        persistSession: true,
+        autoRefreshToken: true,
+      }
+    })
+  : null;
+
+// Helper function to check if admin operations are available
+export const isAdminAvailable = () => !!supabaseAdmin;
+
+// Log client initialization status
+console.log('Supabase client initialization:', {
+  url: supabaseUrl ? 'configured' : 'missing',
+  anonKey: supabaseAnonKey ? 'configured' : 'missing',
+  adminKey: supabaseAdminKey ? 'configured' : 'missing',
+  adminClientAvailable: !!supabaseAdmin
+});
+>>>>>>> abc0e592a4f6533549aa5a0fd7bef19dc6c05a98
