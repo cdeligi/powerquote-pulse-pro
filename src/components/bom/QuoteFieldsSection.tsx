@@ -110,8 +110,10 @@ const QuoteFieldsSection = ({ quoteFields, onFieldChange }: QuoteFieldsSectionPr
               onCheckedChange={(checked) => onFieldChange(field.id, checked)}
               className="border-gray-600"
             />
-            <Label htmlFor={field.id} className="text-white text-sm">
-              {field.label}
+            <Label htmlFor={field.id} className="flex items-center space-x-2">
+              <span className="text-white text-sm font-medium">
+                {field.label}
+              </span>
             </Label>
           </div>
         );
@@ -168,13 +170,8 @@ const QuoteFieldsSection = ({ quoteFields, onFieldChange }: QuoteFieldsSectionPr
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {configuredFields.map((field) => (
               <div key={field.id} className="space-y-2">
-                <Label htmlFor={field.id} className="text-white flex items-center space-x-2">
-                  <span>{field.label}</span>
-                  {field.required && (
-                    <Badge variant="outline" className="text-xs text-red-400 border-red-400">
-                      Required
-                    </Badge>
-                  )}
+                <Label htmlFor={field.id} className="text-white flex items-center">
+                  {field.label}
                 </Label>
                 {field.type === 'checkbox' ? (
                   renderField(field)

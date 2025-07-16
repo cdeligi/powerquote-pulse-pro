@@ -414,14 +414,6 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
                       </div>
                     </div>
                     <div className="flex items-center space-x-2">
-                      {field.required && (
-                        <Badge 
-                          variant="outline" 
-                          className="text-xs border-red-500 text-red-400 bg-red-900/20"
-                        >
-                          Required
-                        </Badge>
-                      )}
                       <Switch
                         id={`enabled-${field.id}`}
                         checked={field.enabled}
@@ -479,7 +471,9 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
                     <div className="flex-1">
                       <div className="flex items-center space-x-2">
                         <DragHandle field={field} />
-                        <CardTitle className="text-white text-sm font-medium truncate">{field.label}</CardTitle>
+                        <CardTitle className={`${field.required ? 'text-red-400' : 'text-white'} text-sm font-medium truncate`}>
+                          {field.label}
+                        </CardTitle>
                       </div>
                       <Badge 
                         variant="outline" 
@@ -487,15 +481,6 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
                       >
                         {field.type.toUpperCase()}
                       </Badge>
-                      {field.required && (
-                        <Badge 
-                          variant="outline" 
-                          className="text-xs border-red-500 text-red-400 bg-red-900/20"
-                        >
-                          <AlertCircle className="h-3 w-3 mr-1" />
-                          Required
-                        </Badge>
-                      )}
                     </div>
                     <div className="flex-shrink-0">
                       <Switch
@@ -660,7 +645,7 @@ const QuoteFieldForm = ({ onSubmit, initialData, onCancel }: QuoteFieldFormProps
               hover:bg-gray-700
             `}
           />
-          <Label htmlFor="required" className="text-white">Required Field</Label>
+          <Label htmlFor="required" className={`${formData.required ? 'text-red-400' : 'text-white'} text-sm font-medium`}>{formData.label}</Label>
         </div>
         <div className="flex items-center space-x-2">
           <Switch
