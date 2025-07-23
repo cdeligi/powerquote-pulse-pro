@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -26,7 +26,41 @@ const SlotCardSelector = ({
   canSeePrices,
   currentSlotAssignments = {}
 }: SlotCardSelectorProps) => {
-  const [selectedFiberInputs, setSelectedFiberInputs] = useState<number>(4);
+  const [availableCards, setAvailableCards] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const loadCards = async () => {
+      try {
+        setLoading(true);
+        const level3Products = await productDataService.getLevel3ProductsForLevel2(chassis.id);
+        
+        // Convert to the expected format
+        const cards = level3Products.map(product => ({
+          id: product.id,
+          name: product.name,
+          parentProductId: product.parentProductId,
+          type: product.type,
+          description: product.description,
+          price: product.price,
+          enabled: product.enabled,
+          slotRequirement: product.specifications?.slotRequirement || 1,
+          compatibleChassis: product.specifications?.compatibleChassis || [chassis.type],
+          specifications: product.specifications,
+          partNumber: product.partNumber
+        }));
+        
+        setAvailableCards(cards);
+      } catch (error) {
+        console.error('Error loading cards:', error);
+        setAvailableCards([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadCards();
+  }, [chassis.id, chassis.type]);
 
   const getCardTypeColor = (cardType: string) => {
     switch (cardType) {
@@ -40,28 +74,6 @@ const SlotCardSelector = ({
       default: return 'text-white border-gray-500';
     }
   };
-
-  // Get available cards from productDataService
-  const getAvailableCards = () => {
-    const level3Products = productDataService.getLevel3ProductsForLevel2(chassis.id);
-    
-    // Convert to the expected format
-    return level3Products.map(product => ({
-      id: product.id,
-      name: product.name,
-      parentProductId: product.parentProductId,
-      type: product.type,
-      description: product.description,
-      price: product.price,
-      enabled: product.enabled,
-      slotRequirement: product.specifications?.slotRequirement || 1,
-      compatibleChassis: product.specifications?.compatibleChassis || [chassis.type],
-      specifications: product.specifications,
-      partNumber: product.partNumber
-    }));
-  };
-
-  const availableCards = getAvailableCards();
 
   // Filter cards based on chassis compatibility, bushing validation, and LTX slot 8 restriction
   const getCompatibleCards = () => {
@@ -119,6 +131,21 @@ const SlotCardSelector = ({
   const ltxSlot8ErrorCards = chassis.type === 'LTX' && slot === 8 
     ? availableCards.filter(card => card.type !== 'display')
     : [];
+
+  if (loading) {
+    return (
+      <Dialog open={true} onOpenChange={onClose}>
+        <DialogContent className="max-w-5xl bg-gray-900 border-gray-800 text-white">
+          <DialogHeader>
+            <DialogTitle className="text-white">Loading Cards...</DialogTitle>
+          </DialogHeader>
+          <div className="flex justify-center py-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
 
   return (
     <Dialog open={true} onOpenChange={onClose}>

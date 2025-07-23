@@ -18,12 +18,8 @@ const Index = () => {
   const handleLogout = async () => {
     console.log('Logout initiated...');
     try {
-      const { error } = await signOut();
-      if (error) {
-        console.error('Logout error:', error);
-      } else {
-        console.log('Logout successful');
-      }
+      await signOut();
+    console.log('Logout successful');
     } catch (err) {
       console.error('Unexpected logout error:', err);
     }

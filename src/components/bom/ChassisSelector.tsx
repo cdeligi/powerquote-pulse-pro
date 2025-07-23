@@ -26,7 +26,7 @@ const ChassisSelector = ({ onChassisSelect, selectedChassis, canSeePrices }: Cha
         await productDataService.initialize();
         
         // Get chassis options from productDataService using the proper relationship
-        const qtmsLevel2Products = productDataService.getLevel2ProductsForLevel1('qtms');
+        const qtmsLevel2Products = await productDataService.getLevel2ProductsForLevel1('qtms');
         const validChassis = qtmsLevel2Products.filter(chassis => 
           ['LTX', 'MTX', 'STX'].includes(chassis.type) && chassis.enabled
         );
@@ -37,9 +37,9 @@ const ChassisSelector = ({ onChassisSelect, selectedChassis, canSeePrices }: Cha
         console.error('Error loading chassis:', error);
         // Fallback to sync method
         try {
-          const syncChassis = productDataService.getLevel2ProductsForLevel1('qtms')
-            .filter(chassis => ['LTX', 'MTX', 'STX'].includes(chassis.type) && chassis.enabled);
-          setChassisOptions(syncChassis);
+          const syncChassis = await productDataService.getLevel2ProductsForLevel1('qtms');
+          const filteredChassis = syncChassis.filter(chassis => ['LTX', 'MTX', 'STX'].includes(chassis.type) && chassis.enabled);
+          setChassisOptions(filteredChassis);
         } catch (syncError) {
           console.error('Sync fallback failed:', syncError);
           setChassisOptions([]);

@@ -47,13 +47,8 @@ const ProductSyncManager = () => {
       if (level3Result.error) throw level3Result.error;
       if (level4Result.error) throw level4Result.error;
 
-      // Persist fetched products to local storage
-      productDataService.replaceAllProducts(
-        level1Result.data || [],
-        level2Result.data || [],
-        level3Result.data || [],
-        level4Result.data || []
-      );
+      // Products are now always fetched fresh from Supabase
+      // No need to replaceAllProducts since service now queries database directly
 
       // Update local state with fresh data
       setSyncStats({

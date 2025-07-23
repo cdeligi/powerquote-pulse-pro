@@ -140,7 +140,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     getInitialSession();
 
     return () => {
-      listener?.unsubscribe();
+      listener.subscription.unsubscribe();
       clearTimeout(maxLoadingTimeout);
     };
   }, []);

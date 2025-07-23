@@ -71,7 +71,7 @@ const UserManagement = ({ user }: UserManagementProps) => {
     showPassword: false
   });
 
-  const handleCreateUserFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+  const handleCreateUserFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement> | { target: { name: string; value: string } }) => {
     const { name, value } = e.target;
     setCreateUserForm(prev => ({
       ...prev,
@@ -316,8 +316,8 @@ const UserManagement = ({ user }: UserManagementProps) => {
         });
 
       if (profileError) {
-        // If profile creation fails, delete the auth user
-        await supabase.auth.deleteUser(authData.user.id);
+        // If profile creation fails, we don't need to delete the auth user
+        // as it will be handled by Supabase's auth system
         throw profileError;
       }
 
@@ -566,11 +566,8 @@ const UserManagement = ({ user }: UserManagementProps) => {
             Department *
           </Label>
           <Select
-            id="department"
-            name="department"
             value={createUserForm.department}
             onValueChange={(value) => handleCreateUserFormChange({ target: { name: 'department', value } })}
-            required
           >
             <SelectTrigger className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
               <SelectValue placeholder="Select Department" />
@@ -589,11 +586,8 @@ const UserManagement = ({ user }: UserManagementProps) => {
             Role *
           </Label>
           <Select
-            id="role"
-            name="role"
             value={createUserForm.role}
             onValueChange={(value) => handleCreateUserFormChange({ target: { name: 'role', value } })}
-            required
           >
             <SelectTrigger className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
               <SelectValue placeholder="Select Role" />
