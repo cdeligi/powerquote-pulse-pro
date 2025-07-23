@@ -563,7 +563,11 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
             <div className="space-y-4">
               <h3 className="text-lg font-semibold">Configure Chassis</h3>
               <RackVisualizer
-                chassis={selectedChassis}
+                chassis={{
+                  ...selectedChassis,
+                  height: selectedChassis.specifications?.height || '',
+                  slots: selectedChassis.specifications?.slots || 0
+                } as any}
                 slotAssignments={slotAssignments}
                 selectedSlot={selectedSlot}
                 onSlotClick={handleSlotClick}
@@ -572,12 +576,13 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
                 onRemoteDisplayToggle={handleRemoteDisplayToggle}
               />
               
-              <SlotCardSelector
-                selectedChassis={selectedChassis}
-                selectedSlot={selectedSlot}
-                onCardSelect={handleCardSelect}
-                canSeePrices={canSeePrices}
-              />
+            <SlotCardSelector
+              chassis={selectedChassis}
+              slot={selectedSlot}
+              onCardSelect={handleCardSelect}
+              onClose={() => setSelectedSlot(null)}
+              canSeePrices={canSeePrices}
+            />
               
               {selectedChassis && Object.keys(slotAssignments).length > 0 && (
                 <Button 
@@ -663,11 +668,10 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
   return (
     <div className="space-y-6">
       {/* Quote Fields Section */}
-      <QuoteFieldsSection
-        quoteFields={quoteFields}
-        onFieldChange={handleQuoteFieldChange}
-        validation={validation}
-      />
+          <QuoteFieldsSection
+            quoteFields={quoteFields}
+            onFieldChange={handleQuoteFieldChange}
+          />
 
       {/* Product Selection */}
       <Card>
@@ -698,30 +702,30 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
             ))}
 
             <TabsContent value="additional-config">
-              <AdditionalConfigTab
-                onProductSelect={handleDGAProductSelect}
-                canSeePrices={canSeePrices}
-              />
-            </TabsContent>
+            <AdditionalConfigTab
+              onCardSelect={handleCardSelect}
+              canSeePrices={canSeePrices}
+            />
+          </TabsContent>
           </Tabs>
         </CardContent>
       </Card>
 
       {/* BOM Display */}
       <BOMDisplay
-        items={bomItems}
-        onUpdate={handleBOMUpdate}
-        onItemEdit={handleBOMConfigurationEdit}
+        bomItems={bomItems}
+        onUpdateBOM={handleBOMUpdate}
+        onEditConfiguration={handleBOMConfigurationEdit}
         canSeePrices={canSeePrices}
       />
 
       {/* Discount Section */}
       <DiscountSection
-        discountPercentage={discountPercentage}
-        discountJustification={discountJustification}
+        bomItems={bomItems}
         onDiscountChange={handleDiscountChange}
-        totalValue={bomItems.reduce((sum, item) => sum + item.product.price * item.quantity, 0)}
-        canApplyDiscount={true}
+        canSeePrices={canSeePrices}
+        initialDiscount={discountPercentage}
+        initialJustification={discountJustification}
       />
 
       {/* Submit Button */}
@@ -738,28 +742,26 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
       {/* Configuration Dialogs */}
       {configuringCard && configuringCard.product.name.toLowerCase().includes('analog') && (
         <AnalogCardConfigurator
-          isOpen={true}
-          onClose={() => setConfiguringCard(null)}
+          bomItem={configuringCard}
           onSave={handleCardConfiguration}
-          card={configuringCard.product as Level3Product}
+          onClose={() => setConfiguringCard(null)}
         />
       )}
 
       {configuringCard && configuringCard.product.name.toLowerCase().includes('bushing') && (
         <BushingCardConfigurator
-          isOpen={true}
-          onClose={() => setConfiguringCard(null)}
+          bomItem={configuringCard}
           onSave={handleCardConfiguration}
-          card={configuringCard.product as Level3Product}
+          onClose={() => setConfiguringCard(null)}
         />
       )}
 
       {editingQTMS && (
         <QTMSConfigurationEditor
-          isOpen={true}
-          onClose={() => setEditingQTMS(null)}
-          qtmsConfiguration={editingQTMS}
+          consolidatedQTMS={editingQTMS}
           onSave={handleQTMSConfigurationSave}
+          onClose={() => setEditingQTMS(null)}
+          canSeePrices={canSeePrices}
         />
       )}
     </div>
