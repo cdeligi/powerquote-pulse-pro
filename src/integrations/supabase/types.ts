@@ -413,6 +413,7 @@ export type Database = {
       }
       products: {
         Row: {
+          asset_type_id: string | null
           category: string | null
           code: string | null
           cost: number | null
@@ -435,6 +436,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          asset_type_id?: string | null
           category?: string | null
           code?: string | null
           cost?: number | null
@@ -457,6 +459,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          asset_type_id?: string | null
           category?: string | null
           code?: string | null
           cost?: number | null
@@ -478,7 +481,15 @@ export type Database = {
           subcategory?: string | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "products_asset_type_id_fkey"
+            columns: ["asset_type_id"]
+            isOneToOne: false
+            referencedRelation: "asset_types"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       products_lvl1: {
         Row: {
