@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -8,8 +8,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Level1Product, Level2Product } from "@/types/product";
-import { productDataService } from "@/services/productDataService";
-import { ExternalLink, Plus, CheckCircle2 } from "lucide-react";
+import { usePDProducts, useLevel2Products } from "@/hooks/useProductQueries";
+import { ExternalLink, Plus, CheckCircle2, Loader2 } from "lucide-react";
 
 interface PDProductSelectorProps {
   onProductSelect: (product: Level1Product, configuration?: Record<string, any>, level2Options?: Level2Product[]) => void;
@@ -20,40 +20,24 @@ const PDProductSelector = ({ onProductSelect, canSeePrices }: PDProductSelectorP
   const [selectedProducts, setSelectedProducts] = useState<Set<string>>(new Set());
   const [standaloneLevel2Options, setStandaloneLevel2Options] = useState<Level2Product[]>([]);
   const [productConfigurations, setProductConfigurations] = useState<Record<string, Record<string, any>>>({});
-  const [loading, setLoading] = useState(true);
 
-  const [pdProducts, setPdProducts] = useState<Level1Product[]>([]);
-  const [level2Options, setLevel2Options] = useState<Level2Product[]>([]);
+  // Use optimized queries with caching
+  const { data: pdProducts = [], isLoading: pdLoading, error: pdError } = usePDProducts();
+  const { data: allLevel2Products = [], isLoading: l2Loading } = useLevel2Products();
 
-  useEffect(() => {
-    const loadProducts = async () => {
-      try {
-        const l1Products = await productDataService.getLevel1Products();
-        const l1Filtered = l1Products.filter((p) => p.type === 'QPDM' && p.enabled);
-        setPdProducts(l1Filtered);
+  // Filter level 2 products for PD accessories
+  const level2Options = useMemo(() => 
+    (allLevel2Products as Level2Product[]).filter(p => 
+      p.enabled && 
+      (p.parentProductId?.toLowerCase().includes('pd') ||
+       p.parentProductId?.toLowerCase().includes('qpdm') ||
+       p.type?.includes('PD') ||
+       p.name.toLowerCase().includes('sensor'))
+    ), 
+    [allLevel2Products]
+  );
 
-        const l2Products = await productDataService.getLevel2Products();
-        const l2Filtered = l2Products.filter(
-          (p) => p.enabled && p.parentProductId === 'qpdm'
-        );
-        setLevel2Options(l2Filtered);
-      } catch (error) {
-        console.error('Error loading PD products:', error);
-        // Fallback to sync methods
-        const l1Sync = productDataService.getLevel1ProductsSync();
-        setPdProducts(l1Sync.filter((p) => p.type === 'QPDM' && p.enabled));
-        
-        const l2Sync = productDataService.getLevel2ProductsSync();
-        setLevel2Options(l2Sync.filter(
-          (p) => p.enabled && p.parentProductId === 'qpdm'
-        ));
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadProducts();
-  }, []);
+  const loading = pdLoading || l2Loading;
 
   const handleProductToggle = (productId: string) => {
     const newSelected = new Set(selectedProducts);
@@ -143,7 +127,7 @@ const PDProductSelector = ({ onProductSelect, canSeePrices }: PDProductSelectorP
   const handleAddSelectedProducts = () => {
     // Add selected Level 1 products with their configurations
     selectedProducts.forEach(productId => {
-      const product = pdProducts.find(p => p.id === productId);
+      const product = (pdProducts as Level1Product[]).find(p => p.id === productId);
       if (product) {
         const config = productConfigurations[productId] || {};
         onProductSelect(product, config, []);
@@ -169,7 +153,7 @@ const PDProductSelector = ({ onProductSelect, canSeePrices }: PDProductSelectorP
     
     // Level 1 products with their configurations
     selectedProducts.forEach(productId => {
-      const product = pdProducts.find(p => p.id === productId);
+      const product = (pdProducts as Level1Product[]).find(p => p.id === productId);
       if (product) {
         total += calculateProductPrice(product, productId);
       }
@@ -184,7 +168,28 @@ const PDProductSelector = ({ onProductSelect, canSeePrices }: PDProductSelectorP
   const hasSelections = selectedProducts.size > 0 || standaloneLevel2Options.some(opt => opt.enabled);
 
   if (loading) {
-    return <div className="text-white">Loading PD products...</div>;
+    return (
+      <div className="flex items-center justify-center py-8">
+        <Loader2 className="h-8 w-8 animate-spin text-white" />
+        <span className="ml-2 text-white">Loading PD products...</span>
+      </div>
+    );
+  }
+
+  if (pdError) {
+    return (
+      <div className="text-center py-8">
+        <p className="text-red-400">Error loading PD products. Please try again.</p>
+      </div>
+    );
+  }
+
+  if ((pdProducts as Level1Product[]).length === 0) {
+    return (
+      <div className="text-center py-8">
+        <p className="text-gray-400">No PD products available. Please check the Admin panel to add products.</p>
+      </div>
+    );
   }
 
   return (
@@ -204,7 +209,7 @@ const PDProductSelector = ({ onProductSelect, canSeePrices }: PDProductSelectorP
         </div>
         
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {pdProducts.map((product) => {
+          {(pdProducts as Level1Product[]).map((product) => {
             const isSelected = selectedProducts.has(product.id);
             const productPrice = calculateProductPrice(product, product.id);
             

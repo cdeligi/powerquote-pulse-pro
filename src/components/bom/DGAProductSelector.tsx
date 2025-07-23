@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -6,8 +6,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Level1Product, Level2Product } from "@/types/product";
-import { productDataService } from "@/services/productDataService";
-import { ExternalLink, Plus, CheckCircle2 } from "lucide-react";
+import { useDGAProducts, useLevel2Products } from "@/hooks/useProductQueries";
+import { ExternalLink, Plus, CheckCircle2, Loader2 } from "lucide-react";
 
 interface DGAProductSelectorProps {
   onProductSelect: (product: Level1Product, configuration?: Record<string, any>, level2Options?: Level2Product[]) => void;
@@ -17,43 +17,24 @@ interface DGAProductSelectorProps {
 const DGAProductSelector = ({ onProductSelect, canSeePrices }: DGAProductSelectorProps) => {
   const [selectedProducts, setSelectedProducts] = useState<Set<string>>(new Set());
   const [selectedLevel2Options, setSelectedLevel2Options] = useState<Record<string, Level2Product[]>>({});
-  const [dgaProducts, setDgaProducts] = useState<Level1Product[]>([]);
-  const [level2Options, setLevel2Options] = useState<Level2Product[]>([]);
-  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const loadProducts = async () => {
-      try {
-        const l1Products = await productDataService.getLevel1Products();
-        const l1Filtered = l1Products.filter(
-          (p) => ['TM8', 'TM3', 'TM1'].includes(p.type) && p.enabled
-        );
-        setDgaProducts(l1Filtered);
+  // Use optimized queries with caching
+  const { data: dgaProducts = [], isLoading: dgaLoading, error: dgaError } = useDGAProducts();
+  const { data: allLevel2Products = [], isLoading: l2Loading } = useLevel2Products();
 
-        const l2Products = await productDataService.getLevel2Products();
-        const l2Filtered = l2Products.filter(
-          (p) => p.enabled && ['CalGas', 'Standard', 'Moisture'].includes(p.type)
-        );
-        setLevel2Options(l2Filtered);
-      } catch (error) {
-        console.error('Error loading DGA products:', error);
-        // Fallback to sync methods
-        const l1Sync = productDataService.getLevel1ProductsSync();
-        setDgaProducts(l1Sync.filter(
-          (p) => ['TM8', 'TM3', 'TM1'].includes(p.type) && p.enabled
-        ));
-        
-        const l2Sync = productDataService.getLevel2ProductsSync();
-        setLevel2Options(l2Sync.filter(
-          (p) => p.enabled && ['CalGas', 'Standard', 'Moisture'].includes(p.type)
-        ));
-      } finally {
-        setLoading(false);
-      }
-    };
+  // Filter level 2 products for DGA accessories
+  const level2Options = useMemo(() => 
+    (allLevel2Products as Level2Product[]).filter(p => 
+      p.enabled && 
+      (p.type?.includes('CalGas') || 
+       p.type?.includes('Standard') || 
+       p.type?.includes('Moisture') ||
+       p.parentProductId?.toLowerCase().includes('dga'))
+    ), 
+    [allLevel2Products]
+  );
 
-    loadProducts();
-  }, []);
+  const loading = dgaLoading || l2Loading;
 
   const handleProductToggle = (productId: string) => {
     const newSelected = new Set(selectedProducts);
@@ -101,7 +82,7 @@ const DGAProductSelector = ({ onProductSelect, canSeePrices }: DGAProductSelecto
   const handleAddSelectedProducts = () => {
     // Add selected Level 1 products with their Level 2 options
     selectedProducts.forEach(productId => {
-      const product = dgaProducts.find(p => p.id === productId);
+      const product = (dgaProducts as Level1Product[]).find(p => p.id === productId);
       if (product) {
         const level2Opts = selectedLevel2Options[productId] || [];
         onProductSelect(product, {}, level2Opts);
@@ -118,7 +99,7 @@ const DGAProductSelector = ({ onProductSelect, canSeePrices }: DGAProductSelecto
     
     // Level 1 products with their Level 2 options
     selectedProducts.forEach(productId => {
-      const product = dgaProducts.find(p => p.id === productId);
+    const product = (dgaProducts as Level1Product[]).find(p => p.id === productId);
       if (product) {
         total += calculateProductPrice(product, productId);
       }
@@ -130,7 +111,28 @@ const DGAProductSelector = ({ onProductSelect, canSeePrices }: DGAProductSelecto
   const hasSelections = selectedProducts.size > 0;
 
   if (loading) {
-    return <div className="text-white">Loading DGA products...</div>;
+    return (
+      <div className="flex items-center justify-center py-8">
+        <Loader2 className="h-8 w-8 animate-spin text-white" />
+        <span className="ml-2 text-white">Loading DGA products...</span>
+      </div>
+    );
+  }
+
+  if (dgaError) {
+    return (
+      <div className="text-center py-8">
+        <p className="text-red-400">Error loading DGA products. Please try again.</p>
+      </div>
+    );
+  }
+
+  if ((dgaProducts as Level1Product[]).length === 0) {
+    return (
+      <div className="text-center py-8">
+        <p className="text-gray-400">No DGA products available. Please check the Admin panel to add products.</p>
+      </div>
+    );
   }
 
   return (
@@ -150,7 +152,7 @@ const DGAProductSelector = ({ onProductSelect, canSeePrices }: DGAProductSelecto
         </div>
         
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {dgaProducts.map((product) => {
+          {(dgaProducts as Level1Product[]).map((product) => {
             const isSelected = selectedProducts.has(product.id);
             const productPrice = calculateProductPrice(product, product.id);
             
@@ -229,7 +231,7 @@ const DGAProductSelector = ({ onProductSelect, canSeePrices }: DGAProductSelecto
           <CardContent>
             <div className="space-y-3">
               {Array.from(selectedProducts).map((productId) => {
-                const product = dgaProducts.find(p => p.id === productId);
+                const product = (dgaProducts as Level1Product[]).find(p => p.id === productId);
                 const selectedOptions = selectedLevel2Options[productId] || [];
                 
                 return (

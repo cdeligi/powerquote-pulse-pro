@@ -1,7 +1,21 @@
 
 import { createRoot } from 'react-dom/client'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import App from './App.tsx'
 import './index.css'
+
+// Create a client with optimized defaults
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 5 * 60 * 1000, // 5 minutes
+      gcTime: 30 * 60 * 1000, // 30 minutes
+      refetchOnWindowFocus: false,
+      refetchOnMount: false,
+      retry: 2,
+    },
+  },
+})
 
 console.log('=== Application Starting ===');
 console.log('Environment check:', {
@@ -41,7 +55,11 @@ const root = createRoot(rootElement);
 
 try {
   console.log('📦 Rendering App component...');
-  root.render(<App />);
+  root.render(
+    <QueryClientProvider client={queryClient}>
+      <App />
+    </QueryClientProvider>
+  );
   console.log('✅ App rendered successfully');
 } catch (error) {
   console.error('❌ Failed to render app:', error);

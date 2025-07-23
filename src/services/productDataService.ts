@@ -79,16 +79,10 @@ class ProductDataService {
     };
   }
 
-  // Level 1 Products (Real-time Supabase fetch)
+  // Level 1 Products (Optimized with RPC)
   async getLevel1Products(): Promise<Level1Product[]> {
     try {
-      const { data, error } = await supabase
-        .from('products')
-        .select('*')
-        .eq('product_level', 1)
-        .eq('enabled', true)
-        .order('name');
-
+      const { data, error } = await supabase.rpc('get_products_by_level', { level_filter: 1 });
       if (error) throw error;
       return (data || []).map(row => this.transformDbToLevel1(row));
     } catch (error) {
@@ -97,16 +91,34 @@ class ProductDataService {
     }
   }
 
-  // Level 2 Products (Real-time Supabase fetch)
+  // DGA Products (Optimized with RPC)
+  async getDGAProducts(): Promise<Level1Product[]> {
+    try {
+      const { data, error } = await supabase.rpc('get_dga_products');
+      if (error) throw error;
+      return (data || []).map(row => this.transformDbToLevel1(row));
+    } catch (error) {
+      console.error('Error fetching DGA products:', error);
+      return [];
+    }
+  }
+
+  // PD Products (Optimized with RPC)
+  async getPDProducts(): Promise<Level1Product[]> {
+    try {
+      const { data, error } = await supabase.rpc('get_pd_products');
+      if (error) throw error;
+      return (data || []).map(row => this.transformDbToLevel1(row));
+    } catch (error) {
+      console.error('Error fetching PD products:', error);
+      return [];
+    }
+  }
+
+  // Level 2 Products (Optimized with RPC)
   async getLevel2Products(): Promise<Level2Product[]> {
     try {
-      const { data, error } = await supabase
-        .from('products')
-        .select('*')
-        .eq('product_level', 2)
-        .eq('enabled', true)
-        .order('name');
-
+      const { data, error } = await supabase.rpc('get_products_by_level', { level_filter: 2 });
       if (error) throw error;
       return (data || []).map(row => this.transformDbToLevel2(row));
     } catch (error) {

@@ -1195,6 +1195,61 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: string[]
       }
+      get_dga_products: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          id: string
+          name: string
+          description: string
+          price: number
+          cost: number
+          enabled: boolean
+          category: string
+          subcategory: string
+          parent_product_id: string
+          part_number: string
+          image_url: string
+          product_info_url: string
+          specifications: Json
+        }[]
+      }
+      get_pd_products: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          id: string
+          name: string
+          description: string
+          price: number
+          cost: number
+          enabled: boolean
+          category: string
+          subcategory: string
+          parent_product_id: string
+          part_number: string
+          image_url: string
+          product_info_url: string
+          specifications: Json
+        }[]
+      }
+      get_products_by_level: {
+        Args: { level_filter: number }
+        Returns: {
+          id: string
+          name: string
+          description: string
+          price: number
+          cost: number
+          enabled: boolean
+          category: string
+          subcategory: string
+          parent_product_id: string
+          part_number: string
+          image_url: string
+          product_info_url: string
+          specifications: Json
+          slot_requirement: number
+        }[]
+      }
       get_user_role: {
         Args: { user_id: string }
         Returns: string
