@@ -1224,6 +1224,43 @@ export type Database = {
           specifications: Json
         }[]
       }
+      get_level1_products_with_asset_types: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          id: string
+          name: string
+          description: string
+          price: number
+          cost: number
+          enabled: boolean
+          category: string
+          subcategory: string
+          part_number: string
+          image_url: string
+          product_info_url: string
+          specifications: Json
+          asset_type_id: string
+          asset_type_name: string
+        }[]
+      }
+      get_level2_products_by_parent: {
+        Args: { parent_id: string }
+        Returns: {
+          id: string
+          name: string
+          description: string
+          price: number
+          cost: number
+          enabled: boolean
+          category: string
+          subcategory: string
+          parent_product_id: string
+          part_number: string
+          image_url: string
+          product_info_url: string
+          specifications: Json
+        }[]
+      }
       get_pd_products: {
         Args: Record<PropertyKey, never>
         Returns: {
