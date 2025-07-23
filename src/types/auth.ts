@@ -11,3 +11,9 @@ export interface LoginCredentials {
   email: string;
   password: string;
 }
+
+export interface AuthError {
+  code: string;
+  message: string;
+  type: 'auth' | 'session' | 'profile';
+}

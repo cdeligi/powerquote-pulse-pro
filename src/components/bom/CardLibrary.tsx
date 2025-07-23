@@ -28,7 +28,7 @@ const CardLibrary = ({ chassis, onCardSelect, canSeePrices }: CardLibraryProps) 
         await productDataService.initialize();
         
         // Get all cards for this chassis from productDataService using proper relationships
-        const cardsForChassis = productDataService.getLevel3ProductsForLevel2(chassis.id);
+        const cardsForChassis = await productDataService.getLevel3ProductsForLevel2(chassis.id);
         
         console.log('CardLibrary: Loaded cards for chassis', chassis.id, ':', cardsForChassis);
         setAllCards(cardsForChassis.filter(card => card.enabled !== false));
@@ -36,7 +36,7 @@ const CardLibrary = ({ chassis, onCardSelect, canSeePrices }: CardLibraryProps) 
         console.error('Error loading cards:', error);
         // Fallback to sync method
         try {
-          const syncCards = productDataService.getLevel3ProductsForLevel2(chassis.id);
+          const syncCards = await productDataService.getLevel3ProductsForLevel2(chassis.id);
           setAllCards(syncCards.filter(card => card.enabled !== false));
         } catch (syncError) {
           console.error('Sync fallback failed:', syncError);

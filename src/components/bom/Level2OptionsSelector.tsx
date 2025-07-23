@@ -9,9 +9,10 @@ interface Level2OptionsSelectorProps {
   level1Product: Level1Product;
   selectedOptions: Level2Product[];
   onOptionToggle: (option: Level2Product) => void;
+  canSeePrices?: boolean;
 }
 
-const Level2OptionsSelector = ({ level1Product, selectedOptions, onOptionToggle }: Level2OptionsSelectorProps) => {
+const Level2OptionsSelector = ({ level1Product, selectedOptions, onOptionToggle, canSeePrices = true }: Level2OptionsSelectorProps) => {
   const [availableOptions, setAvailableOptions] = useState<Level2Product[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -20,8 +21,8 @@ const Level2OptionsSelector = ({ level1Product, selectedOptions, onOptionToggle 
       try {
         setLoading(true);
         // Use the relationship method to get Level 2 products for the selected Level 1
-        const options = productDataService.getLevel2ProductsForLevel1(level1Product.id).filter(p => p.enabled);
-        setAvailableOptions(options);
+        const options = await productDataService.getLevel2ProductsForLevel1(level1Product.id);
+        setAvailableOptions(options.filter(p => p.enabled));
       } catch (error) {
         console.error('Error loading Level 2 options:', error);
         setAvailableOptions([]);

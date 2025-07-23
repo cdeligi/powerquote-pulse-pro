@@ -543,7 +543,7 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div>
               <Level2OptionsSelector
-                level1ProductId={productId}
+                level1Product={selectedLevel1Product}
                 selectedOptions={selectedLevel2Options}
                 onOptionToggle={handleLevel2OptionToggle}
                 canSeePrices={canSeePrices}
@@ -612,7 +612,7 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
           return (
             <div className="space-y-4">
               <Level2OptionsSelector
-                level1ProductId={productId}
+                level1Product={selectedLevel1Product}
                 selectedOptions={selectedLevel2Options}
                 onOptionToggle={handleLevel2OptionToggle}
                 canSeePrices={canSeePrices}
