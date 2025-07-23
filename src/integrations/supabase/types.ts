@@ -79,6 +79,33 @@ export type Database = {
           },
         ]
       }
+      asset_types: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          enabled: boolean | null
+          id: string
+          name: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          enabled?: boolean | null
+          id: string
+          name: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          enabled?: boolean | null
+          id?: string
+          name?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       bom_items: {
         Row: {
           approved_unit_price: number | null
