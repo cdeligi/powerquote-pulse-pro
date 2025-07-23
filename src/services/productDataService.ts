@@ -9,793 +9,617 @@ import {
   BushingTapModelOption,
 } from "@/types/product";
 import { supabase } from "@/integrations/supabase/client";
-import {
-  DEFAULT_ASSET_TYPES,
-  DEFAULT_LEVEL1_PRODUCTS,
-  DEFAULT_LEVEL2_PRODUCTS,
-  DEFAULT_LEVEL3_PRODUCTS,
-  DEFAULT_ANALOG_SENSORS,
-  DEFAULT_BUSHING_TAP_MODELS
-} from "@/data/productDefaults";
-import { dataDebugUtils } from "@/utils/dataDebug";
 
 class ProductDataService {
-  private level1Products: Level1Product[] = [];
-  private level2Products: Level2Product[] = [];
-  private level3Products: Level3Product[] = [];
-  private level4Products: Level4Product[] = [];
-  private assetTypes: AssetType[] = [];
-  private analogSensorTypes: AnalogSensorOption[] = [];
-  private bushingTapModels: BushingTapModelOption[] = [];
   private initialized: boolean = false;
-  private initializationPromise: Promise<void> | null = null;
 
   constructor() {
-    // Load defaults immediately to prevent blocking
-    this.loadDefaults();
     this.initialized = true;
   }
 
   async initialize(): Promise<void> {
-    if (this.initialized && this.level1Products.length > 0) {
-      return;
-    }
-    
-    if (this.initializationPromise) {
-      return this.initializationPromise;
-    }
-
-    this.initializationPromise = this._performInitialization();
-    return this.initializationPromise;
+    // No initialization needed - we always fetch fresh data from Supabase
+    this.initialized = true;
   }
 
-  private async _performInitialization(): Promise<void> {
-    try {
-      console.log('ProductDataService: Starting initialization...');
-      
-      // Set a timeout to prevent infinite loading
-      const initTimeout = setTimeout(() => {
-        console.warn('ProductDataService: Initialization timeout, using defaults');
-        this.loadDefaults();
-        this.initialized = true;
-      }, 5000);
-
-      // Step 1: Try to load from database first
-      const dbSuccess = await this.loadFromDatabase();
-      
-      if (!dbSuccess) {
-        console.log('ProductDataService: Database load failed, trying localStorage...');
-        // Step 2: Fallback to localStorage
-        const localSuccess = this.loadFromLocalStorage();
-        
-        if (!localSuccess) {
-          console.log('ProductDataService: localStorage load failed, using defaults...');
-          // Step 3: Final fallback to defaults
-          this.loadDefaults();
-        }
-      }
-
-      // Clear the timeout since we completed successfully
-      clearTimeout(initTimeout);
-
-      // Validate data relationships
-      dataDebugUtils.validateProductRelationships(
-        this.level1Products, 
-        this.level2Products, 
-        this.level3Products
-      );
-
-      // Save current state to localStorage for offline access
-      this.saveToLocalStorage();
-      
-      this.initialized = true;
-      console.log('ProductDataService: Initialization complete', {
-        level1Count: this.level1Products.length,
-        level2Count: this.level2Products.length,
-        level3Count: this.level3Products.length,
-        level4Count: this.level4Products.length,
-        assetTypesCount: this.assetTypes.length
-      });
-
-    } catch (error) {
-      console.error('ProductDataService: Initialization failed:', error);
-      // Emergency fallback to defaults
-      this.loadDefaults();
-      this.initialized = true;
-    }
+  // Transform database rows to Level1Product interface
+  private transformDbToLevel1(row: any): Level1Product {
+    return {
+      id: row.id,
+      name: row.name,
+      type: row.subcategory || 'QTMS',
+      category: row.category,
+      description: row.description || '',
+      price: parseFloat(row.price) || 0,
+      cost: parseFloat(row.cost) || 0,
+      enabled: row.enabled !== false,
+      partNumber: row.part_number,
+      image: row.image_url,
+      productInfoUrl: row.product_info_url,
+      hasQuantitySelection: false // Can be enhanced later
+    };
   }
 
-  private async loadFromDatabase(): Promise<boolean> {
-    try {
-      console.log('ProductDataService: Loading from database...');
-      
-      // Set a timeout for database operations
-      const dbTimeout = new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error('Database timeout')), 3000);
-      });
-
-      const dbOperations = Promise.all([
-        supabase.from('products').select('*').eq('category', 'level1').eq('is_active', true),
-        supabase.from('products').select('*').eq('category', 'level2').eq('is_active', true),
-        supabase.from('products').select('*').eq('category', 'level3').eq('is_active', true),
-        supabase.from('level4_products').select('*').eq('enabled', true),
-        supabase.from('level1_level2_relationships').select('*'),
-        supabase.from('level2_level3_relationships').select('*')
-      ]);
-
-      const [
-        { data: level1Data, error: l1Error },
-        { data: level2Data, error: l2Error },
-        { data: level3Data, error: l3Error },
-        { data: level4Data, error: l4Error },
-        { data: l1l2Relations, error: l1l2Error },
-        { data: l2l3Relations, error: l2l3Error }
-      ] = await Promise.race([dbOperations, dbTimeout]);
-
-      if (l1Error || l2Error || l3Error || l4Error || l1l2Error || l2l3Error) {
-        console.warn('ProductDataService: Database errors:', { l1Error, l2Error, l3Error, l4Error, l1l2Error, l2l3Error });
-        return false;
-      }
-
-      // Transform database format to our format with proper relationships and ensure cost data flows through
-      this.level1Products = this.transformDbToLevel1(level1Data || []);
-      this.level2Products = this.transformDbToLevel2(level2Data || [], l1l2Relations || []);
-      this.level3Products = this.transformDbToLevel3(level3Data || [], l2l3Relations || []);
-      this.level4Products = level4Data || [];
-
-      // Load other data types (use defaults for now since they're not in DB)
-      this.assetTypes = [...DEFAULT_ASSET_TYPES];
-      this.analogSensorTypes = [...DEFAULT_ANALOG_SENSORS];
-      this.bushingTapModels = [...DEFAULT_BUSHING_TAP_MODELS];
-
-      // Validate we have some data
-      const hasData = this.level1Products.length > 0;
-      
-      console.log('ProductDataService: Database load successful', {
-        level1Count: this.level1Products.length,
-        level2Count: this.level2Products.length,
-        level3Count: this.level3Products.length,
-        relationshipsL1L2: l1l2Relations?.length || 0,
-        relationshipsL2L3: l2l3Relations?.length || 0
-      });
-      
-      return hasData;
-    } catch (error) {
-      console.error('ProductDataService: Database load failed:', error);
-      return false;
-    }
+  // Transform database rows to Level2Product interface
+  private transformDbToLevel2(row: any): Level2Product {
+    return {
+      id: row.id,
+      name: row.name,
+      parentProductId: row.parent_product_id || '',
+      type: row.subcategory || 'LTX',
+      description: row.description || '',
+      price: parseFloat(row.price) || 0,
+      cost: parseFloat(row.cost) || 0,
+      enabled: row.enabled !== false,
+      specifications: row.specifications || {},
+      partNumber: row.part_number,
+      image: row.image_url,
+      productInfoUrl: row.product_info_url
+    };
   }
 
-  private loadFromLocalStorage(): boolean {
-    try {
-      console.log('ProductDataService: Loading from localStorage...');
-      
-      const storedL1 = localStorage.getItem('level1Products');
-      const storedL2 = localStorage.getItem('level2Products');
-      const storedL3 = localStorage.getItem('level3Products');
-      const storedL4 = localStorage.getItem('level4Products');
-      
-      if (storedL1) this.level1Products = JSON.parse(storedL1);
-      if (storedL2) this.level2Products = JSON.parse(storedL2);
-      if (storedL3) this.level3Products = JSON.parse(storedL3);
-      if (storedL4) this.level4Products = JSON.parse(storedL4);
-
-      // Load other types
-      const storedAssetTypes = localStorage.getItem('assetTypes');
-      const storedAnalogSensors = localStorage.getItem('analogSensorTypes');
-      const storedBushingTap = localStorage.getItem('bushingTapModels');
-      
-      this.assetTypes = storedAssetTypes ? JSON.parse(storedAssetTypes) : [...DEFAULT_ASSET_TYPES];
-      this.analogSensorTypes = storedAnalogSensors ? JSON.parse(storedAnalogSensors) : [...DEFAULT_ANALOG_SENSORS];
-      this.bushingTapModels = storedBushingTap ? JSON.parse(storedBushingTap) : [...DEFAULT_BUSHING_TAP_MODELS];
-
-      // Validate we have some data
-      const hasData = this.level1Products.length > 0;
-      
-      console.log('ProductDataService: localStorage load result:', { hasData });
-      return hasData;
-    } catch (error) {
-      console.error('ProductDataService: localStorage load failed:', error);
-      return false;
-    }
+  // Transform database rows to Level3Product interface
+  private transformDbToLevel3(row: any): Level3Product {
+    return {
+      id: row.id,
+      name: row.name,
+      parentProductId: row.parent_product_id || '',
+      type: row.subcategory || 'card',
+      description: row.description || '',
+      price: parseFloat(row.price) || 0,
+      cost: parseFloat(row.cost) || 0,
+      enabled: row.enabled !== false,
+      specifications: {
+        ...row.specifications,
+        slotRequirement: row.slot_requirement || 1
+      },
+      partNumber: row.part_number,
+      image: row.image_url,
+      productInfoUrl: row.product_info_url
+    };
   }
 
-  private loadDefaults(): void {
-    console.log('ProductDataService: Loading default data...');
-    
-    this.level1Products = [...DEFAULT_LEVEL1_PRODUCTS];
-    this.level2Products = [...DEFAULT_LEVEL2_PRODUCTS];
-    this.level3Products = [...DEFAULT_LEVEL3_PRODUCTS];
-    this.level4Products = [];
-    this.assetTypes = [...DEFAULT_ASSET_TYPES];
-    this.analogSensorTypes = [...DEFAULT_ANALOG_SENSORS];
-    this.bushingTapModels = [...DEFAULT_BUSHING_TAP_MODELS];
-  }
-
-  private saveToLocalStorage(): void {
-    try {
-      localStorage.setItem('level1Products', JSON.stringify(this.level1Products));
-      localStorage.setItem('level2Products', JSON.stringify(this.level2Products));
-      localStorage.setItem('level3Products', JSON.stringify(this.level3Products));
-      localStorage.setItem('level4Products', JSON.stringify(this.level4Products));
-      localStorage.setItem('assetTypes', JSON.stringify(this.assetTypes));
-      localStorage.setItem('analogSensorTypes', JSON.stringify(this.analogSensorTypes));
-      localStorage.setItem('bushingTapModels', JSON.stringify(this.bushingTapModels));
-    } catch (error) {
-      console.error('ProductDataService: Failed to save to localStorage:', error);
-    }
-  }
-
-  // Transform database format to our format with proper relationships and ensure cost data flows through
-  private transformDbToLevel1(dbData: any[]): Level1Product[] {
-    return dbData.map(item => ({
-      id: item.id,
-      name: item.name,
-      type: item.subcategory || 'QTMS',
-      category: item.category,
-      description: item.description || '',
-      price: parseFloat(item.price) || 0,
-      cost: parseFloat(item.cost) || 0, // Ensure cost is included
-      enabled: item.is_active !== false
-    }));
-  }
-
-  private transformDbToLevel2(dbData: any[], relationships: any[]): Level2Product[] {
-    return dbData.map(item => {
-      // Find parent relationship
-      const parentRelation = relationships.find(rel => rel.level2_product_id === item.id);
-      
-      return {
-        id: item.id,
-        name: item.name,
-        parentProductId: parentRelation?.level1_product_id || '',
-        type: item.subcategory || 'LTX',
-        description: item.description || '',
-        price: parseFloat(item.price) || 0,
-        cost: parseFloat(item.cost) || 0, // Ensure cost is included
-        enabled: item.is_active !== false,
-        specifications: this.parseSpecifications(item.subcategory)
-      };
-    });
-  }
-
-  private transformDbToLevel3(dbData: any[], relationships: any[]): Level3Product[] {
-    return dbData.map(item => {
-      // Find parent relationship
-      const parentRelation = relationships.find(rel => rel.level3_product_id === item.id);
-      
-      return {
-        id: item.id,
-        name: item.name,
-        parentProductId: parentRelation?.level2_product_id || '',
-        type: item.subcategory || 'card',
-        description: item.description || '',
-        price: parseFloat(item.price) || 0,
-        cost: parseFloat(item.cost) || 0, // Ensure cost is included
-        enabled: item.is_active !== false,
-        specifications: this.parseLevel3Specifications(item.subcategory, item.name)
-      };
-    });
-  }
-
-  private parseSpecifications(subcategory: string): any {
-    switch (subcategory) {
-      case 'LTX':
-        return { height: '7U', slots: 19, capacity: 'Large' };
-      case 'MTX':
-        return { height: '5U', slots: 12, capacity: 'Medium' };
-      case 'STX':
-        return { height: '3U', slots: 6, capacity: 'Small' };
-      default:
-        return {};
-    }
-  }
-
-  private parseLevel3Specifications(subcategory: string, name: string): any {
-    const specs: any = {};
-    
-    if (subcategory === 'card') {
-      specs.slotRequirement = 1;
-      
-      if (name.toLowerCase().includes('analog')) {
-        specs.inputs = 8;
-        specs.channels = 8;
-        specs.inputTypes = ['4-20mA', '0-10V', 'RTD', 'Thermocouple'];
-      } else if (name.toLowerCase().includes('digital')) {
-        specs.inputs = 16;
-        specs.outputs = ['Relay', 'Digital'];
-        specs.channels = 16;
-      } else if (name.toLowerCase().includes('communication')) {
-        specs.protocols = ['Modbus', 'DNP3', 'IEC 61850'];
-        specs.outputs = ['Ethernet', 'Serial'];
-      }
-    }
-    
-    return specs;
-  }
-
-  // Public async methods
+  // Level 1 Products (Real-time Supabase fetch)
   async getLevel1Products(): Promise<Level1Product[]> {
-    // Always return immediately with current data, optionally trigger background update
-    if (!this.initialized || this.level1Products.length === 0) {
-      this.initialize().catch(console.error);
+    try {
+      const { data, error } = await supabase
+        .from('products')
+        .select('*')
+        .eq('product_level', 1)
+        .eq('enabled', true)
+        .order('name');
+
+      if (error) throw error;
+      return (data || []).map(row => this.transformDbToLevel1(row));
+    } catch (error) {
+      console.error('Error fetching Level 1 products:', error);
+      return [];
     }
-    return [...this.level1Products];
   }
 
+  // Level 2 Products (Real-time Supabase fetch)
   async getLevel2Products(): Promise<Level2Product[]> {
-    if (!this.initialized || this.level2Products.length === 0) {
-      this.initialize().catch(console.error);
+    try {
+      const { data, error } = await supabase
+        .from('products')
+        .select('*')
+        .eq('product_level', 2)
+        .eq('enabled', true)
+        .order('name');
+
+      if (error) throw error;
+      return (data || []).map(row => this.transformDbToLevel2(row));
+    } catch (error) {
+      console.error('Error fetching Level 2 products:', error);
+      return [];
     }
-    return [...this.level2Products];
   }
 
+  // Level 3 Products (Real-time Supabase fetch)
   async getLevel3Products(): Promise<Level3Product[]> {
-    if (!this.initialized || this.level3Products.length === 0) {
-      this.initialize().catch(console.error);
+    try {
+      const { data, error } = await supabase
+        .from('products')
+        .select('*')
+        .eq('product_level', 3)
+        .eq('enabled', true)
+        .order('name');
+
+      if (error) throw error;
+      return (data || []).map(row => this.transformDbToLevel3(row));
+    } catch (error) {
+      console.error('Error fetching Level 3 products:', error);
+      return [];
     }
-    return [...this.level3Products];
   }
 
+  // Level 4 Products (Real-time Supabase fetch)
   async getLevel4Products(): Promise<Level4Product[]> {
-    if (!this.initialized) {
-      this.initialize().catch(console.error);
+    try {
+      const { data, error } = await supabase
+        .from('level4_products')
+        .select(`
+          *,
+          options:level4_configuration_options(*)
+        `)
+        .eq('enabled', true)
+        .order('name');
+
+      if (error) throw error;
+      return data || [];
+    } catch (error) {
+      console.error('Error fetching Level 4 products:', error);
+      return [];
     }
-    return [...this.level4Products];
   }
 
-  async getAssetTypes(): Promise<AssetType[]> {
-    if (!this.initialized || this.assetTypes.length === 0) {
-      this.initialize().catch(console.error);
+  // Get products with rack configuration enabled
+  async getRackConfigurableProducts(): Promise<Level1Product[]> {
+    try {
+      const { data, error } = await supabase
+        .from('products')
+        .select('*')
+        .eq('product_level', 1)
+        .eq('enabled', true)
+        .eq('rack_configurable', true)
+        .order('name');
+
+      if (error) throw error;
+      return (data || []).map(row => this.transformDbToLevel1(row));
+    } catch (error) {
+      console.error('Error fetching rack configurable products:', error);
+      return [];
     }
-    return [...this.assetTypes];
   }
 
-  // Synchronous methods for backward compatibility
+  // Synchronous methods for backward compatibility (return empty arrays - force async usage)
   getLevel1ProductsSync(): Level1Product[] {
-    return [...this.level1Products];
+    console.warn('Sync methods deprecated - use async versions');
+    return [];
   }
 
   getLevel2ProductsSync(): Level2Product[] {
-    return [...this.level2Products];
+    console.warn('Sync methods deprecated - use async versions');
+    return [];
   }
 
   getLevel3ProductsSync(): Level3Product[] {
-    return [...this.level3Products];
+    console.warn('Sync methods deprecated - use async versions');
+    return [];
   }
 
   getLevel4ProductsSync(): Level4Product[] {
-    return [...this.level4Products];
+    console.warn('Sync methods deprecated - use async versions');
+    return [];
+  }
+
+  // Asset types (static for now)
+  async getAssetTypes(): Promise<AssetType[]> {
+    return [
+      { id: 'power-transformer', name: 'Power Transformer', enabled: true },
+      { id: 'gas-insulated-switchgear', name: 'Gas Insulated Switchgear', enabled: true },
+      { id: 'breaker', name: 'Breaker', enabled: true }
+    ];
   }
 
   getAssetTypesSync(): AssetType[] {
-    return [...this.assetTypes];
+    return [
+      { id: 'power-transformer', name: 'Power Transformer', enabled: true },
+      { id: 'gas-insulated-switchgear', name: 'Gas Insulated Switchgear', enabled: true },
+      { id: 'breaker', name: 'Breaker', enabled: true }
+    ];
   }
 
-  // Relationship methods with proper database-driven relationships
-  getLevel2ProductsForLevel1(level1Id: string): Level2Product[] {
-    return this.level2Products.filter(l2 => l2.parentProductId === level1Id);
-  }
-
-  getLevel3ProductsForLevel2(level2Id: string): Level3Product[] {
-    return this.level3Products.filter(l3 => l3.parentProductId === level2Id);
-  }
-
-  // Sensor and bushing methods
-  getAnalogSensorTypes(): AnalogSensorOption[] {
-    return [...this.analogSensorTypes];
-  }
-
-  getBushingTapModels(): BushingTapModelOption[] {
-    return [...this.bushingTapModels];
-  }
-
-  // CRUD methods for analog sensor types
-  async createAnalogSensorType(data: Omit<AnalogSensorOption, 'id'>): Promise<AnalogSensorOption> {
-    const newItem: AnalogSensorOption = {
-      ...data,
-      id: `analog-${Date.now()}`
-    };
-    this.analogSensorTypes.push(newItem);
-    this.saveToLocalStorage();
-    return newItem;
-  }
-
-  async updateAnalogSensorType(id: string, data: Partial<Omit<AnalogSensorOption, 'id'>>): Promise<AnalogSensorOption | null> {
-    const index = this.analogSensorTypes.findIndex(item => item.id === id);
-    if (index !== -1) {
-      this.analogSensorTypes[index] = { ...this.analogSensorTypes[index], ...data };
-      this.saveToLocalStorage();
-      return this.analogSensorTypes[index];
-    }
-    return null;
-  }
-
-  async deleteAnalogSensorType(id: string): Promise<void> {
-    this.analogSensorTypes = this.analogSensorTypes.filter(item => item.id !== id);
-    this.saveToLocalStorage();
-  }
-
-  // CRUD methods for bushing tap models
-  async createBushingTapModel(data: Omit<BushingTapModelOption, 'id'>): Promise<BushingTapModelOption> {
-    const newItem: BushingTapModelOption = {
-      ...data,
-      id: `bushing-${Date.now()}`
-    };
-    this.bushingTapModels.push(newItem);
-    this.saveToLocalStorage();
-    return newItem;
-  }
-
-  async updateBushingTapModel(id: string, data: Partial<Omit<BushingTapModelOption, 'id'>>): Promise<BushingTapModelOption | null> {
-    const index = this.bushingTapModels.findIndex(item => item.id === id);
-    if (index !== -1) {
-      this.bushingTapModels[index] = { ...this.bushingTapModels[index], ...data };
-      this.saveToLocalStorage();
-      return this.bushingTapModels[index];
-    }
-    return null;
-  }
-
-  async deleteBushingTapModel(id: string): Promise<void> {
-    this.bushingTapModels = this.bushingTapModels.filter(item => item.id !== id);
-    this.saveToLocalStorage();
-  }
-
-  // Replace all products method for sync functionality
-  replaceAllProducts(level1Data: any[], level2Data: any[], level3Data: any[], level4Data: any[]): void {
-    this.level1Products = this.transformDbToLevel1(level1Data);
-    this.level2Products = this.transformDbToLevel2(level2Data, []); // Pass empty array for relationships
-    this.level3Products = this.transformDbToLevel3(level3Data, []); // Pass empty array for relationships
-    this.level4Products = level4Data;
-    this.saveToLocalStorage();
-    this.initialized = true;
-  }
-
-  // Level 1 Products methods
-  async createLevel1Product(product: Omit<Level1Product, 'id'>): Promise<Level1Product> {
-    await this.initialize();
-    const newProduct: Level1Product = {
-      ...product,
-      id: `level1-${Date.now()}`
-    };
-    this.level1Products.push(newProduct);
-    this.saveToLocalStorage();
-
+  // Relationship methods using parent_product_id
+  async getLevel2ProductsForLevel1(level1Id: string): Promise<Level2Product[]> {
     try {
-      await supabase.from('products').insert({
-        id: newProduct.id,
-        name: newProduct.name,
-        description: newProduct.description,
-        category: 'level1',
-        subcategory: newProduct.type,
-        price: newProduct.price,
-        cost: newProduct.cost ?? null,
-        is_active: newProduct.enabled
-      });
-    } catch (error) {
-      console.error('Failed to persist level1 product', error);
-    }
+      const { data, error } = await supabase
+        .from('products')
+        .select('*')
+        .eq('product_level', 2)
+        .eq('parent_product_id', level1Id)
+        .eq('enabled', true)
+        .order('name');
 
-    return newProduct;
+      if (error) throw error;
+      return (data || []).map(row => this.transformDbToLevel2(row));
+    } catch (error) {
+      console.error('Error fetching Level 2 products for Level 1:', error);
+      return [];
+    }
   }
 
-  async updateLevel1Product(id: string, updates: Partial<Omit<Level1Product, 'id'>>): Promise<Level1Product | null> {
-    await this.initialize();
-    const index = this.level1Products.findIndex(product => product.id === id);
-    if (index !== -1) {
-      this.level1Products[index] = { ...this.level1Products[index], ...updates };
-      this.saveToLocalStorage();
+  async getLevel3ProductsForLevel2(level2Id: string): Promise<Level3Product[]> {
+    try {
+      const { data, error } = await supabase
+        .from('products')
+        .select('*')
+        .eq('product_level', 3)
+        .eq('parent_product_id', level2Id)
+        .eq('enabled', true)
+        .order('name');
 
-      try {
-        await supabase.from('products')
-          .update({
-            name: this.level1Products[index].name,
-            description: this.level1Products[index].description,
-            subcategory: this.level1Products[index].type,
-            price: this.level1Products[index].price,
-            cost: this.level1Products[index].cost ?? null,
-            is_active: this.level1Products[index].enabled
-          })
-          .eq('id', id);
-      } catch (error) {
-        console.error('Failed to update level1 product', error);
-      }
-
-      return this.level1Products[index];
+      if (error) throw error;
+      return (data || []).map(row => this.transformDbToLevel3(row));
+    } catch (error) {
+      console.error('Error fetching Level 3 products for Level 2:', error);
+      return [];
     }
-    return null;
+  }
+
+  // CRUD Operations for Level 1 Products
+  async createLevel1Product(product: Omit<Level1Product, 'id'>): Promise<Level1Product> {
+    try {
+      const id = `level1-${Date.now()}`;
+      const { data, error } = await supabase
+        .from('products')
+        .insert({
+          id,
+          code: product.partNumber,
+          name: product.name,
+          description: product.description,
+          price: product.price,
+          cost: product.cost,
+          category: product.category || 'monitoring-systems',
+          subcategory: product.type,
+          enabled: product.enabled,
+          rack_configurable: (product as any).rackConfigurable || false,
+          product_level: 1,
+          part_number: product.partNumber,
+          image_url: product.image,
+          product_info_url: product.productInfoUrl
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      return this.transformDbToLevel1(data);
+    } catch (error) {
+      console.error('Error creating Level 1 product:', error);
+      throw error;
+    }
+  }
+
+  async updateLevel1Product(id: string, updates: Partial<Level1Product>): Promise<Level1Product | null> {
+    try {
+      const { data, error } = await supabase
+        .from('products')
+        .update({
+          code: updates.partNumber,
+          name: updates.name,
+          description: updates.description,
+          price: updates.price,
+          cost: updates.cost,
+          category: updates.category,
+          subcategory: updates.type,
+          enabled: updates.enabled,
+          rack_configurable: (updates as any).rackConfigurable,
+          part_number: updates.partNumber,
+          image_url: updates.image,
+          product_info_url: updates.productInfoUrl
+        })
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return this.transformDbToLevel1(data);
+    } catch (error) {
+      console.error('Error updating Level 1 product:', error);
+      return null;
+    }
   }
 
   async deleteLevel1Product(id: string): Promise<void> {
-    await this.initialize();
-    this.level1Products = this.level1Products.filter(product => product.id !== id);
-    this.saveToLocalStorage();
-
     try {
-      await supabase.from('products').delete().eq('id', id);
+      const { error } = await supabase
+        .from('products')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
     } catch (error) {
-      console.error('Failed to delete level1 product', error);
+      console.error('Error deleting Level 1 product:', error);
+      throw error;
     }
   }
 
-  // Level 2 Products methods
+  // CRUD Operations for Level 2 Products
   async createLevel2Product(product: Omit<Level2Product, 'id'>): Promise<Level2Product> {
-    await this.initialize();
-    const newProduct: Level2Product = {
-      ...product,
-      id: `level2-${Date.now()}`
-    };
-    this.level2Products.push(newProduct);
-    this.saveToLocalStorage();
-
     try {
-      await supabase.from('products').insert({
-        id: newProduct.id,
-        name: newProduct.name,
-        description: newProduct.description,
-        category: 'level2',
-        subcategory: newProduct.type,
-        price: newProduct.price,
-        cost: newProduct.cost ?? null,
-        is_active: newProduct.enabled
-      });
-    } catch (error) {
-      console.error('Failed to persist level2 product', error);
-    }
+      const id = `level2-${Date.now()}`;
+      const { data, error } = await supabase
+        .from('products')
+        .insert({
+          id,
+          code: product.partNumber,
+          name: product.name,
+          description: product.description,
+          price: product.price,
+          cost: product.cost,
+          category: 'chassis',
+          subcategory: product.type,
+          enabled: product.enabled,
+          parent_product_id: product.parentProductId,
+          product_level: 2,
+          part_number: product.partNumber,
+          specifications: product.specifications,
+          image_url: product.image,
+          product_info_url: product.productInfoUrl
+        })
+        .select()
+        .single();
 
-    return newProduct;
+      if (error) throw error;
+      return this.transformDbToLevel2(data);
+    } catch (error) {
+      console.error('Error creating Level 2 product:', error);
+      throw error;
+    }
   }
 
-  async updateLevel2Product(id: string, updates: Partial<Omit<Level2Product, 'id'>>): Promise<Level2Product | null> {
-    await this.initialize();
-    const index = this.level2Products.findIndex(product => product.id === id);
-    if (index !== -1) {
-      this.level2Products[index] = { ...this.level2Products[index], ...updates };
-      this.saveToLocalStorage();
+  async updateLevel2Product(id: string, updates: Partial<Level2Product>): Promise<Level2Product | null> {
+    try {
+      const { data, error } = await supabase
+        .from('products')
+        .update({
+          code: updates.partNumber,
+          name: updates.name,
+          description: updates.description,
+          price: updates.price,
+          cost: updates.cost,
+          subcategory: updates.type,
+          enabled: updates.enabled,
+          parent_product_id: updates.parentProductId,
+          part_number: updates.partNumber,
+          specifications: updates.specifications,
+          image_url: updates.image,
+          product_info_url: updates.productInfoUrl
+        })
+        .eq('id', id)
+        .select()
+        .single();
 
-      try {
-        await supabase.from('products')
-          .update({
-            name: this.level2Products[index].name,
-            description: this.level2Products[index].description,
-            subcategory: this.level2Products[index].type,
-            price: this.level2Products[index].price,
-            cost: this.level2Products[index].cost ?? null,
-            is_active: this.level2Products[index].enabled
-          })
-          .eq('id', id);
-      } catch (error) {
-        console.error('Failed to update level2 product', error);
-      }
-
-      return this.level2Products[index];
+      if (error) throw error;
+      return this.transformDbToLevel2(data);
+    } catch (error) {
+      console.error('Error updating Level 2 product:', error);
+      return null;
     }
-    return null;
   }
 
   async deleteLevel2Product(id: string): Promise<void> {
-    await this.initialize();
-    this.level2Products = this.level2Products.filter(product => product.id !== id);
-    this.saveToLocalStorage();
-
     try {
-      await supabase.from('products').delete().eq('id', id);
+      const { error } = await supabase
+        .from('products')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
     } catch (error) {
-      console.error('Failed to delete level2 product', error);
+      console.error('Error deleting Level 2 product:', error);
+      throw error;
     }
   }
 
-  // Level 3 and Level 4 methods
+  // CRUD Operations for Level 3 Products
   async createLevel3Product(product: Omit<Level3Product, 'id'>): Promise<Level3Product> {
-    await this.initialize();
-    const newProduct: Level3Product = {
-      ...product,
-      id: `level3-${Date.now()}`
-    };
-    this.level3Products.push(newProduct);
-    this.saveToLocalStorage();
-
     try {
-      await supabase.from('products').insert({
-        id: newProduct.id,
-        name: newProduct.name,
-        description: newProduct.description,
-        category: 'level3',
-        subcategory: newProduct.type,
-        price: newProduct.price,
-        cost: newProduct.cost ?? null,
-        is_active: newProduct.enabled ?? true
-      });
-    } catch (error) {
-      console.error('Failed to persist level3 product', error);
-    }
+      const id = `level3-${Date.now()}`;
+      const { data, error } = await supabase
+        .from('products')
+        .insert({
+          id,
+          code: product.partNumber,
+          name: product.name,
+          description: product.description,
+          price: product.price,
+          cost: product.cost,
+          category: 'card',
+          subcategory: product.type,
+          enabled: product.enabled,
+          parent_product_id: product.parentProductId,
+          product_level: 3,
+          part_number: product.partNumber,
+          slot_requirement: product.specifications?.slotRequirement || 1,
+          specifications: product.specifications,
+          image_url: product.image,
+          product_info_url: product.productInfoUrl
+        })
+        .select()
+        .single();
 
-    return newProduct;
+      if (error) throw error;
+      return this.transformDbToLevel3(data);
+    } catch (error) {
+      console.error('Error creating Level 3 product:', error);
+      throw error;
+    }
   }
 
-  async updateLevel3Product(id: string, updates: Partial<Omit<Level3Product, 'id'>>): Promise<Level3Product | null> {
-    await this.initialize();
-    const index = this.level3Products.findIndex(product => product.id === id);
-    if (index !== -1) {
-      this.level3Products[index] = { ...this.level3Products[index], ...updates };
-      this.saveToLocalStorage();
+  async updateLevel3Product(id: string, updates: Partial<Level3Product>): Promise<Level3Product | null> {
+    try {
+      const { data, error } = await supabase
+        .from('products')
+        .update({
+          code: updates.partNumber,
+          name: updates.name,
+          description: updates.description,
+          price: updates.price,
+          cost: updates.cost,
+          subcategory: updates.type,
+          enabled: updates.enabled,
+          parent_product_id: updates.parentProductId,
+          part_number: updates.partNumber,
+          slot_requirement: updates.specifications?.slotRequirement,
+          specifications: updates.specifications,
+          image_url: updates.image,
+          product_info_url: updates.productInfoUrl
+        })
+        .eq('id', id)
+        .select()
+        .single();
 
-      try {
-        await supabase.from('products')
-          .update({
-            name: this.level3Products[index].name,
-            description: this.level3Products[index].description,
-            subcategory: this.level3Products[index].type,
-            price: this.level3Products[index].price,
-            cost: this.level3Products[index].cost ?? null,
-            is_active: this.level3Products[index].enabled ?? true
-          })
-          .eq('id', id);
-      } catch (error) {
-        console.error('Failed to update level3 product', error);
-      }
-
-      return this.level3Products[index];
+      if (error) throw error;
+      return this.transformDbToLevel3(data);
+    } catch (error) {
+      console.error('Error updating Level 3 product:', error);
+      return null;
     }
-    return null;
   }
 
   async deleteLevel3Product(id: string): Promise<void> {
-    await this.initialize();
-    this.level3Products = this.level3Products.filter(product => product.id !== id);
-    this.saveToLocalStorage();
-
     try {
-      await supabase.from('products').delete().eq('id', id);
+      const { error } = await supabase
+        .from('products')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
     } catch (error) {
-      console.error('Failed to delete level3 product', error);
+      console.error('Error deleting Level 3 product:', error);
+      throw error;
     }
   }
 
-  // Level 4 Products methods
+  // CRUD Operations for Level 4 Products
   async createLevel4Product(product: Omit<Level4Product, 'id'>): Promise<Level4Product> {
-    await this.initialize();
-    const newProduct: Level4Product = {
-      ...product,
-      id: `level4-${Date.now()}`
-    };
-    this.level4Products.push(newProduct);
-    this.saveToLocalStorage();
-
     try {
-      await supabase.from('level4_products').insert({
-        id: newProduct.id,
-        name: newProduct.name,
-        description: newProduct.description,
-        parent_product_id: newProduct.parentProductId,
-        configuration_type: newProduct.configurationType,
-        price: newProduct.price,
-        cost: newProduct.cost ?? null,
-        enabled: newProduct.enabled
-      });
+      const id = `level4-${Date.now()}`;
+      const { data, error } = await supabase
+        .from('level4_products')
+        .insert({
+          id,
+          name: product.name,
+          parent_product_id: product.parentProductId,
+          description: product.description,
+          configuration_type: product.configurationType,
+          price: product.price,
+          cost: product.cost,
+          enabled: product.enabled,
+          part_number: (product as any).partNumber
+        })
+        .select()
+        .single();
 
-      // Insert configuration options if they exist
-      if (newProduct.options && newProduct.options.length > 0) {
-        const optionsToInsert = newProduct.options.map(option => ({
-          id: option.id,
-          level4_product_id: newProduct.id,
-          option_key: option.optionKey,
-          option_value: option.optionValue,
-          display_order: option.displayOrder,
-          enabled: option.enabled
-        }));
-        
-        await supabase.from('level4_configuration_options').insert(optionsToInsert);
-      }
+      if (error) throw error;
+      return { ...data, options: [] };
     } catch (error) {
-      console.error('Failed to persist level4 product', error);
+      console.error('Error creating Level 4 product:', error);
+      throw error;
     }
-
-    return newProduct;
   }
 
-  async updateLevel4Product(id: string, updates: Partial<Omit<Level4Product, 'id'>>): Promise<Level4Product | null> {
-    await this.initialize();
-    const index = this.level4Products.findIndex(product => product.id === id);
-    if (index !== -1) {
-      this.level4Products[index] = { ...this.level4Products[index], ...updates };
-      this.saveToLocalStorage();
+  async updateLevel4Product(id: string, updates: Partial<Level4Product>): Promise<Level4Product | null> {
+    try {
+      const { data, error } = await supabase
+        .from('level4_products')
+        .update({
+          name: updates.name,
+          parent_product_id: updates.parentProductId,
+          description: updates.description,
+          configuration_type: updates.configurationType,
+          price: updates.price,
+          cost: updates.cost,
+          enabled: updates.enabled,
+          part_number: (updates as any).partNumber
+        })
+        .eq('id', id)
+        .select()
+        .single();
 
-      try {
-        await supabase.from('level4_products')
-          .update({
-            name: this.level4Products[index].name,
-            description: this.level4Products[index].description,
-            parent_product_id: this.level4Products[index].parentProductId,
-            configuration_type: this.level4Products[index].configurationType,
-            price: this.level4Products[index].price,
-            cost: this.level4Products[index].cost ?? null,
-            enabled: this.level4Products[index].enabled
-          })
-          .eq('id', id);
-
-        // Update configuration options if they exist
-        if (this.level4Products[index].options) {
-          // Delete existing options
-          await supabase.from('level4_configuration_options').delete().eq('level4_product_id', id);
-          
-          // Insert new options
-          if (this.level4Products[index].options!.length > 0) {
-            const optionsToInsert = this.level4Products[index].options!.map(option => ({
-              id: option.id,
-              level4_product_id: id,
-              option_key: option.optionKey,
-              option_value: option.optionValue,
-              display_order: option.displayOrder,
-              enabled: option.enabled
-            }));
-            
-            await supabase.from('level4_configuration_options').insert(optionsToInsert);
-          }
-        }
-      } catch (error) {
-        console.error('Failed to update level4 product', error);
-      }
-
-      return this.level4Products[index];
+      if (error) throw error;
+      return { ...data, options: [] };
+    } catch (error) {
+      console.error('Error updating Level 4 product:', error);
+      return null;
     }
-    return null;
   }
 
   async deleteLevel4Product(id: string): Promise<void> {
-    await this.initialize();
-    this.level4Products = this.level4Products.filter(product => product.id !== id);
-    this.saveToLocalStorage();
-
     try {
-      // Delete configuration options first
-      await supabase.from('level4_configuration_options').delete().eq('level4_product_id', id);
-      // Delete the product
-      await supabase.from('level4_products').delete().eq('id', id);
+      const { error } = await supabase
+        .from('level4_products')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
     } catch (error) {
-      console.error('Failed to delete level4 product', error);
+      console.error('Error deleting Level 4 product:', error);
+      throw error;
     }
   }
 
-  // Debug method to reset and reload
-  async resetAndReload(): Promise<void> {
-    console.log('ProductDataService: Resetting and reloading...');
-    dataDebugUtils.clearLocalStorage();
-    this.initialized = false;
-    this.initializationPromise = null;
-    this.loadDefaults();
-    this.initialized = true;
-    await this.initialize();
+  // Static sensor/bushing methods (can be enhanced to use Supabase later)
+  getAnalogSensorTypes(): AnalogSensorOption[] {
+    return [
+      { id: 'temp', name: 'Temperature', description: 'Temperature sensor input' },
+      { id: 'pressure', name: 'Pressure', description: 'Pressure sensor input' },
+      { id: 'current', name: 'Current', description: 'Current measurement input' },
+      { id: 'voltage', name: 'Voltage', description: 'Voltage measurement input' }
+    ];
   }
 
-  // Debug methods
+  getBushingTapModels(): BushingTapModelOption[] {
+    return [
+      { id: 'model-a', name: 'Model A' },
+      { id: 'model-b', name: 'Model B' }
+    ];
+  }
+
+  async createAnalogSensorType(data: Omit<AnalogSensorOption, 'id'>): Promise<AnalogSensorOption> {
+    // Implement when needed
+    throw new Error('Not implemented - use Supabase table');
+  }
+
+  async updateAnalogSensorType(id: string, data: Partial<Omit<AnalogSensorOption, 'id'>>): Promise<AnalogSensorOption | null> {
+    // Implement when needed
+    throw new Error('Not implemented - use Supabase table');
+  }
+
+  async deleteAnalogSensorType(id: string): Promise<void> {
+    // Implement when needed
+    throw new Error('Not implemented - use Supabase table');
+  }
+
+  async createBushingTapModel(data: Omit<BushingTapModelOption, 'id'>): Promise<BushingTapModelOption> {
+    // Implement when needed
+    throw new Error('Not implemented - use Supabase table');
+  }
+
+  async updateBushingTapModel(id: string, data: Partial<Omit<BushingTapModelOption, 'id'>>): Promise<BushingTapModelOption | null> {
+    // Implement when needed
+    throw new Error('Not implemented - use Supabase table');
+  }
+
+  async deleteBushingTapModel(id: string): Promise<void> {
+    // Implement when needed
+    throw new Error('Not implemented - use Supabase table');
+  }
+
+  // Debug and utility methods
+  async resetAndReload(): Promise<void> {
+    console.log('Reset not needed - always fetching fresh data from Supabase');
+  }
+
   clearCorruptedData(): void {
-    console.log('ProductDataService: Clearing potentially corrupted data...');
-    dataDebugUtils.clearLocalStorage();
-    this.loadDefaults();
-    this.saveToLocalStorage();
+    console.log('Clear not needed - using Supabase as source of truth');
   }
 
   getDebugInfo(): any {
     return {
+      service: 'Real Supabase ProductDataService',
       initialized: this.initialized,
-      level1Count: this.level1Products.length,
-      level2Count: this.level2Products.length,
-      level3Count: this.level3Products.length,
-      level4Count: this.level4Products.length,
-      assetTypesCount: this.assetTypes.length,
-      analogSensorTypesCount: this.analogSensorTypes.length,
-      bushingTapModelsCount: this.bushingTapModels.length
+      note: 'All data fetched real-time from Supabase'
     };
   }
 }
 
+// Export singleton instance
 export const productDataService = new ProductDataService();
 
-// Expose for debugging
+// Expose debug info for development
 if (typeof window !== 'undefined') {
   (window as any).productDataService = productDataService;
-  (window as any).clearProductData = () => productDataService.clearCorruptedData();
   (window as any).getProductDebugInfo = () => productDataService.getDebugInfo();
 }

@@ -414,37 +414,67 @@ export type Database = {
       products: {
         Row: {
           category: string | null
+          code: string | null
           cost: number | null
           created_at: string
           description: string | null
+          enabled: boolean | null
           id: string
+          image_url: string | null
           is_active: boolean
           name: string
+          parent_product_id: string | null
+          part_number: string | null
           price: number | null
+          product_info_url: string | null
+          product_level: number | null
+          rack_configurable: boolean | null
+          slot_requirement: number | null
+          specifications: Json | null
           subcategory: string | null
           updated_at: string
         }
         Insert: {
           category?: string | null
+          code?: string | null
           cost?: number | null
           created_at?: string
           description?: string | null
+          enabled?: boolean | null
           id: string
+          image_url?: string | null
           is_active?: boolean
           name: string
+          parent_product_id?: string | null
+          part_number?: string | null
           price?: number | null
+          product_info_url?: string | null
+          product_level?: number | null
+          rack_configurable?: boolean | null
+          slot_requirement?: number | null
+          specifications?: Json | null
           subcategory?: string | null
           updated_at?: string
         }
         Update: {
           category?: string | null
+          code?: string | null
           cost?: number | null
           created_at?: string
           description?: string | null
+          enabled?: boolean | null
           id?: string
+          image_url?: string | null
           is_active?: boolean
           name?: string
+          parent_product_id?: string | null
+          part_number?: string | null
           price?: number | null
+          product_info_url?: string | null
+          product_level?: number | null
+          rack_configurable?: boolean | null
+          slot_requirement?: number | null
+          specifications?: Json | null
           subcategory?: string | null
           updated_at?: string
         }

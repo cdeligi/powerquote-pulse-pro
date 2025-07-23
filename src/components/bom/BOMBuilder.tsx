@@ -80,7 +80,7 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
     setQuoteFields(prev => ({ ...prev, [fieldId]: value }));
   };
 
-  // Load Level 1 products for dynamic tabs
+  // Load Level 1 products for dynamic tabs - use real Supabase data
   const [level1Products, setLevel1Products] = useState<Level1Product[]>([]);
   const [level1Loading, setLevel1Loading] = useState(true);
 
@@ -91,9 +91,7 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
         setLevel1Products(products.filter(p => p.enabled));
       } catch (error) {
         console.error('Error loading Level 1 products:', error);
-        // Fallback to sync method
-        const syncProducts = productDataService.getLevel1ProductsSync();
-        setLevel1Products(syncProducts.filter(p => p.enabled));
+        setLevel1Products([]);
       } finally {
         setLevel1Loading(false);
       }
@@ -500,20 +498,20 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
             notification_type: 'quote_pending_approval',
             sent_to: adminIds,
             message_content: {
-              customer_name: quoteFields.customerName,
-              submitted_by: user!.name,
-              quote_value: discountedValue,
-              discount_percentage: discountPercentage,
-            },
+              title: 'New Quote Pending Approval',
+              message: `Quote ${quoteId} from ${user!.name} is pending approval`,
+              quote_value: originalQuoteValue,
+              requested_discount: discountPercentage
+            }
           });
         }
       } catch (notificationError) {
-        console.error('Failed to send admin notifications:', notificationError);
+        console.warn('Failed to send admin notifications:', notificationError);
       }
 
       toast({
         title: 'Quote Submitted Successfully',
-        description: `Quote ${quoteId} has been submitted for approval.`,
+        description: `Your quote ${quoteId} has been submitted for approval.`,
       });
 
       handleSubmitQuote(quoteId);
@@ -529,256 +527,241 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
     }
   };
 
-  // Render product content based on selected tab
-  const renderProductContent = (productId: string) => {
-    if (productId === 'additional-config') {
-      return (
-        <AdditionalConfigTab
-          onCardSelect={handleCardSelect}
-          canSeePrices={canSeePrices}
-        />
-      );
-    }
+  // Determine if the current product supports rack configuration
+  const currentProductSupportsRack = selectedLevel1Product && (selectedLevel1Product as any).rackConfigurable === true;
 
+  const renderProductContent = (productId: string) => {
     const product = level1Products.find(p => p.id === productId);
     if (!product) return null;
 
-    switch (productId) {
-      case 'qtms':
-        return (
-          <div className="space-y-6">
-            <ChassisSelector
-              onChassisSelect={handleChassisSelect}
-              selectedChassis={selectedChassis}
-              canSeePrices={canSeePrices}
-            />
-            
-            {selectedChassis && (
-              <div className="space-y-6">
-                <RackVisualizer
-                  chassis={selectedChassis as any}
-                  slotAssignments={slotAssignments as any}
-                  onSlotClick={handleSlotClick}
-                  onSlotClear={handleSlotClear}
-                  selectedSlot={selectedSlot}
-                  hasRemoteDisplay={hasRemoteDisplay}
-                  onRemoteDisplayToggle={handleRemoteDisplayToggle}
-                />
-                
-                {Object.keys(slotAssignments).length > 0 && (
-                  <Card className="bg-gray-900 border-gray-800">
-                    <CardContent className="pt-6">
-                      <button
-                        onClick={handleAddChassisAndCardsToBOM}
-                        className="w-full bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded font-medium"
-                      >
-                        Add Chassis & Cards to BOM
-                      </button>
-                    </CardContent>
-                  </Card>
-                )}
-              </div>
-            )}
-            
-            {selectedSlot !== null && selectedChassis && (
-              <SlotCardSelector
-                chassis={selectedChassis as any}
-                slot={selectedSlot}
-                onCardSelect={handleCardSelect}
-                onClose={() => setSelectedSlot(null)}
-                canSeePrices={canSeePrices}
-                currentSlotAssignments={slotAssignments}
-              />
-            )}
-          </div>
-        );
-      
-      case 'dga':
-        return (
-          <DGAProductSelector
-            onProductSelect={handleDGAProductSelect}
-            canSeePrices={canSeePrices}
-          />
-        );
-      
-      case 'partial-discharge':
-        return (
-          <PDProductSelector
-            onProductSelect={handleDGAProductSelect}
-            canSeePrices={canSeePrices}
-          />
-        );
-      
-      default:
-        return (
-          <div className="space-y-6">
-            {selectedLevel1Product && (
+    // Check if this product has rack configuration enabled
+    const hasRackConfig = (product as any).rackConfigurable === true;
+
+    if (hasRackConfig) {
+      return (
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div>
               <Level2OptionsSelector
-                level1Product={selectedLevel1Product}
+                level1ProductId={productId}
                 selectedOptions={selectedLevel2Options}
                 onOptionToggle={handleLevel2OptionToggle}
+                canSeePrices={canSeePrices}
               />
-            )}
+            </div>
+            
+            <div>
+              <ChassisSelector
+                onChassisSelect={handleChassisSelect}
+                selectedChassis={selectedChassis}
+                canSeePrices={canSeePrices}
+              />
+            </div>
           </div>
-        );
+
+          {selectedChassis && (
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold">Configure Chassis</h3>
+              <RackVisualizer
+                chassis={selectedChassis}
+                slotAssignments={slotAssignments}
+                selectedSlot={selectedSlot}
+                onSlotClick={handleSlotClick}
+                onSlotClear={handleSlotClear}
+                hasRemoteDisplay={hasRemoteDisplay}
+                onRemoteDisplayToggle={handleRemoteDisplayToggle}
+              />
+              
+              <SlotCardSelector
+                selectedChassis={selectedChassis}
+                selectedSlot={selectedSlot}
+                onCardSelect={handleCardSelect}
+                canSeePrices={canSeePrices}
+              />
+              
+              {selectedChassis && Object.keys(slotAssignments).length > 0 && (
+                <Button 
+                  onClick={handleAddChassisAndCardsToBOM}
+                  className="w-full"
+                >
+                  Add Configuration to BOM
+                </Button>
+              )}
+            </div>
+          )}
+        </div>
+      );
+    } else {
+      // Non-rack configurable products show standard options
+      switch (productId) {
+        case 'dga':
+          return (
+            <DGAProductSelector
+              onProductSelect={handleDGAProductSelect}
+              canSeePrices={canSeePrices}
+            />
+          );
+        case 'partial-discharge':
+          return (
+            <PDProductSelector
+              onProductSelect={handleDGAProductSelect}
+              canSeePrices={canSeePrices}
+            />
+          );
+        default:
+          return (
+            <div className="space-y-4">
+              <Level2OptionsSelector
+                level1ProductId={productId}
+                selectedOptions={selectedLevel2Options}
+                onOptionToggle={handleLevel2OptionToggle}
+                canSeePrices={canSeePrices}
+              />
+            </div>
+          );
+      }
     }
   };
 
-  // CONDITIONAL RENDERING IN JSX - NO EARLY RETURNS
+  // Show loading state while data is being fetched
+  if (level1Loading) {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <p>Loading product catalog...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Check authentication
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-white">Loading...</div>
+      <div className="flex items-center justify-center p-8">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <p>Checking authentication...</p>
+        </div>
       </div>
     );
   }
 
   if (!user) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-white text-center">
-          <p className="mb-4">Please log in to use the BOM Builder</p>
-          <p className="text-gray-400">Authentication is required to submit quotes</p>
-        </div>
-      </div>
+      <Card>
+        <CardContent className="p-6">
+          <div className="text-center">
+            <h3 className="text-lg font-medium text-gray-900 mb-2">Authentication Required</h3>
+            <p className="text-gray-600">Please log in to access the BOM Builder.</p>
+          </div>
+        </CardContent>
+      </Card>
     );
-  }
-
-  if (level1Loading) {
-    return <div className="text-white">Loading products...</div>;
   }
 
   return (
     <div className="space-y-6">
-      {/* Quote Fields Section - Always at the top */}
+      {/* Quote Fields Section */}
       <QuoteFieldsSection
         quoteFields={quoteFields}
         onFieldChange={handleQuoteFieldChange}
+        validation={validation}
       />
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full">
-        {/* Left side - Product selection (2/3 width) */}
-        <div className="lg:col-span-2 space-y-6">
-          <Card className="bg-gray-900 border-gray-800">
-            <CardHeader>
-              <CardTitle className="text-white">BOM Builder</CardTitle>
-              <CardDescription className="text-gray-400">
-                Build your Bill of Materials by selecting products and configurations
-                <br />
-                <span className="text-green-400">Logged in as: {user.name} ({user.email})</span>
-              </CardDescription>
-            </CardHeader>
-          </Card>
-
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full bg-gray-800" style={{ gridTemplateColumns: `repeat(${level1Products.length + 1}, 1fr)` }}>
-              {level1Products.map((product) => (
-                <TabsTrigger 
-                  key={product.id}
-                  value={product.id} 
-                  className="text-white data-[state=active]:bg-red-600 data-[state=active]:text-white"
-                >
+      {/* Product Selection */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Product Selection</CardTitle>
+          <CardDescription>
+            Select products to add to your Bill of Materials
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Tabs value={activeTab} onValueChange={setActiveTab}>
+            <TabsList className="grid w-full grid-cols-4">
+              {level1Products.map(product => (
+                <TabsTrigger key={product.id} value={product.id}>
                   {product.name}
-                  {product.category && (
-                    <Badge variant="outline" className="ml-2 text-xs">
-                      {product.category}
-                    </Badge>
+                  {(product as any).rackConfigurable && (
+                    <Badge variant="secondary" className="ml-2 text-xs">Rack</Badge>
                   )}
                 </TabsTrigger>
               ))}
-              <TabsTrigger 
-                value="additional-config" 
-                className="text-white data-[state=active]:bg-red-600 data-[state=active]:text-white"
-              >
-                Additional Config
-                <Badge variant="outline" className="ml-2 text-xs">
-                  Cards
-                </Badge>
-              </TabsTrigger>
+              <TabsTrigger value="additional-config">Additional</TabsTrigger>
             </TabsList>
-            
-            {level1Products.map((product) => (
-              <TabsContent key={product.id} value={product.id} className="mt-6">
+
+            {level1Products.map(product => (
+              <TabsContent key={product.id} value={product.id}>
                 {renderProductContent(product.id)}
               </TabsContent>
             ))}
-            
-            <TabsContent value="additional-config" className="mt-6">
-              {renderProductContent('additional-config')}
+
+            <TabsContent value="additional-config">
+              <AdditionalConfigTab
+                onProductSelect={handleDGAProductSelect}
+                canSeePrices={canSeePrices}
+              />
             </TabsContent>
           </Tabs>
-        </div>
+        </CardContent>
+      </Card>
 
-        {/* Right side - BOM Display and Discount (1/3 width) */}
-        <div className="lg:col-span-1 space-y-6">
-          <BOMDisplay
-            bomItems={bomItems}
-            onUpdateBOM={handleBOMUpdate}
-            onEditConfiguration={handleBOMConfigurationEdit}
-            canSeePrices={canSeePrices}
-          />
-          
-          {/* Discount Section with Submit Quote Button */}
-          <DiscountSection
-            bomItems={bomItems}
-            onDiscountChange={handleDiscountChange}
-            canSeePrices={canSeePrices}
-            initialDiscount={discountPercentage}
-            initialJustification={discountJustification}
-          />
+      {/* BOM Display */}
+      <BOMDisplay
+        items={bomItems}
+        onUpdate={handleBOMUpdate}
+        onItemEdit={handleBOMConfigurationEdit}
+        canSeePrices={canSeePrices}
+      />
 
-          {/* Submit Quote Button - Moved here to bottom of discount section */}
-          {bomItems.length > 0 && (
-            <Card className="bg-gray-900 border-gray-800">
-              <CardContent className="pt-6">
-                <Button
-                  onClick={submitQuoteRequest}
-                  className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3"
-                  size="lg"
-                  disabled={isSubmitting}
-                  data-cy="submit-quote"
-                >
-                  {isSubmitting ? 'Submitting...' : `Submit Quote Request (${bomItems.length} items)`}
-                </Button>
-                {!validation.isValid && (
-                  <div className="mt-2 text-sm text-red-400">
-                    Missing required fields: {validation.missingFields.join(', ')}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          )}
-        </div>
+      {/* Discount Section */}
+      <DiscountSection
+        discountPercentage={discountPercentage}
+        discountJustification={discountJustification}
+        onDiscountChange={handleDiscountChange}
+        totalValue={bomItems.reduce((sum, item) => sum + item.product.price * item.quantity, 0)}
+        canApplyDiscount={true}
+      />
+
+      {/* Submit Button */}
+      <div className="flex justify-end">
+        <Button
+          onClick={submitQuoteRequest}
+          disabled={isSubmitting || bomItems.length === 0}
+          size="lg"
+        >
+          {isSubmitting ? 'Submitting...' : 'Submit Quote Request'}
+        </Button>
       </div>
 
-      {/* Card Configuration Dialogs */}
+      {/* Configuration Dialogs */}
       {configuringCard && configuringCard.product.name.toLowerCase().includes('analog') && (
         <AnalogCardConfigurator
-          bomItem={configuringCard}
-          onSave={handleCardConfiguration}
+          isOpen={true}
           onClose={() => setConfiguringCard(null)}
+          onSave={handleCardConfiguration}
+          card={configuringCard.product as Level3Product}
         />
       )}
 
       {configuringCard && configuringCard.product.name.toLowerCase().includes('bushing') && (
         <BushingCardConfigurator
-          bomItem={configuringCard}
-          onSave={handleCardConfiguration}
+          isOpen={true}
           onClose={() => setConfiguringCard(null)}
+          onSave={handleCardConfiguration}
+          card={configuringCard.product as Level3Product}
         />
       )}
 
-      {/* QTMS Configuration Editor */}
       {editingQTMS && (
         <QTMSConfigurationEditor
-          consolidatedQTMS={editingQTMS}
-          onSave={handleQTMSConfigurationSave}
+          isOpen={true}
           onClose={() => setEditingQTMS(null)}
-          canSeePrices={canSeePrices}
+          qtmsConfiguration={editingQTMS}
+          onSave={handleQTMSConfigurationSave}
         />
       )}
-
-      {/* End of dialogs */}
     </div>
   );
 };
