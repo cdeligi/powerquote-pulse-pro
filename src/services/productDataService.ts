@@ -27,7 +27,7 @@ class ProductDataService {
     return {
       id: row.id,
       name: row.name,
-      type: row.subcategory || 'QTMS',
+      type: row.asset_type_id || row.subcategory || 'power-transformer',
       category: row.category,
       description: row.description || '',
       price: parseFloat(row.price) || 0,
@@ -36,7 +36,8 @@ class ProductDataService {
       partNumber: row.part_number,
       image: row.image_url,
       productInfoUrl: row.product_info_url,
-      hasQuantitySelection: false // Can be enhanced later
+      hasQuantitySelection: false,
+      rackConfigurable: row.rack_configurable || false
     };
   }
 

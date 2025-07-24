@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,8 +7,9 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { Edit3, Trash2, Save, X } from "lucide-react";
-import { Level1Product } from "@/types/product";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Edit3, Trash2, Save, X, Filter } from "lucide-react";
+import { Level1Product, AssetType } from "@/types/product";
 import { productDataService } from "@/services/productDataService";
 import { useToast } from "@/hooks/use-toast";
 
@@ -24,6 +25,20 @@ export const Level1ProductList: React.FC<Level1ProductListProps> = ({
   const { toast } = useToast();
   const [editingProduct, setEditingProduct] = useState<string | null>(null);
   const [editFormData, setEditFormData] = useState<Partial<Level1Product>>({});
+  const [assetTypeFilter, setAssetTypeFilter] = useState<string>('all');
+  const [assetTypes, setAssetTypes] = useState<AssetType[]>([]);
+
+  useEffect(() => {
+    const loadAssetTypes = async () => {
+      try {
+        const types = await productDataService.getAssetTypes();
+        setAssetTypes(types.filter(type => type.enabled));
+      } catch (error) {
+        console.error('Error loading asset types:', error);
+      }
+    };
+    loadAssetTypes();
+  }, []);
 
   const handleEditStart = (product: Level1Product) => {
     setEditingProduct(product.id);
@@ -82,6 +97,11 @@ export const Level1ProductList: React.FC<Level1ProductListProps> = ({
     }
   };
 
+  // Filter products by asset type
+  const filteredProducts = assetTypeFilter === 'all' 
+    ? products 
+    : products.filter(product => product.type === assetTypeFilter);
+
   if (products.length === 0) {
     return (
       <Card className="bg-white border-gray-200">
@@ -97,11 +117,31 @@ export const Level1ProductList: React.FC<Level1ProductListProps> = ({
   return (
     <Card className="bg-white border-gray-200">
       <CardHeader>
-        <CardTitle className="text-gray-900">Level 1 Products ({products.length})</CardTitle>
+        <div className="flex justify-between items-center">
+          <CardTitle className="text-gray-900">
+            Level 1 Products ({filteredProducts.length} of {products.length})
+          </CardTitle>
+          <div className="flex items-center gap-2">
+            <Filter className="h-4 w-4 text-gray-500" />
+            <Select value={assetTypeFilter} onValueChange={setAssetTypeFilter}>
+              <SelectTrigger className="w-48 bg-white border-gray-300 text-gray-900">
+                <SelectValue placeholder="Filter by Asset Type" />
+              </SelectTrigger>
+              <SelectContent className="bg-white border-gray-300">
+                <SelectItem value="all" className="text-gray-900">All Asset Types</SelectItem>
+                {assetTypes.map((type) => (
+                  <SelectItem key={type.id} value={type.id} className="text-gray-900">
+                    {type.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
-          {products.map((product) => (
+          {filteredProducts.map((product) => (
             <div key={product.id} className="p-4 border border-gray-200 rounded-lg bg-gray-50">
               {editingProduct === product.id ? (
                 <div className="space-y-4">

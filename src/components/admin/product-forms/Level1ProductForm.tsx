@@ -17,7 +17,7 @@ interface Level1ProductFormProps {
 const Level1ProductForm = ({ onSubmit, initialData }: Level1ProductFormProps) => {
   const [formData, setFormData] = useState({
     name: initialData?.name || '',
-    type: initialData?.type || '',
+    assetType: initialData?.type || 'power-transformer',
     category: initialData?.category || '',
     description: initialData?.description || '',
     price: initialData?.price || 0,
@@ -25,7 +25,8 @@ const Level1ProductForm = ({ onSubmit, initialData }: Level1ProductFormProps) =>
     productInfoUrl: initialData?.productInfoUrl || '',
     enabled: initialData?.enabled ?? true,
     partNumber: initialData?.partNumber || '',
-    image: initialData?.image || ''
+    image: initialData?.image || '',
+    rackConfigurable: false
   });
 
   const [assetTypes, setAssetTypes] = useState<AssetType[]>([]);
@@ -51,39 +52,46 @@ const Level1ProductForm = ({ onSubmit, initialData }: Level1ProductFormProps) =>
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSubmit(formData);
+    // Transform assetType to type for backwards compatibility
+    const productData = {
+      ...formData,
+      type: formData.assetType
+    };
+    delete (productData as any).assetType;
+    delete (productData as any).rackConfigurable;
+    onSubmit(productData);
   };
 
   if (loading) {
-    return <div className="text-white">Loading asset types...</div>;
+    return <div className="text-foreground">Loading asset types...</div>;
   }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <Label htmlFor="name" className="text-white">Product Name</Label>
+          <Label htmlFor="name" className="text-foreground">Product Name</Label>
           <Input
             id="name"
             value={formData.name}
             onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-            className="bg-gray-800 border-gray-700 text-white"
+            className="bg-background border-border text-foreground"
             required
             placeholder="e.g., QTMS, DGA, Partial Discharge"
           />
         </div>
         <div>
-          <Label htmlFor="type" className="text-white">Asset Type (Level 0)</Label>
+          <Label htmlFor="assetType" className="text-foreground">Asset Type</Label>
           <Select 
-            value={formData.type} 
-            onValueChange={(value) => setFormData({ ...formData, type: value })}
+            value={formData.assetType} 
+            onValueChange={(value) => setFormData({ ...formData, assetType: value })}
           >
-            <SelectTrigger className="bg-gray-800 border-gray-700 text-white">
+            <SelectTrigger className="bg-background border-border text-foreground">
               <SelectValue placeholder="Select asset type" />
             </SelectTrigger>
-            <SelectContent className="bg-gray-800 border-gray-700">
+            <SelectContent className="bg-background border-border">
               {assetTypes.map((type) => (
-                <SelectItem key={type.id} value={type.name} className="text-white">
+                <SelectItem key={type.id} value={type.id} className="text-foreground">
                   {type.name}
                 </SelectItem>
               ))}
@@ -93,82 +101,91 @@ const Level1ProductForm = ({ onSubmit, initialData }: Level1ProductFormProps) =>
       </div>
 
       <div>
-        <Label htmlFor="category" className="text-white">Category (Optional)</Label>
+        <Label htmlFor="category" className="text-foreground">Category (Optional)</Label>
         <Input
           id="category"
           value={formData.category}
           onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-          className="bg-gray-800 border-gray-700 text-white"
+          className="bg-background border-border text-foreground"
           placeholder="e.g., Monitoring Systems, DGA Monitors"
         />
       </div>
 
       <div>
-        <Label htmlFor="description" className="text-white">Description</Label>
+        <Label htmlFor="description" className="text-foreground">Description</Label>
         <Textarea
           id="description"
           value={formData.description}
           onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-          className="bg-gray-800 border-gray-700 text-white"
+          className="bg-background border-border text-foreground"
           required
         />
       </div>
 
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <Label htmlFor="price" className="text-white">Base Price ($)</Label>
+          <Label htmlFor="price" className="text-foreground">Base Price ($)</Label>
           <Input
             id="price"
             type="number"
             value={formData.price}
             onChange={(e) => setFormData({ ...formData, price: parseFloat(e.target.value) })}
-            className="bg-gray-800 border-gray-700 text-white"
+            className="bg-background border-border text-foreground"
             required
           />
         </div>
         <div>
-          <Label htmlFor="cost" className="text-white">Base Cost ($)</Label>
+          <Label htmlFor="cost" className="text-foreground">Base Cost ($)</Label>
           <Input
             id="cost"
             type="number"
             value={formData.cost}
             onChange={(e) => setFormData({ ...formData, cost: parseFloat(e.target.value) })}
-            className="bg-gray-800 border-gray-700 text-white"
+            className="bg-background border-border text-foreground"
           />
         </div>
       </div>
 
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <Label htmlFor="partNumber" className="text-white">Part Number</Label>
+          <Label htmlFor="partNumber" className="text-foreground">Part Number</Label>
           <Input
             id="partNumber"
             value={formData.partNumber}
             onChange={(e) => setFormData({ ...formData, partNumber: e.target.value })}
-            className="bg-gray-800 border-gray-700 text-white"
+            className="bg-background border-border text-foreground"
           />
         </div>
         <div>
-          <Label htmlFor="productInfoUrl" className="text-white">Product Info URL</Label>
+          <Label htmlFor="productInfoUrl" className="text-foreground">Product Info URL</Label>
           <Input
             id="productInfoUrl"
             type="url"
             value={formData.productInfoUrl}
             onChange={(e) => setFormData({ ...formData, productInfoUrl: e.target.value })}
-            className="bg-gray-800 border-gray-700 text-white"
+            className="bg-background border-border text-foreground"
           />
         </div>
       </div>
 
       <div>
-        <Label htmlFor="image" className="text-white">Image URL</Label>
+        <Label htmlFor="image" className="text-foreground">Image URL</Label>
         <Input
           id="image"
           type="url"
           value={formData.image}
           onChange={(e) => setFormData({ ...formData, image: e.target.value })}
-          className="bg-gray-800 border-gray-700 text-white"
+          className="bg-background border-border text-foreground"
         />
+      </div>
+
+      <div className="flex items-center space-x-2">
+        <Switch
+          id="rackConfigurable"
+          checked={formData.rackConfigurable}
+          onCheckedChange={(rackConfigurable) => setFormData({ ...formData, rackConfigurable })}
+        />
+        <Label htmlFor="rackConfigurable" className="text-foreground">Rack Configurable</Label>
       </div>
 
       <div className="flex items-center space-x-2">
@@ -177,11 +194,11 @@ const Level1ProductForm = ({ onSubmit, initialData }: Level1ProductFormProps) =>
           checked={formData.enabled}
           onCheckedChange={(enabled) => setFormData({ ...formData, enabled })}
         />
-        <Label htmlFor="enabled" className="text-white">Enabled</Label>
+        <Label htmlFor="enabled" className="text-foreground">Enabled</Label>
       </div>
 
       <div className="flex justify-end space-x-3 pt-4">
-        <Button type="submit" className="bg-red-600 hover:bg-red-700">
+        <Button type="submit" className="bg-primary hover:bg-primary/90">
           {initialData ? 'Update' : 'Create'} Product
         </Button>
       </div>

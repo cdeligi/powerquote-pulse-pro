@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Edit3, Trash2, Save, X } from "lucide-react";
+import { Edit3, Trash2, Save, X, Filter } from "lucide-react";
 import { Level1Product, Level2Product } from "@/types/product";
 import { productDataService } from "@/services/productDataService";
 import { useToast } from "@/hooks/use-toast";
@@ -27,6 +27,7 @@ export const Level2ProductList: React.FC<Level2ProductListProps> = ({
   const { toast } = useToast();
   const [editingProduct, setEditingProduct] = useState<string | null>(null);
   const [editFormData, setEditFormData] = useState<Partial<Level2Product>>({});
+  const [parentFilter, setParentFilter] = useState<string>('all');
 
   const handleEditStart = (product: Level2Product) => {
     setEditingProduct(product.id);
@@ -91,6 +92,11 @@ export const Level2ProductList: React.FC<Level2ProductListProps> = ({
     return parent ? parent.name : 'Unknown Parent';
   };
 
+  // Filter products by parent Level 1 product
+  const filteredProducts = parentFilter === 'all' 
+    ? products 
+    : products.filter(product => product.parentProductId === parentFilter);
+
   if (products.length === 0) {
     return (
       <Card className="bg-white border-gray-200">
@@ -106,11 +112,31 @@ export const Level2ProductList: React.FC<Level2ProductListProps> = ({
   return (
     <Card className="bg-white border-gray-200">
       <CardHeader>
-        <CardTitle className="text-gray-900">Level 2 Products ({products.length})</CardTitle>
+        <div className="flex justify-between items-center">
+          <CardTitle className="text-gray-900">
+            Level 2 Products ({filteredProducts.length} of {products.length})
+          </CardTitle>
+          <div className="flex items-center gap-2">
+            <Filter className="h-4 w-4 text-gray-500" />
+            <Select value={parentFilter} onValueChange={setParentFilter}>
+              <SelectTrigger className="w-48 bg-white border-gray-300 text-gray-900">
+                <SelectValue placeholder="Filter by Parent Product" />
+              </SelectTrigger>
+              <SelectContent className="bg-white border-gray-300">
+                <SelectItem value="all" className="text-gray-900">All Parent Products</SelectItem>
+                {level1Products.map((product) => (
+                  <SelectItem key={product.id} value={product.id} className="text-gray-900">
+                    {product.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
-          {products.map((product) => (
+          {filteredProducts.map((product) => (
             <div key={product.id} className="p-4 border border-gray-200 rounded-lg bg-gray-50">
               {editingProduct === product.id ? (
                 <div className="space-y-4">

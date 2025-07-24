@@ -535,7 +535,7 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
     if (!product) return null;
 
     // Check if this product has rack configuration enabled
-    const hasRackConfig = (product as any).rackConfigurable === true;
+    const hasRackConfig = product.rackConfigurable === true;
 
     if (hasRackConfig) {
       return (
@@ -687,7 +687,7 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
               {level1Products.map(product => (
                 <TabsTrigger key={product.id} value={product.id}>
                   {product.name}
-                  {(product as any).rackConfigurable && (
+                  {product.rackConfigurable && (
                     <Badge variant="secondary" className="ml-2 text-xs">Rack</Badge>
                   )}
                 </TabsTrigger>

@@ -25,6 +25,7 @@ export interface Level1Product {
   partNumber?: string;
   customizations?: string[]; // For DGA products
   hasQuantitySelection?: boolean; // For PD couplers
+  rackConfigurable?: boolean; // Whether this product supports rack configuration
 }
 
 // Level 2: Product Variants/Chassis (LTX, MTX, STX for QTMS)
