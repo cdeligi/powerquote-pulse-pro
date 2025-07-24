@@ -83,24 +83,6 @@ export const ProductManagement = () => {
     }
   };
 
-  const handleResetData = async () => {
-    try {
-      setIsLoading(true);
-      await productDataService.resetAndReload();
-      setRefreshTrigger(prev => prev + 1);
-      toast({
-        title: "Success",
-        description: "Product data has been reset and reloaded"
-      });
-    } catch (error) {
-      console.error('Error resetting data:', error);
-      toast({
-        title: "Error",
-        description: "Failed to reset product data",
-        variant: "destructive"
-      });
-    }
-  };
 
   const refreshProductData = async () => {
     console.log('ProductManagement: Manual refresh triggered');
@@ -183,10 +165,6 @@ export const ProductManagement = () => {
             <h2 className="text-3xl font-bold tracking-tight">Product Management</h2>
             <p className="text-muted-foreground">Loading product data...</p>
           </div>
-          <Button onClick={handleResetData} variant="outline">
-            <RefreshCw className="h-4 w-4 mr-2" />
-            Reset Data
-          </Button>
         </div>
         <div className="flex items-center justify-center py-12">
           <div className="text-center">
@@ -210,10 +188,6 @@ export const ProductManagement = () => {
             </p>
           </div>
           <div className="flex gap-2">
-            <Button onClick={handleResetData} variant="outline">
-              <RefreshCw className="h-4 w-4 mr-2" />
-              Reset Data
-            </Button>
             <Button onClick={refreshProductData} variant="default">
               <RefreshCw className="h-4 w-4 mr-2" />
               Retry
@@ -232,9 +206,6 @@ export const ProductManagement = () => {
                 <Button onClick={refreshProductData} variant="default">
                   <RefreshCw className="h-4 w-4 mr-2" />
                   Retry Loading
-                </Button>
-                <Button onClick={handleResetData} variant="outline">
-                  Reset to Defaults
                 </Button>
               </div>
             </div>
@@ -267,10 +238,6 @@ export const ProductManagement = () => {
             </Button>
           </div>
         </div>
-        <Button onClick={handleResetData} variant="outline">
-          <RefreshCw className="h-4 w-4 mr-2" />
-          Reset Data
-        </Button>
       </div>
 
       <Tabs defaultValue="level1" className="space-y-4">
@@ -371,78 +338,41 @@ export const ProductManagement = () => {
               onProductUpdate={refreshProductData}
             />
             
-            {/* Collapsible forms for creating new products */}
-            <div className="grid gap-4">
-              <Collapsible open={showLevel3CardForm} onOpenChange={setShowLevel3CardForm}>
-                <CollapsibleTrigger asChild>
-                  <Button 
-                    variant="outline" 
-                    className="w-full"
-                    disabled={level2Products.length === 0}
-                  >
-                    <Plus className="h-4 w-4 mr-2" />
-                    {showLevel3CardForm ? 'Hide' : 'Add'} New Card/Component
-                  </Button>
-                </CollapsibleTrigger>
-                <CollapsibleContent className="mt-4">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Create New Card/Component</CardTitle>
-                      <CardDescription>
-                        Cards and components that go into Level 2 products (chassis).
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      {level2Products.length > 0 ? (
-                        <CardForm 
-                          onSubmit={handleLevel3Save}
-                          level2Products={level2Products}
-                        />
-                      ) : (
-                        <div className="text-center py-4 text-gray-500">
-                          <p>No Level 2 products available for card assignment.</p>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                </CollapsibleContent>
-              </Collapsible>
-
-              <Collapsible open={showLevel3OptionForm} onOpenChange={setShowLevel3OptionForm}>
-                <CollapsibleTrigger asChild>
-                  <Button 
-                    variant="outline" 
-                    className="w-full"
-                    disabled={level1Products.length === 0}
-                  >
-                    <Plus className="h-4 w-4 mr-2" />
-                    {showLevel3OptionForm ? 'Hide' : 'Add'} New Product Option
-                  </Button>
-                </CollapsibleTrigger>
-                <CollapsibleContent className="mt-4">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Create New Product Option</CardTitle>
-                      <CardDescription>
-                        Options and accessories for Level 1 products.
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      {level1Products.length > 0 ? (
-                        <Level2OptionForm 
-                          onSubmit={handleLevel3Save}
-                          level1Products={level1Products}
-                        />
-                      ) : (
-                        <div className="text-center py-4 text-gray-500">
-                          <p>No Level 1 products available for option assignment.</p>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                </CollapsibleContent>
-              </Collapsible>
-            </div>
+            {/* Collapsible form for creating new cards/components only */}
+            <Collapsible open={showLevel3CardForm} onOpenChange={setShowLevel3CardForm}>
+              <CollapsibleTrigger asChild>
+                <Button 
+                  variant="outline" 
+                  className="w-full"
+                  disabled={level2Products.length === 0}
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  {showLevel3CardForm ? 'Hide' : 'Add'} New Card/Component
+                </Button>
+              </CollapsibleTrigger>
+              <CollapsibleContent className="mt-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Create New Card/Component</CardTitle>
+                    <CardDescription>
+                      Cards and components that go into Level 2 products (chassis).
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {level2Products.length > 0 ? (
+                      <CardForm 
+                        onSubmit={handleLevel3Save}
+                        level2Products={level2Products}
+                      />
+                    ) : (
+                      <div className="text-center py-4 text-gray-500">
+                        <p>No Level 2 products available for card assignment.</p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </CollapsibleContent>
+            </Collapsible>
           </div>
         </TabsContent>
 
