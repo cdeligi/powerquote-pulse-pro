@@ -45,6 +45,7 @@ export const Level1ProductList: React.FC<Level1ProductListProps> = ({
     setEditFormData({
       name: product.name,
       type: product.type,
+      asset_type_id: product.asset_type_id,
       description: product.description,
       price: product.price,
       cost: product.cost || 0,
@@ -100,7 +101,7 @@ export const Level1ProductList: React.FC<Level1ProductListProps> = ({
   // Filter products by asset type
   const filteredProducts = assetTypeFilter === 'all' 
     ? products 
-    : products.filter(product => product.type === assetTypeFilter);
+    : products.filter(product => product.asset_type_id === assetTypeFilter);
 
   if (products.length === 0) {
     return (
@@ -154,6 +155,21 @@ export const Level1ProductList: React.FC<Level1ProductListProps> = ({
                         onChange={(e) => setEditFormData(prev => ({ ...prev, name: e.target.value }))}
                         className="bg-white border-gray-300 text-gray-900"
                       />
+                    </div>
+                    <div>
+                      <Label htmlFor={`asset_type_id-${product.id}`} className="text-gray-700">Asset Type</Label>
+                      <Select value={editFormData.asset_type_id || ''} onValueChange={(value) => setEditFormData(prev => ({ ...prev, asset_type_id: value }))}>
+                        <SelectTrigger className="bg-white border-gray-300 text-gray-900">
+                          <SelectValue placeholder="Select asset type" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-white border-gray-300">
+                          {assetTypes.map((type) => (
+                            <SelectItem key={type.id} value={type.id} className="text-gray-900">
+                              {type.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                     <div>
                       <Label htmlFor={`type-${product.id}`} className="text-gray-700">Type</Label>
@@ -232,10 +248,10 @@ export const Level1ProductList: React.FC<Level1ProductListProps> = ({
                       {product.description && (
                         <p className="text-gray-600 text-sm mt-1">{product.description}</p>
                       )}
-                      <div className="flex items-center space-x-2 mt-2">
-                        <Badge variant="secondary" className="bg-blue-100 text-blue-800 border-blue-200">
-                          {product.type}
-                        </Badge>
+                       <div className="flex items-center space-x-2 mt-2">
+                         <Badge variant="secondary" className="bg-blue-100 text-blue-800 border-blue-200">
+                           {assetTypes.find(type => type.id === product.asset_type_id)?.name || product.type}
+                         </Badge>
                         <Badge variant={product.enabled ? "default" : "secondary"} 
                                className={product.enabled ? "bg-green-100 text-green-800 border-green-200" : "bg-gray-100 text-gray-600 border-gray-200"}>
                           {product.enabled ? 'Enabled' : 'Disabled'}

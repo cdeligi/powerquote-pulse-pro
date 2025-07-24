@@ -28,6 +28,7 @@ class ProductDataService {
       id: row.id,
       name: row.name,
       type: row.asset_type_id || row.subcategory || 'power-transformer',
+      asset_type_id: row.asset_type_id,
       category: row.category,
       description: row.description || '',
       price: parseFloat(row.price) || 0,
@@ -206,16 +207,30 @@ class ProductDataService {
     return [];
   }
 
-  // Asset types (static for now)
+  // Asset types from Supabase
   async getAssetTypes(): Promise<AssetType[]> {
-    return [
-      { id: 'power-transformer', name: 'Power Transformer', enabled: true },
-      { id: 'gas-insulated-switchgear', name: 'Gas Insulated Switchgear', enabled: true },
-      { id: 'breaker', name: 'Breaker', enabled: true }
-    ];
+    try {
+      const { data, error } = await supabase
+        .from('asset_types')
+        .select('*')
+        .eq('enabled', true)
+        .order('name');
+
+      if (error) throw error;
+      return data || [];
+    } catch (error) {
+      console.error('Error fetching asset types:', error);
+      // Fallback to hardcoded values if database fails
+      return [
+        { id: 'power-transformer', name: 'Power Transformer', enabled: true },
+        { id: 'gas-insulated-switchgear', name: 'Gas Insulated Switchgear', enabled: true },
+        { id: 'breaker', name: 'Breaker', enabled: true }
+      ];
+    }
   }
 
   getAssetTypesSync(): AssetType[] {
+    console.warn('Sync asset types deprecated - use async getAssetTypes()');
     return [
       { id: 'power-transformer', name: 'Power Transformer', enabled: true },
       { id: 'gas-insulated-switchgear', name: 'Gas Insulated Switchgear', enabled: true },
@@ -275,6 +290,7 @@ class ProductDataService {
           cost: product.cost,
           category: product.category || 'monitoring-systems',
           subcategory: product.type,
+          asset_type_id: (product as any).asset_type_id,
           enabled: product.enabled,
           rack_configurable: (product as any).rackConfigurable || false,
           product_level: 1,
@@ -305,6 +321,7 @@ class ProductDataService {
           cost: updates.cost,
           category: updates.category,
           subcategory: updates.type,
+          asset_type_id: (updates as any).asset_type_id,
           enabled: updates.enabled,
           rack_configurable: (updates as any).rackConfigurable,
           part_number: updates.partNumber,

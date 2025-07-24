@@ -15,6 +15,7 @@ export interface Level1Product {
   id: string;
   name: string;
   type: string; // Made mandatory since code depends on it for branching
+  asset_type_id?: string; // Links to AssetType table
   category?: string; // Optional internal category for organization
   description: string;
   price: number;
