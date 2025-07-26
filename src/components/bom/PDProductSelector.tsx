@@ -21,9 +21,9 @@ const PDProductSelector = ({ onProductSelect, canSeePrices }: PDProductSelectorP
   const [standaloneLevel2Options, setStandaloneLevel2Options] = useState<Level2Product[]>([]);
   const [productConfigurations, setProductConfigurations] = useState<Record<string, Record<string, any>>>({});
 
-  // Use optimized queries with caching
+  // Use optimized queries with strict database-driven filtering
   const { data: pdProducts = [], isLoading: pdLoading, error: pdError } = usePDProducts();
-  const { data: level2Options = [], isLoading: l2Loading } = useLevel2ProductsByCategory('pd');
+  const { data: pdLevel2Products = [], isLoading: l2Loading } = useLevel2ProductsByCategory('pd');
 
   const loading = pdLoading || l2Loading;
 
@@ -306,7 +306,7 @@ const PDProductSelector = ({ onProductSelect, canSeePrices }: PDProductSelectorP
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              {level2Options.map((option) => {
+              {pdLevel2Products.map((option) => {
                 const isSelected = standaloneLevel2Options.some(opt => opt.id === option.id && opt.enabled);
                 const isSensorProduct = option.id === 'pd-sensor' || option.id === 'uhf-sensor';
                 const quantity = productConfigurations[option.id]?.quantity || '1';

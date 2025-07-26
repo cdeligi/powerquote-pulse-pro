@@ -75,6 +75,7 @@ export const useLevel2ProductsByCategory = (category: 'dga' | 'pd' | 'qtms') => 
     staleTime: 5 * 60 * 1000,
     gcTime: 30 * 60 * 1000,
     refetchOnWindowFocus: false,
+    enabled: Boolean(category), // Only run if category is provided
   });
 };
 
