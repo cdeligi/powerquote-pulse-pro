@@ -531,77 +531,84 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
     const product = level1Products.find(p => p.id === productId);
     if (!product) return null;
 
+    // QTMS tab - only show chassis selector
+    if (productId === 'QTMS') {
+      return (
+        <div className="space-y-6">
+          <ChassisSelector
+            onChassisSelect={handleChassisSelect}
+            selectedChassis={selectedChassis}
+            canSeePrices={canSeePrices}
+          />
+
+          {selectedChassis && selectedChassis.chassisType && selectedChassis.chassisType !== 'N/A' && (
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold">Configure {selectedChassis.chassisType} Chassis</h3>
+              <RackVisualizer
+                chassis={{
+                  ...selectedChassis,
+                  height: selectedChassis.specifications?.height || '',
+                  slots: selectedChassis.specifications?.slots || 0
+                } as any}
+                slotAssignments={slotAssignments}
+                selectedSlot={selectedSlot}
+                onSlotClick={handleSlotClick}
+                onSlotClear={handleSlotClear}
+                hasRemoteDisplay={hasRemoteDisplay}
+                onRemoteDisplayToggle={handleRemoteDisplayToggle}
+              />
+              
+              <SlotCardSelector
+                chassis={selectedChassis}
+                slot={selectedSlot}
+                onCardSelect={handleCardSelect}
+                onClose={() => setSelectedSlot(null)}
+                canSeePrices={canSeePrices}
+              />
+              
+              {selectedChassis && Object.keys(slotAssignments).length > 0 && (
+                <Button 
+                  onClick={handleAddChassisAndCardsToBOM}
+                  className="w-full"
+                >
+                  Add Configuration to BOM
+                </Button>
+              )}
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // DGA tab - only show DGA product selector
+    if (productId === 'DGA') {
+      return (
+        <DGAProductSelector
+          onProductSelect={handleDGAProductSelect}
+          canSeePrices={canSeePrices}
+        />
+      );
+    }
+
+    // PD tab - only show PD product selector
+    if (productId === 'PD') {
+      return (
+        <PDProductSelector
+          onProductSelect={handleDGAProductSelect}
+          canSeePrices={canSeePrices}
+        />
+      );
+    }
+
+    // Other products - show Level 2 options selector only
     return (
       <div className="space-y-6">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div>
-            <Level2OptionsSelector
-              level1Product={selectedLevel1Product}
-              selectedOptions={selectedLevel2Options}
-              onOptionToggle={handleLevel2OptionToggle}
-              canSeePrices={canSeePrices}
-            />
-          </div>
-          
-          <div>
-            <ChassisSelector
-              onChassisSelect={handleChassisSelect}
-              selectedChassis={selectedChassis}
-              canSeePrices={canSeePrices}
-            />
-          </div>
-        </div>
-
-        {selectedChassis && selectedChassis.chassisType && selectedChassis.chassisType !== 'N/A' && (
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold">Configure {selectedChassis.chassisType} Chassis</h3>
-            <RackVisualizer
-              chassis={{
-                ...selectedChassis,
-                height: selectedChassis.specifications?.height || '',
-                slots: selectedChassis.specifications?.slots || 0
-              } as any}
-              slotAssignments={slotAssignments}
-              selectedSlot={selectedSlot}
-              onSlotClick={handleSlotClick}
-              onSlotClear={handleSlotClear}
-              hasRemoteDisplay={hasRemoteDisplay}
-              onRemoteDisplayToggle={handleRemoteDisplayToggle}
-            />
-            
-            <SlotCardSelector
-              chassis={selectedChassis}
-              slot={selectedSlot}
-              onCardSelect={handleCardSelect}
-              onClose={() => setSelectedSlot(null)}
-              canSeePrices={canSeePrices}
-            />
-            
-            {selectedChassis && Object.keys(slotAssignments).length > 0 && (
-              <Button 
-                onClick={handleAddChassisAndCardsToBOM}
-                className="w-full"
-              >
-                Add Configuration to BOM
-              </Button>
-            )}
-          </div>
-        )}
-
-        {/* Special product handling */}
-        {productId === 'dga' && (
-          <DGAProductSelector
-            onProductSelect={handleDGAProductSelect}
-            canSeePrices={canSeePrices}
-          />
-        )}
-
-        {productId === 'partial-discharge' && (
-          <PDProductSelector
-            onProductSelect={handleDGAProductSelect}
-            canSeePrices={canSeePrices}
-          />
-        )}
+        <Level2OptionsSelector
+          level1Product={selectedLevel1Product}
+          selectedOptions={selectedLevel2Options}
+          onOptionToggle={handleLevel2OptionToggle}
+          canSeePrices={canSeePrices}
+        />
       </div>
     );
   };
