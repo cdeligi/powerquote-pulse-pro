@@ -559,9 +559,9 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
             </div>
           </div>
 
-          {selectedChassis && (
+          {selectedChassis && selectedChassis.chassisType && selectedChassis.chassisType !== 'N/A' && (
             <div className="space-y-4">
-              <h3 className="text-lg font-semibold">Configure Chassis</h3>
+              <h3 className="text-lg font-semibold">Configure {selectedChassis.chassisType} Chassis</h3>
               <RackVisualizer
                 chassis={{
                   ...selectedChassis,
