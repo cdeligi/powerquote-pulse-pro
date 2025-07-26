@@ -17,9 +17,6 @@ interface Level1ProductFormProps {
 const Level1ProductForm = ({ onSubmit, initialData }: Level1ProductFormProps) => {
   const [formData, setFormData] = useState({
     name: initialData?.name || '',
-    type: initialData?.type || '',
-    description: initialData?.description || '',
-    price: initialData?.price || 0,
     category: initialData?.category || '',
     productInfoUrl: initialData?.productInfoUrl || '',
     enabled: initialData?.enabled ?? true,
@@ -50,7 +47,13 @@ const Level1ProductForm = ({ onSubmit, initialData }: Level1ProductFormProps) =>
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSubmit(formData);
+    // Add required fields with default values for compatibility
+    onSubmit({
+      ...formData,
+      type: formData.name, // Use name as type
+      description: formData.category || '', // Use category as description fallback
+      price: 0 // Default price
+    });
   };
 
   if (loading) {
@@ -80,44 +83,6 @@ const Level1ProductForm = ({ onSubmit, initialData }: Level1ProductFormProps) =>
           className="bg-background border-border text-foreground"
           placeholder="e.g., Monitoring Systems, DGA Monitors"
         />
-      </div>
-
-      <div>
-        <Label htmlFor="description" className="text-foreground">Description</Label>
-        <Input
-          id="description"
-          value={formData.description}
-          onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-          className="bg-background border-border text-foreground"
-          placeholder="Brief description of the product"
-          required
-        />
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <Label htmlFor="type" className="text-foreground">Type</Label>
-          <Input
-            id="type"
-            value={formData.type}
-            onChange={(e) => setFormData({ ...formData, type: e.target.value })}
-            className="bg-background border-border text-foreground"
-            placeholder="Product type"
-            required
-          />
-        </div>
-        <div>
-          <Label htmlFor="price" className="text-foreground">Price ($)</Label>
-          <Input
-            id="price"
-            type="number"
-            step="0.01"
-            value={formData.price}
-            onChange={(e) => setFormData({ ...formData, price: parseFloat(e.target.value) || 0 })}
-            className="bg-background border-border text-foreground"
-            required
-          />
-        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-4">
