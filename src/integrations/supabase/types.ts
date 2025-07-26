@@ -1299,6 +1299,7 @@ export type Database = {
           product_info_url: string
           specifications: Json
           slot_requirement: number
+          chassis_type: string
         }[]
       }
       get_user_role: {
