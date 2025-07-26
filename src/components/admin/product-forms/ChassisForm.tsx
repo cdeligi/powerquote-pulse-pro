@@ -18,17 +18,16 @@ const ChassisForm = ({ onSubmit, level1Products, initialData }: ChassisFormProps
   const [formData, setFormData] = useState({
     name: initialData?.name || '',
     parentProductId: initialData?.parentProductId || '',
-    type: initialData?.type || 'Standard',
     chassisType: initialData?.chassisType || 'N/A',
     description: initialData?.description || '',
     price: initialData?.price || 0,
     cost: initialData?.cost || 0,
     enabled: initialData?.enabled ?? true,
     specifications: initialData?.specifications || {
-      height: '',
       slots: 0
     },
-    partNumber: initialData?.partNumber || ''
+    partNumber: initialData?.partNumber || '',
+    productInfoUrl: initialData?.productInfoUrl || ''
   });
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -71,22 +70,6 @@ const ChassisForm = ({ onSubmit, level1Products, initialData }: ChassisFormProps
 
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <Label htmlFor="type" className="text-foreground">Type</Label>
-          <Select
-            value={formData.type}
-            onValueChange={(value) => setFormData({ ...formData, type: value })}
-          >
-            <SelectTrigger className="bg-background border-border text-foreground">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent className="bg-background border-border">
-              <SelectItem value="CalGas" className="text-foreground">CalGas</SelectItem>
-              <SelectItem value="Moisture" className="text-foreground">Moisture</SelectItem>
-              <SelectItem value="Standard" className="text-foreground">Standard</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div>
           <Label htmlFor="chassisType" className="text-foreground">Chassis Type</Label>
           <Select
             value={formData.chassisType}
@@ -103,9 +86,6 @@ const ChassisForm = ({ onSubmit, level1Products, initialData }: ChassisFormProps
             </SelectContent>
           </Select>
         </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
         <div>
           <Label htmlFor="slots" className="text-foreground">Slots</Label>
           <Input
@@ -122,6 +102,9 @@ const ChassisForm = ({ onSubmit, level1Products, initialData }: ChassisFormProps
             className="bg-background border-border text-foreground"
           />
         </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
         <div>
           <Label htmlFor="partNumber" className="text-foreground">Part Number</Label>
           <Input
@@ -131,23 +114,16 @@ const ChassisForm = ({ onSubmit, level1Products, initialData }: ChassisFormProps
             className="bg-background border-border text-foreground"
           />
         </div>
-      </div>
-
-      <div>
-        <Label htmlFor="height" className="text-foreground">Height</Label>
-        <Input
-          id="height"
-          value={formData.specifications?.height || ''}
-          onChange={(e) => setFormData({ 
-            ...formData, 
-            specifications: { 
-              ...formData.specifications,
-              height: e.target.value 
-            }
-          })}
-          className="bg-background border-border text-foreground"
-          placeholder="e.g., 6U"
-        />
+        <div>
+          <Label htmlFor="productInfoUrl" className="text-foreground">Product Info URL</Label>
+          <Input
+            id="productInfoUrl"
+            value={formData.productInfoUrl}
+            onChange={(e) => setFormData({ ...formData, productInfoUrl: e.target.value })}
+            className="bg-background border-border text-foreground"
+            placeholder="https://..."
+          />
+        </div>
       </div>
 
       <div>

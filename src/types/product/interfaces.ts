@@ -34,14 +34,13 @@ export interface Level2Product {
   id: string;
   name: string;
   parentProductId: string; // Links to Level1Product
-  type: string; // Dynamic type instead of hardcoded union
+  type?: string; // Deprecated: use chassisType instead - kept for backward compatibility
   description: string;
   price: number;
   cost?: number;
   enabled: boolean;
   chassisType?: string; // Chassis type: N/A, LTX, MTX, STX
   specifications?: {
-    height?: string;
     slots?: number;
     capacity?: string;
     [key: string]: any;
@@ -114,6 +113,7 @@ export interface ProductTypeConfig {
 
 // Legacy interfaces for backward compatibility - extend from new hierarchy
 export interface Chassis extends Level2Product {
+  type: string; // Keep for backward compatibility
   height: string;
   slots: number;
   productInfoUrl?: string;

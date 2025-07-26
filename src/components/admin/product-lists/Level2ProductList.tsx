@@ -35,12 +35,12 @@ export const Level2ProductList: React.FC<Level2ProductListProps> = ({
     setEditFormData({
       name: product.name,
       parentProductId: product.parentProductId,
-      type: product.type,
       chassisType: product.chassisType || 'N/A',
       description: product.description,
       price: product.price,
       cost: product.cost || 0,
-      enabled: product.enabled
+      enabled: product.enabled,
+      productInfoUrl: product.productInfoUrl || ''
     });
   };
 
@@ -186,15 +186,6 @@ export const Level2ProductList: React.FC<Level2ProductListProps> = ({
                         </SelectContent>
                       </Select>
                     </div>
-                    <div>
-                       <Label htmlFor={`type-${product.id}`} className="text-gray-700">Type</Label>
-                       <Input
-                         id={`type-${product.id}`}
-                         value={editFormData.type || ''}
-                         onChange={(e) => setEditFormData(prev => ({ ...prev, type: e.target.value }))}
-                         className="bg-white border-gray-300 text-gray-900"
-                       />
-                     </div>
                      <div>
                        <Label htmlFor={`chassisType-${product.id}`} className="text-gray-700">Chassis Type</Label>
                        <Select
@@ -211,6 +202,16 @@ export const Level2ProductList: React.FC<Level2ProductListProps> = ({
                            <SelectItem value="STX" className="text-gray-900">STX</SelectItem>
                          </SelectContent>
                        </Select>
+                     </div>
+                     <div>
+                       <Label htmlFor={`productInfoUrl-${product.id}`} className="text-gray-700">Product Info URL</Label>
+                       <Input
+                         id={`productInfoUrl-${product.id}`}
+                         value={editFormData.productInfoUrl || ''}
+                         onChange={(e) => setEditFormData(prev => ({ ...prev, productInfoUrl: e.target.value }))}
+                         className="bg-white border-gray-300 text-gray-900"
+                         placeholder="https://..."
+                       />
                      </div>
                     <div className="flex items-center space-x-2">
                       <Switch
@@ -281,9 +282,6 @@ export const Level2ProductList: React.FC<Level2ProductListProps> = ({
                         <p className="text-gray-600 text-sm mt-1">{product.description}</p>
                       )}
                        <div className="flex items-center space-x-2 mt-2">
-                         <Badge variant="secondary" className="bg-blue-100 text-blue-800 border-blue-200">
-                           {product.type}
-                         </Badge>
                          <Badge variant="outline" className="bg-orange-100 text-orange-800 border-orange-200">
                            Chassis: {product.chassisType || 'N/A'}
                          </Badge>
@@ -315,16 +313,29 @@ export const Level2ProductList: React.FC<Level2ProductListProps> = ({
                       </Button>
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div>
-                      <span className="text-gray-500">Price:</span>
-                      <span className="text-gray-900 font-medium ml-2">${product.price.toLocaleString()}</span>
-                    </div>
-                    <div>
-                      <span className="text-gray-500">Cost:</span>
-                      <span className="text-gray-900 font-medium ml-2">${(product.cost || 0).toLocaleString()}</span>
-                    </div>
-                  </div>
+                   <div className="grid grid-cols-2 gap-4 text-sm">
+                     <div>
+                       <span className="text-gray-500">Price:</span>
+                       <span className="text-gray-900 font-medium ml-2">${product.price.toLocaleString()}</span>
+                     </div>
+                     <div>
+                       <span className="text-gray-500">Cost:</span>
+                       <span className="text-gray-900 font-medium ml-2">${(product.cost || 0).toLocaleString()}</span>
+                     </div>
+                     {product.productInfoUrl && (
+                       <div className="col-span-2">
+                         <span className="text-gray-500">Product Info:</span>
+                         <a 
+                           href={product.productInfoUrl} 
+                           target="_blank" 
+                           rel="noopener noreferrer" 
+                           className="text-blue-600 hover:text-blue-800 underline ml-2"
+                         >
+                           View Details
+                         </a>
+                       </div>
+                     )}
+                   </div>
                 </div>
               )}
             </div>
