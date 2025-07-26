@@ -241,18 +241,21 @@ class ProductDataService {
   // Relationship methods using parent_product_id
   async getLevel2ProductsForLevel1(level1Id: string): Promise<Level2Product[]> {
     try {
-      const { data, error } = await supabase
-        .from('products')
-        .select('*')
-        .eq('product_level', 2)
-        .eq('parent_product_id', level1Id)
-        .eq('enabled', true)
-        .order('name');
+      console.log(`Fetching Level 2 products for Level 1 ID: ${level1Id}`);
+      
+      const { data, error } = await supabase.rpc('get_level2_products_by_parent', {
+        parent_id: level1Id
+      });
 
-      if (error) throw error;
+      if (error) {
+        console.error(`Error fetching Level 2 products for ${level1Id}:`, error);
+        throw error;
+      }
+
+      console.log(`Found ${data?.length || 0} Level 2 products for ${level1Id}`);
       return (data || []).map(row => this.transformDbToLevel2(row));
     } catch (error) {
-      console.error('Error fetching Level 2 products for Level 1:', error);
+      console.error('Error in getLevel2ProductsForLevel1:', error);
       return [];
     }
   }

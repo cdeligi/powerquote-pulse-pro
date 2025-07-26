@@ -13,7 +13,7 @@ import PDProductSelector from './PDProductSelector';
 import BOMDisplay from './BOMDisplay';
 import AnalogCardConfigurator from './AnalogCardConfigurator';
 import BushingCardConfigurator from './BushingCardConfigurator';
-import AdditionalConfigTab from './AdditionalConfigTab';
+
 import { productDataService } from '@/services/productDataService';
 import QuoteFieldsSection from './QuoteFieldsSection';
 import DiscountSection from './DiscountSection';
@@ -668,13 +668,12 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
         </CardHeader>
         <CardContent>
           <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="grid w-full grid-cols-4">
+            <TabsList className="grid w-full grid-cols-3">
               {level1Products.map(product => (
                 <TabsTrigger key={product.id} value={product.id}>
                   {product.name}
                 </TabsTrigger>
               ))}
-              <TabsTrigger value="additional-config">Additional</TabsTrigger>
             </TabsList>
 
             {level1Products.map(product => (
@@ -682,13 +681,6 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
                 {renderProductContent(product.id)}
               </TabsContent>
             ))}
-
-            <TabsContent value="additional-config">
-            <AdditionalConfigTab
-              onCardSelect={handleCardSelect}
-              canSeePrices={canSeePrices}
-            />
-          </TabsContent>
           </Tabs>
         </CardContent>
       </Card>
