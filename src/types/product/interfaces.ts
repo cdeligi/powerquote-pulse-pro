@@ -39,6 +39,7 @@ export interface Level2Product {
   price: number;
   cost?: number;
   enabled: boolean;
+  chassisType?: string; // Chassis type: N/A, LTX, MTX, STX
   specifications?: {
     height?: string;
     slots?: number;

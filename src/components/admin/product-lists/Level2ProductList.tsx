@@ -28,6 +28,7 @@ export const Level2ProductList: React.FC<Level2ProductListProps> = ({
   const [editingProduct, setEditingProduct] = useState<string | null>(null);
   const [editFormData, setEditFormData] = useState<Partial<Level2Product>>({});
   const [parentFilter, setParentFilter] = useState<string>('all');
+  const [chassisTypeFilter, setChassisTypeFilter] = useState<string>('all');
 
   const handleEditStart = (product: Level2Product) => {
     setEditingProduct(product.id);
@@ -35,6 +36,7 @@ export const Level2ProductList: React.FC<Level2ProductListProps> = ({
       name: product.name,
       parentProductId: product.parentProductId,
       type: product.type,
+      chassisType: product.chassisType || 'N/A',
       description: product.description,
       price: product.price,
       cost: product.cost || 0,
@@ -92,10 +94,12 @@ export const Level2ProductList: React.FC<Level2ProductListProps> = ({
     return parent ? parent.name : 'Unknown Parent';
   };
 
-  // Filter products by parent Level 1 product
-  const filteredProducts = parentFilter === 'all' 
-    ? products 
-    : products.filter(product => product.parentProductId === parentFilter);
+  // Filter products by parent Level 1 product and chassis type
+  const filteredProducts = products.filter(product => {
+    const matchesParent = parentFilter === 'all' || product.parentProductId === parentFilter;
+    const matchesChassisType = chassisTypeFilter === 'all' || product.chassisType === chassisTypeFilter;
+    return matchesParent && matchesChassisType;
+  });
 
   if (products.length === 0) {
     return (
@@ -116,19 +120,33 @@ export const Level2ProductList: React.FC<Level2ProductListProps> = ({
           <CardTitle className="text-gray-900">
             Level 2 Products ({filteredProducts.length} of {products.length})
           </CardTitle>
-          <div className="flex items-center gap-2">
-            <Filter className="h-4 w-4 text-gray-500" />
-            <Select value={parentFilter} onValueChange={setParentFilter}>
-              <SelectTrigger className="w-48 bg-white border-gray-300 text-gray-900">
-                <SelectValue placeholder="Filter by Parent Product" />
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <Filter className="h-4 w-4 text-gray-500" />
+              <Select value={parentFilter} onValueChange={setParentFilter}>
+                <SelectTrigger className="w-48 bg-white border-gray-300 text-gray-900">
+                  <SelectValue placeholder="Filter by Parent Product" />
+                </SelectTrigger>
+                <SelectContent className="bg-white border-gray-300">
+                  <SelectItem value="all" className="text-gray-900">All Parent Products</SelectItem>
+                  {level1Products.map((product) => (
+                    <SelectItem key={product.id} value={product.id} className="text-gray-900">
+                      {product.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <Select value={chassisTypeFilter} onValueChange={setChassisTypeFilter}>
+              <SelectTrigger className="w-40 bg-white border-gray-300 text-gray-900">
+                <SelectValue placeholder="Filter by Chassis Type" />
               </SelectTrigger>
               <SelectContent className="bg-white border-gray-300">
-                <SelectItem value="all" className="text-gray-900">All Parent Products</SelectItem>
-                {level1Products.map((product) => (
-                  <SelectItem key={product.id} value={product.id} className="text-gray-900">
-                    {product.name}
-                  </SelectItem>
-                ))}
+                <SelectItem value="all" className="text-gray-900">All Chassis Types</SelectItem>
+                <SelectItem value="N/A" className="text-gray-900">N/A</SelectItem>
+                <SelectItem value="LTX" className="text-gray-900">LTX</SelectItem>
+                <SelectItem value="MTX" className="text-gray-900">MTX</SelectItem>
+                <SelectItem value="STX" className="text-gray-900">STX</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -169,14 +187,31 @@ export const Level2ProductList: React.FC<Level2ProductListProps> = ({
                       </Select>
                     </div>
                     <div>
-                      <Label htmlFor={`type-${product.id}`} className="text-gray-700">Type</Label>
-                      <Input
-                        id={`type-${product.id}`}
-                        value={editFormData.type || ''}
-                        onChange={(e) => setEditFormData(prev => ({ ...prev, type: e.target.value }))}
-                        className="bg-white border-gray-300 text-gray-900"
-                      />
-                    </div>
+                       <Label htmlFor={`type-${product.id}`} className="text-gray-700">Type</Label>
+                       <Input
+                         id={`type-${product.id}`}
+                         value={editFormData.type || ''}
+                         onChange={(e) => setEditFormData(prev => ({ ...prev, type: e.target.value }))}
+                         className="bg-white border-gray-300 text-gray-900"
+                       />
+                     </div>
+                     <div>
+                       <Label htmlFor={`chassisType-${product.id}`} className="text-gray-700">Chassis Type</Label>
+                       <Select
+                         value={editFormData.chassisType || 'N/A'}
+                         onValueChange={(value) => setEditFormData(prev => ({ ...prev, chassisType: value }))}
+                       >
+                         <SelectTrigger className="bg-white border-gray-300 text-gray-900">
+                           <SelectValue placeholder="Select Chassis Type" />
+                         </SelectTrigger>
+                         <SelectContent className="bg-white border-gray-300">
+                           <SelectItem value="N/A" className="text-gray-900">N/A (Not a chassis)</SelectItem>
+                           <SelectItem value="LTX" className="text-gray-900">LTX</SelectItem>
+                           <SelectItem value="MTX" className="text-gray-900">MTX</SelectItem>
+                           <SelectItem value="STX" className="text-gray-900">STX</SelectItem>
+                         </SelectContent>
+                       </Select>
+                     </div>
                     <div className="flex items-center space-x-2">
                       <Switch
                         id={`enabled-${product.id}`}
@@ -245,18 +280,21 @@ export const Level2ProductList: React.FC<Level2ProductListProps> = ({
                       {product.description && (
                         <p className="text-gray-600 text-sm mt-1">{product.description}</p>
                       )}
-                      <div className="flex items-center space-x-2 mt-2">
-                        <Badge variant="secondary" className="bg-blue-100 text-blue-800 border-blue-200">
-                          {product.type}
-                        </Badge>
-                        <Badge variant="outline" className="bg-purple-100 text-purple-800 border-purple-200">
-                          Parent: {getParentProductName(product.parentProductId)}
-                        </Badge>
-                        <Badge variant={product.enabled ? "default" : "secondary"} 
-                               className={product.enabled ? "bg-green-100 text-green-800 border-green-200" : "bg-gray-100 text-gray-600 border-gray-200"}>
-                          {product.enabled ? 'Enabled' : 'Disabled'}
-                        </Badge>
-                      </div>
+                       <div className="flex items-center space-x-2 mt-2">
+                         <Badge variant="secondary" className="bg-blue-100 text-blue-800 border-blue-200">
+                           {product.type}
+                         </Badge>
+                         <Badge variant="outline" className="bg-orange-100 text-orange-800 border-orange-200">
+                           Chassis: {product.chassisType || 'N/A'}
+                         </Badge>
+                         <Badge variant="outline" className="bg-purple-100 text-purple-800 border-purple-200">
+                           Parent: {getParentProductName(product.parentProductId)}
+                         </Badge>
+                         <Badge variant={product.enabled ? "default" : "secondary"} 
+                                className={product.enabled ? "bg-green-100 text-green-800 border-green-200" : "bg-gray-100 text-gray-600 border-gray-200"}>
+                           {product.enabled ? 'Enabled' : 'Disabled'}
+                         </Badge>
+                       </div>
                     </div>
                     <div className="flex space-x-2 ml-4">
                       <Button

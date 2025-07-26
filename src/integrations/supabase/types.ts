@@ -415,6 +415,7 @@ export type Database = {
         Row: {
           asset_type_id: string | null
           category: string | null
+          chassis_type: string | null
           code: string | null
           cost: number | null
           created_at: string
@@ -438,6 +439,7 @@ export type Database = {
         Insert: {
           asset_type_id?: string | null
           category?: string | null
+          chassis_type?: string | null
           code?: string | null
           cost?: number | null
           created_at?: string
@@ -461,6 +463,7 @@ export type Database = {
         Update: {
           asset_type_id?: string | null
           category?: string | null
+          chassis_type?: string | null
           code?: string | null
           cost?: number | null
           created_at?: string
