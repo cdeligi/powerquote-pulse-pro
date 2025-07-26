@@ -18,9 +18,9 @@ const DGAProductSelector = ({ onProductSelect, canSeePrices }: DGAProductSelecto
   const [selectedProducts, setSelectedProducts] = useState<Set<string>>(new Set());
   const [selectedLevel2Options, setSelectedLevel2Options] = useState<Record<string, Level2Product[]>>({});
 
-  // Use optimized queries with caching
+  // Use optimized queries with strict database-driven filtering
   const { data: dgaProducts = [], isLoading: dgaLoading, error: dgaError } = useDGAProducts();
-  const { data: level2Options = [], isLoading: l2Loading } = useLevel2ProductsByCategory('dga');
+  const { data: dgaLevel2Products = [], isLoading: l2Loading } = useLevel2ProductsByCategory('dga');
 
   const loading = dgaLoading || l2Loading;
 
@@ -226,7 +226,7 @@ const DGAProductSelector = ({ onProductSelect, canSeePrices }: DGAProductSelecto
                   <div key={productId} className="border border-gray-600 rounded p-3">
                     <h4 className="text-white font-medium text-sm mb-2">{product?.name}</h4>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                      {level2Options.map((option) => {
+                      {dgaLevel2Products.map((option) => {
                         const isSelected = selectedOptions.some(opt => opt.id === option.id && opt.enabled);
                         
                         return (
