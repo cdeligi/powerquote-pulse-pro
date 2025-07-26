@@ -275,6 +275,18 @@ class ProductDataService {
     }
   }
 
+  // Get Level 2 products by category using the new database function
+  async getLevel2ProductsByCategory(category: 'dga' | 'pd' | 'qtms'): Promise<Level2Product[]> {
+    try {
+      const { data, error } = await supabase.rpc('get_level2_products_for_category', { category_filter: category });
+      if (error) throw error;
+      return (data || []).map(row => this.transformDbToLevel2(row));
+    } catch (error) {
+      console.error(`Error fetching Level 2 products for category ${category}:`, error);
+      return [];
+    }
+  }
+
   // CRUD Operations for Level 1 Products
   async createLevel1Product(product: Omit<Level1Product, 'id'>): Promise<Level1Product> {
     try {

@@ -31,7 +31,7 @@ export const findOptimalBushingPlacement = (
   chassis: Level2Product,
   currentSlotAssignments: Record<number, Level3Product>
 ): BushingPlacement | null => {
-  const config = getBushingSlotConfiguration(chassis.type);
+  const config = getBushingSlotConfiguration(chassis.chassisType || chassis.type);
   
   if (config.allowedPlacements.length === 0) {
     return null;
@@ -57,7 +57,7 @@ export const findOptimalBushingPlacement = (
 
   // For LTX, if primary placement (6-7) is occupied by non-bushing cards, 
   // but fallback (13-14) is available, use fallback
-  if (chassis.type === 'LTX' && config.allowedPlacements.length === 2) {
+  if ((chassis.chassisType || chassis.type) === 'LTX' && config.allowedPlacements.length === 2) {
     const [fallbackPrimary, fallbackSecondary] = config.allowedPlacements[1];
     const isFallbackPrimaryOccupied = currentSlotAssignments[fallbackPrimary] && !isBushingCard(currentSlotAssignments[fallbackPrimary]);
     const isFallbackSecondaryOccupied = currentSlotAssignments[fallbackSecondary] && !isBushingCard(currentSlotAssignments[fallbackSecondary]);
@@ -93,7 +93,7 @@ export const validateBushingCardPlacement = (
   if (!placement) {
     return {
       isValid: false,
-      errorMessage: `Bushing cards are not supported for ${chassis.type} chassis`,
+      errorMessage: `Bushing cards are not supported for ${chassis.chassisType || chassis.type} chassis`,
       occupiedSlots: []
     };
   }
