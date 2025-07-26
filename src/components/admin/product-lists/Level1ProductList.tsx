@@ -172,16 +172,16 @@ export const Level1ProductList: React.FC<Level1ProductListProps> = ({
                       </Select>
                     </div>
                   </div>
-                  <div>
-                    <Label htmlFor={`description-${product.id}`} className="text-gray-700">Description</Label>
-                    <Textarea
-                      id={`description-${product.id}`}
-                      value={editFormData.description || ''}
-                      onChange={(e) => setEditFormData(prev => ({ ...prev, description: e.target.value }))}
-                      className="bg-white border-gray-300 text-gray-900"
-                      rows={3}
-                    />
-                  </div>
+                    <div>
+                      <Label htmlFor={`category-${product.id}`} className="text-gray-700">Category</Label>
+                      <Input
+                        id={`category-${product.id}`}
+                        value={editFormData.category || ''}
+                        onChange={(e) => setEditFormData(prev => ({ ...prev, category: e.target.value }))}
+                        className="bg-white border-gray-300 text-gray-900"
+                        placeholder="e.g., Monitoring Systems"
+                      />
+                    </div>
                   <div className="flex items-center space-x-2">
                     <Switch
                       id={`enabled-${product.id}`}
@@ -214,13 +214,10 @@ export const Level1ProductList: React.FC<Level1ProductListProps> = ({
                   <div className="flex justify-between items-start mb-3">
                     <div className="flex-1">
                       <h4 className="text-gray-900 font-medium text-lg">{product.name}</h4>
-                      {product.description && (
-                        <p className="text-gray-600 text-sm mt-1">{product.description}</p>
+                      {product.category && (
+                        <p className="text-gray-600 text-sm mt-1">{product.category}</p>
                       )}
                        <div className="flex items-center space-x-2 mt-2">
-                         <Badge variant="secondary" className="bg-blue-100 text-blue-800 border-blue-200">
-                           {assetTypes.find(type => type.id === product.asset_type_id)?.name || product.type}
-                         </Badge>
                         <Badge variant={product.enabled ? "default" : "secondary"} 
                                className={product.enabled ? "bg-green-100 text-green-800 border-green-200" : "bg-gray-100 text-gray-600 border-gray-200"}>
                           {product.enabled ? 'Enabled' : 'Disabled'}

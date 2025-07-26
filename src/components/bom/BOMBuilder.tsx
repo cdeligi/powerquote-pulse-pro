@@ -83,6 +83,7 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
   // Load Level 1 products for dynamic tabs - use real Supabase data
   const [level1Products, setLevel1Products] = useState<Level1Product[]>([]);
   const [level1Loading, setLevel1Loading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     const loadLevel1Products = async () => {
@@ -668,6 +669,9 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
         </CardHeader>
         <CardContent>
           <Tabs value={activeTab} onValueChange={(value) => {
+            // Add loading state to prevent UI lag
+            setIsLoading(true);
+            
             setActiveTab(value);
             const selectedProduct = level1Products.find(p => p.id === value);
             setSelectedLevel1Product(selectedProduct || null);
@@ -677,6 +681,11 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
             setSlotAssignments({});
             setSelectedSlot(null);
             setHasRemoteDisplay(false);
+            
+            console.log('Tab switching to:', value, 'Product:', selectedProduct);
+            
+            // Remove loading state after brief delay for smooth transition
+            setTimeout(() => setIsLoading(false), 100);
           }}>
             <TabsList className="grid w-full grid-cols-3">
               {level1Products.map(product => (
