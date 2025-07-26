@@ -531,8 +531,8 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
     const product = level1Products.find(p => p.id === productId);
     if (!product) return null;
 
-    // QTMS tab - only show chassis selector
-    if (productId === 'QTMS') {
+    // QTMS tab - only show chassis selector (case insensitive check)
+    if (productId.toLowerCase() === 'qtms') {
       return (
         <div className="space-y-6">
           <ChassisSelector
@@ -667,7 +667,17 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <Tabs value={activeTab} onValueChange={(value) => {
+            setActiveTab(value);
+            const selectedProduct = level1Products.find(p => p.id === value);
+            setSelectedLevel1Product(selectedProduct || null);
+            
+            // Clear relevant state when switching tabs
+            setSelectedChassis(null);
+            setSlotAssignments({});
+            setSelectedSlot(null);
+            setHasRemoteDisplay(false);
+          }}>
             <TabsList className="grid w-full grid-cols-3">
               {level1Products.map(product => (
                 <TabsTrigger key={product.id} value={product.id}>

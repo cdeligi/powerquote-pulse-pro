@@ -17,16 +17,14 @@ interface Level1ProductFormProps {
 const Level1ProductForm = ({ onSubmit, initialData }: Level1ProductFormProps) => {
   const [formData, setFormData] = useState({
     name: initialData?.name || '',
-    assetType: initialData?.type || 'power-transformer',
-    category: initialData?.category || '',
+    type: initialData?.type || '',
     description: initialData?.description || '',
     price: initialData?.price || 0,
-    cost: initialData?.cost || 0,
+    category: initialData?.category || '',
     productInfoUrl: initialData?.productInfoUrl || '',
     enabled: initialData?.enabled ?? true,
     partNumber: initialData?.partNumber || '',
-    image: initialData?.image || '',
-    rackConfigurable: false
+    image: initialData?.image || ''
   });
 
   const [assetTypes, setAssetTypes] = useState<AssetType[]>([]);
@@ -52,14 +50,7 @@ const Level1ProductForm = ({ onSubmit, initialData }: Level1ProductFormProps) =>
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // Transform assetType to type for backwards compatibility
-    const productData = {
-      ...formData,
-      type: formData.assetType
-    };
-    delete (productData as any).assetType;
-    delete (productData as any).rackConfigurable;
-    onSubmit(productData);
+    onSubmit(formData);
   };
 
   if (loading) {
@@ -68,36 +59,16 @@ const Level1ProductForm = ({ onSubmit, initialData }: Level1ProductFormProps) =>
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <Label htmlFor="name" className="text-foreground">Product Name</Label>
-          <Input
-            id="name"
-            value={formData.name}
-            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-            className="bg-background border-border text-foreground"
-            required
-            placeholder="e.g., QTMS, DGA, Partial Discharge"
-          />
-        </div>
-        <div>
-          <Label htmlFor="assetType" className="text-foreground">Asset Type</Label>
-          <Select 
-            value={formData.assetType} 
-            onValueChange={(value) => setFormData({ ...formData, assetType: value })}
-          >
-            <SelectTrigger className="bg-background border-border text-foreground">
-              <SelectValue placeholder="Select asset type" />
-            </SelectTrigger>
-            <SelectContent className="bg-background border-border">
-              {assetTypes.map((type) => (
-                <SelectItem key={type.id} value={type.id} className="text-foreground">
-                  {type.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+      <div>
+        <Label htmlFor="name" className="text-foreground">Product Name</Label>
+        <Input
+          id="name"
+          value={formData.name}
+          onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+          className="bg-background border-border text-foreground"
+          required
+          placeholder="e.g., QTMS, DGA, Partial Discharge"
+        />
       </div>
 
       <div>
@@ -113,35 +84,38 @@ const Level1ProductForm = ({ onSubmit, initialData }: Level1ProductFormProps) =>
 
       <div>
         <Label htmlFor="description" className="text-foreground">Description</Label>
-        <Textarea
+        <Input
           id="description"
           value={formData.description}
           onChange={(e) => setFormData({ ...formData, description: e.target.value })}
           className="bg-background border-border text-foreground"
+          placeholder="Brief description of the product"
           required
         />
       </div>
 
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <Label htmlFor="price" className="text-foreground">Base Price ($)</Label>
+          <Label htmlFor="type" className="text-foreground">Type</Label>
           <Input
-            id="price"
-            type="number"
-            value={formData.price}
-            onChange={(e) => setFormData({ ...formData, price: parseFloat(e.target.value) })}
+            id="type"
+            value={formData.type}
+            onChange={(e) => setFormData({ ...formData, type: e.target.value })}
             className="bg-background border-border text-foreground"
+            placeholder="Product type"
             required
           />
         </div>
         <div>
-          <Label htmlFor="cost" className="text-foreground">Base Cost ($)</Label>
+          <Label htmlFor="price" className="text-foreground">Price ($)</Label>
           <Input
-            id="cost"
+            id="price"
             type="number"
-            value={formData.cost}
-            onChange={(e) => setFormData({ ...formData, cost: parseFloat(e.target.value) })}
+            step="0.01"
+            value={formData.price}
+            onChange={(e) => setFormData({ ...formData, price: parseFloat(e.target.value) || 0 })}
             className="bg-background border-border text-foreground"
+            required
           />
         </div>
       </div>
@@ -177,15 +151,6 @@ const Level1ProductForm = ({ onSubmit, initialData }: Level1ProductFormProps) =>
           onChange={(e) => setFormData({ ...formData, image: e.target.value })}
           className="bg-background border-border text-foreground"
         />
-      </div>
-
-      <div className="flex items-center space-x-2">
-        <Switch
-          id="rackConfigurable"
-          checked={formData.rackConfigurable}
-          onCheckedChange={(rackConfigurable) => setFormData({ ...formData, rackConfigurable })}
-        />
-        <Label htmlFor="rackConfigurable" className="text-foreground">Rack Configurable</Label>
       </div>
 
       <div className="flex items-center space-x-2">

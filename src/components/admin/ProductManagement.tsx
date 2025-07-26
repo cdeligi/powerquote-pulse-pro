@@ -30,6 +30,9 @@ export const ProductManagement = () => {
   const [showLevel2Form, setShowLevel2Form] = useState(false);
   const [showLevel3CardForm, setShowLevel3CardForm] = useState(false);
   const [showLevel3OptionForm, setShowLevel3OptionForm] = useState(false);
+  
+  // Tab state persistence
+  const [activeTab, setActiveTab] = useState('level1');
 
   useEffect(() => {
     initializeData();
@@ -124,6 +127,8 @@ export const ProductManagement = () => {
       }
       refreshProductData();
       setShowLevel2Form(false);
+      // Stay on level2 tab after editing
+      setActiveTab('level2');
     } catch (error) {
       console.error('ProductManagement: Error saving Level 2 product:', error);
       toast({ 
@@ -240,7 +245,7 @@ export const ProductManagement = () => {
         </div>
       </div>
 
-      <Tabs defaultValue="level1" className="space-y-4">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="level1">Level 1 Products</TabsTrigger>
           <TabsTrigger value="level2">Level 2 Products</TabsTrigger>
