@@ -171,37 +171,6 @@ export const Level1ProductList: React.FC<Level1ProductListProps> = ({
                         </SelectContent>
                       </Select>
                     </div>
-                    <div>
-                      <Label htmlFor={`type-${product.id}`} className="text-gray-700">Type</Label>
-                      <Input
-                        id={`type-${product.id}`}
-                        value={editFormData.type || ''}
-                        onChange={(e) => setEditFormData(prev => ({ ...prev, type: e.target.value }))}
-                        className="bg-white border-gray-300 text-gray-900"
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor={`price-${product.id}`} className="text-gray-700">Price ($)</Label>
-                      <Input
-                        id={`price-${product.id}`}
-                        type="number"
-                        step="0.01"
-                        value={editFormData.price || 0}
-                        onChange={(e) => setEditFormData(prev => ({ ...prev, price: parseFloat(e.target.value) || 0 }))}
-                        className="bg-white border-gray-300 text-gray-900"
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor={`cost-${product.id}`} className="text-gray-700">Cost ($)</Label>
-                      <Input
-                        id={`cost-${product.id}`}
-                        type="number"
-                        step="0.01"
-                        value={editFormData.cost || 0}
-                        onChange={(e) => setEditFormData(prev => ({ ...prev, cost: parseFloat(e.target.value) || 0 }))}
-                        className="bg-white border-gray-300 text-gray-900"
-                      />
-                    </div>
                   </div>
                   <div>
                     <Label htmlFor={`description-${product.id}`} className="text-gray-700">Description</Label>
@@ -277,16 +246,12 @@ export const Level1ProductList: React.FC<Level1ProductListProps> = ({
                       </Button>
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div>
-                      <span className="text-gray-500">Price:</span>
-                      <span className="text-gray-900 font-medium ml-2">${product.price.toLocaleString()}</span>
+                  {product.partNumber && (
+                    <div className="text-sm">
+                      <span className="text-gray-500">Part Number:</span>
+                      <span className="text-gray-900 font-medium ml-2">{product.partNumber}</span>
                     </div>
-                    <div>
-                      <span className="text-gray-500">Cost:</span>
-                      <span className="text-gray-900 font-medium ml-2">${(product.cost || 0).toLocaleString()}</span>
-                    </div>
-                  </div>
+                  )}
                 </div>
               )}
             </div>
