@@ -6,7 +6,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Level1Product, Level2Product } from "@/types/product";
-import { useDGAProducts, useLevel2Products } from "@/hooks/useProductQueries";
+import { useDGAProducts, useLevel2ProductsByCategory } from "@/hooks/useProductQueries";
 import { ExternalLink, Plus, CheckCircle2, Loader2 } from "lucide-react";
 
 interface DGAProductSelectorProps {
@@ -20,19 +20,7 @@ const DGAProductSelector = ({ onProductSelect, canSeePrices }: DGAProductSelecto
 
   // Use optimized queries with caching
   const { data: dgaProducts = [], isLoading: dgaLoading, error: dgaError } = useDGAProducts();
-  const { data: allLevel2Products = [], isLoading: l2Loading } = useLevel2Products();
-
-  // Filter level 2 products for DGA accessories
-  const level2Options = useMemo(() => 
-    (allLevel2Products as Level2Product[]).filter(p => 
-      p.enabled && 
-      (p.type?.includes('CalGas') || 
-       p.type?.includes('Standard') || 
-       p.type?.includes('Moisture') ||
-       p.parentProductId?.toLowerCase().includes('dga'))
-    ), 
-    [allLevel2Products]
-  );
+  const { data: level2Options = [], isLoading: l2Loading } = useLevel2ProductsByCategory('dga');
 
   const loading = dgaLoading || l2Loading;
 

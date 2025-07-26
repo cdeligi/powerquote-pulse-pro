@@ -8,7 +8,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Level1Product, Level2Product } from "@/types/product";
-import { usePDProducts, useLevel2Products } from "@/hooks/useProductQueries";
+import { usePDProducts, useLevel2ProductsByCategory } from "@/hooks/useProductQueries";
 import { ExternalLink, Plus, CheckCircle2, Loader2 } from "lucide-react";
 
 interface PDProductSelectorProps {
@@ -23,19 +23,7 @@ const PDProductSelector = ({ onProductSelect, canSeePrices }: PDProductSelectorP
 
   // Use optimized queries with caching
   const { data: pdProducts = [], isLoading: pdLoading, error: pdError } = usePDProducts();
-  const { data: allLevel2Products = [], isLoading: l2Loading } = useLevel2Products();
-
-  // Filter level 2 products for PD accessories
-  const level2Options = useMemo(() => 
-    (allLevel2Products as Level2Product[]).filter(p => 
-      p.enabled && 
-      (p.parentProductId?.toLowerCase().includes('pd') ||
-       p.parentProductId?.toLowerCase().includes('qpdm') ||
-       p.type?.includes('PD') ||
-       p.name.toLowerCase().includes('sensor'))
-    ), 
-    [allLevel2Products]
-  );
+  const { data: level2Options = [], isLoading: l2Loading } = useLevel2ProductsByCategory('pd');
 
   const loading = pdLoading || l2Loading;
 

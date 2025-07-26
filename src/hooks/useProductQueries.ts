@@ -67,6 +67,17 @@ export const usePDProducts = () => {
   });
 };
 
+// Hook for Level 2 products by category with caching
+export const useLevel2ProductsByCategory = (category: 'dga' | 'pd' | 'qtms') => {
+  return useQuery({
+    queryKey: [...productQueryKeys.level2(), category],
+    queryFn: () => productDataService.getLevel2ProductsByCategory(category),
+    staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+    refetchOnWindowFocus: false,
+  });
+};
+
 // Hook to prefetch products (for performance)
 export const usePrefetchProducts = () => {
   const queryClient = useQueryClient();
