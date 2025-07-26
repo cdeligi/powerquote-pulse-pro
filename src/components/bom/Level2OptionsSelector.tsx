@@ -76,9 +76,11 @@ const Level2OptionsSelector = ({ level1Product, selectedOptions, onOptionToggle,
               <CardContent>
                 <p className="text-gray-400 text-sm mb-3">{option.description}</p>
                 <div className="flex justify-between items-center">
-                  <span className="text-white font-medium">
-                    ${option.price.toLocaleString()}
-                  </span>
+                  {canSeePrices && option.price && (
+                    <span className="text-white font-medium">
+                      ${option.price.toLocaleString()}
+                    </span>
+                  )}
                   {option.partNumber && (
                     <Badge variant="outline" className="text-xs">
                       {option.partNumber}

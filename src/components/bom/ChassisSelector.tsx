@@ -26,7 +26,7 @@ const ChassisSelector = ({ onChassisSelect, selectedChassis, canSeePrices }: Cha
         await productDataService.initialize();
         
         // Get chassis options from productDataService using the proper relationship
-        const qtmsLevel2Products = await productDataService.getLevel2ProductsForLevel1('qtms');
+        const qtmsLevel2Products = await productDataService.getLevel2ProductsForLevel1('QTMS');
         const validChassis = qtmsLevel2Products.filter(chassis => 
           chassis.chassisType && chassis.chassisType !== 'N/A' && chassis.enabled
         );
@@ -37,7 +37,7 @@ const ChassisSelector = ({ onChassisSelect, selectedChassis, canSeePrices }: Cha
         console.error('Error loading chassis:', error);
         // Fallback to sync method
         try {
-          const syncChassis = await productDataService.getLevel2ProductsForLevel1('qtms');
+          const syncChassis = await productDataService.getLevel2ProductsForLevel1('QTMS');
           const filteredChassis = syncChassis.filter(chassis => chassis.chassisType && chassis.chassisType !== 'N/A' && chassis.enabled);
           setChassisOptions(filteredChassis);
         } catch (syncError) {
