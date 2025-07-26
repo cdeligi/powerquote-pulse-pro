@@ -28,7 +28,7 @@ const ChassisSelector = ({ onChassisSelect, selectedChassis, canSeePrices }: Cha
         // Get chassis options from productDataService using the proper relationship
         const qtmsLevel2Products = await productDataService.getLevel2ProductsForLevel1('qtms');
         const validChassis = qtmsLevel2Products.filter(chassis => 
-          ['LTX', 'MTX', 'STX'].includes(chassis.type) && chassis.enabled
+          chassis.chassisType && chassis.chassisType !== 'N/A' && chassis.enabled
         );
         
         console.log('ChassisSelector: Loaded chassis:', validChassis);
@@ -38,7 +38,7 @@ const ChassisSelector = ({ onChassisSelect, selectedChassis, canSeePrices }: Cha
         // Fallback to sync method
         try {
           const syncChassis = await productDataService.getLevel2ProductsForLevel1('qtms');
-          const filteredChassis = syncChassis.filter(chassis => ['LTX', 'MTX', 'STX'].includes(chassis.type) && chassis.enabled);
+          const filteredChassis = syncChassis.filter(chassis => chassis.chassisType && chassis.chassisType !== 'N/A' && chassis.enabled);
           setChassisOptions(filteredChassis);
         } catch (syncError) {
           console.error('Sync fallback failed:', syncError);
@@ -93,7 +93,7 @@ const ChassisSelector = ({ onChassisSelect, selectedChassis, canSeePrices }: Cha
                 {chassis.description}
               </CardDescription>
               <Badge variant="outline" className="w-fit text-white border-gray-500">
-                {chassis.specifications?.height || '3U'} • {chassis.specifications?.slots || 6} slots
+                {chassis.chassisType} • {chassis.specifications?.height || '3U'} • {chassis.specifications?.slots || 6} slots
               </Badge>
             </CardHeader>
             <CardContent className="flex-1 flex flex-col">
