@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -9,20 +8,40 @@ interface Level2OptionsSelectorProps {
   level1Product: Level1Product;
   selectedOptions: Level2Product[];
   onOptionToggle: (option: Level2Product) => void;
+  onChassisSelect?: (chassis: Level2Product) => void;
   canSeePrices?: boolean;
 }
 
-const Level2OptionsSelector = ({ level1Product, selectedOptions, onOptionToggle, canSeePrices = true }: Level2OptionsSelectorProps) => {
+const Level2OptionsSelector = ({ 
+  level1Product, 
+  selectedOptions, 
+  onOptionToggle, 
+  onChassisSelect, 
+  canSeePrices = true 
+}: Level2OptionsSelectorProps) => {
   const [availableOptions, setAvailableOptions] = useState<Level2Product[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const loadOptions = async () => {
       try {
+        console.group(`[Level2OptionsSelector] Loading options for level 1 product:`, level1Product);
         setLoading(true);
+        
         // Use the relationship method to get Level 2 products for the selected Level 1
+        console.log('Calling getLevel2ProductsForLevel1 with ID:', level1Product.id);
         const options = await productDataService.getLevel2ProductsForLevel1(level1Product.id);
-        setAvailableOptions(options.filter(p => p.enabled));
+        
+        console.log('Raw options from service:', options);
+        
+        // Filter enabled products
+        const enabledOptions = options.filter(p => p.enabled);
+        console.log(`Filtered ${options.length - enabledOptions.length} disabled products`);
+        
+        console.log('Setting available options:', enabledOptions);
+        setAvailableOptions(enabledOptions);
+        
+        console.groupEnd();
       } catch (error) {
         console.error('Error loading Level 2 options:', error);
         setAvailableOptions([]);
@@ -31,11 +50,27 @@ const Level2OptionsSelector = ({ level1Product, selectedOptions, onOptionToggle,
       }
     };
 
-    loadOptions();
-  }, [level1Product.id]);
+    if (level1Product?.id) {
+      loadOptions();
+    }
+  }, [level1Product?.id]);
 
   const isSelected = (option: Level2Product) => {
     return selectedOptions.some(selected => selected.id === option.id);
+  };
+
+  const handleOptionClick = (option: Level2Product) => {
+    console.log('Option clicked:', option);
+    
+    // If the option has a chassisType and it's not 'N/A', handle as chassis selection
+    if (option.chassisType && option.chassisType !== 'N/A' && onChassisSelect) {
+      console.log('Handling as chassis selection');
+      onChassisSelect(option);
+    } else {
+      // Otherwise, toggle the option in the selected options
+      console.log('Toggling option in selected options');
+      onOptionToggle(option);
+    }
   };
 
   if (loading) {
@@ -55,50 +90,67 @@ const Level2OptionsSelector = ({ level1Product, selectedOptions, onOptionToggle,
       
       {availableOptions.length > 0 ? (
         <div className="grid gap-4 md:grid-cols-2">
-          {availableOptions.map((option) => (
-            <Card
-              key={option.id}
-              className={`cursor-pointer transition-all hover:shadow-lg ${
-                isSelected(option)
-                  ? 'bg-red-600 border-red-500'
-                  : 'bg-gray-900 border-gray-800 hover:border-red-500'
-              }`}
-              onClick={() => onOptionToggle(option)}
-            >
-              <CardHeader>
-                <CardTitle className="text-white flex items-center justify-between">
-                  {option.name}
-                  <Badge variant="outline" className="text-xs">
-                    {option.type}
-                  </Badge>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-gray-400 text-sm mb-3">{option.description}</p>
-                <div className="flex justify-between items-center">
-                  {canSeePrices && option.price && (
-                    <span className="text-white font-medium">
-                      ${option.price.toLocaleString()}
-                    </span>
-                  )}
-                  {option.partNumber && (
-                    <Badge variant="outline" className="text-xs">
-                      {option.partNumber}
-                    </Badge>
-                  )}
-                </div>
-                {option.specifications && (
-                  <div className="mt-2 flex flex-wrap gap-1">
-                    {Object.entries(option.specifications).map(([key, value]) => (
-                      <Badge key={key} variant="outline" className="text-xs">
-                        {key}: {value}
+          {availableOptions.map((option) => {
+            const isCurrentlySelected = isSelected(option);
+            const requiresChassisConfig = option.chassisType && option.chassisType !== 'N/A';
+            
+            return (
+              <Card
+                key={option.id}
+                className={`cursor-pointer transition-all hover:shadow-lg ${
+                  isCurrentlySelected
+                    ? 'bg-red-600 border-red-500'
+                    : 'bg-gray-900 border-gray-800 hover:border-red-500'
+                }`}
+                onClick={() => handleOptionClick(option)}
+              >
+                <CardHeader>
+                  <CardTitle className="text-white flex items-center justify-between">
+                    {option.name}
+                    <div className="flex items-center gap-2">
+                      {requiresChassisConfig && (
+                        <Badge variant="outline" className="text-xs bg-blue-500 text-white">
+                          Configure
+                        </Badge>
+                      )}
+                      <Badge variant="outline" className="text-xs">
+                        {option.type}
                       </Badge>
-                    ))}
+                    </div>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-gray-400 text-sm mb-3">{option.description}</p>
+                  {requiresChassisConfig && (
+                    <p className="text-xs text-blue-300 mb-2">
+                      Requires chassis configuration
+                    </p>
+                  )}
+                  <div className="flex justify-between items-center">
+                    {canSeePrices && option.price && (
+                      <span className="text-white font-medium">
+                        ${option.price.toLocaleString()}
+                      </span>
+                    )}
+                    {option.partNumber && (
+                      <Badge variant="outline" className="text-xs">
+                        {option.partNumber}
+                      </Badge>
+                    )}
                   </div>
-                )}
-              </CardContent>
-            </Card>
-          ))}
+                  {option.specifications && (
+                    <div className="mt-2 flex flex-wrap gap-1">
+                      {Object.entries(option.specifications).map(([key, value]) => (
+                        <Badge key={key} variant="outline" className="text-xs">
+                          {key}: {value}
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       ) : (
         <div className="text-center py-8">

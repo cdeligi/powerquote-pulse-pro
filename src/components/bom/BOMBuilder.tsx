@@ -49,6 +49,7 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
   const [discountJustification, setDiscountJustification] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [editingQTMS, setEditingQTMS] = useState<ConsolidatedQTMS | null>(null);
+  const [configuringChassis, setConfiguringChassis] = useState<Level2Product | null>(null);
 
   // Get available quote fields for validation
   const [availableQuoteFields, setAvailableQuoteFields] = useState<any[]>([]);
@@ -104,6 +105,7 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
   // Set default active tab when products are loaded
   useEffect(() => {
     if (level1Products.length > 0 && !activeTab) {
+      console.log('Setting default active tab. Available products:', level1Products.map(p => ({ id: p.id, name: p.name })));
       setActiveTab(level1Products[0].id);
     }
   }, [level1Products.length, activeTab]);
@@ -111,8 +113,12 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
   // Update selected product when tab changes
   useEffect(() => {
     if (activeTab && activeTab !== 'additional-config') {
+      console.log('Active tab changed to:', activeTab);
       const product = level1Products.find(p => p.id === activeTab);
+      console.log('Found product for tab:', product);
+      
       if (product && selectedLevel1Product?.id !== activeTab) {
+        console.log('Setting selectedLevel1Product to:', product);
         setSelectedLevel1Product(product);
         setSelectedLevel2Options([]);
         setSelectedChassis(null);
@@ -123,21 +129,105 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
   }, [activeTab, level1Products, selectedLevel1Product?.id]);
 
   const handleLevel2OptionToggle = (option: Level2Product) => {
-    setSelectedLevel2Options(prev => {
-      const exists = prev.find(item => item.id === option.id);
-      if (exists) {
-        return prev.filter(item => item.id !== option.id);
-      } else {
-        return [...prev, option];
-      }
+    // If the option has a chassis type and it's not 'N/A', show chassis config
+    if (option.chassisType && option.chassisType !== 'N/A') {
+      console.log('Showing chassis configuration for:', option.name);
+      setConfiguringChassis(option);
+      setSelectedChassis(option);
+      setSlotAssignments({});
+      setSelectedSlot(null);
+      return;
+    }
+
+    // Otherwise, add directly to BOM
+    console.log('Adding product directly to BOM:', option.name);
+    const newItem: BOMItem = {
+      id: `${option.id}-${Date.now()}`,
+      product: option,
+      quantity: 1,
+      enabled: true
+    };
+    
+    // Add to BOM
+    setBomItems(prev => [...prev, newItem]);
+    onBOMUpdate([...bomItems, newItem]);
+    
+    // Show success message
+    toast({
+      title: 'Added to BOM',
+      description: `${option.name} has been added to your bill of materials.`,
     });
   };
 
   const handleChassisSelect = (chassis: Level2Product) => {
+    console.log('Chassis selected:', chassis.name, 'chassisType:', chassis.chassisType);
+    
+    // Set the selected chassis and initialize the configuration state
     setSelectedChassis(chassis);
+    
+    // If this is a chassis that needs configuration (has a valid chassisType)
+    if (chassis.chassisType && chassis.chassisType !== 'N/A') {
+      console.log('Setting up chassis configuration for:', chassis.name);
+      setConfiguringChassis(chassis);
+      setSlotAssignments({});
+      setSelectedSlot(null);
+      
+      // Scroll to the configuration section
+      setTimeout(() => {
+        const configSection = document.getElementById('chassis-configuration');
+        if (configSection) {
+          configSection.scrollIntoView({ behavior: 'smooth' });
+        }
+      }, 100);
+    } else {
+      // For non-chassis products, add directly to BOM
+      console.log('Adding non-chassis product directly to BOM:', chassis.name);
+      const newItem: BOMItem = {
+        id: `${chassis.id}-${Date.now()}`,
+        product: chassis,
+        quantity: 1,
+        enabled: true
+      };
+      
+      setBomItems(prev => [...prev, newItem]);
+      onBOMUpdate([...bomItems, newItem]);
+      
+      toast({
+        title: 'Added to BOM',
+        description: `${chassis.name} has been added to your bill of materials.`,
+      });
+    }
+  };
+
+  const handleAddChassisToBOM = () => {
+    if (!selectedChassis) return;
+    
+    console.log('Adding chassis configuration to BOM:', selectedChassis.name);
+    
+    // Create the chassis item
+    const chassisItem: BOMItem = {
+      id: `${selectedChassis.id}-${Date.now()}`,
+      product: selectedChassis,
+      quantity: 1,
+      enabled: true,
+      slotAssignments: { ...slotAssignments }
+    };
+    
+    // Add to BOM
+    setBomItems(prev => [...prev, chassisItem]);
+    onBOMUpdate([...bomItems, chassisItem]);
+    
+    // Reset chassis configuration state
+    setConfiguringChassis(null);
+    setSelectedChassis(null);
     setSlotAssignments({});
     setSelectedSlot(null);
-    setHasRemoteDisplay(false);
+    
+    // Show success message
+    toast({
+      title: 'Chassis Configuration Added',
+      description: `${selectedChassis.name} configuration has been added to your bill of materials.`,
+    });
   };
 
   const handleSlotClick = (slot: number) => {
@@ -529,11 +619,81 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
   };
 
   const renderProductContent = (productId: string) => {
+    console.group(`[BOMBuilder] Rendering product content for: ${productId}`);
     const product = level1Products.find(p => p.id === productId);
-    if (!product) return null;
+    if (!product) {
+      console.error(`Product not found for ID: ${productId}`);
+      console.groupEnd();
+      return null;
+    }
 
-    // QTMS tab - only show chassis selector (case insensitive check)
+    // If we're configuring a chassis, show the chassis configuration UI
+    if (configuringChassis) {
+      console.log('Rendering chassis configuration for:', configuringChassis.name);
+      return (
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <h3 className="text-xl font-semibold">
+              Configure {configuringChassis.name}
+            </h3>
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => {
+                setConfiguringChassis(null);
+                setSelectedChassis(null);
+              }}
+            >
+              Back to Products
+            </Button>
+          </div>
+          
+          <RackVisualizer
+            chassis={{
+              ...configuringChassis,
+              height: configuringChassis.specifications?.height || '',
+              slots: configuringChassis.specifications?.slots || 0
+            }}
+            slotAssignments={slotAssignments}
+            selectedSlot={selectedSlot}
+            onSlotClick={handleSlotClick}
+            onSlotClear={handleSlotClear}
+            hasRemoteDisplay={hasRemoteDisplay}
+            onRemoteDisplayToggle={handleRemoteDisplayToggle}
+          />
+          
+          <SlotCardSelector
+            chassis={configuringChassis}
+            slot={selectedSlot}
+            onCardSelect={handleCardSelect}
+            onClose={() => setSelectedSlot(null)}
+            canSeePrices={canSeePrices}
+          />
+          
+          <div className="flex justify-end space-x-4">
+            <Button 
+              variant="outline"
+              onClick={() => {
+                setConfiguringChassis(null);
+                setSelectedChassis(null);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleAddChassisToBOM}
+              disabled={Object.keys(slotAssignments).length === 0}
+            >
+              Add to BOM
+            </Button>
+          </div>
+        </div>
+      );
+    }
+
+    // QTMS tab - show chassis selector
     if (productId.toLowerCase() === 'qtms') {
+      console.log('Rendering QTMS tab content');
       return (
         <div className="space-y-6">
           <ChassisSelector
@@ -541,71 +701,15 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
             selectedChassis={selectedChassis}
             canSeePrices={canSeePrices}
           />
-
-          {selectedChassis && selectedChassis.chassisType && selectedChassis.chassisType !== 'N/A' && (
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold">Configure {selectedChassis.chassisType} Chassis</h3>
-              <RackVisualizer
-                chassis={{
-                  ...selectedChassis,
-                  height: selectedChassis.specifications?.height || '',
-                  slots: selectedChassis.specifications?.slots || 0
-                } as any}
-                slotAssignments={slotAssignments}
-                selectedSlot={selectedSlot}
-                onSlotClick={handleSlotClick}
-                onSlotClear={handleSlotClear}
-                hasRemoteDisplay={hasRemoteDisplay}
-                onRemoteDisplayToggle={handleRemoteDisplayToggle}
-              />
-              
-              <SlotCardSelector
-                chassis={selectedChassis}
-                slot={selectedSlot}
-                onCardSelect={handleCardSelect}
-                onClose={() => setSelectedSlot(null)}
-                canSeePrices={canSeePrices}
-              />
-              
-              {selectedChassis && Object.keys(slotAssignments).length > 0 && (
-                <Button 
-                  onClick={handleAddChassisAndCardsToBOM}
-                  className="w-full"
-                >
-                  Add Configuration to BOM
-                </Button>
-              )}
-            </div>
-          )}
         </div>
       );
     }
 
-    // DGA tab - only show DGA product selector
-    if (productId === 'DGA') {
-      return (
-        <DGAProductSelector
-          onProductSelect={handleDGAProductSelect}
-          canSeePrices={canSeePrices}
-        />
-      );
-    }
-
-    // PD tab - only show PD product selector
-    if (productId === 'PD') {
-      return (
-        <PDProductSelector
-          onProductSelect={handleDGAProductSelect}
-          canSeePrices={canSeePrices}
-        />
-      );
-    }
-
-    // Other products - show Level 2 options selector only
+    // For other tabs, show the level 2 options selector
     return (
       <div className="space-y-6">
         <Level2OptionsSelector
-          level1Product={selectedLevel1Product}
+          level1Product={product}
           selectedOptions={selectedLevel2Options}
           onOptionToggle={handleLevel2OptionToggle}
           canSeePrices={canSeePrices}

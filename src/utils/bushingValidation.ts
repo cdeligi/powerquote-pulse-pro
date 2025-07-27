@@ -1,4 +1,3 @@
-
 import { Level2Product, Level3Product } from '@/types/product';
 
 export interface BushingSlotValidation {
@@ -15,14 +14,30 @@ export interface BushingPlacement {
 }
 
 export const getBushingSlotConfiguration = (chassisType: string): { allowedPlacements: number[][] } => {
-  switch (chassisType) {
+  // Normalize the chassis type
+  const normalizedType = (chassisType || '').toString().trim().toUpperCase();
+  
+  // Map old format to new format if needed
+  let mappedType = normalizedType;
+  if (normalizedType === '14-CARD' || normalizedType === '14CARD') {
+    mappedType = 'LTX';
+  } else if (normalizedType === '7-CARD' || normalizedType === '7CARD') {
+    mappedType = 'MTX';
+  } else if (normalizedType === '4-CARD' || normalizedType === '4CARD') {
+    mappedType = 'STX';
+  }
+  
+  console.log(`[Bushing Validation] getBushingSlotConfiguration - Input: ${chassisType}, Mapped: ${mappedType}`);
+  
+  switch (mappedType) {
     case 'LTX':
-      return { allowedPlacements: [[6, 7], [13, 14]] }; // Priority: 6-7, fallback: 13-14
+      return { allowedPlacements: [[6, 7], [13, 14]] }; // Primary: 6-7, Fallback: 13-14
     case 'MTX':
-      return { allowedPlacements: [[6, 7]] }; // Fixed slots 6-7 only
+      return { allowedPlacements: [[6, 7]] }; // Only 6-7
     case 'STX':
-      return { allowedPlacements: [[3, 4]] }; // Fixed slots 3-4 only
+      return { allowedPlacements: [[3, 4]] }; // Only 3-4
     default:
+      console.warn(`[Bushing Validation] No bushing slot configuration found for chassis type: ${chassisType} (mapped to: ${mappedType})`);
       return { allowedPlacements: [] };
   }
 };
@@ -31,9 +46,21 @@ export const findOptimalBushingPlacement = (
   chassis: Level2Product,
   currentSlotAssignments: Record<number, Level3Product>
 ): BushingPlacement | null => {
-  const config = getBushingSlotConfiguration(chassis.chassisType || chassis.type);
+  const chassisType = (chassis.chassisType || chassis.type || '').toUpperCase();
+  
+  if (!chassisType) {
+    console.warn('[Bushing Validation] Cannot find bushing placement: Chassis type is not specified', {
+      chassisId: chassis?.id,
+      chassisName: chassis?.name
+    });
+    return null;
+  }
+
+  const config = getBushingSlotConfiguration(chassisType);
+  console.log(`[Bushing Validation] Bushing config for ${chassisType}:`, config);
   
   if (config.allowedPlacements.length === 0) {
+    console.warn(`[Bushing Validation] No allowed bushing placements for chassis type: ${chassisType}`);
     return null;
   }
 
@@ -88,16 +115,58 @@ export const validateBushingCardPlacement = (
   chassis: Level2Product,
   currentSlotAssignments: Record<number, Level3Product>
 ): BushingSlotValidation => {
-  const placement = findOptimalBushingPlacement(chassis, currentSlotAssignments);
+  // Log chassis details for debugging
+  const chassisType = (chassis.chassisType || chassis.type || '').toUpperCase();
+  console.log(`[Bushing Validation] Validating bushing card placement for chassis:`, {
+    id: chassis.id,
+    name: chassis.name,
+    chassisType: chassis.chassisType,
+    type: chassis.type,
+    normalizedChassisType: chassisType,
+    specifications: chassis.specifications
+  });
   
-  if (!placement) {
+  // If chassis type is not specified, check if we can infer it from the name
+  if (!chassisType) {
+    const errorMessage = 'Chassis type is not specified';
+    console.warn(`[Bushing Validation] ${errorMessage}`, { chassis });
     return {
       isValid: false,
-      errorMessage: `Bushing cards are not supported for ${chassis.chassisType || chassis.type} chassis`,
+      errorMessage,
       occupiedSlots: []
     };
   }
 
+  // Special case: If chassis type is 'N/A', bushing cards are not supported
+  if (chassisType === 'N/A') {
+    const errorMessage = 'Bushing cards are not supported for N/A chassis';
+    console.warn(`[Bushing Validation] ${errorMessage}`);
+    return {
+      isValid: false,
+      errorMessage,
+      occupiedSlots: []
+    };
+  }
+
+  const placement = findOptimalBushingPlacement(chassis, currentSlotAssignments);
+  
+  if (!placement) {
+    const errorMessage = `Bushing cards are not supported for ${chassisType} chassis`;
+    console.warn(`[Bushing Validation] No valid bushing placement found: ${errorMessage}`, {
+      chassisId: chassis.id,
+      chassisName: chassis.name,
+      chassisType: chassisType,
+      currentSlotAssignments: Object.keys(currentSlotAssignments).map(Number)
+    });
+    
+    return {
+      isValid: false,
+      errorMessage,
+      occupiedSlots: []
+    };
+  }
+
+  console.log(`[Bushing Validation] Valid bushing placement found:`, placement);
   return {
     isValid: true,
     occupiedSlots: [placement.primarySlot, placement.secondarySlot]
