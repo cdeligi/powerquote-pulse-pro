@@ -1,51 +1,84 @@
-
 import { useState, useEffect } from "react";
 import { Level2Product } from "@/types/product";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ExternalLink } from "lucide-react";
 import { productDataService } from "@/services/productDataService";
 
 interface ChassisSelectorProps {
   onChassisSelect: (chassis: Level2Product) => void;
   selectedChassis: Level2Product | null;
-  canSeePrices: boolean;
+  canSeePrices?: boolean;
 }
 
-const ChassisSelector = ({ onChassisSelect, selectedChassis, canSeePrices }: ChassisSelectorProps) => {
+const ChassisSelector = ({ onChassisSelect, selectedChassis, canSeePrices = true }: ChassisSelectorProps) => {
   const [chassisOptions, setChassisOptions] = useState<Level2Product[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const loadChassis = async () => {
       try {
+        console.group('[ChassisSelector] Loading chassis options');
         setLoading(true);
         
         // Initialize the service first
+        console.log('Initializing product data service...');
         await productDataService.initialize();
         
-        // Get chassis options from productDataService using the proper relationship
-        const qtmsLevel2Products = await productDataService.getLevel2ProductsForLevel1('qtms');
-        const validChassis = qtmsLevel2Products.filter(chassis => 
-          chassis.chassisType && chassis.chassisType !== 'N/A' && chassis.enabled
-        );
+        // Get chassis options using the category-based method
+        console.log("Fetching QTMS chassis products by category");
+        const qtmsChassisProducts = await productDataService.getLevel2ProductsByCategory('qtms');
         
-        console.log('ChassisSelector: Loaded chassis:', validChassis);
-        setChassisOptions(validChassis);
-      } catch (error) {
-        console.error('Error loading chassis:', error);
-        // Fallback to sync method
-        try {
-          const syncChassis = await productDataService.getLevel2ProductsForLevel1('qtms');
-          const filteredChassis = syncChassis.filter(chassis => chassis.chassisType && chassis.chassisType !== 'N/A' && chassis.enabled);
-          setChassisOptions(filteredChassis);
-        } catch (syncError) {
-          console.error('Sync fallback failed:', syncError);
-          setChassisOptions([]);
+        console.log('Raw chassis products from service:', qtmsChassisProducts);
+        
+        if (!qtmsChassisProducts || qtmsChassisProducts.length === 0) {
+          console.warn('No QTMS chassis products found using category-based method');
+          
+          // Fallback to parent-based method
+          console.log('Falling back to parent-based method...');
+          const fallbackChassis = await productDataService.getLevel2ProductsForLevel1('qtms');
+          console.log('Fallback chassis products:', fallbackChassis);
+          
+          if (!fallbackChassis || fallbackChassis.length === 0) {
+            console.error('No QTMS chassis products found using either method');
+            setChassisOptions([]);
+            console.groupEnd();
+            return;
+          }
+          
+          // Filter out any disabled chassis
+          const enabledChassis = fallbackChassis.filter(chassis => {
+            const isEnabled = chassis.enabled !== false; // Default to true if undefined
+            if (!isEnabled) {
+              console.log(`Skipping disabled chassis: ${chassis.id} (${chassis.name})`);
+            }
+            return isEnabled;
+          });
+          
+          console.log(`Setting ${enabledChassis.length} valid chassis options`);
+          setChassisOptions(enabledChassis);
+          console.groupEnd();
+          return;
         }
+        
+        // If we got here, the category-based method returned products
+        const enabledChassis = qtmsChassisProducts.filter(chassis => {
+          const isEnabled = chassis.enabled !== false; // Default to true if undefined
+          if (!isEnabled) {
+            console.log(`Skipping disabled chassis: ${chassis.id} (${chassis.name})`);
+          }
+          return isEnabled;
+        });
+        
+        console.log(`Setting ${enabledChassis.length} valid chassis options`);
+        setChassisOptions(enabledChassis);
+        
+      } catch (error) {
+        console.error('Error loading chassis options:', error);
+        setChassisOptions([]);
       } finally {
         setLoading(false);
+        console.groupEnd();
       }
     };
 
@@ -71,6 +104,13 @@ const ChassisSelector = ({ onChassisSelect, selectedChassis, canSeePrices }: Cha
         <div className="text-center py-8">
           <p className="text-gray-400 mb-4">No QTMS chassis available.</p>
           <p className="text-gray-500 text-sm">Please create Level 2 products (LTX, MTX, STX) for QTMS in the Admin Panel.</p>
+          <Button 
+            variant="outline" 
+            className="mt-4"
+            onClick={() => window.location.reload()}
+          >
+            Refresh
+          </Button>
         </div>
       </div>
     );
@@ -79,57 +119,48 @@ const ChassisSelector = ({ onChassisSelect, selectedChassis, canSeePrices }: Cha
   return (
     <div className="space-y-4">
       <h3 className="text-xl font-bold text-white mb-4">Select QTMS Chassis</h3>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {chassisOptions.map((chassis) => (
-          <Card 
-            key={chassis.id} 
-            className={`bg-gray-900 border-gray-800 hover:border-red-600 transition-all cursor-pointer flex flex-col ${
-              selectedChassis?.id === chassis.id ? 'border-red-600 bg-red-900/20' : ''
+          <Card
+            key={chassis.id}
+            className={`cursor-pointer transition-all hover:shadow-lg ${
+              selectedChassis?.id === chassis.id
+                ? 'bg-red-600 border-red-500'
+                : 'bg-gray-900 border-gray-800 hover:border-red-500'
             }`}
+            onClick={() => onChassisSelect(chassis)}
           >
             <CardHeader>
-              <CardTitle className="text-white text-lg">{chassis.name}</CardTitle>
-              <CardDescription className="text-gray-400">
-                {chassis.description}
-              </CardDescription>
-              <Badge variant="outline" className="w-fit text-white border-gray-500">
-                {chassis.chassisType} • {chassis.specifications?.height || '3U'} • {chassis.specifications?.slots || 6} slots
-              </Badge>
+              <CardTitle className="text-white flex items-center justify-between">
+                {chassis.name}
+                <Badge variant="outline" className="text-xs">
+                  {chassis.type || 'Chassis'}
+                </Badge>
+              </CardTitle>
             </CardHeader>
-            <CardContent className="flex-1 flex flex-col">
-              <div className="flex-1" />
-              
-              <div className="space-y-3">
-                <div className="flex justify-between items-center">
-                  <span className="text-white font-bold">
-                    {canSeePrices ? `$${chassis.price.toLocaleString()}` : '—'}
+            <CardContent>
+              <p className="text-gray-400 text-sm mb-3">{chassis.description}</p>
+              <div className="flex justify-between items-center">
+                {canSeePrices && chassis.price && (
+                  <span className="text-white font-medium">
+                    ${chassis.price.toLocaleString()}
                   </span>
-                </div>
-
-                {chassis.productInfoUrl && (
-                  <div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="text-blue-400 hover:text-blue-300 p-1"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        window.open(chassis.productInfoUrl, '_blank');
-                      }}
-                    >
-                      <ExternalLink className="h-4 w-4 mr-1" />
-                      Product Info
-                    </Button>
-                  </div>
                 )}
-                
-                <Button 
-                  className="w-full bg-red-600 hover:bg-red-700 text-white"
-                  onClick={() => onChassisSelect(chassis)}
-                >
-                  {selectedChassis?.id === chassis.id ? 'Selected' : 'Select Chassis'}
-                </Button>
+                {chassis.partNumber && (
+                  <Badge variant="outline" className="text-xs">
+                    {chassis.partNumber}
+                  </Badge>
+                )}
               </div>
+              {chassis.specifications && (
+                <div className="mt-2 flex flex-wrap gap-1">
+                  {Object.entries(chassis.specifications).map(([key, value]) => (
+                    <Badge key={key} variant="outline" className="text-xs">
+                      {key}: {value}
+                    </Badge>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
         ))}

@@ -44,20 +44,55 @@ class ProductDataService {
 
   // Transform database rows to Level2Product interface
   private transformDbToLevel2(row: any): Level2Product {
-    return {
+    console.group(`[transformDbToLevel2] Transforming product: ${row.name} (${row.id})`);
+    
+    // Log the raw row data for debugging
+    console.log('Raw row data:', JSON.stringify(row, null, 2));
+    
+    // Determine chassis type - prioritize subcategory, then chassis_type, then type
+    const chassisType = row.subcategory || row.chassis_type || row.type || 'N/A';
+    
+    // Map to standard chassis types if needed
+    let mappedChassisType = chassisType.toUpperCase();
+    if (chassisType === '14-card' || chassisType === '14CARD') {
+      mappedChassisType = 'LTX';
+    } else if (chassisType === '7-card' || chassisType === '7CARD') {
+      mappedChassisType = 'MTX';
+    } else if (chassisType === '4-card' || chassisType === '4CARD') {
+      mappedChassisType = 'STX';
+    }
+    
+    const transformed = {
       id: row.id,
       name: row.name,
-      parentProductId: row.parent_product_id || '',
-      chassisType: row.chassis_type || 'N/A',
+      type: 'chassis', // Standardize type to 'chassis' for all level 2 products
+      asset_type_id: row.asset_type_id,
+      category: row.category,
       description: row.description || '',
+      specifications: {
+        ...(row.specifications || {}),
+        // Ensure we have slots defined based on chassis type
+        slots: row.specifications?.slots || 
+               (mappedChassisType === 'LTX' ? 14 : 
+                mappedChassisType === 'MTX' ? 7 : 4),
+        height: row.specifications?.height || '3U'
+      },
       price: parseFloat(row.price) || 0,
       cost: parseFloat(row.cost) || 0,
-      enabled: row.enabled !== false,
-      specifications: row.specifications || {},
-      partNumber: row.part_number,
-      image: row.image_url,
-      productInfoUrl: row.product_info_url
+      enabled: row.enabled !== undefined ? row.enabled : true,
+      parentProductId: row.parent_product_id,
+      partNumber: row.part_number || '',
+      image: row.image_url || '',
+      productInfoUrl: row.product_info_url || '',
+      chassisType: mappedChassisType, // Use the mapped chassis type
+      productLevel: row.product_level || 2,
+      rackConfigurable: row.rack_configurable !== false // Default to true if not specified
     };
+
+    console.log('Transformed product:', JSON.stringify(transformed, null, 2));
+    console.groupEnd();
+    
+    return transformed;
   }
 
   // Transform database rows to Level3Product interface
@@ -281,26 +316,71 @@ class ProductDataService {
   // Get Level 2 products by category using the new database function
   async getLevel2ProductsByCategory(category: 'dga' | 'pd' | 'qtms'): Promise<Level2Product[]> {
     try {
-      console.log(`Fetching Level 2 products for category: ${category}`);
+      console.group(`[ProductDataService] Fetching Level 2 products for category: ${category}`);
       
+      // Try the category-based RPC first
+      console.log(`Calling RPC: get_level2_products_for_category with category: ${category.toUpperCase()}`);
       const { data, error } = await supabase.rpc('get_level2_products_for_category', {
         category_filter: category.toUpperCase()
       });
 
       if (error) {
-        console.error(`Error fetching Level 2 products for ${category}:`, error);
-        throw error;
+        console.error(`RPC Error (get_level2_products_for_category):`, error);
+        console.log('Falling back to parent-based method...');
+        
+        // Fallback to parent-based method if category-based fails
+        try {
+          // Map category to parent ID
+          const parentIdMap = {
+            'dga': 'dga',
+            'pd': 'pd',
+            'qtms': 'qtms'
+          };
+          
+          const parentId = parentIdMap[category];
+          if (!parentId) {
+            throw new Error(`No parent ID mapping for category: ${category}`);
+          }
+          
+          console.log(`Fetching Level 2 products for parent ID: ${parentId}`);
+          const parentBasedProducts = await this.getLevel2ProductsForLevel1(parentId);
+          console.log(`Found ${parentBasedProducts.length} products using parent-based method`);
+          
+          // Ensure we have the category set correctly
+          const productsWithCategory = parentBasedProducts.map(product => ({
+            ...product,
+            category: category.toLowerCase()
+          }));
+          
+          console.groupEnd();
+          return productsWithCategory;
+        } catch (fallbackError) {
+          console.error('Fallback method also failed:', fallbackError);
+          throw new Error(`Both category-based and parent-based methods failed for ${category}`);
+        }
       }
 
-      const level2Products = data?.map(row => ({
-        ...this.transformDbToLevel2(row),
-        type: row.chassis_type || row.category || 'Standard'
-      })) || [];
+      // If we got here, the category-based method worked
+      console.log(`RPC Response: Found ${data?.length || 0} products`);
+      
+      const level2Products = (data || []).map(row => {
+        const transformed = this.transformDbToLevel2(row);
+        console.log('Transformed product:', {
+          id: transformed.id,
+          name: transformed.name,
+          enabled: transformed.enabled,
+          category: transformed.category,
+          chassisType: transformed.chassisType
+        });
+        return transformed;
+      });
 
-      console.log(`Found ${level2Products.length} Level 2 products for ${category}:`, level2Products);
+      console.log(`Returning ${level2Products.length} Level 2 products for ${category}`);
+      console.groupEnd();
       return level2Products;
     } catch (error) {
-      console.error(`Error fetching Level 2 products for category ${category}:`, error);
+      console.error(`Error in getLevel2ProductsByCategory for ${category}:`, error);
+      console.groupEnd();
       return [];
     }
   }

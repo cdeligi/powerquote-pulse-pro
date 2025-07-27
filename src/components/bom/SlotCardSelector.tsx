@@ -77,24 +77,68 @@ const SlotCardSelector = ({
 
   // Filter cards based on chassis compatibility, bushing validation, and LTX slot 8 restriction
   const getCompatibleCards = () => {
-    return availableCards.filter(card => {
-      if (!card.compatibleChassis.includes(chassis.type)) {
+    console.group(`[SlotCardSelector] Filtering cards for chassis:`, {
+      chassisId: chassis.id,
+      chassisName: chassis.name,
+      chassisType: chassis.chassisType,
+      legacyType: chassis.type,
+      slot: slot,
+      currentSlotAssignments: Object.keys(currentSlotAssignments),
+      allChassisProps: { ...chassis } // Log all chassis properties
+    });
+
+    const filteredCards = availableCards.filter(card => {
+      console.log(`[SlotCardSelector] Checking card: ${card.name} (${card.id})`);
+      
+      // Check chassis compatibility - use chassisType for compatibility check
+      const chassisTypes = [
+        chassis.chassisType,
+        chassis.type,
+        chassis.specifications?.chassisType,
+        chassis.specifications?.type
+      ].filter(Boolean);
+      
+      console.log(`[SlotCardSelector] Available chassis types for compatibility check:`, chassisTypes);
+      
+      // Check if the card is compatible with any of the chassis types
+      const isCompatible = card.compatibleChassis.some((compatibleType: string) => 
+        chassisTypes.some(chassisType => 
+          chassisType && compatibleType && 
+          chassisType.toString().toLowerCase() === compatibleType.toLowerCase()
+        )
+      );
+
+      if (!isCompatible) {
+        console.log(`[SlotCardSelector] Card ${card.name} is not compatible with any of chassis types:`, chassisTypes);
         return false;
       }
 
       // LTX Slot 8 restriction - only display cards allowed
-      if (chassis.type === 'LTX' && slot === 8 && card.type !== 'display') {
+      const isLTX = chassisTypes.some(t => t && t.toString().toUpperCase() === 'LTX');
+      if (isLTX && slot === 8 && card.type !== 'display') {
+        console.log(`[SlotCardSelector] Card ${card.name} is not allowed in LTX slot 8`);
         return false;
       }
 
       // Special validation for bushing cards
       if (isBushingCard(card as any)) {
+        console.log(`[SlotCardSelector] Validating bushing card: ${card.name}`);
         const validation = validateBushingCardPlacement(chassis, currentSlotAssignments);
+        console.log(`[SlotCardSelector] Bushing validation result:`, validation);
+        
+        if (!validation.isValid) {
+          console.warn(`[SlotCardSelector] Bushing card ${card.name} is not valid for placement:`, validation.errorMessage);
+        }
+        
         return validation.isValid;
       }
 
       return true;
     });
+
+    console.log(`[SlotCardSelector] Found ${filteredCards.length} compatible cards`);
+    console.groupEnd();
+    return filteredCards;
   };
 
   const compatibleCards = getCompatibleCards();
