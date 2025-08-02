@@ -127,7 +127,6 @@ const DGAProductSelector = ({ onProductSelect, canSeePrices }: DGAProductSelecto
     <div className="space-y-8 max-w-6xl mx-auto">
       <div className="text-center">
         <h2 className="text-3xl font-bold text-white mb-3">DGA Products</h2>
-        <p className="text-gray-400 text-lg">Select dissolved gas analysis monitoring equipment</p>
       </div>
 
       {/* Level 1 Products Grid */}
