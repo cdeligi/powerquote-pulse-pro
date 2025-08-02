@@ -83,7 +83,8 @@ const RackVisualizer = ({
       return card.name;
     }
     // For empty slots, show appropriate title
-    if (chassis.type === 'LTX' && slot === 8) {
+    const chassisType = chassis.type?.toUpperCase() || chassis.chassisType?.toUpperCase() || '';
+    if (chassisType === 'LTX' && slot === 8) {
       return 'Slot 8 - Click to add Display Card';
     }
     return `Slot ${slot} - Click to add card`;
@@ -159,9 +160,11 @@ const RackVisualizer = ({
   };
 
   const renderChassisLayout = () => {
-    if (chassis.type === 'LTX') {
-      // Top row: slots 8-14
-      // Bottom row: CPU (0) + slots 1-7
+    const chassisType = chassis.type?.toUpperCase() || chassis.chassisType?.toUpperCase() || '';
+    
+    if (chassisType === 'LTX') {
+      // Top row: slots 8-14 (7 slots)
+      // Bottom row: CPU (0) + slots 1-7 (8 slots)
       const topRowSlots = [8, 9, 10, 11, 12, 13, 14];
       const bottomRowSlots = [0, 1, 2, 3, 4, 5, 6, 7];
       
@@ -175,7 +178,7 @@ const RackVisualizer = ({
           </div>
         </div>
       );
-    } else if (chassis.type === 'MTX') {
+    } else if (chassisType === 'MTX') {
       // Single row: CPU (0) + slots 1-7
       const slots = [0, 1, 2, 3, 4, 5, 6, 7];
       return (
@@ -200,7 +203,7 @@ const RackVisualizer = ({
         <CardTitle className="text-white flex items-center justify-between">
           <span>Rack Configuration - {chassis.name}</span>
           <Badge variant="outline" className="text-sm text-white border-gray-500">
-            {chassis.height} • {chassis.slots} slots
+            {chassis.specifications?.height || chassis.height || '6U'} • {chassis.specifications?.slots || 14} slots
           </Badge>
         </CardTitle>
       </CardHeader>

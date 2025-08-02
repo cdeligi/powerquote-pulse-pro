@@ -150,6 +150,11 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
   };
 
   const handleLevel2OptionToggle = (option: Level2Product) => {
+    console.log('Level2OptionToggle called with option:', option.name, 'chassisType:', option.chassisType);
+    
+    // Check if this is a single-selection context (clear other selections first)
+    setSelectedLevel2Options([]);
+    
     // If the option has a chassis type and it's not 'N/A', show chassis config
     if (option.chassisType && option.chassisType !== 'N/A') {
       console.log('Showing chassis configuration for:', option.name);
@@ -160,7 +165,8 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
       return;
     }
 
-    // Otherwise, add directly to BOM
+    // For N/A chassis type or no chassis type, add directly to BOM
+    console.log('Adding N/A chassis product directly to BOM:', option.name);
     handleAddToBOM(option);
   };
 
@@ -654,13 +660,16 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
             onRemoteDisplayToggle={handleRemoteDisplayToggle}
           />
           
-          <SlotCardSelector
-            chassis={configuringChassis}
-            slot={selectedSlot}
-            onCardSelect={handleCardSelect}
-            onClose={() => setSelectedSlot(null)}
-            canSeePrices={canSeePrices}
-          />
+          {selectedSlot !== null && (
+            <SlotCardSelector
+              chassis={configuringChassis}
+              slot={selectedSlot}
+              onCardSelect={handleCardSelect}
+              onClose={() => setSelectedSlot(null)}
+              canSeePrices={canSeePrices}
+              currentSlotAssignments={slotAssignments}
+            />
+          )}
           
           <div className="flex justify-end space-x-4">
             <Button 

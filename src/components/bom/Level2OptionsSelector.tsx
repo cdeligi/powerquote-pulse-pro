@@ -63,15 +63,15 @@ const Level2OptionsSelector = ({
   };
 
   const handleOptionClick = (option: Level2Product) => {
-    console.log('Option clicked:', option);
+    console.log('Level2Option clicked:', option.name, 'chassisType:', option.chassisType);
     
-    // If the option has a chassisType and it's not 'N/A', handle as chassis selection
+    // For single-selection behavior, only handle chassis selection if it's a chassis
     if (option.chassisType && option.chassisType !== 'N/A' && onChassisSelect) {
-      console.log('Handling as chassis selection');
+      console.log('Handling as chassis selection - requires configuration');
       onChassisSelect(option);
     } else {
-      // Otherwise, toggle the option in the selected options
-      console.log('Toggling option in selected options');
+      // For N/A chassis type or no chassis type, this should add directly to BOM
+      console.log('Handling as direct BOM addition');
       onOptionToggle(option);
     }
   };
