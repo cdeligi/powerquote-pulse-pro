@@ -184,7 +184,6 @@ const PDProductSelector = ({ onProductSelect, canSeePrices }: PDProductSelectorP
     <div className="space-y-8 max-w-6xl mx-auto">
       <div className="text-center">
         <h2 className="text-3xl font-bold text-white mb-3">Partial Discharge Products</h2>
-        <p className="text-gray-400 text-lg">Select partial discharge monitoring equipment</p>
       </div>
 
       {/* Level 1 Products Grid */}
