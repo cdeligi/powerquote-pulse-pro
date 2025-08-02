@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Level2Product } from "@/types/product";
+import { Level1Product, Level2Product, Level3Product } from "@/types/product";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -8,10 +8,11 @@ import { productDataService } from "@/services/productDataService";
 interface ChassisSelectorProps {
   onChassisSelect: (chassis: Level2Product) => void;
   selectedChassis: Level2Product | null;
+  onAddToBOM?: (product: Level1Product | Level2Product | Level3Product) => void;
   canSeePrices?: boolean;
 }
 
-const ChassisSelector = ({ onChassisSelect, selectedChassis, canSeePrices = true }: ChassisSelectorProps) => {
+const ChassisSelector = ({ onChassisSelect, selectedChassis, onAddToBOM, canSeePrices = true }: ChassisSelectorProps) => {
   const [chassisOptions, setChassisOptions] = useState<Level2Product[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -123,12 +124,11 @@ const ChassisSelector = ({ onChassisSelect, selectedChassis, canSeePrices = true
         {chassisOptions.map((chassis) => (
           <Card
             key={chassis.id}
-            className={`cursor-pointer transition-all hover:shadow-lg ${
+            className={`transition-all hover:shadow-lg ${
               selectedChassis?.id === chassis.id
                 ? 'bg-red-600 border-red-500'
                 : 'bg-gray-900 border-gray-800 hover:border-red-500'
             }`}
-            onClick={() => onChassisSelect(chassis)}
           >
             <CardHeader>
               <CardTitle className="text-white flex items-center justify-between">
@@ -140,7 +140,7 @@ const ChassisSelector = ({ onChassisSelect, selectedChassis, canSeePrices = true
             </CardHeader>
             <CardContent>
               <p className="text-gray-400 text-sm mb-3">{chassis.description}</p>
-              <div className="flex justify-between items-center">
+              <div className="flex justify-between items-center mb-3">
                 {canSeePrices && chassis.price && (
                   <span className="text-white font-medium">
                     ${chassis.price.toLocaleString()}
@@ -152,6 +152,34 @@ const ChassisSelector = ({ onChassisSelect, selectedChassis, canSeePrices = true
                   </Badge>
                 )}
               </div>
+              
+              {/* Configure or Add to BOM buttons */}
+              <div className="flex gap-2 mb-3">
+                <Button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onChassisSelect(chassis);
+                  }}
+                  size="sm"
+                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+                >
+                  Configure Chassis
+                </Button>
+                {onAddToBOM && (
+                  <Button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onAddToBOM(chassis);
+                    }}
+                    size="sm"
+                    variant="outline"
+                    className="flex-1"
+                  >
+                    Add to BOM
+                  </Button>
+                )}
+              </div>
+              
               {chassis.specifications && (
                 <div className="mt-2 flex flex-wrap gap-1">
                   {Object.entries(chassis.specifications).map(([key, value]) => (

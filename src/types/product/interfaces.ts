@@ -152,6 +152,7 @@ export interface BOMItem {
   level2Options?: Level2Product[];
   level3Customizations?: Level3Customization[];
   level4Configurations?: Level4Product[];
+  slotAssignments?: Record<number, Level3Product>; // For chassis configurations
   
   // Additional properties for admin quote management
   name?: string;
