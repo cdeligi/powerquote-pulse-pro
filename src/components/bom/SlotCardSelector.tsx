@@ -194,24 +194,31 @@ const SlotCardSelector = ({
   return (
     <Dialog open={true} onOpenChange={onClose}>
       <DialogContent className="max-w-5xl bg-gray-900 border-gray-800 text-white max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="text-white flex items-center justify-between">
-            Select Card for Slot {slot}
-            {slot !== 8 && chassis.type === 'LTX' && compatibleCards.some(card => card.type === 'display') && (
-              <span className="text-sm text-gray-400">
-                (Display cards will auto-route to slot 8)
-              </span>
-            )}
-            {chassis.type === 'LTX' && slot === 8 && (
-              <span className="text-sm text-purple-400">
-                (Display Cards Only)
-              </span>
-            )}
-            <Button variant="ghost" size="sm" onClick={onClose}>
-              <X className="h-4 w-4" />
-            </Button>
-          </DialogTitle>
-        </DialogHeader>
+          <DialogHeader>
+            <DialogTitle className="text-white flex items-center justify-between">
+              Select Card for Slot {slot}
+              <div className="flex items-center gap-4">
+                {slot !== 8 && chassis.type === 'LTX' && compatibleCards.some(card => card.type === 'display') && (
+                  <span className="text-sm text-gray-400">
+                    (Display cards will auto-route to slot 8)
+                  </span>
+                )}
+                {chassis.type === 'LTX' && slot === 8 && (
+                  <span className="text-sm text-purple-400">
+                    (Display Cards Only)
+                  </span>
+                )}
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={onClose}
+                  className="h-6 w-6 p-0 hover:bg-gray-700"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            </DialogTitle>
+          </DialogHeader>
 
         {/* Show LTX slot 8 restriction */}
         {chassis.type === 'LTX' && slot === 8 && ltxSlot8ErrorCards.length > 0 && (
