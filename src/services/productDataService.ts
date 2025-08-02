@@ -369,7 +369,6 @@ class ProductDataService {
           id: transformed.id,
           name: transformed.name,
           enabled: transformed.enabled,
-          category: transformed.category,
           chassisType: transformed.chassisType
         });
         return transformed;

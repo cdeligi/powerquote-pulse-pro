@@ -128,6 +128,27 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
     }
   }, [activeTab, level1Products, selectedLevel1Product?.id]);
 
+  const handleAddToBOM = (product: Level1Product | Level2Product | Level3Product) => {
+    console.log('Adding product to BOM:', product.name);
+    
+    const newItem: BOMItem = {
+      id: `${product.id}-${Date.now()}`,
+      product: product,
+      quantity: 1,
+      enabled: true
+    };
+    
+    // Add to BOM
+    setBomItems(prev => [...prev, newItem]);
+    onBOMUpdate([...bomItems, newItem]);
+    
+    // Show success message
+    toast({
+      title: 'Added to BOM',
+      description: `${product.name} has been added to your bill of materials.`,
+    });
+  };
+
   const handleLevel2OptionToggle = (option: Level2Product) => {
     // If the option has a chassis type and it's not 'N/A', show chassis config
     if (option.chassisType && option.chassisType !== 'N/A') {
@@ -140,23 +161,7 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
     }
 
     // Otherwise, add directly to BOM
-    console.log('Adding product directly to BOM:', option.name);
-    const newItem: BOMItem = {
-      id: `${option.id}-${Date.now()}`,
-      product: option,
-      quantity: 1,
-      enabled: true
-    };
-    
-    // Add to BOM
-    setBomItems(prev => [...prev, newItem]);
-    onBOMUpdate([...bomItems, newItem]);
-    
-    // Show success message
-    toast({
-      title: 'Added to BOM',
-      description: `${option.name} has been added to your bill of materials.`,
-    });
+    handleAddToBOM(option);
   };
 
   const handleChassisSelect = (chassis: Level2Product) => {
@@ -181,21 +186,7 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
       }, 100);
     } else {
       // For non-chassis products, add directly to BOM
-      console.log('Adding non-chassis product directly to BOM:', chassis.name);
-      const newItem: BOMItem = {
-        id: `${chassis.id}-${Date.now()}`,
-        product: chassis,
-        quantity: 1,
-        enabled: true
-      };
-      
-      setBomItems(prev => [...prev, newItem]);
-      onBOMUpdate([...bomItems, newItem]);
-      
-      toast({
-        title: 'Added to BOM',
-        description: `${chassis.name} has been added to your bill of materials.`,
-      });
+      handleAddToBOM(chassis);
     }
   };
 
@@ -651,6 +642,7 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
           <RackVisualizer
             chassis={{
               ...configuringChassis,
+              type: configuringChassis.type || configuringChassis.chassisType || 'chassis',
               height: configuringChassis.specifications?.height || '',
               slots: configuringChassis.specifications?.slots || 0
             }}
@@ -699,19 +691,42 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
           <ChassisSelector
             onChassisSelect={handleChassisSelect}
             selectedChassis={selectedChassis}
+            onAddToBOM={handleAddToBOM}
             canSeePrices={canSeePrices}
           />
         </div>
       );
     }
 
-    // For other tabs, show the level 2 options selector
+    // For other tabs, show the level 2 options selector and add to BOM button
     return (
       <div className="space-y-6">
+        {/* Level 1 Product Add to BOM */}
+        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-4 rounded-lg border border-blue-200">
+          <div className="flex items-center justify-between">
+            <div>
+              <h4 className="font-semibold text-gray-900">{product.name}</h4>
+              <p className="text-sm text-gray-600">{product.description}</p>
+              {canSeePrices && (
+                <p className="text-lg font-bold text-blue-600 mt-1">
+                  ${product.price.toLocaleString()}
+                </p>
+              )}
+            </div>
+            <Button
+              onClick={() => handleAddToBOM(product)}
+              className="bg-blue-600 hover:bg-blue-700 text-white"
+            >
+              Add to BOM
+            </Button>
+          </div>
+        </div>
+
         <Level2OptionsSelector
           level1Product={product}
           selectedOptions={selectedLevel2Options}
           onOptionToggle={handleLevel2OptionToggle}
+          onAddToBOM={handleAddToBOM}
           canSeePrices={canSeePrices}
         />
       </div>

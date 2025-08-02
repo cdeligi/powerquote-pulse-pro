@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Level1Product, Level2Product } from '@/types/product';
+import { Button } from '@/components/ui/button';
+import { Level1Product, Level2Product, Level3Product } from '@/types/product';
 import { productDataService } from '@/services/productDataService';
 
 interface Level2OptionsSelectorProps {
@@ -9,6 +10,7 @@ interface Level2OptionsSelectorProps {
   selectedOptions: Level2Product[];
   onOptionToggle: (option: Level2Product) => void;
   onChassisSelect?: (chassis: Level2Product) => void;
+  onAddToBOM?: (product: Level1Product | Level2Product | Level3Product) => void;
   canSeePrices?: boolean;
 }
 
@@ -17,6 +19,7 @@ const Level2OptionsSelector = ({
   selectedOptions, 
   onOptionToggle, 
   onChassisSelect, 
+  onAddToBOM,
   canSeePrices = true 
 }: Level2OptionsSelectorProps) => {
   const [availableOptions, setAvailableOptions] = useState<Level2Product[]>([]);
@@ -126,7 +129,7 @@ const Level2OptionsSelector = ({
                       Requires chassis configuration
                     </p>
                   )}
-                  <div className="flex justify-between items-center">
+                  <div className="flex justify-between items-center mb-3">
                     {canSeePrices && option.price && (
                       <span className="text-white font-medium">
                         ${option.price.toLocaleString()}
@@ -138,6 +141,23 @@ const Level2OptionsSelector = ({
                       </Badge>
                     )}
                   </div>
+                  
+                  {/* Add to BOM Button */}
+                  {onAddToBOM && !requiresChassisConfig && (
+                    <div className="mb-3">
+                      <Button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onAddToBOM(option);
+                        }}
+                        size="sm"
+                        className="w-full bg-green-600 hover:bg-green-700 text-white"
+                      >
+                        Add to BOM
+                      </Button>
+                    </div>
+                  )}
+                  
                   {option.specifications && (
                     <div className="mt-2 flex flex-wrap gap-1">
                       {Object.entries(option.specifications).map(([key, value]) => (
