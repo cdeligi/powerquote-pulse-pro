@@ -648,8 +648,8 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
           <RackVisualizer
             chassis={{
               ...configuringChassis,
-              type: configuringChassis.type || configuringChassis.chassisType || 'chassis',
-              height: configuringChassis.specifications?.height || '',
+              type: configuringChassis.chassisType || configuringChassis.type || 'chassis',
+              height: configuringChassis.specifications?.height || '6U',
               slots: configuringChassis.specifications?.slots || 0
             }}
             slotAssignments={slotAssignments}
@@ -735,6 +735,7 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
           level1Product={product}
           selectedOptions={selectedLevel2Options}
           onOptionToggle={handleLevel2OptionToggle}
+          onChassisSelect={handleChassisSelect}
           onAddToBOM={handleAddToBOM}
           canSeePrices={canSeePrices}
         />
@@ -782,63 +783,72 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
   return (
     <div className="space-y-6">
       {/* Quote Fields Section */}
-          <QuoteFieldsSection
-            quoteFields={quoteFields}
-            onFieldChange={handleQuoteFieldChange}
-          />
-
-      {/* Product Selection */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Product Selection</CardTitle>
-          <CardDescription>
-            Select products to add to your Bill of Materials
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Tabs value={activeTab} onValueChange={(value) => {
-            // Add loading state to prevent UI lag
-            setIsLoading(true);
-            
-            setActiveTab(value);
-            const selectedProduct = level1Products.find(p => p.id === value);
-            setSelectedLevel1Product(selectedProduct || null);
-            
-            // Clear relevant state when switching tabs
-            setSelectedChassis(null);
-            setSlotAssignments({});
-            setSelectedSlot(null);
-            setHasRemoteDisplay(false);
-            
-            console.log('Tab switching to:', value, 'Product:', selectedProduct);
-            
-            // Remove loading state after brief delay for smooth transition
-            setTimeout(() => setIsLoading(false), 100);
-          }}>
-            <TabsList className="grid w-full grid-cols-3">
-              {level1Products.map(product => (
-                <TabsTrigger key={product.id} value={product.id}>
-                  {product.name}
-                </TabsTrigger>
-              ))}
-            </TabsList>
-
-            {level1Products.map(product => (
-              <TabsContent key={product.id} value={product.id}>
-                {renderProductContent(product.id)}
-              </TabsContent>
-            ))}
-          </Tabs>
-        </CardContent>
-      </Card>
-
-      {/* BOM Display */}
-      <BOMDisplay
-        bomItems={bomItems}
-        onUpdateBOM={handleBOMUpdate}
-        onEditConfiguration={handleBOMConfigurationEdit}
-        canSeePrices={canSeePrices}
+      <QuoteFieldsSection
+        quoteFields={quoteFields}
+        onFieldChange={handleQuoteFieldChange}
       />
+
+      {/* Main Layout: Product Selection (Left) and BOM Display (Right) */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Product Selection - Left Side (2/3 width) */}
+        <div className="lg:col-span-2">
+          <Card>
+            <CardHeader>
+              <CardTitle>Product Selection</CardTitle>
+              <CardDescription>
+                Select products to add to your Bill of Materials
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Tabs value={activeTab} onValueChange={(value) => {
+                // Add loading state to prevent UI lag
+                setIsLoading(true);
+                
+                setActiveTab(value);
+                const selectedProduct = level1Products.find(p => p.id === value);
+                setSelectedLevel1Product(selectedProduct || null);
+                
+                // Clear relevant state when switching tabs
+                setSelectedChassis(null);
+                setSlotAssignments({});
+                setSelectedSlot(null);
+                setHasRemoteDisplay(false);
+                
+                console.log('Tab switching to:', value, 'Product:', selectedProduct);
+                
+                // Remove loading state after brief delay for smooth transition
+                setTimeout(() => setIsLoading(false), 100);
+              }}>
+                <TabsList className="grid w-full grid-cols-3">
+                  {level1Products.map(product => (
+                    <TabsTrigger key={product.id} value={product.id}>
+                      {product.name}
+                    </TabsTrigger>
+                  ))}
+                </TabsList>
+
+                {level1Products.map(product => (
+                  <TabsContent key={product.id} value={product.id}>
+                    {renderProductContent(product.id)}
+                  </TabsContent>
+                ))}
+              </Tabs>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* BOM Display - Right Side (1/3 width, sticky) */}
+        <div className="lg:col-span-1">
+          <div className="sticky top-4">
+            <BOMDisplay
+              bomItems={bomItems}
+              onUpdateBOM={handleBOMUpdate}
+              onEditConfiguration={handleBOMConfigurationEdit}
+              canSeePrices={canSeePrices}
+            />
+          </div>
+        </div>
+      </div>
 
       {/* Discount Section */}
       <DiscountSection

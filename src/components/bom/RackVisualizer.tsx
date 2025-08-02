@@ -161,10 +161,12 @@ const RackVisualizer = ({
 
   const renderChassisLayout = () => {
     const chassisType = chassis.type?.toUpperCase() || chassis.chassisType?.toUpperCase() || '';
+    const totalSlots = chassis.specifications?.slots || chassis.slots || 0;
     
-    if (chassisType === 'LTX') {
-      // Top row: slots 8-14 (7 slots)
-      // Bottom row: CPU (0) + slots 1-7 (8 slots)
+    console.log(`RackVisualizer: chassis type = ${chassisType}, total slots = ${totalSlots}`);
+    
+    if (chassisType === 'LTX' && totalSlots === 14) {
+      // LTX with 14 slots: Top row slots 8-14 (7 slots), Bottom row CPU (0) + slots 1-7 (8 slots)
       const topRowSlots = [8, 9, 10, 11, 12, 13, 14];
       const bottomRowSlots = [0, 1, 2, 3, 4, 5, 6, 7];
       
@@ -178,20 +180,41 @@ const RackVisualizer = ({
           </div>
         </div>
       );
-    } else if (chassisType === 'MTX') {
-      // Single row: CPU (0) + slots 1-7
+    } else if (chassisType === 'MTX' && totalSlots === 7) {
+      // MTX with 7 slots: Single row CPU (0) + slots 1-7
       const slots = [0, 1, 2, 3, 4, 5, 6, 7];
       return (
         <div className="grid grid-cols-8 gap-2">
           {slots.map(renderSlot)}
         </div>
       );
-    } else {
-      // STX: Single row: CPU (0) + slots 1-4
+    } else if (chassisType === 'STX' && totalSlots === 4) {
+      // STX with 4 slots: Single row CPU (0) + slots 1-4
       const slots = [0, 1, 2, 3, 4];
       return (
         <div className="grid grid-cols-5 gap-2">
           {slots.map(renderSlot)}
+        </div>
+      );
+    } else {
+      // Fallback: render based on actual slot count from database
+      const slots = Array.from({ length: totalSlots + 1 }, (_, i) => i); // Include CPU slot 0
+      const slotsPerRow = Math.min(8, totalSlots + 1);
+      const rows = Math.ceil((totalSlots + 1) / slotsPerRow);
+      
+      return (
+        <div className="space-y-2">
+          {Array.from({ length: rows }, (_, rowIndex) => {
+            const startSlot = rowIndex * slotsPerRow;
+            const endSlot = Math.min(startSlot + slotsPerRow, totalSlots + 1);
+            const rowSlots = slots.slice(startSlot, endSlot);
+            
+            return (
+              <div key={rowIndex} className={`grid gap-2`} style={{ gridTemplateColumns: `repeat(${rowSlots.length}, minmax(0, 1fr))` }}>
+                {rowSlots.map(renderSlot)}
+              </div>
+            );
+          })}
         </div>
       );
     }
