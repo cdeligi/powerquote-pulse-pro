@@ -11,12 +11,15 @@ interface BOMDisplayProps {
   bomItems: BOMItem[];
   onUpdateBOM: (items: BOMItem[]) => void;
   onEditConfiguration?: (item: BOMItem) => void;
+  onSubmitQuote?: () => void;
   canSeePrices: boolean;
 }
 
-const BOMDisplay = ({ bomItems, onUpdateBOM, onEditConfiguration, canSeePrices }: BOMDisplayProps) => {
+const BOMDisplay = ({ bomItems, onUpdateBOM, onEditConfiguration, onSubmitQuote, canSeePrices }: BOMDisplayProps) => {
   const [editingItem, setEditingItem] = useState<string | null>(null);
   const [editQuantity, setEditQuantity] = useState<number>(1);
+  const [editingPrice, setEditingPrice] = useState<string | null>(null);
+  const [editPrice, setEditPrice] = useState<number>(0);
 
   const handleEditStart = (item: BOMItem) => {
     setEditingItem(item.id);
@@ -34,6 +37,32 @@ const BOMDisplay = ({ bomItems, onUpdateBOM, onEditConfiguration, canSeePrices }
   const handleEditCancel = () => {
     setEditingItem(null);
     setEditQuantity(1);
+  };
+
+  const handlePriceEditStart = (item: BOMItem) => {
+    setEditingPrice(item.id);
+    setEditPrice(item.product.price || 0);
+  };
+
+  const handlePriceEditSave = (itemId: string) => {
+    const updatedItems = bomItems.map(item =>
+      item.id === itemId 
+        ? { 
+            ...item, 
+            product: { ...item.product, price: editPrice },
+            // Track price changes for admin review
+            original_unit_price: item.original_unit_price || item.product.price,
+            approved_unit_price: editPrice
+          } 
+        : item
+    );
+    onUpdateBOM(updatedItems);
+    setEditingPrice(null);
+  };
+
+  const handlePriceEditCancel = () => {
+    setEditingPrice(null);
+    setEditPrice(0);
   };
 
   const handleRemoveItem = (itemId: string) => {
@@ -207,12 +236,62 @@ const BOMDisplay = ({ bomItems, onUpdateBOM, onEditConfiguration, canSeePrices }
               
               {canSeePrices && (
                 <div className="text-right">
-                  <div className="text-white font-medium">
-                    ${((item.product.price || 0) * item.quantity).toLocaleString()}
+                  <div className="flex items-center space-x-2 justify-end">
+                    {editingPrice === item.id ? (
+                      <div className="flex items-center space-x-1">
+                        <span className="text-gray-400 text-xs">$</span>
+                        <Input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={editPrice}
+                          onChange={(e) => setEditPrice(parseFloat(e.target.value) || 0)}
+                          className="w-20 h-6 text-xs bg-gray-700 border-gray-600 text-white"
+                        />
+                        <Button
+                          size="sm"
+                          onClick={() => handlePriceEditSave(item.id)}
+                          className="h-6 w-6 p-0 bg-green-600 hover:bg-green-700"
+                          title="Save price"
+                        >
+                          <Save className="h-3 w-3" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={handlePriceEditCancel}
+                          className="h-6 w-6 p-0 text-gray-400 hover:text-white"
+                          title="Cancel"
+                        >
+                          <X className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center space-x-1">
+                        <div className="text-white font-medium">
+                          ${((item.product.price || 0) * item.quantity).toLocaleString()}
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handlePriceEditStart(item)}
+                          className="h-4 w-4 p-0 text-gray-400 hover:text-white"
+                          title="Edit price"
+                        >
+                          <Edit3 className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    )}
                   </div>
-                  {item.quantity > 1 && (
+                  {item.quantity > 1 && !editingPrice && (
                     <div className="text-gray-400 text-xs">
                       ${item.product.price?.toLocaleString() || '—'} each
+                    </div>
+                  )}
+                  {/* Show price adjustment indicator */}
+                  {item.original_unit_price && item.original_unit_price !== item.product.price && (
+                    <div className="text-yellow-400 text-xs">
+                      Orig: ${item.original_unit_price.toLocaleString()}
                     </div>
                   )}
                   {/* Display cost information if available */}
@@ -247,6 +326,19 @@ const BOMDisplay = ({ bomItems, onUpdateBOM, onEditConfiguration, canSeePrices }
                 </span>
               </div>
             )}
+          </div>
+        )}
+        
+        {/* Submit to Quote Button */}
+        {bomItems.length > 0 && onSubmitQuote && (
+          <div className="pt-3 border-t border-gray-700">
+            <Button
+              onClick={onSubmitQuote}
+              className="w-full bg-red-600 hover:bg-red-700 text-white"
+              size="lg"
+            >
+              Submit to Quote
+            </Button>
           </div>
         )}
       </CardContent>

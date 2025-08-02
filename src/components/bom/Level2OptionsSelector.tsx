@@ -142,21 +142,21 @@ const Level2OptionsSelector = ({
                     )}
                   </div>
                   
-                  {/* Add to BOM Button */}
-                  {onAddToBOM && !requiresChassisConfig && (
-                    <div className="mb-3">
-                      <Button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onAddToBOM(option);
-                        }}
-                        size="sm"
-                        className="w-full bg-green-600 hover:bg-green-700 text-white"
-                      >
-                        Add to BOM
-                      </Button>
-                    </div>
-                  )}
+                   {/* Add to Bill of Material Button */}
+                   {onAddToBOM && !requiresChassisConfig && (
+                     <div className="mb-3">
+                       <Button
+                         onClick={(e) => {
+                           e.stopPropagation();
+                           onAddToBOM(option);
+                         }}
+                         size="sm"
+                         className="w-full bg-green-600 hover:bg-green-700 text-white"
+                       >
+                         Add to Bill of Material
+                       </Button>
+                     </div>
+                   )}
                   
                   {option.specifications && (
                     <div className="mt-2 flex flex-wrap gap-1">
