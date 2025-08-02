@@ -844,6 +844,7 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
               bomItems={bomItems}
               onUpdateBOM={handleBOMUpdate}
               onEditConfiguration={handleBOMConfigurationEdit}
+              onSubmitQuote={submitQuoteRequest}
               canSeePrices={canSeePrices}
             />
           </div>
