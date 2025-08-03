@@ -158,6 +158,7 @@ const ChassisSelector = ({ onChassisSelect, selectedChassis, onAddToBOM, canSeeP
                 <Button
                   onClick={(e) => {
                     e.stopPropagation();
+                    console.log('Configure Chassis clicked for:', chassis.name, 'chassisType:', chassis.chassisType);
                     onChassisSelect(chassis);
                   }}
                   size="sm"
