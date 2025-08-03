@@ -49,8 +49,8 @@ class ProductDataService {
     // Log the raw row data for debugging
     console.log('Raw row data:', JSON.stringify(row, null, 2));
     
-    // Determine chassis type - prioritize subcategory, then chassis_type, then type
-    const chassisType = row.subcategory || row.chassis_type || row.type || 'N/A';
+    // Determine chassis type - prioritize chassis_type field from database, fallback to type, subcategory for display only
+    const chassisType = row.chassis_type || row.type || 'N/A';
     
     // Map to standard chassis types if needed
     let mappedChassisType = chassisType.toUpperCase();

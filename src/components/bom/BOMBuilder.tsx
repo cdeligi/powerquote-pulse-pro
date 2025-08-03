@@ -48,6 +48,7 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [editingQTMS, setEditingQTMS] = useState<ConsolidatedQTMS | null>(null);
   const [configuringChassis, setConfiguringChassis] = useState<Level2Product | null>(null);
+  const [editingOriginalItem, setEditingOriginalItem] = useState<BOMItem | null>(null);
 
   // Get available quote fields for validation
   const [availableQuoteFields, setAvailableQuoteFields] = useState<any[]>([]);
@@ -199,30 +200,52 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
     
     console.log('Adding chassis configuration to BOM:', selectedChassis.name);
     
-    // Create the chassis item
-    const chassisItem: BOMItem = {
-      id: `${selectedChassis.id}-${Date.now()}`,
-      product: selectedChassis,
-      quantity: 1,
-      enabled: true,
-      slotAssignments: { ...slotAssignments }
-    };
-    
-    // Add to BOM
-    setBomItems(prev => [...prev, chassisItem]);
-    onBOMUpdate([...bomItems, chassisItem]);
+    // Check if we're editing an existing item
+    if (editingOriginalItem) {
+      // Update the existing item with new configuration
+      const updatedItem: BOMItem = {
+        ...editingOriginalItem,
+        slotAssignments: { ...slotAssignments }
+      };
+      
+      // Find and update the existing item in BOM
+      const updatedItems = bomItems.map(item => 
+        item.id === editingOriginalItem.id ? updatedItem : item
+      );
+      
+      setBomItems(updatedItems);
+      onBOMUpdate(updatedItems);
+      setEditingOriginalItem(null);
+      
+      toast({
+        title: 'Configuration Updated',
+        description: `${selectedChassis.name} configuration has been updated.`,
+      });
+    } else {
+      // Create new chassis item
+      const chassisItem: BOMItem = {
+        id: `${selectedChassis.id}-${Date.now()}`,
+        product: selectedChassis,
+        quantity: 1,
+        enabled: true,
+        slotAssignments: { ...slotAssignments }
+      };
+      
+      // Add to BOM
+      setBomItems(prev => [...prev, chassisItem]);
+      onBOMUpdate([...bomItems, chassisItem]);
+      
+      toast({
+        title: 'Chassis Configuration Added',
+        description: `${selectedChassis.name} configuration has been added to your bill of materials.`,
+      });
+    }
     
     // Reset chassis configuration state
     setConfiguringChassis(null);
     setSelectedChassis(null);
     setSlotAssignments({});
     setSelectedSlot(null);
-    
-    // Show success message
-    toast({
-      title: 'Chassis Configuration Added',
-      description: `${selectedChassis.name} configuration has been added to your bill of materials.`,
-    });
   };
 
   const handleSlotClick = (slot: number) => {
@@ -385,10 +408,8 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
       setSlotAssignments(item.slotAssignments || {});
       setConfiguringChassis(item.product as Level2Product);
       
-      // Remove the item from BOM temporarily while editing
-      const updatedItems = bomItems.filter(bomItem => bomItem.id !== item.id);
-      setBomItems(updatedItems);
-      onBOMUpdate(updatedItems);
+      // Store the original item for restoration if edit is cancelled
+      setEditingOriginalItem(item);
       
       // Scroll to configuration section
       setTimeout(() => {
