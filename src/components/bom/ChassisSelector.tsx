@@ -161,7 +161,7 @@ const ChassisSelector = ({ onChassisSelect, selectedChassis, onAddToBOM, canSeeP
                     onChassisSelect(chassis);
                   }}
                   size="sm"
-                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-medium"
+                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-medium shadow-md hover:shadow-lg transition-all duration-200 border-0"
                 >
                   Configure Chassis
                 </Button>
@@ -172,8 +172,7 @@ const ChassisSelector = ({ onChassisSelect, selectedChassis, onAddToBOM, canSeeP
                       onAddToBOM(chassis);
                     }}
                     size="sm"
-                    variant="outline"
-                    className="flex-1 text-gray-300 border-gray-600 hover:text-white hover:border-gray-400 hover:bg-gray-800"
+                    className="flex-1 bg-green-600 hover:bg-green-700 text-white font-medium shadow-md hover:shadow-lg transition-all duration-200 border-0"
                   >
                     Add to BOM
                   </Button>

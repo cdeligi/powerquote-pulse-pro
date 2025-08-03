@@ -84,10 +84,12 @@ const BOMDisplay = ({ bomItems, onUpdateBOM, onEditConfiguration, onSubmitQuote,
   };
 
   const isConfigurableItem = (item: BOMItem) => {
-    // Check if item is configurable - includes QTMS, Level 4 products, analog sensors, and bushing configurations
+    // Check if item is configurable - includes QTMS, Level 4 products, analog sensors, bushing configurations, and chassis-configured items
     return item.product.type === 'QTMS' || 
            item.configuration || 
+           item.slotAssignments ||  // Items with chassis/slot configuration
            (item.product as any).configurationType ||
+           ((item.product as any).chassisType && (item.product as any).chassisType !== 'N/A') ||  // Chassis items that can be configured
            item.product.name?.toLowerCase().includes('analog') ||
            item.product.name?.toLowerCase().includes('bushing') ||
            item.product.name?.toLowerCase().includes('digital');

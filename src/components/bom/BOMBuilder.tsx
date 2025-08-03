@@ -8,8 +8,6 @@ import Level2OptionsSelector from './Level2OptionsSelector';
 import ChassisSelector from './ChassisSelector';
 import RackVisualizer from './RackVisualizer';
 import SlotCardSelector from './SlotCardSelector';
-import DGAProductSelector from './DGAProductSelector';
-import PDProductSelector from './PDProductSelector';
 import BOMDisplay from './BOMDisplay';
 import AnalogCardConfigurator from './AnalogCardConfigurator';
 import BushingCardConfigurator from './BushingCardConfigurator';
@@ -347,32 +345,6 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
     setSelectedSlot(null);
   };
 
-  const handleDGAProductSelect = (product: Level1Product, configuration?: Record<string, any>, level2Options?: Level2Product[]) => {
-    const newItem: BOMItem = {
-      id: `${Date.now()}-${Math.random()}`,
-      product: product,
-      quantity: 1,
-      enabled: true,
-      configuration
-    };
-    
-    const updatedItems = [...bomItems, newItem];
-    
-    if (level2Options) {
-      level2Options.forEach(option => {
-        const optionItem: BOMItem = {
-          id: `${Date.now()}-${Math.random()}-${option.id}`,
-          product: option as any,
-          quantity: 1,
-          enabled: true
-        };
-        updatedItems.push(optionItem);
-      });
-    }
-    
-    setBomItems(updatedItems);
-    onBOMUpdate(updatedItems);
-  };
 
   const handleRemoteDisplayToggle = (enabled: boolean) => {
     setHasRemoteDisplay(enabled);

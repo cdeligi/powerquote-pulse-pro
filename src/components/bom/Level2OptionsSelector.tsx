@@ -147,16 +147,16 @@ const Level2OptionsSelector = ({
                    {/* Add to Bill of Material Button */}
                    {onAddToBOM && !requiresChassisConfig && (
                      <div className="mb-3">
-                       <Button
-                         onClick={(e) => {
-                           e.stopPropagation();
-                           onAddToBOM(option);
-                         }}
-                         size="sm"
-                         className="w-full bg-green-600 hover:bg-green-700 text-white"
-                       >
-                         Add to Bill of Material
-                       </Button>
+                        <Button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onAddToBOM(option);
+                          }}
+                          size="sm"
+                          className="w-full bg-green-600 hover:bg-green-700 text-white font-medium shadow-md hover:shadow-lg transition-all duration-200 border-0"
+                        >
+                          Add to Bill of Material
+                        </Button>
                      </div>
                    )}
                   
