@@ -402,9 +402,34 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
   };
 
   const handleBOMConfigurationEdit = (item: BOMItem) => {
-    if (item.product.name?.includes('QTMS') && item.configuration) {
+    console.log('Editing BOM item configuration:', item);
+    
+    // Check if this is a chassis-configured item (has slot assignments)
+    if (item.slotAssignments || (item.product as any).chassisType && (item.product as any).chassisType !== 'N/A') {
+      console.log('Editing chassis configuration for:', item.product.name);
+      
+      // Set up the chassis for editing
+      setSelectedChassis(item.product as Level2Product);
+      setSlotAssignments(item.slotAssignments || {});
+      setConfiguringChassis(item.product as Level2Product);
+      
+      // Remove the item from BOM temporarily while editing
+      const updatedItems = bomItems.filter(bomItem => bomItem.id !== item.id);
+      setBomItems(updatedItems);
+      onBOMUpdate(updatedItems);
+      
+      // Scroll to configuration section
+      setTimeout(() => {
+        const configSection = document.getElementById('chassis-configuration');
+        if (configSection) {
+          configSection.scrollIntoView({ behavior: 'smooth' });
+        }
+      }, 100);
+      
+    } else if (item.product.name?.includes('QTMS') && item.configuration) {
+      // Handle QTMS-specific configuration
       const consolidatedQTMS: ConsolidatedQTMS = {
-        id: item.id,
+        id: item.id || `qtms-${Date.now()}`,
         name: item.product.name,
         description: item.product.description || '',
         partNumber: item.partNumber || item.product.partNumber || '',
@@ -414,6 +439,7 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
       };
       setEditingQTMS(consolidatedQTMS);
     } else {
+      // For other configurable items (Level 4, analog cards, etc.)
       setConfiguringBOMItem(item);
     }
   };
@@ -628,9 +654,9 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
     if (configuringChassis) {
       console.log('Rendering chassis configuration for:', configuringChassis.name);
       return (
-        <div className="space-y-6">
+        <div id="chassis-configuration" className="space-y-6">
           <div className="flex items-center justify-between">
-            <h3 className="text-xl font-semibold">
+            <h3 className="text-xl font-semibold text-white">
               Configure {configuringChassis.name}
             </h3>
             <Button 
@@ -639,6 +665,8 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
               onClick={() => {
                 setConfiguringChassis(null);
                 setSelectedChassis(null);
+                setSlotAssignments({});
+                setSelectedSlot(null);
               }}
             >
               Back to Products
@@ -677,13 +705,17 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
               onClick={() => {
                 setConfiguringChassis(null);
                 setSelectedChassis(null);
+                setSlotAssignments({});
+                setSelectedSlot(null);
               }}
+              className="text-gray-300 border-gray-600 hover:text-white hover:border-gray-400"
             >
               Cancel
             </Button>
             <Button 
               onClick={handleAddChassisToBOM}
               disabled={Object.keys(slotAssignments).length === 0}
+              className="bg-green-600 hover:bg-green-700 text-white disabled:opacity-50"
             >
               Add to BOM
             </Button>
@@ -707,30 +739,10 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
       );
     }
 
-    // For other tabs, show the level 2 options selector and add to BOM button
+    // For other Level 1 products, only show Level 2 options selector
+    // Level 1 products should not have direct "Add to BOM" buttons
     return (
       <div className="space-y-6">
-        {/* Level 1 Product Add to BOM */}
-        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-4 rounded-lg border border-blue-200">
-          <div className="flex items-center justify-between">
-            <div>
-              <h4 className="font-semibold text-gray-900">{product.name}</h4>
-              <p className="text-sm text-gray-600">{product.description}</p>
-              {canSeePrices && (
-                <p className="text-lg font-bold text-blue-600 mt-1">
-                  ${product.price.toLocaleString()}
-                </p>
-              )}
-            </div>
-            <Button
-              onClick={() => handleAddToBOM(product)}
-              className="bg-blue-600 hover:bg-blue-700 text-white"
-            >
-              Add to BOM
-            </Button>
-          </div>
-        </div>
-
         <Level2OptionsSelector
           level1Product={product}
           selectedOptions={selectedLevel2Options}
