@@ -98,7 +98,7 @@ const QuoteFieldsSection = ({ quoteFields, onFieldChange }: QuoteFieldsSectionPr
               <SelectValue placeholder={`Select ${field.label.toLowerCase()}...`} />
             </SelectTrigger>
             <SelectContent className="bg-gray-700 border-gray-600">
-              {field.options?.map((option) => (
+              {(field.options || []).map((option) => (
                 <SelectItem key={option} value={option}>
                   {option}
                 </SelectItem>
