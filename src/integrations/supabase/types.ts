@@ -1262,6 +1262,7 @@ export type Database = {
           image_url: string
           product_info_url: string
           specifications: Json
+          chassis_type: string
         }[]
       }
       get_level2_products_for_category: {
