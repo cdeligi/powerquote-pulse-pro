@@ -717,9 +717,84 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
       );
     }
 
-    // QTMS tab - show chassis selector
+    // QTMS tab - show chassis selector or configuration
     if (productId.toLowerCase() === 'qtms') {
-      console.log('Rendering QTMS tab content');
+      console.log('Rendering QTMS tab content, configuringChassis:', configuringChassis);
+      
+      // If configuring a chassis, show rack visualizer
+      if (configuringChassis && selectedChassis) {
+        return (
+          <div className="space-y-6">
+            <div className="bg-gray-800 p-6 rounded-lg border border-gray-700">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-xl font-semibold text-white">Configure {selectedChassis.name}</h3>
+                 <Button
+                   variant="outline"
+                   onClick={() => {
+                     setConfiguringChassis(null);
+                     setSelectedChassis(null);
+                     setSlotAssignments({});
+                     setSelectedSlot(null);
+                   }}
+                   className="text-gray-300 border-gray-600 hover:text-white hover:border-gray-400"
+                 >
+                   Back to Products
+                 </Button>
+               </div>
+
+               <RackVisualizer
+                 chassis={{
+                   ...selectedChassis,
+                   type: selectedChassis.chassisType || selectedChassis.type || 'chassis',
+                   height: selectedChassis.specifications?.height || '6U',
+                   slots: selectedChassis.specifications?.slots || 0
+                 }}
+                 slotAssignments={slotAssignments}
+                 onSlotClick={handleSlotClick}
+                 onSlotClear={handleSlotClear}
+                 selectedSlot={selectedSlot}
+                 hasRemoteDisplay={hasRemoteDisplay}
+                 onRemoteDisplayToggle={handleRemoteDisplayToggle}
+               />
+             </div>
+
+             {selectedSlot && (
+               <SlotCardSelector
+                 chassis={selectedChassis}
+                 slot={selectedSlot}
+                 onCardSelect={handleCardSelect}
+                 onClose={() => setSelectedSlot(null)}
+                 canSeePrices={canSeePrices}
+                 currentSlotAssignments={slotAssignments}
+               />
+             )}
+
+             <div className="flex gap-4 justify-end">
+               <Button
+                 variant="outline"
+                 onClick={() => {
+                   setConfiguringChassis(null);
+                   setSelectedChassis(null);
+                   setSlotAssignments({});
+                   setSelectedSlot(null);
+                 }}
+                 className="text-gray-300 border-gray-600 hover:text-white hover:border-gray-400"
+               >
+                 Cancel
+               </Button>
+              <Button 
+                onClick={handleAddChassisToBOM}
+                disabled={Object.keys(slotAssignments).length === 0}
+                className="bg-green-600 hover:bg-green-700 text-white disabled:opacity-50"
+              >
+                Add to BOM
+              </Button>
+            </div>
+          </div>
+        );
+      }
+
+      // Otherwise, show chassis selector
       return (
         <div className="space-y-6">
           <ChassisSelector
