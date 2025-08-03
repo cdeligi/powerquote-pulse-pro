@@ -92,13 +92,26 @@ const QuoteFieldsSection = ({ quoteFields, onFieldChange }: QuoteFieldsSectionPr
         );
 
       case 'select':
+        // Parse options if they are stored as JSON string in database
+        let options: string[] = [];
+        try {
+          if (typeof field.options === 'string') {
+            options = JSON.parse(field.options);
+          } else if (Array.isArray(field.options)) {
+            options = field.options;
+          }
+        } catch (error) {
+          console.error('Failed to parse field options:', error);
+          options = [];
+        }
+
         return (
           <Select value={value} onValueChange={(newValue) => onFieldChange(field.id, newValue)}>
             <SelectTrigger className={`bg-gray-700 border-gray-600 text-white ${isRequired && !value ? 'border-red-500' : ''}`}>
               <SelectValue placeholder={`Select ${field.label.toLowerCase()}...`} />
             </SelectTrigger>
             <SelectContent className="bg-gray-700 border-gray-600">
-              {(field.options || []).map((option) => (
+              {options.map((option) => (
                 <SelectItem key={option} value={option}>
                   {option}
                 </SelectItem>
