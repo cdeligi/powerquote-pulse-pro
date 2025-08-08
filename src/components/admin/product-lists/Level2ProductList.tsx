@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,18 +17,33 @@ interface Level2ProductListProps {
   products: Level2Product[];
   level1Products: Level1Product[];
   onProductUpdate: () => void;
+  onEditPartNumbers: (l2Id: string) => void;
 }
 
 export const Level2ProductList: React.FC<Level2ProductListProps> = ({
   products,
   level1Products,
-  onProductUpdate
+  onProductUpdate,
+  onEditPartNumbers
 }) => {
   const { toast } = useToast();
   const [editingProduct, setEditingProduct] = useState<string | null>(null);
   const [editFormData, setEditFormData] = useState<Partial<Level2Product>>({});
   const [parentFilter, setParentFilter] = useState<string>('all');
   const [chassisTypeFilter, setChassisTypeFilter] = useState<string>('all');
+
+  // Part number config cache per Level 2
+  const [pnConfigs, setPnConfigs] = useState<Record<string, any>>({});
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      const entries = await Promise.all(
+        products.map(async (p) => [p.id, await productDataService.getPartNumberConfig(p.id)] as const)
+      );
+      if (mounted) setPnConfigs(Object.fromEntries(entries));
+    })();
+    return () => { mounted = false; };
+  }, [products]);
 
   const handleEditStart = (product: Level2Product) => {
     setEditingProduct(product.id);
@@ -304,6 +319,14 @@ export const Level2ProductList: React.FC<Level2ProductListProps> = ({
                         <Edit3 className="h-4 w-4" />
                       </Button>
                       <Button
+                        onClick={() => onEditPartNumbers(product.id)}
+                        variant="outline"
+                        size="sm"
+                        className="border-blue-300 text-blue-700 hover:bg-blue-50"
+                      >
+                        Part Numbers
+                      </Button>
+                      <Button
                         onClick={() => handleDelete(product.id, product.name)}
                         variant="outline"
                         size="sm"
@@ -336,7 +359,24 @@ export const Level2ProductList: React.FC<Level2ProductListProps> = ({
                        </div>
                      )}
                    </div>
-                </div>
+                   {pnConfigs[product.id] && (
+                     <div className="mt-3 p-3 rounded-md border border-gray-200 bg-white">
+                       <div className="text-xs text-gray-500 mb-1">Part Number Preview</div>
+                       <div className="grid grid-cols-3 gap-2 text-sm">
+                         <div><span className="text-gray-500">Prefix:</span> <span className="text-gray-900 ml-1">{pnConfigs[product.id].prefix}</span></div>
+                         <div><span className="text-gray-500">Slots:</span> <span className="text-gray-900 ml-1">{pnConfigs[product.id].slot_count}</span></div>
+                         <div><span className="text-gray-500">Separator:</span> <span className="text-gray-900 ml-1">{pnConfigs[product.id].suffix_separator}</span></div>
+                         <div><span className="text-gray-500">Remote Off:</span> <span className="text-gray-900 ml-1">{pnConfigs[product.id].remote_off_code}</span></div>
+                         <div><span className="text-gray-500">Remote On:</span> <span className="text-gray-900 ml-1">{pnConfigs[product.id].remote_on_code}</span></div>
+                         <div className="text-right">
+                           <Button size="sm" variant="outline" className="border-blue-300 text-blue-700 hover:bg-blue-50" onClick={() => onEditPartNumbers(product.id)}>
+                             Edit in Part Numbers
+                           </Button>
+                         </div>
+                       </div>
+                     </div>
+                   )}
+                 </div>
               )}
             </div>
           ))}

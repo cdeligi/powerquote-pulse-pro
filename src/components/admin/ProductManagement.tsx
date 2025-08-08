@@ -34,7 +34,7 @@ export const ProductManagement = () => {
   
   // Tab state persistence
   const [activeTab, setActiveTab] = useState('level1');
-
+  const [selectedL2ForPN, setSelectedL2ForPN] = useState<string | undefined>(undefined);
   useEffect(() => {
     initializeData();
   }, [refreshTrigger]);
@@ -91,6 +91,11 @@ export const ProductManagement = () => {
   const refreshProductData = async () => {
     console.log('ProductManagement: Manual refresh triggered');
     setRefreshTrigger(prev => prev + 1);
+  };
+
+  const goToPartNumbers = (l2Id: string) => {
+    setSelectedL2ForPN(l2Id);
+    setActiveTab('partnumbers');
   };
 
   const handleLevel1Save = async (productData: Omit<Level1Product, 'id'> | Level1Product) => {
@@ -295,6 +300,7 @@ export const ProductManagement = () => {
               products={level2Products}
               level1Products={level1Products}
               onProductUpdate={refreshProductData}
+              onEditPartNumbers={goToPartNumbers}
             />
             
             {/* Collapsible form for creating new products */}
@@ -343,6 +349,7 @@ export const ProductManagement = () => {
               products={level3Products}
               level2Products={level2Products}
               onProductUpdate={refreshProductData}
+              onEditPartNumbers={goToPartNumbers}
             />
             
             {/* Collapsible form for creating new cards/components only */}
@@ -384,7 +391,7 @@ export const ProductManagement = () => {
         </TabsContent>
 
         <TabsContent value="partnumbers" className="space-y-4">
-          <PartNumberConfigManager />
+          <PartNumberConfigManager initialSelectedL2={selectedL2ForPN} />
         </TabsContent>
 
         <TabsContent value="level4" className="space-y-4">
