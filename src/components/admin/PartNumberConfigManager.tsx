@@ -5,9 +5,22 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
+import { Switch } from "@/components/ui/switch";
 import { productDataService } from "@/services/productDataService";
 import { Level2Product, Level3Product } from "@/types/product";
 import { useToast } from "@/hooks/use-toast";
+
+type CodeTemplate = {
+  template?: string;
+  slot_span?: number;
+  is_standard?: boolean;
+  standard_position?: number | null;
+  designated_only?: boolean;
+  designated_positions?: number[];
+  designated_positions_str?: string; // UI helper
+  outside_chassis?: boolean;
+  notes?: string | null;
+};
 
 type PartNumberConfigManagerProps = { initialSelectedL2?: string };
 const PartNumberConfigManager: React.FC<PartNumberConfigManagerProps> = ({ initialSelectedL2 }) => {
@@ -26,7 +39,7 @@ const PartNumberConfigManager: React.FC<PartNumberConfigManagerProps> = ({ initi
   const [remoteOnCode, setRemoteOnCode] = useState("D1");
 
   // Level 3 code templates
-  const [templates, setTemplates] = useState<Record<string, { template: string; slot_span: number }>>({});
+  const [templates, setTemplates] = useState<Record<string, CodeTemplate>>({});
 
   useEffect(() => {
     (async () => {
@@ -87,12 +100,27 @@ const PartNumberConfigManager: React.FC<PartNumberConfigManagerProps> = ({ initi
         remote_off_code: remoteOffCode,
         remote_on_code: remoteOnCode
       });
-      const codesPayload = level3List.map(l3 => ({
-        level3_product_id: l3.id,
-        level2_product_id: selectedL2,
-        template: templates[l3.id]?.template || "X",
-        slot_span: templates[l3.id]?.slot_span || (l3.specifications?.slotRequirement as any) || 1
-      }));
+      const codesPayload = level3List.map(l3 => {
+        const t = templates[l3.id] || {};
+        const designated = (t.designated_positions_str !== undefined)
+          ? (t.designated_positions_str || '')
+              .split(',')
+              .map(s => parseInt(s.trim()))
+              .filter(n => !isNaN(n))
+          : (t.designated_positions || []);
+        return {
+          level3_product_id: l3.id,
+          level2_product_id: selectedL2,
+          template: t.template || "X",
+          slot_span: t.slot_span || (l3.specifications?.slotRequirement as any) || 1,
+          is_standard: !!t.is_standard,
+          standard_position: t.standard_position ?? null,
+          designated_only: !!t.designated_only,
+          designated_positions: designated,
+          outside_chassis: !!t.outside_chassis,
+          notes: t.notes ?? null,
+        };
+      });
       await productDataService.upsertPartNumberCodes(codesPayload);
       toast({ title: "Saved", description: "Part number configuration updated" });
     } catch (e) {
@@ -161,14 +189,17 @@ const PartNumberConfigManager: React.FC<PartNumberConfigManagerProps> = ({ initi
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {level3List.map(l3 => (
-              <div key={l3.id} className="p-3 rounded-md border border-border bg-background/50">
+              <div key={l3.id} className="p-3 rounded-md border border-border bg-background/50 space-y-2">
                 <div className="text-sm font-medium mb-2">{l3.name}</div>
                 <div className="grid grid-cols-5 gap-2 items-center">
                   <div className="col-span-3">
                     <Label className="text-xs">Template</Label>
                     <Input
                       value={templates[l3.id]?.template ?? ""}
-                      onChange={e => setTemplates(prev => ({ ...prev, [l3.id]: { template: e.target.value, slot_span: prev[l3.id]?.slot_span || 1 } }))}
+                      onChange={e => setTemplates(prev => ({ 
+                        ...prev, 
+                        [l3.id]: { ...(prev[l3.id] || {}), template: e.target.value, slot_span: prev[l3.id]?.slot_span ?? 1 } 
+                      }))}
                       placeholder="e.g., D, A, F{inputs}, B{numberOfBushings}"
                       className="bg-background border-border text-foreground"
                     />
@@ -178,7 +209,89 @@ const PartNumberConfigManager: React.FC<PartNumberConfigManagerProps> = ({ initi
                     <Input
                       type="number"
                       value={templates[l3.id]?.slot_span ?? (l3.specifications?.slotRequirement as any) ?? 1}
-                      onChange={e => setTemplates(prev => ({ ...prev, [l3.id]: { template: prev[l3.id]?.template || "", slot_span: parseInt(e.target.value) || 1 } }))}
+                      onChange={e => setTemplates(prev => ({ 
+                        ...prev, 
+                        [l3.id]: { ...(prev[l3.id] || {}), template: prev[l3.id]?.template || "", slot_span: parseInt(e.target.value) || 1 } 
+                      }))}
+                      className="bg-background border-border text-foreground"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="flex items-center justify-between rounded border border-border p-2">
+                    <div>
+                      <Label className="text-xs">Standard item</Label>
+                      <div className="text-foreground/70 text-xs">Auto-included in build</div>
+                    </div>
+                    <Switch
+                      checked={!!templates[l3.id]?.is_standard}
+                      onCheckedChange={(v) => setTemplates(prev => ({
+                        ...prev,
+                        [l3.id]: { ...(prev[l3.id] || {}), is_standard: v }
+                      }))}
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 items-center">
+                    <Label className="text-xs">Std Position</Label>
+                    <Input
+                      type="number"
+                      placeholder="e.g., 8"
+                      value={templates[l3.id]?.standard_position ?? ""}
+                      onChange={(e) => setTemplates(prev => ({
+                        ...prev,
+                        [l3.id]: { ...(prev[l3.id] || {}), standard_position: e.target.value === '' ? null : (parseInt(e.target.value) || 0) }
+                      }))}
+                      className="bg-background border-border text-foreground"
+                    />
+                  </div>
+                  <div className="flex items-center justify-between rounded border border-border p-2">
+                    <div>
+                      <Label className="text-xs">Outside chassis</Label>
+                      <div className="text-foreground/70 text-xs">Shown in Accessories</div>
+                    </div>
+                    <Switch
+                      checked={!!templates[l3.id]?.outside_chassis}
+                      onCheckedChange={(v) => setTemplates(prev => ({
+                        ...prev,
+                        [l3.id]: { ...(prev[l3.id] || {}), outside_chassis: v }
+                      }))}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between rounded border border-border p-2">
+                    <div>
+                      <Label className="text-xs">Designated only</Label>
+                      <div className="text-foreground/70 text-xs">Restrict to specific slots</div>
+                    </div>
+                    <Switch
+                      checked={!!templates[l3.id]?.designated_only}
+                      onCheckedChange={(v) => setTemplates(prev => ({
+                        ...prev,
+                        [l3.id]: { ...(prev[l3.id] || {}), designated_only: v }
+                      }))}
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 items-center">
+                    <Label className="text-xs">Allowed slots</Label>
+                    <Input
+                      placeholder="e.g., 1,2,8"
+                      value={templates[l3.id]?.designated_positions_str ?? (templates[l3.id]?.designated_positions?.join(',') || '')}
+                      onChange={(e) => setTemplates(prev => ({
+                        ...prev,
+                        [l3.id]: { ...(prev[l3.id] || {}), designated_positions_str: e.target.value }
+                      }))}
+                      className="bg-background border-border text-foreground"
+                    />
+                  </div>
+                  <div className="col-span-2">
+                    <Label className="text-xs">Notes</Label>
+                    <Input
+                      placeholder="Optional notes"
+                      value={templates[l3.id]?.notes ?? ''}
+                      onChange={(e) => setTemplates(prev => ({
+                        ...prev,
+                        [l3.id]: { ...(prev[l3.id] || {}), notes: e.target.value }
+                      }))}
                       className="bg-background border-border text-foreground"
                     />
                   </div>
