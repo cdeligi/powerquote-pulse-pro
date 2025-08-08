@@ -1273,6 +1273,10 @@ export type Database = {
         Args: { p_user_id: string; p_status: string }
         Returns: Json
       }
+      array_all_positive: {
+        Args: { arr: number[] }
+        Returns: boolean
+      }
       calculate_bom_total_cost: {
         Args: { quote_id_param: string }
         Returns: number
