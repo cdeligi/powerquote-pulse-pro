@@ -23,7 +23,8 @@ const RackVisualizer = ({
   onSlotClear, 
   selectedSlot,
   hasRemoteDisplay = false,
-  onRemoteDisplayToggle
+  onRemoteDisplayToggle,
+  standardSlotHints
 }: RackVisualizerProps) => {
   
   const bushingSlots = getBushingOccupiedSlots(slotAssignments);
@@ -71,25 +72,25 @@ const RackVisualizer = ({
     return `${slot}`;
   };
 
-  const getSlotTitle = (slot: number) => {
-    if (slot === 0) return 'CPU (Fixed)';
-    if (slotAssignments[slot]) {
-      const card = slotAssignments[slot];
-      if (isBushingCard(card)) {
-        const isSecondarySlot = Object.values(bushingSlots).some(slots => 
-          slots.includes(slot) && slots[0] !== slot
-        );
-        return isSecondarySlot ? `${card.name} (Extension Slot)` : card.name;
-      }
-      return card.name;
+const getSlotTitle = (slot: number) => {
+  if (slot === 0) return 'CPU (Fixed)';
+  if (slotAssignments[slot]) {
+    const card = slotAssignments[slot];
+    if (isBushingCard(card)) {
+      const isSecondarySlot = Object.values(bushingSlots).some(slots => 
+        slots.includes(slot) && slots[0] !== slot
+      );
+      return isSecondarySlot ? `${card.name} (Extension Slot)` : card.name;
     }
-    // For empty slots, show appropriate title
-    const chassisType = chassis.type?.toUpperCase() || chassis.chassisType?.toUpperCase() || '';
-    if (chassisType === 'LTX' && slot === 8) {
-      return 'Slot 8 - Click to add Display Card';
-    }
-    return `Slot ${slot} - Click to add card`;
-  };
+    return card.name;
+  }
+  // Empty slots - show standard hints when available
+  const hints = standardSlotHints?.[slot];
+  if (hints && hints.length) {
+    return `Slot ${slot} - Standard: ${hints.join(', ')}`;
+  }
+  return `Slot ${slot} - Click to add card`;
+};
 
   const isSlotClickable = (slot: number) => {
     if (slot === 0) return false; // CPU slot not clickable
@@ -138,24 +139,34 @@ const RackVisualizer = ({
         onClick={() => clickable && onSlotClick(slot)}
         title={getSlotTitle(slot)}
       >
-        {slot === 0 && <Cpu className="h-4 w-4 mr-1" />}
-        {getSlotLabel(slot)}
-        
-        {/* Clear button for occupied slots */}
-        {slot !== 0 && slotAssignments[slot] && !isSecondaryBushingSlot && (
-          <Button
-            size="sm"
-            variant="ghost"
-            className="absolute -top-2 -right-2 h-5 w-5 p-0 bg-red-600 hover:bg-red-700 text-white rounded-full"
-            onClick={(e) => {
-              e.stopPropagation();
-              handleSlotClear(slot);
-            }}
-            title={isPrimaryBushingSlot ? "Clear all bushing cards" : "Clear slot"}
-          >
-            <X className="h-3 w-3" />
-          </Button>
-        )}
+{slot === 0 && <Cpu className="h-4 w-4 mr-1" />}
+{getSlotLabel(slot)}
+
+{/* Standard hint badge */}
+{!slotAssignments[slot] && standardSlotHints && standardSlotHints[slot] && (
+  <span
+    className="absolute top-1 left-1 text-[10px] px-1.5 py-0.5 rounded bg-gray-900/70 border border-gray-600"
+    title={`Standard: ${standardSlotHints[slot].join(', ')}`}
+  >
+    Std
+  </span>
+)}
+
+{/* Clear button for occupied slots */}
+{slot !== 0 && slotAssignments[slot] && !isSecondaryBushingSlot && (
+  <Button
+    size="sm"
+    variant="ghost"
+    className="absolute -top-2 -right-2 h-5 w-5 p-0 bg-red-600 hover:bg-red-700 text-white rounded-full"
+    onClick={(e) => {
+      e.stopPropagation();
+      handleSlotClear(slot);
+    }}
+    title={isPrimaryBushingSlot ? "Clear all bushing cards" : "Clear slot"}
+  >
+    <X className="h-3 w-3" />
+  </Button>
+)}
       </div>
     );
   };

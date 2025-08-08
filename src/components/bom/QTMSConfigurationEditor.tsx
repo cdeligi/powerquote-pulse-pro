@@ -466,58 +466,76 @@ const QTMSConfigurationEditor = ({
       };
     });
 
-    let components = chassisItem ? [chassisItem, ...cardItems] : cardItems;
+let components = chassisItem ? [chassisItem, ...cardItems] : cardItems;
 
-    // Auto-include CPU module as Level 3 (logical slot 0)
-    const chassisType = consolidatedQTMS.configuration.chassis.type?.toLowerCase?.() || 'ltx';
-    const cpuProductId = `cpu-card-${chassisType}`;
-    const cpuItem: BOMItem = {
-      id: `${Date.now()}-cpu-${chassisType}`,
-      product: {
-        id: cpuProductId,
-        name: 'CPU Module',
-        type: 'module',
-        description: `CPU module for QTMS ${chassisType.toUpperCase()} chassis (standard in slot 0)`,
-        price: 0,
-        enabled: true,
-        specifications: { allowed_slots_by_chassis: { [chassisType.toUpperCase()]: [0] } }
-      } as any,
-      quantity: 1,
+// Auto-include CPU module as Level 3 (logical slot 0)
+const chassisType = consolidatedQTMS.configuration.chassis.type?.toLowerCase?.() || 'ltx';
+const cpuProductId = `cpu-card-${chassisType}`;
+const cpuItem: BOMItem = {
+  id: `${Date.now()}-cpu-${chassisType}`,
+  product: {
+    id: cpuProductId,
+    name: 'CPU Module',
+    type: 'module',
+    description: `CPU module for QTMS ${chassisType.toUpperCase()} chassis (standard in slot 0)`,
+    price: 0,
+    enabled: true,
+    specifications: { allowed_slots_by_chassis: { [chassisType.toUpperCase()]: [0] } }
+  } as any,
+  quantity: 1,
+  enabled: true
+};
+// Avoid duplicate CPU if already present
+const hasCPU = components.some(c => c.product?.id === cpuProductId);
+if (!hasCPU) {
+  components.unshift(cpuItem);
+}
+
+// Add remote display if selected, using the L3 product id per chassis
+if (editedHasRemoteDisplay) {
+  const remoteId = `remote-display-${chassisType}`;
+  const remoteDisplayItem = {
+    id: `${Date.now()}-remote-display`,
+    product: {
+      id: remoteId,
+      name: 'Remote Display',
+      type: 'accessory',
+      description: `Remote display for QTMS ${chassisType.toUpperCase()} chassis`,
+      price: 850,
       enabled: true
-    };
-    // Avoid duplicate CPU if already present
-    const hasCPU = components.some(c => c.product?.id === cpuProductId);
-    if (!hasCPU) {
-      components.unshift(cpuItem);
-    }
+    } as any,
+    quantity: 1,
+    enabled: true
+  };
+  // Avoid duplicate Remote Display if already present
+  const hasRemote = components.some(c => c.product?.id === remoteId);
+  if (!hasRemote) {
+    components.push(remoteDisplayItem);
+  }
+}
 
-    // Add remote display if selected, using the L3 product id per chassis
-    if (editedHasRemoteDisplay) {
-      const remoteId = `remote-display-${chassisType}`;
-      const remoteDisplayItem = {
-        id: `${Date.now()}-remote-display`,
-        product: {
-          id: remoteId,
-          name: 'Remote Display',
-          type: 'accessory',
-          description: `Remote display for QTMS ${chassisType.toUpperCase()} chassis`,
-          price: 850,
-          enabled: true
-        } as any,
-        quantity: 1,
-        enabled: true
-      };
-      // Avoid duplicate Remote Display if already present
-      const hasRemote = components.some(c => c.product?.id === remoteId);
-      if (!hasRemote) {
-        components.push(remoteDisplayItem);
+// Include standard outside-chassis items from admin config
+if (codeMap && level3Products.length) {
+  Object.entries(codeMap).forEach(([l3Id, def]) => {
+    if (def?.outside_chassis && def?.is_standard) {
+      const product = level3Products.find(p => p.id === l3Id);
+      if (product && !components.some(c => c.product?.id === product.id)) {
+        components.push({
+          id: `${Date.now()}-outside-${l3Id}`,
+          product: product as any,
+          quantity: 1,
+          enabled: true,
+          partNumber: product.partNumber
+        });
       }
     }
+  });
+}
 
-    // Calculate new total price including configuration costs
-    const baseTotalPrice = components.reduce((sum, item) => sum + (item.product.price || 0), 0);
-    const configurationCosts = Object.values(cardConfigurations).flat().reduce((sum, config) => sum + (config.price || 0), 0);
-    const totalPrice = baseTotalPrice + configurationCosts;
+// Calculate new total price including configuration costs
+const baseTotalPrice = components.reduce((sum, item) => sum + (item.product.price || 0), 0);
+const configurationCosts = Object.values(cardConfigurations).flat().reduce((sum, config) => sum + (config.price || 0), 0);
+const totalPrice = baseTotalPrice + configurationCosts;
 
     // Create updated QTMS configuration
     const updatedQTMS: ConsolidatedQTMS = {
@@ -596,15 +614,16 @@ const QTMSConfigurationEditor = ({
             </Card>
 
             {/* Rack Configuration - Removed Tabs */}
-            <RackVisualizer
-              chassis={consolidatedQTMS.configuration.chassis as any}
-              slotAssignments={editedSlotAssignments as any}
-              onSlotClick={handleSlotClick}
-              onSlotClear={handleSlotClear}
-              selectedSlot={selectedSlot}
-              hasRemoteDisplay={editedHasRemoteDisplay}
-              onRemoteDisplayToggle={handleRemoteDisplayToggle}
-            />
+<RackVisualizer
+  chassis={consolidatedQTMS.configuration.chassis as any}
+  slotAssignments={editedSlotAssignments as any}
+  onSlotClick={handleSlotClick}
+  onSlotClear={handleSlotClear}
+  selectedSlot={selectedSlot}
+  hasRemoteDisplay={editedHasRemoteDisplay}
+  onRemoteDisplayToggle={handleRemoteDisplayToggle}
+  standardSlotHints={standardSlotHints}
+/>
 
             {/* Configuration Changes Summary with Color Coding */}
             {Object.keys(editedSlotAssignments).length > 0 && (
@@ -703,16 +722,18 @@ const QTMSConfigurationEditor = ({
       </Dialog>
 
       {/* Slot Card Selector Dialog */}
-      {selectedSlot !== null && (
-        <SlotCardSelector
-          chassis={consolidatedQTMS.configuration.chassis as any}
-          slot={selectedSlot}
-          onCardSelect={handleCardSelect}
-          onClose={() => setSelectedSlot(null)}
-          canSeePrices={canSeePrices}
-          currentSlotAssignments={editedSlotAssignments}
-        />
-      )}
+{selectedSlot !== null && (
+  <SlotCardSelector
+    chassis={consolidatedQTMS.configuration.chassis as any}
+    slot={selectedSlot}
+    onCardSelect={handleCardSelect}
+    onClose={() => setSelectedSlot(null)}
+    canSeePrices={canSeePrices}
+    currentSlotAssignments={editedSlotAssignments}
+    codeMap={codeMap}
+    pnConfig={pnConfig}
+  />
+)}
 
       {/* Card Configuration Dialogs */}
       {configuringCard && configuringCard.product.name.toLowerCase().includes('analog') && (
