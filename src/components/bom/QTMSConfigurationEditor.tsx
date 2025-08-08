@@ -12,6 +12,8 @@ import AnalogCardConfigurator from './AnalogCardConfigurator';
 import BushingCardConfigurator from './BushingCardConfigurator';
 import { findOptimalBushingPlacement, findExistingBushingSlots, isBushingCard } from '@/utils/bushingValidation';
 import { productDataService } from '@/services/productDataService';
+import { useToast } from '@/hooks/use-toast';
+
 interface QTMSConfigurationEditorProps {
   consolidatedQTMS: ConsolidatedQTMS;
   onSave: (updatedQTMS: ConsolidatedQTMS) => void;
@@ -27,6 +29,8 @@ const QTMSConfigurationEditor = ({
   canSeePrices,
   readOnly = false
 }: QTMSConfigurationEditorProps) => {
+  const { toast } = useToast();
+
   const [editedSlotAssignments, setEditedSlotAssignments] = useState<Record<number, Level3Product>>(
     consolidatedQTMS.configuration.slotAssignments
   );
@@ -177,8 +181,53 @@ const QTMSConfigurationEditor = ({
     });
   };
 
+  // Utility: get allowed slots for card by chassis type from specs
+  const getAllowedSlotsForCard = (card: Level3Product, chassisType: string): number[] | null => {
+    const spec = card.specifications || {};
+    // Support both snake_case (from DB) and camelCase
+    const byChassis = (spec.allowed_slots_by_chassis || spec.allowedSlotsByChassis) as Record<string, number[]> | undefined;
+    if (!byChassis) return null;
+    const allowed = byChassis[chassisType];
+    return Array.isArray(allowed) ? allowed : null;
+  };
+
   const handleCardSelect = (card: Level3Product, slot?: number) => {
     if (readOnly) return;
+
+    const chassisType = consolidatedQTMS.configuration.chassis.type;
+    const targetSlot = slot !== undefined ? slot : selectedSlot!;
+
+    // Generic allowed-slots enforcement from metadata
+    const allowedSlots = getAllowedSlotsForCard(card, chassisType);
+    if (allowedSlots && !allowedSlots.includes(targetSlot)) {
+      toast({
+        title: 'Invalid slot for this card',
+        description: `This ${card.name} can only be placed in slot(s): ${allowedSlots.join(', ')}`,
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // LTX Slot 8 restriction - only display cards allowed
+    if (chassisType === 'LTX' && targetSlot === 8 && card.type !== 'display') {
+      toast({
+        title: 'Slot 8 reserved',
+        description: 'On LTX chassis, only Display cards may be placed in slot 8.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // LTX Display card must be in slot 8
+    if (chassisType === 'LTX' && card.type === 'display' && targetSlot !== 8) {
+      toast({
+        title: 'Display slot restriction',
+        description: 'On LTX chassis, the Display card must be placed in slot 8.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     // Special handling for bushing cards
     if (isBushingCard(card)) {
       const placement = findOptimalBushingPlacement(
@@ -188,6 +237,11 @@ const QTMSConfigurationEditor = ({
       
       if (!placement) {
         console.error('Cannot place bushing card - no valid placement found');
+        toast({
+          title: 'Cannot place bushing card',
+          description: 'No valid adjacent slots available for this bushing card.',
+          variant: 'destructive',
+        });
         return;
       }
 
@@ -223,13 +277,6 @@ const QTMSConfigurationEditor = ({
       }
 
       setSelectedSlot(null);
-      return;
-    }
-
-    // LTX Slot 8 restriction - only display cards allowed
-    const targetSlot = slot !== undefined ? slot : selectedSlot!;
-    if (consolidatedQTMS.configuration.chassis.type === 'LTX' && targetSlot === 8 && card.type !== 'display') {
-      console.error('Only display cards can be placed in slot 8 of LTX chassis');
       return;
     }
 
@@ -300,22 +347,50 @@ const QTMSConfigurationEditor = ({
 
     let components = chassisItem ? [chassisItem, ...cardItems] : cardItems;
 
-    // Add remote display if selected
+    // Auto-include CPU module as Level 3 (logical slot 0)
+    const chassisType = consolidatedQTMS.configuration.chassis.type?.toLowerCase?.() || 'ltx';
+    const cpuProductId = `cpu-card-${chassisType}`;
+    const cpuItem: BOMItem = {
+      id: `${Date.now()}-cpu-${chassisType}`,
+      product: {
+        id: cpuProductId,
+        name: 'CPU Module',
+        type: 'module',
+        description: `CPU module for QTMS ${chassisType.toUpperCase()} chassis (standard in slot 0)`,
+        price: 0,
+        enabled: true,
+        specifications: { allowed_slots_by_chassis: { [chassisType.toUpperCase()]: [0] } }
+      } as any,
+      quantity: 1,
+      enabled: true
+    };
+    // Avoid duplicate CPU if already present
+    const hasCPU = components.some(c => c.product?.id === cpuProductId);
+    if (!hasCPU) {
+      components.unshift(cpuItem);
+    }
+
+    // Add remote display if selected, using the L3 product id per chassis
     if (editedHasRemoteDisplay) {
+      const remoteId = `remote-display-${chassisType}`;
       const remoteDisplayItem = {
         id: `${Date.now()}-remote-display`,
         product: {
-          id: 'remote-display',
+          id: remoteId,
           name: 'Remote Display',
           type: 'accessory',
-          description: 'Remote display for QTMS chassis',
+          description: `Remote display for QTMS ${chassisType.toUpperCase()} chassis`,
           price: 850,
           enabled: true
         } as any,
         quantity: 1,
         enabled: true
       };
-      components.push(remoteDisplayItem);
+      // Avoid duplicate Remote Display if already present
+      const hasRemote = components.some(c => c.product?.id === remoteId);
+      if (!hasRemote) {
+        components.push(remoteDisplayItem);
+      }
     }
 
     // Calculate new total price including configuration costs
@@ -354,9 +429,14 @@ const QTMSConfigurationEditor = ({
       <Dialog open={true} onOpenChange={onClose}>
         <DialogContent className="bg-gray-900 border-gray-800 text-white max-w-7xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="text-white flex items-center">
-              <Settings className="mr-2 h-5 w-5" />
-              Edit QTMS Configuration - {consolidatedQTMS.name}
+            <DialogTitle className="text-white flex items-center justify-between">
+              <span className="flex items-center">
+                <Settings className="mr-2 h-5 w-5" />
+                Edit QTMS Configuration - {consolidatedQTMS.name}
+              </span>
+              <Badge variant="outline" className="text-white border-gray-500">
+                {livePartNumber || consolidatedQTMS.partNumber}
+              </Badge>
             </DialogTitle>
           </DialogHeader>
           
