@@ -24,7 +24,7 @@ const CardForm = ({ onSubmit, level2Products, initialData }: CardFormProps) => {
     cost: initialData?.cost || 0,
     enabled: initialData?.enabled ?? true,
     specifications: initialData?.specifications || {},
-    partNumber: initialData?.partNumber || '',
+    
     image: initialData?.image || ''
   });
 
@@ -133,13 +133,10 @@ const CardForm = ({ onSubmit, level2Products, initialData }: CardFormProps) => {
       </div>
 
       <div>
-        <Label htmlFor="partNumber" className="text-white">Part Number</Label>
-        <Input
-          id="partNumber"
-          value={formData.partNumber}
-          onChange={(e) => setFormData({ ...formData, partNumber: e.target.value })}
-          className="bg-gray-800 border-gray-700 text-white"
-        />
+        <Label className="text-white">Part Number</Label>
+        <div className="text-sm text-gray-400">
+          Part numbers are configured under Products → Part Numbers.
+        </div>
       </div>
 
       {/* Specifications Section */}

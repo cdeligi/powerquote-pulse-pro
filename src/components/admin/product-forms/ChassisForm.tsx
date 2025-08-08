@@ -26,7 +26,7 @@ const ChassisForm = ({ onSubmit, level1Products, initialData }: ChassisFormProps
     specifications: initialData?.specifications || {
       slots: 0
     },
-    partNumber: initialData?.partNumber || '',
+    
     productInfoUrl: initialData?.productInfoUrl || ''
   });
 
@@ -106,13 +106,10 @@ const ChassisForm = ({ onSubmit, level1Products, initialData }: ChassisFormProps
 
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <Label htmlFor="partNumber" className="text-foreground">Part Number</Label>
-          <Input
-            id="partNumber"
-            value={formData.partNumber}
-            onChange={(e) => setFormData({ ...formData, partNumber: e.target.value })}
-            className="bg-background border-border text-foreground"
-          />
+          <Label className="text-foreground">Part Number</Label>
+          <div className="text-sm text-muted-foreground">
+            Part numbers are managed under Products → Part Numbers.
+          </div>
         </div>
         <div>
           <Label htmlFor="productInfoUrl" className="text-foreground">Product Info URL</Label>
