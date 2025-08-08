@@ -414,31 +414,46 @@ export type Database = {
       part_number_codes: {
         Row: {
           created_at: string
+          designated_only: boolean
+          designated_positions: number[]
           id: string
+          is_standard: boolean
           level2_product_id: string | null
           level3_product_id: string
           notes: string | null
+          outside_chassis: boolean
           slot_span: number
+          standard_position: number | null
           template: string
           updated_at: string
         }
         Insert: {
           created_at?: string
+          designated_only?: boolean
+          designated_positions?: number[]
           id?: string
+          is_standard?: boolean
           level2_product_id?: string | null
           level3_product_id: string
           notes?: string | null
+          outside_chassis?: boolean
           slot_span?: number
+          standard_position?: number | null
           template: string
           updated_at?: string
         }
         Update: {
           created_at?: string
+          designated_only?: boolean
+          designated_positions?: number[]
           id?: string
+          is_standard?: boolean
           level2_product_id?: string | null
           level3_product_id?: string
           notes?: string | null
+          outside_chassis?: boolean
           slot_span?: number
+          standard_position?: number | null
           template?: string
           updated_at?: string
         }
