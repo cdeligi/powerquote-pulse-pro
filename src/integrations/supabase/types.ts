@@ -411,6 +411,78 @@ export type Database = {
         }
         Relationships: []
       }
+      part_number_codes: {
+        Row: {
+          created_at: string
+          id: string
+          level2_product_id: string | null
+          level3_product_id: string
+          notes: string | null
+          slot_span: number
+          template: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          level2_product_id?: string | null
+          level3_product_id: string
+          notes?: string | null
+          slot_span?: number
+          template: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          level2_product_id?: string | null
+          level3_product_id?: string
+          notes?: string | null
+          slot_span?: number
+          template?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      part_number_configs: {
+        Row: {
+          created_at: string
+          id: string
+          level2_product_id: string
+          prefix: string
+          remote_off_code: string
+          remote_on_code: string
+          slot_count: number
+          slot_placeholder: string
+          suffix_separator: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          level2_product_id: string
+          prefix: string
+          remote_off_code?: string
+          remote_on_code?: string
+          slot_count: number
+          slot_placeholder?: string
+          suffix_separator?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          level2_product_id?: string
+          prefix?: string
+          remote_off_code?: string
+          remote_on_code?: string
+          slot_count?: number
+          slot_placeholder?: string
+          suffix_separator?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       products: {
         Row: {
           asset_type_id: string | null
