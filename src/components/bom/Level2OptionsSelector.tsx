@@ -104,7 +104,7 @@ const Level2OptionsSelector = ({
               <Card
                 key={option.id}
                 className={cn(
-                  "cursor-pointer transition-all hover:shadow-md h-full",
+                  "cursor-pointer transition-all hover:shadow-md h-full overflow-hidden",
                   isCurrentlySelected ? "ring-2 ring-primary" : "hover:border-primary"
                 )}
                 onClick={() => handleOptionClick(option)}
@@ -119,7 +119,7 @@ const Level2OptionsSelector = ({
                         </Badge>
                       )}
                       <Badge variant="outline" className="text-xs">
-                        {option.type}
+                        {level1Product.name}
                       </Badge>
                     </div>
                   </CardTitle>

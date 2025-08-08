@@ -126,7 +126,7 @@ const ChassisSelector = ({ onChassisSelect, selectedChassis, onAddToBOM, canSeeP
           <Card
             key={chassis.id}
             className={cn(
-              "transition-all hover:shadow-md h-full",
+              "transition-all hover:shadow-md h-full overflow-hidden",
               selectedChassis?.id === chassis.id ? "ring-2 ring-primary" : "hover:border-primary"
             )}
           >
@@ -134,7 +134,7 @@ const ChassisSelector = ({ onChassisSelect, selectedChassis, onAddToBOM, canSeeP
               <CardTitle className="flex items-center justify-between">
                 {chassis.name}
                 <Badge variant="outline" className="text-xs">
-                  {chassis.type || 'Chassis'}
+                  QTMS
                 </Badge>
               </CardTitle>
             </CardHeader>
@@ -154,7 +154,7 @@ const ChassisSelector = ({ onChassisSelect, selectedChassis, onAddToBOM, canSeeP
               </div>
               
               {/* Configure or Add to BOM buttons */}
-              <div className="flex flex-col sm:flex-row gap-2 mb-3">
+              <div className="flex flex-col sm:flex-row flex-wrap gap-2 mb-3">
                 <Button
                   onClick={(e) => {
                     e.stopPropagation();
