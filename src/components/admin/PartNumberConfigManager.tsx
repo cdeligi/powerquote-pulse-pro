@@ -9,10 +9,11 @@ import { productDataService } from "@/services/productDataService";
 import { Level2Product, Level3Product } from "@/types/product";
 import { useToast } from "@/hooks/use-toast";
 
-const PartNumberConfigManager = () => {
+type PartNumberConfigManagerProps = { initialSelectedL2?: string };
+const PartNumberConfigManager: React.FC<PartNumberConfigManagerProps> = ({ initialSelectedL2 }) => {
   const { toast } = useToast();
   const [level2List, setLevel2List] = useState<Level2Product[]>([]);
-  const [selectedL2, setSelectedL2] = useState<string>("");
+  const [selectedL2, setSelectedL2] = useState<string>(initialSelectedL2 || "");
   const [level3List, setLevel3List] = useState<Level3Product[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -33,6 +34,11 @@ const PartNumberConfigManager = () => {
       setLevel2List(l2);
     })();
   }, []);
+
+  // Update selection when a new initial value is provided
+  useEffect(() => {
+    if (initialSelectedL2) setSelectedL2(initialSelectedL2);
+  }, [initialSelectedL2]);
 
   useEffect(() => {
     if (!selectedL2) return;

@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,12 +17,14 @@ interface Level3ProductListProps {
   products: Level3Product[];
   level2Products: Level2Product[];
   onProductUpdate: () => void;
+  onEditPartNumbers: (l2Id: string) => void;
 }
 
 export const Level3ProductList: React.FC<Level3ProductListProps> = ({
   products,
   level2Products,
-  onProductUpdate
+  onProductUpdate,
+  onEditPartNumbers
 }) => {
   const { toast } = useToast();
   const [editingProduct, setEditingProduct] = useState<string | null>(null);
@@ -41,6 +43,18 @@ export const Level3ProductList: React.FC<Level3ProductListProps> = ({
       enabled: product.enabled !== false
     });
   };
+
+  // Part number codes for current parent filter
+  const [parentCodes, setParentCodes] = useState<Record<string, { template: string; slot_span: number }>>({});
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      if (parentFilter === 'all') { setParentCodes({}); return; }
+      const codes = await productDataService.getPartNumberCodesForLevel2(parentFilter);
+      if (mounted) setParentCodes(codes);
+    })();
+    return () => { mounted = false; };
+  }, [parentFilter]);
 
   const handleEditSave = async (productId: string) => {
     try {
@@ -268,6 +282,14 @@ export const Level3ProductList: React.FC<Level3ProductListProps> = ({
                         <Edit3 className="h-4 w-4" />
                       </Button>
                       <Button
+                        onClick={() => onEditPartNumbers(product.parentProductId)}
+                        variant="outline"
+                        size="sm"
+                        className="border-blue-300 text-blue-700 hover:bg-blue-50"
+                      >
+                        Part Numbers
+                      </Button>
+                      <Button
                         onClick={() => handleDelete(product.id, product.name)}
                         variant="outline"
                         size="sm"
@@ -287,6 +309,20 @@ export const Level3ProductList: React.FC<Level3ProductListProps> = ({
                       <span className="text-gray-900 font-medium ml-2">${(product.cost || 0).toLocaleString()}</span>
                     </div>
                   </div>
+                  {parentFilter !== 'all' && (
+                    <div className="mt-3 p-3 rounded-md border border-gray-200 bg-white">
+                      <div className="text-xs text-gray-500 mb-1">Part Number Template</div>
+                      <div className="grid grid-cols-2 gap-2 text-sm">
+                        <div><span className="text-gray-500">Template:</span> <span className="text-gray-900 ml-1">{parentCodes[product.id]?.template || '—'}</span></div>
+                        <div><span className="text-gray-500">Slot Span:</span> <span className="text-gray-900 ml-1">{parentCodes[product.id]?.slot_span ?? '—'}</span></div>
+                      </div>
+                      <div className="text-right mt-2">
+                        <Button size="sm" variant="outline" className="border-blue-300 text-blue-700 hover:bg-blue-50" onClick={() => onEditPartNumbers(product.parentProductId)}>
+                          Edit in Part Numbers
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
