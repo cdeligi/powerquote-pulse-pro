@@ -22,7 +22,7 @@ const Level1ProductForm: React.FC<Level1ProductFormProps> = ({ onSubmit, initial
     price: initialData?.price || 0,
     cost: initialData?.cost || 0,
     enabled: initialData?.enabled ?? true,
-    partNumber: initialData?.partNumber || '',
+    
     image: initialData?.image || '',
     productInfoUrl: initialData?.productInfoUrl || '',
     rackConfigurable: (initialData as any)?.rackConfigurable ?? false
@@ -134,24 +134,14 @@ const Level1ProductForm: React.FC<Level1ProductFormProps> = ({ onSubmit, initial
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <Label htmlFor="partNumber">Part Number</Label>
-          <Input
-            id="partNumber"
-            value={formData.partNumber}
-            onChange={(e) => setFormData({ ...formData, partNumber: e.target.value })}
-          />
-        </div>
-        <div>
-          <Label htmlFor="image">Image URL</Label>
-          <Input
-            id="image"
-            type="url"
-            value={formData.image}
-            onChange={(e) => setFormData({ ...formData, image: e.target.value })}
-          />
-        </div>
+      <div>
+        <Label htmlFor="image">Image URL</Label>
+        <Input
+          id="image"
+          type="url"
+          value={formData.image}
+          onChange={(e) => setFormData({ ...formData, image: e.target.value })}
+        />
       </div>
 
       <div>

@@ -243,12 +243,6 @@ export const Level1ProductList: React.FC<Level1ProductListProps> = ({
                       </Button>
                     </div>
                   </div>
-                  {product.partNumber && (
-                    <div className="text-sm">
-                      <span className="text-gray-500">Part Number:</span>
-                      <span className="text-gray-900 font-medium ml-2">{product.partNumber}</span>
-                    </div>
-                  )}
                 </div>
               )}
             </div>

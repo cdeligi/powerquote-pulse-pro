@@ -20,7 +20,6 @@ const Level1ProductForm = ({ onSubmit, initialData }: Level1ProductFormProps) =>
     category: initialData?.category || '',
     productInfoUrl: initialData?.productInfoUrl || '',
     enabled: initialData?.enabled ?? true,
-    partNumber: initialData?.partNumber || '',
     image: initialData?.image || ''
   });
 
@@ -85,26 +84,15 @@ const Level1ProductForm = ({ onSubmit, initialData }: Level1ProductFormProps) =>
         />
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <Label htmlFor="partNumber" className="text-foreground">Part Number</Label>
-          <Input
-            id="partNumber"
-            value={formData.partNumber}
-            onChange={(e) => setFormData({ ...formData, partNumber: e.target.value })}
-            className="bg-background border-border text-foreground"
-          />
-        </div>
-        <div>
-          <Label htmlFor="productInfoUrl" className="text-foreground">Product Info URL</Label>
-          <Input
-            id="productInfoUrl"
-            type="url"
-            value={formData.productInfoUrl}
-            onChange={(e) => setFormData({ ...formData, productInfoUrl: e.target.value })}
-            className="bg-background border-border text-foreground"
-          />
-        </div>
+      <div>
+        <Label htmlFor="productInfoUrl" className="text-foreground">Product Info URL</Label>
+        <Input
+          id="productInfoUrl"
+          type="url"
+          value={formData.productInfoUrl}
+          onChange={(e) => setFormData({ ...formData, productInfoUrl: e.target.value })}
+          className="bg-background border-border text-foreground"
+        />
       </div>
 
       <div>
