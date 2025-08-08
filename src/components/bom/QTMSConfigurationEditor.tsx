@@ -54,7 +54,18 @@ const QTMSConfigurationEditor = ({
 
   // Part number configuration state
   const [pnConfig, setPnConfig] = useState<any | null>(null);
-  const [codeMap, setCodeMap] = useState<Record<string, { template: string; slot_span: number }>>({});
+  const [codeMap, setCodeMap] = useState<Record<string, {
+    template: string;
+    slot_span: number;
+    is_standard?: boolean;
+    standard_position?: number | null;
+    designated_only?: boolean;
+    designated_positions?: number[];
+    outside_chassis?: boolean;
+    notes?: string | null;
+  }>>({});
+  const [level3Products, setLevel3Products] = useState<Level3Product[]>([]);
+  const [autoPlaced, setAutoPlaced] = useState(false);
   const [livePartNumber, setLivePartNumber] = useState<string>(consolidatedQTMS.partNumber);
 
   // Load part number config and codes for the selected chassis
@@ -63,13 +74,16 @@ const QTMSConfigurationEditor = ({
     const loadPN = async () => {
       try {
         const level2Id = consolidatedQTMS.configuration.chassis.id;
-        const [cfg, codes] = await Promise.all([
+        const [cfg, codes, l3] = await Promise.all([
           productDataService.getPartNumberConfig(level2Id),
-          productDataService.getPartNumberCodesForLevel2(level2Id)
+          productDataService.getPartNumberCodesForLevel2(level2Id),
+          productDataService.getLevel3ProductsForLevel2(level2Id)
         ]);
         if (!isMounted) return;
         setPnConfig(cfg);
         setCodeMap(codes);
+        setLevel3Products(l3);
+        setAutoPlaced(false);
       } catch (e) {
         console.error('Failed to load part number config:', e);
       }
@@ -191,50 +205,88 @@ const QTMSConfigurationEditor = ({
     return Array.isArray(allowed) ? allowed : null;
   };
 
+  // Auto-place standard cards according to admin configuration
+  useEffect(() => {
+    if (autoPlaced) return;
+    if (!pnConfig || !codeMap || !level3Products.length) return;
+    const totalSlots = pnConfig.slot_count || consolidatedQTMS.configuration.chassis.specifications?.slots || 0;
+
+    const canPlace = (start: number, span: number, assignments: Record<number, Level3Product>) => {
+      if (start < 1 || start + span - 1 > totalSlots) return false;
+      for (let s = 0; s < span; s++) {
+        if (assignments[start + s]) return false;
+      }
+      return true;
+    };
+
+    let updated = { ...editedSlotAssignments } as Record<number, Level3Product>;
+    let changed = false;
+
+    Object.entries(codeMap).forEach(([l3Id, def]) => {
+      if (!def?.is_standard || def?.outside_chassis) return;
+      const card = level3Products.find(p => p.id === l3Id);
+      if (!card) return;
+      // Skip if already placed anywhere
+      if (Object.values(updated).some(c => c.id === l3Id)) return;
+
+      const span = def.slot_span || card.specifications?.slotRequirement || 1;
+      let start: number | null = null;
+
+      if (def.standard_position && canPlace(def.standard_position, span, updated)) {
+        start = def.standard_position;
+      } else if (def.designated_only && def.designated_positions?.length) {
+        for (const pos of def.designated_positions) {
+          if (canPlace(pos, span, updated)) { start = pos; break; }
+        }
+      } else {
+        for (let pos = 1; pos <= totalSlots; pos++) {
+          if (canPlace(pos, span, updated)) { start = pos; break; }
+        }
+      }
+
+      if (start) {
+        for (let s = 0; s < span; s++) {
+          updated[start + s] = card;
+        }
+        changed = true;
+      }
+    });
+
+    if (changed) {
+      setEditedSlotAssignments(updated);
+    }
+    setAutoPlaced(true);
+  }, [pnConfig, codeMap, level3Products, autoPlaced, editedSlotAssignments, consolidatedQTMS.configuration.chassis.specifications]);
+
+  // Hints for standard slot positions not yet filled
+  const standardSlotHints = useMemo(() => {
+    const hints: Record<number, string[]> = {};
+    const nameById = Object.fromEntries(level3Products.map(p => [p.id, p.name] as const));
+    Object.entries(codeMap).forEach(([l3Id, def]) => {
+      if (!def?.is_standard || def?.outside_chassis) return;
+      const pos = def.standard_position;
+      if (!pos) return;
+      if (!editedSlotAssignments[pos]) {
+        const name = nameById[l3Id] || 'Standard Item';
+        hints[pos] = hints[pos] ? [...hints[pos], name] : [name];
+      }
+    });
+    return hints;
+  }, [codeMap, level3Products, editedSlotAssignments]);
+
   const handleCardSelect = (card: Level3Product, slot?: number) => {
     if (readOnly) return;
 
     const chassisType = consolidatedQTMS.configuration.chassis.type;
     const targetSlot = slot !== undefined ? slot : selectedSlot!;
 
-    // Generic allowed-slots enforcement from metadata
-    const allowedSlots = getAllowedSlotsForCard(card, chassisType);
-    if (allowedSlots && !allowedSlots.includes(targetSlot)) {
-      toast({
-        title: 'Invalid slot for this card',
-        description: `This ${card.name} can only be placed in slot(s): ${allowedSlots.join(', ')}`,
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    // LTX Slot 8 restriction - only display cards allowed
-    if (chassisType === 'LTX' && targetSlot === 8 && card.type !== 'display') {
-      toast({
-        title: 'Slot 8 reserved',
-        description: 'On LTX chassis, only Display cards may be placed in slot 8.',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    // LTX Display card must be in slot 8
-    if (chassisType === 'LTX' && card.type === 'display' && targetSlot !== 8) {
-      toast({
-        title: 'Display slot restriction',
-        description: 'On LTX chassis, the Display card must be placed in slot 8.',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    // Special handling for bushing cards
+    // Special handling for bushing cards first
     if (isBushingCard(card)) {
       const placement = findOptimalBushingPlacement(
-        consolidatedQTMS.configuration.chassis, 
+        consolidatedQTMS.configuration.chassis,
         editedSlotAssignments
       );
-      
+
       if (!placement) {
         console.error('Cannot place bushing card - no valid placement found');
         toast({
@@ -245,25 +297,20 @@ const QTMSConfigurationEditor = ({
         return;
       }
 
-      // Clear existing cards if needed
+      // Clear existing cards if needed and place bushing across two slots
       setEditedSlotAssignments(prev => {
         const updated = { ...prev };
-        
-        // Clear existing bushing cards
         if (placement.shouldClearExisting) {
           placement.existingSlotsToClear.forEach(slotToClear => {
             delete updated[slotToClear];
           });
         }
-        
-        // Place the bushing card in both slots
         updated[placement.primarySlot] = card;
         updated[placement.secondarySlot] = card;
-        
         return updated;
       });
 
-      // Check if card needs configuration
+      // Open configuration if needed
       if (card.name.toLowerCase().includes('bushing')) {
         const newItem: BOMItem = {
           id: `${Date.now()}-${Math.random()}`,
@@ -280,23 +327,97 @@ const QTMSConfigurationEditor = ({
       return;
     }
 
+    // Helper to check contiguous placement
+    const totalSlots = pnConfig?.slot_count || consolidatedQTMS.configuration.chassis.specifications?.slots || 0;
+    const canPlaceHere = (start: number, span: number) => {
+      if (start < 1 || start + span - 1 > totalSlots) return false;
+      for (let s = 0; s < span; s++) {
+        if (editedSlotAssignments[start + s]) return false;
+      }
+      return true;
+    };
+
+    // Generic allowed-slots enforcement from metadata
+    const allowedSlots = getAllowedSlotsForCard(card, chassisType);
+    if (allowedSlots && !allowedSlots.includes(targetSlot)) {
+      toast({
+        title: 'Invalid slot for this card',
+        description: `This ${card.name} can only be placed in slot(s): ${allowedSlots.join(', ')}`,
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const codeDef = codeMap[card.id];
+    const span = codeDef?.slot_span || card.specifications?.slotRequirement || 1;
+
+    // Enforce designated-only positions from admin config
+    if (codeDef?.designated_only && codeDef.designated_positions && !codeDef.designated_positions.includes(targetSlot)) {
+      toast({
+        title: 'Designated slot required',
+        description: `This ${card.name} can only be placed in slots: ${codeDef.designated_positions.join(', ')}`,
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // Check contiguous availability
+    if (!canPlaceHere(targetSlot, span)) {
+      toast({
+        title: 'Not enough space',
+        description: `Requires ${span} contiguous slot${span > 1 ? 's' : ''} starting at ${targetSlot}.`,
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // Fallback to legacy LTX rules ONLY if no admin config exists
+    if (!codeDef) {
+      if (chassisType === 'LTX' && targetSlot === 8 && card.type !== 'display') {
+        toast({
+          title: 'Slot 8 reserved',
+          description: 'On LTX chassis, only Display cards may be placed in slot 8.',
+          variant: 'destructive',
+        });
+        return;
+      }
+      if (chassisType === 'LTX' && card.type === 'display' && targetSlot !== 8) {
+        toast({
+          title: 'Display slot restriction',
+          description: 'On LTX chassis, the Display card must be placed in slot 8.',
+          variant: 'destructive',
+        });
+        return;
+      }
+    } else if (codeDef.standard_position && targetSlot !== codeDef.standard_position) {
+      // Auto-route to standard position if available
+      if (canPlaceHere(codeDef.standard_position, span)) {
+        slot = codeDef.standard_position;
+      }
+    }
+
     // Check if card needs configuration
     if (card.name.toLowerCase().includes('analog')) {
       const newItem: BOMItem = {
         id: `${Date.now()}-${Math.random()}`,
         product: card,
         quantity: 1,
-        slot: targetSlot,
+        slot: slot ?? targetSlot,
         enabled: true
       };
       setConfiguringCard(newItem);
       return;
     }
 
-    setEditedSlotAssignments(prev => ({
-      ...prev,
-      [targetSlot]: card
-    }));
+    // Place the card across the required span
+    setEditedSlotAssignments(prev => {
+      const updated = { ...prev };
+      const start = (slot ?? targetSlot)!;
+      for (let s = 0; s < span; s++) {
+        updated[start + s] = card;
+      }
+      return updated;
+    });
     setSelectedSlot(null);
   };
 

@@ -13,6 +13,7 @@ interface RackVisualizerProps {
   selectedSlot?: number | null;
   hasRemoteDisplay?: boolean;
   onRemoteDisplayToggle?: (enabled: boolean) => void;
+  standardSlotHints?: Record<number, string[]>;
 }
 
 const RackVisualizer = ({ 
