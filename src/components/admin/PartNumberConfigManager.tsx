@@ -54,7 +54,7 @@ const PartNumberConfigManager = () => {
           setRemoteOnCode(cfg.remote_on_code || "D1");
         } else {
           // Defaults from L2 specs
-          const current = l2.find(p => p.id === selectedL2);
+          const current = level2List.find(p => p.id === selectedL2);
           setPrefix(current?.chassisType || "");
           setSlotCount((current?.specifications as any)?.slots || 0);
         }
@@ -171,7 +171,7 @@ const PartNumberConfigManager = () => {
                     <Label className="text-xs">Slot Span</Label>
                     <Input
                       type="number"
-                      value={templates[l3.id]?.slot_span ?? (l3.specifications?.slotRequirement as any) || 1}
+                      value={templates[l3.id]?.slot_span ?? (l3.specifications?.slotRequirement as any) ?? 1}
                       onChange={e => setTemplates(prev => ({ ...prev, [l3.id]: { template: prev[l3.id]?.template || "", slot_span: parseInt(e.target.value) || 1 } }))}
                       className="bg-background border-border text-foreground"
                     />
