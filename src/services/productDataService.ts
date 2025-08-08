@@ -736,6 +736,89 @@ class ProductDataService {
     throw new Error('Not implemented - use Supabase table');
   }
 
+  // Part Number Config - data-driven
+  async getPartNumberConfig(level2Id: string): Promise<any | null> {
+    try {
+      const { data, error } = await supabase
+        .from('part_number_configs')
+        .select('*')
+        .eq('level2_product_id', level2Id)
+        .single();
+      if (error) return null;
+      return data;
+    } catch (e) {
+      console.error('getPartNumberConfig error:', e);
+      return null;
+    }
+  }
+
+  async upsertPartNumberConfig(config: {
+    level2_product_id: string;
+    prefix: string;
+    slot_placeholder: string;
+    slot_count: number;
+    suffix_separator?: string;
+    remote_off_code?: string;
+    remote_on_code?: string;
+  }): Promise<any | null> {
+    try {
+      const { data, error } = await supabase
+        .from('part_number_configs')
+        .upsert(config, { onConflict: 'level2_product_id' })
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    } catch (e) {
+      console.error('upsertPartNumberConfig error:', e);
+      return null;
+    }
+  }
+
+  async getPartNumberCodesForLevel2(level2Id: string): Promise<Record<string, { template: string; slot_span: number }>> {
+    try {
+      // Get all Level 3 under this Level 2
+      const level3 = await this.getLevel3ProductsForLevel2(level2Id);
+      const ids = level3.map(l => l.id);
+      if (ids.length === 0) return {};
+      const { data, error } = await supabase
+        .from('part_number_codes')
+        .select('*')
+        .in('level3_product_id', ids);
+      if (error) throw error;
+      const map: Record<string, { template: string; slot_span: number }> = {};
+      (data || []).forEach((row: any) => {
+        // Prefer overrides for this level2 if present
+        const existing = map[row.level3_product_id];
+        if (!existing || row.level2_product_id === level2Id) {
+          map[row.level3_product_id] = { template: row.template, slot_span: row.slot_span || 1 };
+        }
+      });
+      return map;
+    } catch (e) {
+      console.error('getPartNumberCodesForLevel2 error:', e);
+      return {};
+    }
+  }
+
+  async upsertPartNumberCodes(codes: Array<{ level3_product_id: string; level2_product_id?: string | null; template: string; slot_span?: number }>): Promise<boolean> {
+    try {
+      if (!codes || codes.length === 0) return true;
+      const payload = codes.map(c => ({
+        level3_product_id: c.level3_product_id,
+        level2_product_id: c.level2_product_id ?? null,
+        template: c.template,
+        slot_span: c.slot_span ?? 1
+      }));
+      const { error } = await supabase.from('part_number_codes').upsert(payload, { onConflict: 'level3_product_id,level2_product_id' });
+      if (error) throw error;
+      return true;
+    } catch (e) {
+      console.error('upsertPartNumberCodes error:', e);
+      return false;
+    }
+  }
+
   // Debug and utility methods
   async resetAndReload(): Promise<void> {
     console.log('Reset not needed - always fetching fresh data from Supabase');

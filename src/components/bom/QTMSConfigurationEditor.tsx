@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -11,7 +11,7 @@ import SlotCardSelector from './SlotCardSelector';
 import AnalogCardConfigurator from './AnalogCardConfigurator';
 import BushingCardConfigurator from './BushingCardConfigurator';
 import { findOptimalBushingPlacement, findExistingBushingSlots, isBushingCard } from '@/utils/bushingValidation';
-
+import { productDataService } from '@/services/productDataService';
 interface QTMSConfigurationEditorProps {
   consolidatedQTMS: ConsolidatedQTMS;
   onSave: (updatedQTMS: ConsolidatedQTMS) => void;
@@ -47,6 +47,82 @@ const QTMSConfigurationEditor = ({
     });
     setCardConfigurations(initialConfigs);
   });
+
+  // Part number configuration state
+  const [pnConfig, setPnConfig] = useState<any | null>(null);
+  const [codeMap, setCodeMap] = useState<Record<string, { template: string; slot_span: number }>>({});
+  const [livePartNumber, setLivePartNumber] = useState<string>(consolidatedQTMS.partNumber);
+
+  // Load part number config and codes for the selected chassis
+  useEffect(() => {
+    let isMounted = true;
+    const loadPN = async () => {
+      try {
+        const level2Id = consolidatedQTMS.configuration.chassis.id;
+        const [cfg, codes] = await Promise.all([
+          productDataService.getPartNumberConfig(level2Id),
+          productDataService.getPartNumberCodesForLevel2(level2Id)
+        ]);
+        if (!isMounted) return;
+        setPnConfig(cfg);
+        setCodeMap(codes);
+      } catch (e) {
+        console.error('Failed to load part number config:', e);
+      }
+    };
+    loadPN();
+    return () => { isMounted = false; };
+  }, [consolidatedQTMS.configuration.chassis.id]);
+
+  // Compute live part number from data-driven config
+  const computedPartNumber = useMemo(() => {
+    try {
+      if (!pnConfig) return consolidatedQTMS.partNumber;
+      const totalSlots = pnConfig.slot_count || consolidatedQTMS.configuration.chassis.specifications?.slots || 0;
+      const placeholder = pnConfig.slot_placeholder || '0';
+      const slotsArr: string[] = Array(totalSlots).fill(placeholder);
+      const occupied = new Set<number>();
+
+      for (let i = 1; i <= totalSlots; i++) {
+        if (occupied.has(i)) continue;
+        const card = editedSlotAssignments[i];
+        if (!card) continue;
+
+        const codeDef = codeMap[card.id];
+        let template = codeDef?.template || 'X';
+
+        // Replace supported placeholders
+        const inputs = card.specifications?.inputs ?? '';
+        template = template.replace('{inputs}', String(inputs));
+
+        const cardKey = `slot-${i}`;
+        const numberOfBushings = cardConfigurations[cardKey]?.length;
+        if (typeof numberOfBushings === 'number') {
+          template = template.replace('{numberOfBushings}', String(numberOfBushings));
+        }
+
+        // Remove any unresolved placeholders
+        const code = template.replace(/\{[^}]+\}/g, '');
+        slotsArr[i - 1] = code;
+
+        const span = codeDef?.slot_span || card.specifications?.slotRequirement || 1;
+        if (span > 1) {
+          for (let s = 1; s < span; s++) occupied.add(i + s);
+        }
+      }
+
+      const slotsStr = slotsArr.join('');
+      const suffix = `${pnConfig.suffix_separator}${editedHasRemoteDisplay ? pnConfig.remote_on_code : pnConfig.remote_off_code}`;
+      return `${pnConfig.prefix}${slotsStr}${suffix}`;
+    } catch (e) {
+      console.error('Error computing part number:', e);
+      return consolidatedQTMS.partNumber;
+    }
+  }, [pnConfig, codeMap, editedSlotAssignments, editedHasRemoteDisplay, cardConfigurations, consolidatedQTMS.partNumber, consolidatedQTMS.configuration.chassis.specifications]);
+
+  useEffect(() => {
+    setLivePartNumber(computedPartNumber);
+  }, [computedPartNumber]);
 
   const getCardTypeColor = (cardType: string) => {
     switch (cardType) {
@@ -250,6 +326,7 @@ const QTMSConfigurationEditor = ({
     // Create updated QTMS configuration
     const updatedQTMS: ConsolidatedQTMS = {
       ...consolidatedQTMS,
+      partNumber: livePartNumber || consolidatedQTMS.partNumber,
       price: totalPrice,
       configuration: {
         ...consolidatedQTMS.configuration,
@@ -289,9 +366,9 @@ const QTMSConfigurationEditor = ({
               <CardHeader>
                 <CardTitle className="text-white text-lg flex items-center justify-between">
                   Configuration Summary
-                  <Badge variant="outline" className="text-white border-gray-500">
-                    {consolidatedQTMS.partNumber}
-                  </Badge>
+                    <Badge variant="outline" className="text-white border-gray-500">
+                      {livePartNumber || consolidatedQTMS.partNumber}
+                    </Badge>
                 </CardTitle>
               </CardHeader>
               <CardContent>
