@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Level1Product, Level2Product, Level3Product } from '@/types/product';
 import { productDataService } from '@/services/productDataService';
+import { cn } from '@/lib/utils';
 
 interface Level2OptionsSelectorProps {
   level1Product: Level1Product;
@@ -81,7 +82,7 @@ const Level2OptionsSelector = ({
   if (loading) {
     return (
       <div className="space-y-4">
-        <h3 className="text-xl font-medium text-white">Select {level1Product.name} Options</h3>
+        <h3 className="text-xl font-medium text-foreground">Select {level1Product.name} Options</h3>
         <div className="text-center py-8">
           <p className="text-gray-400">Loading options...</p>
         </div>
@@ -91,7 +92,7 @@ const Level2OptionsSelector = ({
 
   return (
     <div className="space-y-4">
-      <h3 className="text-xl font-medium text-white">Select {level1Product.name} Options</h3>
+      <h3 className="text-xl font-medium text-foreground">Select {level1Product.name} Options</h3>
       
       {availableOptions.length > 0 ? (
         <div className="grid gap-4 md:grid-cols-2">
@@ -102,19 +103,18 @@ const Level2OptionsSelector = ({
             return (
               <Card
                 key={option.id}
-                className={`cursor-pointer transition-all hover:shadow-lg ${
-                  isCurrentlySelected
-                    ? 'bg-red-600 border-red-500'
-                    : 'bg-gray-900 border-gray-800 hover:border-red-500'
-                }`}
+                className={cn(
+                  "cursor-pointer transition-all hover:shadow-md h-full",
+                  isCurrentlySelected ? "ring-2 ring-primary" : "hover:border-primary"
+                )}
                 onClick={() => handleOptionClick(option)}
               >
                 <CardHeader>
-                  <CardTitle className="text-white flex items-center justify-between">
+                  <CardTitle className="flex items-center justify-between">
                     {option.name}
                     <div className="flex items-center gap-2">
                       {requiresChassisConfig && (
-                        <Badge variant="outline" className="text-xs bg-blue-500 text-white">
+                        <Badge variant="secondary" className="text-xs">
                           Configure
                         </Badge>
                       )}
@@ -125,15 +125,15 @@ const Level2OptionsSelector = ({
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-gray-400 text-sm mb-3">{option.description}</p>
+                  <p className="text-muted-foreground text-sm mb-3">{option.description}</p>
                   {requiresChassisConfig && (
-                    <p className="text-xs text-blue-300 mb-2">
+                    <p className="text-xs text-muted-foreground mb-2">
                       Requires chassis configuration
                     </p>
                   )}
                   <div className="flex justify-between items-center mb-3">
                     {canSeePrices && option.price && (
-                      <span className="text-white font-medium">
+                      <span className="text-foreground font-medium">
                         ${option.price.toLocaleString()}
                       </span>
                     )}
@@ -153,7 +153,7 @@ const Level2OptionsSelector = ({
                             onAddToBOM(option);
                           }}
                           size="sm"
-                          className="w-full bg-green-600 hover:bg-green-700 text-white font-medium shadow-md hover:shadow-lg transition-all duration-200 border-0"
+                          className="w-full"
                         >
                           Add to Bill of Material
                         </Button>
@@ -163,7 +163,7 @@ const Level2OptionsSelector = ({
                   {option.specifications && (
                     <div className="mt-2 flex flex-wrap gap-1">
                       {Object.entries(option.specifications).map(([key, value]) => (
-                        <Badge key={key} variant="outline" className="text-xs">
+                        <Badge key={key} variant="secondary" className="text-xs">
                           {key}: {value}
                         </Badge>
                       ))}
