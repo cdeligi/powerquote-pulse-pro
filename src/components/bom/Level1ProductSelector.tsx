@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Level1Product } from '@/types/product';
 import { productDataService } from '@/services/productDataService';
+import { cn } from '@/lib/utils';
 
 interface Level1ProductSelectorProps {
   onProductSelect: (product: Level1Product) => void;
@@ -59,7 +60,7 @@ const Level1ProductSelector = ({ onProductSelect, selectedProduct }: Level1Produ
   if (loading) {
     return (
       <div className="space-y-4">
-        <h3 className="text-xl font-medium text-white">Select Main Product Category</h3>
+        <h3 className="text-xl font-medium text-foreground">Select Main Product Category</h3>
         <div className="text-center py-8">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-600 mx-auto mb-4"></div>
           <p className="text-gray-400">Loading products...</p>
@@ -71,13 +72,12 @@ const Level1ProductSelector = ({ onProductSelect, selectedProduct }: Level1Produ
   if (error) {
     return (
       <div className="space-y-4">
-        <h3 className="text-xl font-medium text-white">Select Main Product Category</h3>
+         <h3 className="text-xl font-medium text-foreground">Select Main Product Category</h3>
         <div className="text-center py-8">
           <div className="text-red-400 mb-4">{error}</div>
           <Button 
             onClick={() => window.location.reload()} 
             variant="outline"
-            className="text-white border-gray-600 hover:border-red-500"
           >
             Reload Page
           </Button>
@@ -88,20 +88,19 @@ const Level1ProductSelector = ({ onProductSelect, selectedProduct }: Level1Produ
 
   return (
     <div className="space-y-4">
-      <h3 className="text-xl font-medium text-white">Select Main Product Category</h3>
+      <h3 className="text-xl font-medium text-foreground">Select Main Product Category</h3>
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {products.map((product) => (
           <Card
             key={product.id}
-            className={`cursor-pointer transition-all hover:shadow-lg ${
-              selectedProduct?.id === product.id
-                ? 'bg-red-600 border-red-500'
-                : 'bg-gray-900 border-gray-800 hover:border-red-500'
-            }`}
+            className={cn(
+              "cursor-pointer transition-all hover:shadow-md h-full",
+              selectedProduct?.id === product.id ? "ring-2 ring-primary" : "hover:border-primary"
+            )}
             onClick={() => onProductSelect(product)}
           >
             <CardHeader>
-              <CardTitle className="text-white flex items-center justify-between">
+              <CardTitle className="flex items-center justify-between">
                 {product.name}
                 {product.type && (
                   <Badge variant="outline" className="text-xs">
@@ -111,10 +110,10 @@ const Level1ProductSelector = ({ onProductSelect, selectedProduct }: Level1Produ
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-gray-400 text-sm mb-3">{product.description}</p>
+              <p className="text-muted-foreground text-sm mb-3">{product.description}</p>
               {product.price > 0 && (
                 <div className="flex justify-between items-center">
-                  <span className="text-white font-medium">
+                  <span className="text-foreground font-medium">
                     From ${product.price.toLocaleString()}
                   </span>
                 </div>

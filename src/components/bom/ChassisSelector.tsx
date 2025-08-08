@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { productDataService } from "@/services/productDataService";
+import { cn } from "@/lib/utils";
 
 interface ChassisSelectorProps {
   onChassisSelect: (chassis: Level2Product) => void;
@@ -89,7 +90,7 @@ const ChassisSelector = ({ onChassisSelect, selectedChassis, onAddToBOM, canSeeP
   if (loading) {
     return (
       <div className="space-y-4">
-        <h3 className="text-xl font-bold text-white mb-4">Select QTMS Chassis</h3>
+        <h3 className="text-xl font-bold text-foreground mb-4">Select QTMS Chassis</h3>
         <div className="text-center py-8">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-600 mx-auto mb-4"></div>
           <p className="text-gray-400">Loading chassis options...</p>
@@ -101,7 +102,7 @@ const ChassisSelector = ({ onChassisSelect, selectedChassis, onAddToBOM, canSeeP
   if (chassisOptions.length === 0) {
     return (
       <div className="space-y-4">
-        <h3 className="text-xl font-bold text-white mb-4">Select QTMS Chassis</h3>
+         <h3 className="text-xl font-bold text-foreground mb-4">Select QTMS Chassis</h3>
         <div className="text-center py-8">
           <p className="text-gray-400 mb-4">No QTMS chassis available.</p>
           <p className="text-gray-500 text-sm">Please create Level 2 products (LTX, MTX, STX) for QTMS in the Admin Panel.</p>
@@ -119,19 +120,18 @@ const ChassisSelector = ({ onChassisSelect, selectedChassis, onAddToBOM, canSeeP
 
   return (
     <div className="space-y-4">
-      <h3 className="text-xl font-bold text-white mb-4">Select QTMS Chassis</h3>
+      <h3 className="text-xl font-bold text-foreground mb-4">Select QTMS Chassis</h3>
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {chassisOptions.map((chassis) => (
           <Card
             key={chassis.id}
-            className={`transition-all hover:shadow-lg ${
-              selectedChassis?.id === chassis.id
-                ? 'bg-red-600 border-red-500'
-                : 'bg-gray-900 border-gray-800 hover:border-red-500'
-            }`}
+            className={cn(
+              "transition-all hover:shadow-md h-full",
+              selectedChassis?.id === chassis.id ? "ring-2 ring-primary" : "hover:border-primary"
+            )}
           >
             <CardHeader>
-              <CardTitle className="text-white flex items-center justify-between">
+              <CardTitle className="flex items-center justify-between">
                 {chassis.name}
                 <Badge variant="outline" className="text-xs">
                   {chassis.type || 'Chassis'}
@@ -139,10 +139,10 @@ const ChassisSelector = ({ onChassisSelect, selectedChassis, onAddToBOM, canSeeP
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-gray-400 text-sm mb-3">{chassis.description}</p>
+              <p className="text-muted-foreground text-sm mb-3">{chassis.description}</p>
               <div className="flex justify-between items-center mb-3">
                 {canSeePrices && chassis.price && (
-                  <span className="text-white font-medium">
+                  <span className="text-foreground font-medium">
                     ${chassis.price.toLocaleString()}
                   </span>
                 )}
@@ -154,7 +154,7 @@ const ChassisSelector = ({ onChassisSelect, selectedChassis, onAddToBOM, canSeeP
               </div>
               
               {/* Configure or Add to BOM buttons */}
-              <div className="flex gap-2 mb-3">
+              <div className="flex flex-col sm:flex-row gap-2 mb-3">
                 <Button
                   onClick={(e) => {
                     e.stopPropagation();
@@ -162,7 +162,7 @@ const ChassisSelector = ({ onChassisSelect, selectedChassis, onAddToBOM, canSeeP
                     onChassisSelect(chassis);
                   }}
                   size="sm"
-                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-medium shadow-md hover:shadow-lg transition-all duration-200 border-0"
+                  className="w-full sm:flex-1"
                 >
                   Configure Chassis
                 </Button>
@@ -173,7 +173,8 @@ const ChassisSelector = ({ onChassisSelect, selectedChassis, onAddToBOM, canSeeP
                       onAddToBOM(chassis);
                     }}
                     size="sm"
-                    className="flex-1 bg-green-600 hover:bg-green-700 text-white font-medium shadow-md hover:shadow-lg transition-all duration-200 border-0"
+                    variant="secondary"
+                    className="w-full sm:flex-1"
                   >
                     Add to BOM
                   </Button>
@@ -183,7 +184,7 @@ const ChassisSelector = ({ onChassisSelect, selectedChassis, onAddToBOM, canSeeP
               {chassis.specifications && (
                 <div className="mt-2 flex flex-wrap gap-1">
                   {Object.entries(chassis.specifications).map(([key, value]) => (
-                    <Badge key={key} variant="outline" className="text-xs">
+                    <Badge key={key} variant="secondary" className="text-xs">
                       {key}: {value}
                     </Badge>
                   ))}
