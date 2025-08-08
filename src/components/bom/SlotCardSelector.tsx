@@ -16,6 +16,8 @@ interface SlotCardSelectorProps {
   onClose: () => void;
   canSeePrices: boolean;
   currentSlotAssignments?: Record<number, any>;
+  codeMap?: Record<string, { template: string; slot_span: number; is_standard?: boolean; standard_position?: number | null; designated_only?: boolean; designated_positions?: number[]; outside_chassis?: boolean; notes?: string | null }>;
+  pnConfig?: any;
 }
 
 const SlotCardSelector = ({ 
@@ -24,7 +26,9 @@ const SlotCardSelector = ({
   onCardSelect, 
   onClose, 
   canSeePrices,
-  currentSlotAssignments = {}
+  currentSlotAssignments = {},
+  codeMap,
+  pnConfig
 }: SlotCardSelectorProps) => {
   const [availableCards, setAvailableCards] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -75,73 +79,77 @@ const SlotCardSelector = ({
     }
   };
 
-  // Filter cards based on chassis compatibility, bushing validation, and LTX slot 8 restriction
-  const getCompatibleCards = () => {
-    console.group(`[SlotCardSelector] Filtering cards for chassis:`, {
-      chassisId: chassis.id,
-      chassisName: chassis.name,
-      chassisType: chassis.chassisType,
-      legacyType: chassis.type,
-      slot: slot,
-      currentSlotAssignments: Object.keys(currentSlotAssignments),
-      allChassisProps: { ...chassis } // Log all chassis properties
-    });
+// Filter cards using chassis compatibility, admin rules (designated slots, slot span), and bushing validation
+const getCompatibleCards = () => {
+  console.group(`[SlotCardSelector] Filtering cards for chassis:`, {
+    chassisId: chassis.id,
+    chassisName: chassis.name,
+    chassisType: chassis.chassisType,
+    legacyType: chassis.type,
+    slot: slot,
+    currentSlotAssignments: Object.keys(currentSlotAssignments),
+    allChassisProps: { ...chassis }
+  });
 
-    const filteredCards = availableCards.filter(card => {
-      console.log(`[SlotCardSelector] Checking card: ${card.name} (${card.id})`);
-      
-      // Check chassis compatibility - use chassisType for compatibility check
-      const chassisTypes = [
-        chassis.chassisType,
-        chassis.type,
-        chassis.specifications?.chassisType,
-        chassis.specifications?.type
-      ].filter(Boolean);
-      
-      console.log(`[SlotCardSelector] Available chassis types for compatibility check:`, chassisTypes);
-      
-      // Check if the card is compatible with any of the chassis types
-      const isCompatible = card.compatibleChassis.some((compatibleType: string) => 
-        chassisTypes.some(chassisType => 
-          chassisType && compatibleType && 
-          chassisType.toString().toLowerCase() === compatibleType.toLowerCase()
-        )
-      );
-
-      if (!isCompatible) {
-        console.log(`[SlotCardSelector] Card ${card.name} is not compatible with any of chassis types:`, chassisTypes);
-        return false;
-      }
-
-      // LTX Slot 8 restriction - only display cards allowed
-      const isLTX = chassisTypes.some(t => t && t.toString().toUpperCase() === 'LTX');
-      if (isLTX && slot === 8 && card.type !== 'display') {
-        console.log(`[SlotCardSelector] Card ${card.name} is not allowed in LTX slot 8`);
-        return false;
-      }
-
-      // Special validation for bushing cards
-      if (isBushingCard(card as any)) {
-        console.log(`[SlotCardSelector] Validating bushing card: ${card.name}`);
-        const validation = validateBushingCardPlacement(chassis, currentSlotAssignments);
-        console.log(`[SlotCardSelector] Bushing validation result:`, validation);
-        
-        if (!validation.isValid) {
-          console.warn(`[SlotCardSelector] Bushing card ${card.name} is not valid for placement:`, validation.errorMessage);
-        }
-        
-        return validation.isValid;
-      }
-
-      return true;
-    });
-
-    console.log(`[SlotCardSelector] Found ${filteredCards.length} compatible cards`);
-    console.groupEnd();
-    return filteredCards;
+  const totalSlots = chassis.specifications?.slots || chassis.slots || pnConfig?.slot_count || 0;
+  const canPlace = (start: number, span: number) => {
+    if (start < 1 || start + span - 1 > totalSlots) return false;
+    for (let s = 0; s < span; s++) {
+      if (currentSlotAssignments[start + s]) return false;
+    }
+    return true;
   };
 
-  const compatibleCards = getCompatibleCards();
+  const filteredCards = availableCards.filter(card => {
+    console.log(`[SlotCardSelector] Checking card: ${card.name} (${card.id})`);
+
+    // Check chassis compatibility
+    const chassisTypes = [
+      chassis.chassisType,
+      chassis.type,
+      chassis.specifications?.chassisType,
+      chassis.specifications?.type
+    ].filter(Boolean);
+
+    const isCompatible = card.compatibleChassis.some((compatibleType: string) =>
+      chassisTypes.some(t => t && compatibleType && t.toString().toLowerCase() === compatibleType.toLowerCase())
+    );
+    if (!isCompatible) return false;
+
+    const def = codeMap?.[card.id];
+
+    // Designated-only enforcement when admin config exists
+    if (def?.designated_only && def.designated_positions && !def.designated_positions.includes(slot)) {
+      return false;
+    }
+
+    // Slot span enforcement
+    const span = (def?.slot_span || card.slotRequirement || 1);
+    if (!canPlace(slot, span)) {
+      return false;
+    }
+
+    // Fallback: LTX Slot 8 restriction only when no admin rule exists
+    const isLTX = chassisTypes.some(t => t && t.toString().toUpperCase() === 'LTX');
+    if (!def && isLTX && slot === 8 && card.type !== 'display') {
+      return false;
+    }
+
+    // Bushing validation
+    if (isBushingCard(card as any)) {
+      const validation = validateBushingCardPlacement(chassis, currentSlotAssignments);
+      return validation.isValid;
+    }
+
+    return true;
+  });
+
+  console.log(`[SlotCardSelector] Found ${filteredCards.length} compatible cards`);
+  console.groupEnd();
+  return filteredCards;
+};
+
+const compatibleCards = getCompatibleCards();
 
   // Get validation result for bushing cards to show error messages
   const getBushingValidation = (card: any) => {
@@ -151,14 +159,31 @@ const SlotCardSelector = ({
     return null;
   };
 
-  const handleCardSelect = (card: any) => {
-    // For display cards, automatically route to slot 8 in LTX chassis
-    if (card.type === 'display' && chassis.type === 'LTX') {
-      onCardSelect(card, 8);
-    } else {
-      onCardSelect(card, slot);
+const handleCardSelect = (card: any) => {
+  const def = codeMap?.[card.id];
+  const totalSlots = chassis.specifications?.slots || chassis.slots || pnConfig?.slot_count || 0;
+  const span = def?.slot_span || card.slotRequirement || 1;
+  const canPlace = (start: number, span: number) => {
+    if (start < 1 || start + span - 1 > totalSlots) return false;
+    for (let s = 0; s < span; s++) {
+      if (currentSlotAssignments[start + s]) return false;
     }
+    return true;
   };
+
+  if (def?.standard_position && canPlace(def.standard_position, span)) {
+    onCardSelect(card, def.standard_position);
+    return;
+  }
+
+  // Fallback behavior when no admin rule exists
+  const chassisType = (chassis.chassisType || chassis.type || '').toUpperCase();
+  if (!def && card.type === 'display' && chassisType === 'LTX') {
+    onCardSelect(card, 8);
+  } else {
+    onCardSelect(card, slot);
+  }
+};
 
   const needsConfiguration = (card: any) => {
     return card.name.toLowerCase().includes('analog') || card.name.toLowerCase().includes('bushing');
