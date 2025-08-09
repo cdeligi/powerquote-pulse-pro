@@ -125,6 +125,11 @@ const getCompatibleCards = () => {
 
     const def = codeMap?.[card.id];
 
+    // Exclude items marked as outside the chassis (accessories)
+    if (def?.outside_chassis) {
+      return false;
+    }
+
     // Enforce exclusivity: if any product is exclusive for this slot, only allow that/those products
     if (exclusiveProductIdsForSlot.length > 0 && !exclusiveProductIdsForSlot.includes(card.id)) {
       return false;
