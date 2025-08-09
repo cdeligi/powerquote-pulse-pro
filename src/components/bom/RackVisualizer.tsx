@@ -268,6 +268,12 @@ return (
           </p>
           
           {renderChassisLayout()}
+
+          {/* Part Number - bottom left below rack */}
+          <div className="mt-2 text-xs text-gray-300">
+            <span className="mr-1">Part Number:</span>
+            <span className="font-mono text-white">{partNumber || '—'}</span>
+          </div>
           
           {/* Bushing Card Information */}
           {Object.keys(bushingSlots).length > 0 && (
@@ -303,7 +309,12 @@ return (
                       <Button
                         variant={acc.selected ? 'default' : 'outline'}
                         size="sm"
-                        onClick={() => onAccessoryToggle(acc.product.id)}
+                        onClick={() => {
+                          onAccessoryToggle(acc.product.id);
+                          if (onRemoteDisplayToggle && acc.product.name?.toLowerCase().includes('remote') && acc.product.name?.toLowerCase().includes('display')) {
+                            onRemoteDisplayToggle(!acc.selected);
+                          }
+                        }}
                         className={acc.selected ? 'bg-green-600 hover:bg-green-700' : ''}
                       >
                         {acc.selected ? 'Added' : 'Add'}
