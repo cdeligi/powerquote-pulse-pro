@@ -115,9 +115,9 @@ const BOMAnalysis = ({
                     <p className="text-gray-400 text-sm mt-1">{item.description}</p>
                   )}
                   {item.part_number && (
-                    <Badge variant="outline" className="text-xs text-green-400 border-green-400 mt-2">
-                      P/N: {item.part_number}
-                    </Badge>
+                      <Badge variant="outline" className="text-xs font-mono text-white border-gray-600 mt-2 break-all">
+                        P/N: {item.part_number}
+                      </Badge>
                   )}
                 </div>
                 

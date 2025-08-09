@@ -604,7 +604,7 @@ const totalPrice = baseTotalPrice + configurationCosts;
                 <Settings className="mr-2 h-5 w-5" />
                 Edit QTMS Configuration - {consolidatedQTMS.name}
               </span>
-              <Badge variant="outline" className="text-white border-gray-500">
+              <Badge variant="outline" className="text-white font-mono border-gray-500 break-all">
                 {livePartNumber || consolidatedQTMS.partNumber}
               </Badge>
             </DialogTitle>
@@ -616,7 +616,7 @@ const totalPrice = baseTotalPrice + configurationCosts;
               <CardHeader>
                 <CardTitle className="text-white text-lg flex items-center justify-between">
                   Configuration Summary
-                    <Badge variant="outline" className="text-white border-gray-500">
+                    <Badge variant="outline" className="text-white font-mono border-gray-500 break-all">
                       {livePartNumber || consolidatedQTMS.partNumber}
                     </Badge>
                 </CardTitle>
@@ -732,7 +732,7 @@ const totalPrice = baseTotalPrice + configurationCosts;
           <DialogFooter className="flex items-center justify-between">
             <div className="text-left">
               <div className="text-xs uppercase text-muted-foreground tracking-wider">Part Number</div>
-              <div className="text-foreground font-semibold text-lg">{livePartNumber || consolidatedQTMS.partNumber || `QTMS-${(consolidatedQTMS.configuration.chassis.type||'').toUpperCase()}-`}</div>
+              <div className="text-foreground font-mono font-semibold text-lg break-all">{livePartNumber || consolidatedQTMS.partNumber || `QTMS-${(consolidatedQTMS.configuration.chassis.type||'').toUpperCase()}-`}</div>
             </div>
             <div className="flex space-x-2">
               <Button

@@ -146,8 +146,8 @@ const BOMDisplay = ({ bomItems, onUpdateBOM, onEditConfiguration, onSubmitQuote,
                 )}
                 
                 {/* Part Number Display */}
-                <div className="flex items-center space-x-2 mt-1">
-                  <Badge variant="outline" className="text-xs text-green-400 border-green-400">
+                <div className="flex flex-wrap items-center gap-2 mt-1">
+                  <Badge variant="outline" className="text-xs font-mono text-white border-gray-500 break-all">
                     P/N: {getPartNumber(item)}
                   </Badge>
                   {item.slot && (
