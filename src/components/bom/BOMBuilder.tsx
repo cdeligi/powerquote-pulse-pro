@@ -285,7 +285,8 @@ const handleChassisSelect = (chassis: Level2Product) => {
       // Update the existing item with new configuration
       const updatedItem: BOMItem = {
         ...editingOriginalItem,
-        slotAssignments: { ...slotAssignments }
+        slotAssignments: { ...slotAssignments },
+        partNumber: buildQTMSPartNumber({ chassis: selectedChassis!, slotAssignments, hasRemoteDisplay, pnConfig, codeMap, includeSuffix: false })
       };
       
       // Find and update the existing item in BOM
@@ -299,11 +300,14 @@ const handleChassisSelect = (chassis: Level2Product) => {
           .map(id => {
             const product = level3Products.find(p => p.id === id);
             if (!product) return null as any;
+            const template = codeMap[id]?.template as string | undefined;
+            const accPN = template ? String(template).replace(/\{[^}]+\}/g, '') : (product.partNumber || '');
             return {
               id: `${id}-${Date.now()}`,
               product,
               quantity: 1,
-              enabled: true
+              enabled: true,
+              partNumber: accPN
             } as BOMItem;
           })
           .filter(Boolean) as BOMItem[];
@@ -319,13 +323,13 @@ const handleChassisSelect = (chassis: Level2Product) => {
         description: `${selectedChassis.name} configuration has been updated.`,
       });
     } else {
-      // Create new chassis item
       const chassisItem: BOMItem = {
         id: `${selectedChassis.id}-${Date.now()}`,
         product: selectedChassis,
         quantity: 1,
         enabled: true,
-        slotAssignments: { ...slotAssignments }
+        slotAssignments: { ...slotAssignments },
+        partNumber: buildQTMSPartNumber({ chassis: selectedChassis, slotAssignments, hasRemoteDisplay, pnConfig, codeMap, includeSuffix: false })
       };
       
       // Add to BOM with selected accessories
@@ -333,11 +337,14 @@ const handleChassisSelect = (chassis: Level2Product) => {
         .map(id => {
           const product = level3Products.find(p => p.id === id);
           if (!product) return null as any;
+          const template = codeMap[id]?.template as string | undefined;
+          const accPN = template ? String(template).replace(/\{[^}]+\}/g, '') : (product.partNumber || '');
           return {
             id: `${id}-${Date.now()}`,
             product,
             quantity: 1,
-            enabled: true
+            enabled: true,
+            partNumber: accPN
           } as BOMItem;
         })
         .filter(Boolean) as BOMItem[];

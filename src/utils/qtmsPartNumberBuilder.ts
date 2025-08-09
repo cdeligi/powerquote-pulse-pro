@@ -19,6 +19,8 @@ export interface PartNumberBuildParams {
   }> | null;
   // Optional per-card configurations keyed by `slot-<n>`
   cardConfigurations?: Record<string, any>;
+  // When false, omit accessory suffix (e.g., remote display code) from the result
+  includeSuffix?: boolean;
 }
 
 // Shared, data-driven QTMS part number builder
@@ -26,7 +28,7 @@ export interface PartNumberBuildParams {
 // - Uses Level 3 code templates per slot (supports placeholders like {inputs})
 // - Falls back to sensible defaults when admin config is missing
 export function buildQTMSPartNumber(params: PartNumberBuildParams): string {
-  const { chassis, slotAssignments, hasRemoteDisplay = false, pnConfig, codeMap, cardConfigurations = {} } = params;
+  const { chassis, slotAssignments, hasRemoteDisplay = false, pnConfig, codeMap, cardConfigurations = {}, includeSuffix = true } = params;
 
   try {
     const defaults = {
@@ -75,9 +77,9 @@ export function buildQTMSPartNumber(params: PartNumberBuildParams): string {
 
     const slotsStr = slotsArr.join('');
 
-    // Accessory suffix: use configured remote display codes
+    // Accessory suffix: optionally include remote display codes
     const remoteCode = hasRemoteDisplay ? (cfg.remote_on_code ?? 'D1') : (cfg.remote_off_code ?? '0');
-    const suffix = `${cfg.suffix_separator || '-'}${remoteCode}`;
+    const suffix = includeSuffix ? `${cfg.suffix_separator || '-'}${remoteCode}` : '';
 
     return `${cfg.prefix}${slotsStr}${suffix}`;
   } catch (e) {
