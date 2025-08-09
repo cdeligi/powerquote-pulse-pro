@@ -14,6 +14,7 @@ interface RackVisualizerProps {
   hasRemoteDisplay?: boolean;
   onRemoteDisplayToggle?: (enabled: boolean) => void;
   standardSlotHints?: Record<number, string[]>;
+  colorByProductId?: Record<string, string>;
 }
 
 const RackVisualizer = ({ 
@@ -24,7 +25,8 @@ const RackVisualizer = ({
   selectedSlot,
   hasRemoteDisplay = false,
   onRemoteDisplayToggle,
-  standardSlotHints
+  standardSlotHints,
+  colorByProductId
 }: RackVisualizerProps) => {
   
   const bushingSlots = getBushingOccupiedSlots(slotAssignments);
@@ -42,18 +44,13 @@ const RackVisualizer = ({
     }
   };
 
-  const getSlotColor = (slot: number) => {
-    if (slot === 0) return 'bg-blue-600'; // CPU slot (slot 0)
-    if (selectedSlot === slot) return 'bg-yellow-600'; // Selected slot
-    
-    // Only apply card-type colors if slot has a card assigned
-    if (slotAssignments[slot]) {
-      return getCardTypeColor(slotAssignments[slot].type);
-    }
-    
-    // Empty slots - use neutral colors
-    return 'bg-gray-700'; // Empty slot
-  };
+const getSlotColor = (slot: number) => {
+  if (slot === 0) return 'bg-blue-600'; // CPU slot (slot 0)
+  // For selected empty slots, show highlight; for assigned slots we will use admin color via inline style
+  if (!slotAssignments[slot] && selectedSlot === slot) return 'bg-yellow-600';
+  if (slotAssignments[slot]) return 'bg-gray-700'; // base for assigned; real color via inline style
+  return 'bg-gray-700'; // Empty slot
+};
 
   const getSlotLabel = (slot: number) => {
     if (slot === 0) return 'CPU';
@@ -123,7 +120,7 @@ const getSlotTitle = (slot: number) => {
     );
     const isLTXDisplaySlot = chassis.type === 'LTX' && slot === 8;
     
-    return (
+return (
       <div
         key={slot}
         className={`
@@ -138,10 +135,14 @@ const getSlotTitle = (slot: number) => {
         `}
         onClick={() => clickable && onSlotClick(slot)}
         title={getSlotTitle(slot)}
+        style={(() => {
+          const assigned = slotAssignments[slot];
+          const adminColor = assigned ? (colorByProductId?.[assigned.id] || null) : null;
+          return adminColor ? { backgroundColor: adminColor } : undefined;
+        })()}
       >
-{slot === 0 && <Cpu className="h-4 w-4 mr-1" />}
-{getSlotLabel(slot)}
-
+        {slot === 0 && <Cpu className="h-4 w-4 mr-1" />}
+        {getSlotLabel(slot)}
 {/* Standard hint badge */}
 {!slotAssignments[slot] && standardSlotHints && standardSlotHints[slot] && (
   <span
