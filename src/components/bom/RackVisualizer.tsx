@@ -2,7 +2,7 @@ import { Chassis, Card as ProductCard, Level3Product } from "@/types/product";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Cpu, X, Monitor } from "lucide-react";
+import { X, Monitor } from "lucide-react";
 import { getBushingOccupiedSlots, isBushingCard } from "@/utils/bushingValidation";
 
 interface RackVisualizerProps {
@@ -150,7 +150,7 @@ return (
           return adminColor ? { backgroundColor: adminColor } : undefined;
         })()}
       >
-        {slot === 0 && <Cpu className="h-4 w-4 mr-1" />}
+        
         {getSlotLabel(slot)}
 {/* Standard hint badge */}
 {!slotAssignments[slot] && standardSlotHints && standardSlotHints[slot] && (
@@ -248,7 +248,7 @@ return (
         <CardTitle className="text-white flex items-center justify-between">
           <span>Rack Configuration - {chassis.name}</span>
           <Badge variant="outline" className="text-sm text-white border-gray-500">
-            {chassis.specifications?.height || chassis.height || '6U'} • {chassis.specifications?.slots || 14} slots
+            {chassis.specifications?.height || (chassis as any).height || '6U'} • {chassis.specifications?.slots || (chassis as any).slots || 14} slots
           </Badge>
         </CardTitle>
       </CardHeader>

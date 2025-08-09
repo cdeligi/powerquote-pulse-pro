@@ -280,6 +280,20 @@ const QTMSConfigurationEditor = ({
     return hints;
   }, [codeMap, level3Products, editedSlotAssignments]);
 
+  // Configured CPU tile color (std position 0)
+  const cpuColor = useMemo(() => {
+    const entry = Object.entries(codeMap).find(([, def]) => def?.standard_position === 0 && !!def?.color);
+    return (entry?.[1]?.color as string) || undefined;
+  }, [codeMap]);
+
+  // CPU label from admin L3 (standard_position 0)
+  const cpuLabel = useMemo(() => {
+    const entry = Object.entries(codeMap).find(([, def]) => def?.standard_position === 0);
+    if (!entry) return undefined;
+    const l3 = level3Products.find(p => p.id === entry[0]);
+    return l3?.name;
+  }, [codeMap, level3Products]);
+
   const handleCardSelect = (card: Level3Product, slot?: number) => {
     if (readOnly) return;
 
@@ -629,6 +643,8 @@ const totalPrice = baseTotalPrice + configurationCosts;
   hasRemoteDisplay={editedHasRemoteDisplay}
   onRemoteDisplayToggle={handleRemoteDisplayToggle}
   standardSlotHints={standardSlotHints}
+  cpuColor={cpuColor}
+  cpuLabel={cpuLabel}
 />
 
             {/* Configuration Changes Summary with Color Coding */}
