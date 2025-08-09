@@ -731,8 +731,8 @@ const totalPrice = baseTotalPrice + configurationCosts;
 
           <DialogFooter className="flex items-center justify-between">
             <div className="text-left">
-              <div className="text-xs uppercase text-gray-400 tracking-wider">Part Number</div>
-              <div className="text-white font-semibold text-lg">{livePartNumber || consolidatedQTMS.partNumber || `QTMS-${(consolidatedQTMS.configuration.chassis.type||'').toUpperCase()}-`}</div>
+              <div className="text-xs uppercase text-muted-foreground tracking-wider">Part Number</div>
+              <div className="text-foreground font-semibold text-lg">{livePartNumber || consolidatedQTMS.partNumber || `QTMS-${(consolidatedQTMS.configuration.chassis.type||'').toUpperCase()}-`}</div>
             </div>
             <div className="flex space-x-2">
               <Button
