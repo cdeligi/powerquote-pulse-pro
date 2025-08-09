@@ -48,45 +48,63 @@ class ProductDataService {
     
     // Log the raw row data for debugging
     console.log('Raw row data:', JSON.stringify(row, null, 2));
-    
-    // Determine chassis type - prioritize chassis_type field from database, fallback to type, subcategory for display only
-    const chassisType = row.chassis_type || row.type || 'N/A';
-    
-    // Map to standard chassis types if needed
-    let mappedChassisType = chassisType.toUpperCase();
-    if (chassisType === '14-card' || chassisType === '14CARD') {
-      mappedChassisType = 'LTX';
-    } else if (chassisType === '7-card' || chassisType === '7CARD') {
-      mappedChassisType = 'MTX';
-    } else if (chassisType === '4-card' || chassisType === '4CARD') {
-      mappedChassisType = 'STX';
+
+    // Determine chassis type safely
+    const rawChassisType = typeof row.chassis_type === 'string'
+      ? row.chassis_type
+      : (typeof row.type === 'string' ? row.type : (typeof row.subcategory === 'string' ? row.subcategory : 'N/A'));
+
+    // Normalize and map to standard chassis types
+    const normalized = String(rawChassisType).trim().toLowerCase();
+    let mappedChassisType: string;
+    switch (normalized) {
+      case 'ltx':
+      case '14-card':
+      case '14card':
+      case '14':
+        mappedChassisType = 'LTX';
+        break;
+      case 'mtx':
+      case '7-card':
+      case '7card':
+      case '7':
+        mappedChassisType = 'MTX';
+        break;
+      case 'stx':
+      case '4-card':
+      case '4card':
+      case '4':
+        mappedChassisType = 'STX';
+        break;
+      default:
+        mappedChassisType = rawChassisType ? String(rawChassisType).toUpperCase() : 'N/A';
     }
-    
-    const transformed = {
+
+    // Ensure specifications is an object and inject safe defaults
+    const rawSpecs = (row.specifications && typeof row.specifications === 'object') ? row.specifications : {};
+    const computedSlots = typeof rawSpecs.slots === 'number'
+      ? rawSpecs.slots
+      : (mappedChassisType === 'LTX' ? 14 : mappedChassisType === 'MTX' ? 7 : mappedChassisType === 'STX' ? 4 : 0);
+
+    const transformed: Level2Product = {
       id: row.id,
       name: row.name,
-      type: 'chassis', // Standardize type to 'chassis' for all level 2 products
-      asset_type_id: row.asset_type_id,
-      category: row.category,
+      // Back-compat: many components check .type for LTX/MTX/STX
+      type: mappedChassisType,
+      parentProductId: row.parent_product_id,
       description: row.description || '',
-      specifications: {
-        ...(row.specifications || {}),
-        // Ensure we have slots defined based on chassis type
-        slots: row.specifications?.slots || 
-               (mappedChassisType === 'LTX' ? 14 : 
-                mappedChassisType === 'MTX' ? 7 : 4),
-        height: row.specifications?.height || '3U'
-      },
       price: parseFloat(row.price) || 0,
       cost: parseFloat(row.cost) || 0,
       enabled: row.enabled !== undefined ? row.enabled : true,
-      parentProductId: row.parent_product_id,
+      chassisType: mappedChassisType,
+      specifications: {
+        ...rawSpecs,
+        slots: computedSlots,
+        height: rawSpecs.height || '3U'
+      },
       partNumber: row.part_number || '',
       image: row.image_url || '',
-      productInfoUrl: row.product_info_url || '',
-      chassisType: mappedChassisType, // Use the mapped chassis type
-      productLevel: row.product_level || 2,
-      rackConfigurable: row.rack_configurable !== false // Default to true if not specified
+      productInfoUrl: row.product_info_url || ''
     };
 
     console.log('Transformed product:', JSON.stringify(transformed, null, 2));
@@ -97,18 +115,20 @@ class ProductDataService {
 
   // Transform database rows to Level3Product interface
   private transformDbToLevel3(row: any): Level3Product {
+    const rawSpecs = (row.specifications && typeof row.specifications === 'object') ? row.specifications : {};
+    const subcategory = typeof row.subcategory === 'string' ? row.subcategory : '';
     return {
       id: row.id,
       name: row.name,
       parentProductId: row.parent_product_id || '',
-      type: row.subcategory || 'card',
+      type: subcategory || 'card',
       description: row.description || '',
       price: parseFloat(row.price) || 0,
       cost: parseFloat(row.cost) || 0,
       enabled: row.enabled !== false,
       specifications: {
-        ...row.specifications,
-        slotRequirement: row.slot_requirement || 1
+        ...rawSpecs,
+        slotRequirement: row.slot_requirement || rawSpecs.slotRequirement || 1
       },
       partNumber: row.part_number,
       image: row.image_url,
