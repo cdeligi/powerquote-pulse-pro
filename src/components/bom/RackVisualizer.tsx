@@ -16,6 +16,9 @@ interface RackVisualizerProps {
   standardSlotHints?: Record<number, string[]>;
   colorByProductId?: Record<string, string>;
   cpuColor?: string;
+  cpuLabel?: string;
+  accessories?: { product: Level3Product; selected: boolean; color?: string | null }[];
+  onAccessoryToggle?: (id: string) => void;
 }
 
 const RackVisualizer = ({ 
@@ -28,7 +31,10 @@ const RackVisualizer = ({
   onRemoteDisplayToggle,
   standardSlotHints,
   colorByProductId,
-  cpuColor
+  cpuColor,
+  cpuLabel,
+  accessories,
+  onAccessoryToggle
 }: RackVisualizerProps) => {
   
   const bushingSlots = getBushingOccupiedSlots(slotAssignments);
@@ -56,7 +62,7 @@ const getSlotColor = (slot: number) => {
 };
 
   const getSlotLabel = (slot: number) => {
-    if (slot === 0) return 'CPU';
+    if (slot === 0) return cpuLabel || 'CPU';
     if (slotAssignments[slot]) {
       const card = slotAssignments[slot];
       if (isBushingCard(card)) {
@@ -73,7 +79,7 @@ const getSlotColor = (slot: number) => {
   };
 
 const getSlotTitle = (slot: number) => {
-  if (slot === 0) return 'CPU (Fixed)';
+  if (slot === 0) return `${cpuLabel || 'CPU'} (Fixed)`;
   if (slotAssignments[slot]) {
     const card = slotAssignments[slot];
     if (isBushingCard(card)) {
@@ -249,7 +255,7 @@ return (
       <CardContent>
         <div className="space-y-4">
           <p className="text-gray-400 text-sm">
-            Click on any slot (except CPU) to add a card. Click the X to clear a slot.
+            Click on any slot (except {cpuLabel || 'CPU'}) to add a card. Click the X to clear a slot.
             {chassis.type === 'LTX' && (
               <span className="block text-purple-300 mt-1">
                 Slot 8 is reserved for Display Cards only.
@@ -296,6 +302,33 @@ return (
                 >
                   {hasRemoteDisplay ? "Added" : "Add"}
                 </Button>
+              </div>
+            </div>
+          )}
+          
+          {/* Accessories Section */}
+          {accessories && accessories.length > 0 && (
+            <div className="pt-4 border-t border-gray-700">
+              <h4 className="text-white font-medium mb-2">Accessories</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                {accessories.map((acc) => (
+                  <div key={acc.product.id} className="flex items-center justify-between p-3 bg-gray-800 rounded border border-gray-700">
+                    <div className="flex items-center space-x-2">
+                      <span className="inline-block h-3 w-3 rounded-full" style={acc.color ? { backgroundColor: acc.color } : undefined} />
+                      <span className="text-white">{acc.product.name}</span>
+                    </div>
+                    {onAccessoryToggle && (
+                      <Button
+                        variant={acc.selected ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => onAccessoryToggle(acc.product.id)}
+                        className={acc.selected ? 'bg-green-600 hover:bg-green-700' : ''}
+                      >
+                        {acc.selected ? 'Added' : 'Add'}
+                      </Button>
+                    )}
+                  </div>
+                ))}
               </div>
             </div>
           )}

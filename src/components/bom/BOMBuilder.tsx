@@ -55,6 +55,7 @@ const [pnConfig, setPnConfig] = useState<any | null>(null);
 const [codeMap, setCodeMap] = useState<Record<string, { template: string; slot_span: number; is_standard?: boolean; standard_position?: number | null; designated_only?: boolean; designated_positions?: number[]; outside_chassis?: boolean; notes?: string | null; exclusive_in_slots?: boolean; color?: string | null }>>({});
 const [level3Products, setLevel3Products] = useState<Level3Product[]>([]);
 const [autoPlaced, setAutoPlaced] = useState(false);
+const [selectedAccessories, setSelectedAccessories] = useState<Set<string>>(new Set());
 
 // Hints for standard slot positions not yet filled (top-level to avoid conditional hooks)
 const standardSlotHints = useMemo(() => {
@@ -87,6 +88,34 @@ const cpuColor = useMemo(() => {
   const entry = Object.entries(codeMap).find(([, def]) => def?.standard_position === 0 && !!def?.color);
   return (entry?.[1]?.color as string) || undefined;
 }, [codeMap]);
+
+// CPU label from admin L3 (standard_position 0)
+const cpuLabel = useMemo(() => {
+  const entry = Object.entries(codeMap).find(([, def]) => def?.standard_position === 0);
+  if (!entry) return undefined;
+  const l3 = level3Products.find(p => p.id === entry[0]);
+  return l3?.name;
+}, [codeMap, level3Products]);
+
+// Accessories list from admin config (outside_chassis)
+const accessories = useMemo(() => {
+  return level3Products
+    .filter(p => codeMap[p.id]?.outside_chassis)
+    .map(p => ({
+      product: p,
+      selected: selectedAccessories.has(p.id),
+      color: (codeMap[p.id]?.color as string | null) || null
+    }));
+}, [level3Products, codeMap, selectedAccessories]);
+
+const toggleAccessory = (id: string) => {
+  setSelectedAccessories(prev => {
+    const next = new Set(prev);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    return next;
+  });
+};
 
   // Get available quote fields for validation
   const [availableQuoteFields, setAvailableQuoteFields] = useState<any[]>([]);
@@ -259,9 +288,26 @@ const handleChassisSelect = (chassis: Level2Product) => {
       };
       
       // Find and update the existing item in BOM
-      const updatedItems = bomItems.map(item => 
+      let updatedItems = bomItems.map(item => 
         item.id === editingOriginalItem.id ? updatedItem : item
       );
+
+      // Append selected accessories as separate BOM items
+      if (selectedAccessories.size) {
+        const accessoryItems: BOMItem[] = Array.from(selectedAccessories)
+          .map(id => {
+            const product = level3Products.find(p => p.id === id);
+            if (!product) return null as any;
+            return {
+              id: `${id}-${Date.now()}`,
+              product,
+              quantity: 1,
+              enabled: true
+            } as BOMItem;
+          })
+          .filter(Boolean) as BOMItem[];
+        updatedItems = [...updatedItems, ...accessoryItems];
+      }
       
       setBomItems(updatedItems);
       onBOMUpdate(updatedItems);
@@ -281,9 +327,23 @@ const handleChassisSelect = (chassis: Level2Product) => {
         slotAssignments: { ...slotAssignments }
       };
       
-      // Add to BOM
-      setBomItems(prev => [...prev, chassisItem]);
-      onBOMUpdate([...bomItems, chassisItem]);
+      // Add to BOM with selected accessories
+      const accessoryItems: BOMItem[] = Array.from(selectedAccessories)
+        .map(id => {
+          const product = level3Products.find(p => p.id === id);
+          if (!product) return null as any;
+          return {
+            id: `${id}-${Date.now()}`,
+            product,
+            quantity: 1,
+            enabled: true
+          } as BOMItem;
+        })
+        .filter(Boolean) as BOMItem[];
+
+      const updated = [...bomItems, chassisItem, ...accessoryItems];
+      setBomItems(updated);
+      onBOMUpdate(updated);
       
       toast({
         title: 'Chassis Configuration Added',
@@ -296,6 +356,7 @@ const handleChassisSelect = (chassis: Level2Product) => {
     setSelectedChassis(null);
     setSlotAssignments({});
     setSelectedSlot(null);
+    setSelectedAccessories(new Set());
   };
 
   const handleSlotClick = (slot: number) => {
@@ -753,6 +814,9 @@ const handleAddChassisAndCardsToBOM = () => {
   standardSlotHints={standardSlotHints}
   colorByProductId={colorByProductId}
   cpuColor={cpuColor}
+  cpuLabel={cpuLabel}
+  accessories={accessories}
+  onAccessoryToggle={toggleAccessory}
 />
           
 {selectedSlot !== null && (
@@ -834,6 +898,9 @@ const handleAddChassisAndCardsToBOM = () => {
   standardSlotHints={standardSlotHints}
   colorByProductId={colorByProductId}
   cpuColor={cpuColor}
+  cpuLabel={cpuLabel}
+  accessories={accessories}
+  onAccessoryToggle={toggleAccessory}
 />
              </div>
 
