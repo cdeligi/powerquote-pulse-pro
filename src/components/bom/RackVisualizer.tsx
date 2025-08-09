@@ -19,6 +19,7 @@ interface RackVisualizerProps {
   cpuLabel?: string;
   accessories?: { product: Level3Product; selected: boolean; color?: string | null }[];
   onAccessoryToggle?: (id: string) => void;
+  partNumber?: string;
 }
 
 const RackVisualizer = ({ 
@@ -34,7 +35,8 @@ const RackVisualizer = ({
   cpuColor,
   cpuLabel,
   accessories,
-  onAccessoryToggle
+  onAccessoryToggle,
+  partNumber,
 }: RackVisualizerProps) => {
   
   const bushingSlots = getBushingOccupiedSlots(slotAssignments);
@@ -247,9 +249,16 @@ return (
       <CardHeader>
         <CardTitle className="text-white flex items-center justify-between">
           <span>Rack Configuration - {chassis.name}</span>
-          <Badge variant="outline" className="text-sm text-white border-gray-500">
-            {chassis.specifications?.height || (chassis as any).height || '6U'} • {chassis.specifications?.slots || (chassis as any).slots || 14} slots
-          </Badge>
+          <div className="flex items-center gap-2">
+            {partNumber && (
+              <Badge variant="outline" className="text-xs text-white border-gray-500" title="Part Number">
+                PN: {partNumber}
+              </Badge>
+            )}
+            <Badge variant="outline" className="text-sm text-white border-gray-500">
+              {chassis.specifications?.height || (chassis as any).height || '6U'} • {chassis.specifications?.slots || (chassis as any).slots || 14} slots
+            </Badge>
+          </div>
         </CardTitle>
       </CardHeader>
       <CardContent>
