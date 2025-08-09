@@ -56,6 +56,22 @@ const [codeMap, setCodeMap] = useState<Record<string, { template: string; slot_s
 const [level3Products, setLevel3Products] = useState<Level3Product[]>([]);
 const [autoPlaced, setAutoPlaced] = useState(false);
 
+// Hints for standard slot positions not yet filled (top-level to avoid conditional hooks)
+const standardSlotHints = useMemo(() => {
+  const hints: Record<number, string[]> = {};
+  const nameById = Object.fromEntries(level3Products.map(p => [p.id, p.name] as const));
+  Object.entries(codeMap).forEach(([l3Id, def]) => {
+    if (!def?.is_standard || def?.outside_chassis) return;
+    const pos = def.standard_position;
+    if (!pos) return;
+    if (!slotAssignments[pos]) {
+      const name = nameById[l3Id] || 'Standard Item';
+      hints[pos] = hints[pos] ? [...hints[pos], name] : [name];
+    }
+  });
+  return hints;
+}, [codeMap, level3Products, slotAssignments]);
+
   // Get available quote fields for validation
   const [availableQuoteFields, setAvailableQuoteFields] = useState<any[]>([]);
   
@@ -718,20 +734,7 @@ const handleAddChassisAndCardsToBOM = () => {
   onSlotClear={handleSlotClear}
   hasRemoteDisplay={hasRemoteDisplay}
   onRemoteDisplayToggle={handleRemoteDisplayToggle}
-  standardSlotHints={useMemo(() => {
-    const hints: Record<number, string[]> = {};
-    const nameById = Object.fromEntries(level3Products.map(p => [p.id, p.name] as const));
-    Object.entries(codeMap).forEach(([l3Id, def]) => {
-      if (!def?.is_standard || def?.outside_chassis) return;
-      const pos = def.standard_position;
-      if (!pos) return;
-      if (!slotAssignments[pos]) {
-        const name = nameById[l3Id] || 'Standard Item';
-        hints[pos] = hints[pos] ? [...hints[pos], name] : [name];
-      }
-    });
-    return hints;
-  }, [codeMap, level3Products, slotAssignments])}
+  standardSlotHints={standardSlotHints}
 />
           
 {selectedSlot !== null && (
@@ -810,24 +813,11 @@ const handleAddChassisAndCardsToBOM = () => {
   selectedSlot={selectedSlot}
   hasRemoteDisplay={hasRemoteDisplay}
   onRemoteDisplayToggle={handleRemoteDisplayToggle}
-  standardSlotHints={useMemo(() => {
-    const hints: Record<number, string[]> = {};
-    const nameById = Object.fromEntries(level3Products.map(p => [p.id, p.name] as const));
-    Object.entries(codeMap).forEach(([l3Id, def]) => {
-      if (!def?.is_standard || def?.outside_chassis) return;
-      const pos = def.standard_position;
-      if (!pos) return;
-      if (!slotAssignments[pos]) {
-        const name = nameById[l3Id] || 'Standard Item';
-        hints[pos] = hints[pos] ? [...hints[pos], name] : [name];
-      }
-    });
-    return hints;
-  }, [codeMap, level3Products, slotAssignments])}
+  standardSlotHints={standardSlotHints}
 />
              </div>
 
-{selectedSlot && (
+{selectedSlot !== null && (
   <SlotCardSelector
     chassis={selectedChassis}
     slot={selectedSlot}
