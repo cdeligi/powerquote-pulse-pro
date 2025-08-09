@@ -183,7 +183,7 @@ export const Level3ProductList: React.FC<Level3ProductListProps> = ({
                       </Select>
                     </div>
                     <div>
-                      <Label htmlFor={`type-${product.id}`} className="text-gray-700">Type</Label>
+                      <Label htmlFor={`type-${product.id}`} className="text-gray-700">Display Name</Label>
                       <Input
                         id={`type-${product.id}`}
                         value={editFormData.type || ''}

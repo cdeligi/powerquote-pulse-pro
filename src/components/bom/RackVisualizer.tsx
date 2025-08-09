@@ -84,13 +84,14 @@ const getSlotTitle = (slot: number) => {
   if (slot === 0) return `${cpuLabel || 'CPU'} (Fixed)`;
   if (slotAssignments[slot]) {
     const card = slotAssignments[slot];
+    const display = card?.type ? card.type.charAt(0).toUpperCase() + card.type.slice(1) : card?.name;
     if (isBushingCard(card)) {
       const isSecondarySlot = Object.values(bushingSlots).some(slots => 
         slots.includes(slot) && slots[0] !== slot
       );
-      return isSecondarySlot ? `${card.name} (Extension Slot)` : card.name;
+      return isSecondarySlot ? `${display} (Extension Slot)` : display;
     }
-    return card.name;
+    return display;
   }
   // Empty slots - show standard hints when available
   const hints = standardSlotHints?.[slot];
@@ -336,7 +337,7 @@ return (
                 {Object.entries(bushingSlots).map(([slot, slots]) => (
                   <div key={`bushing-${slot}`} className="flex justify-between text-sm">
                     <span className="text-gray-400">Slots {slots.join('-')}:</span>
-                    <span className="text-white">{slotAssignments[parseInt(slot)]?.name}</span>
+                    <span className="text-white">{(() => { const c = slotAssignments[parseInt(slot)]; const t = c?.type || ''; return t ? t.charAt(0).toUpperCase() + t.slice(1) : c?.name; })()}</span>
                   </div>
                 ))}
                 {Object.entries(slotAssignments)
