@@ -19,6 +19,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/components/ui/use-toast';
 import QTMSConfigurationEditor from './QTMSConfigurationEditor';
 import { consolidateQTMSConfiguration, createQTMSBOMItem, ConsolidatedQTMS, QTMSConfiguration } from '@/utils/qtmsConsolidation';
+import { buildQTMSPartNumber } from '@/utils/qtmsPartNumberBuilder';
 import { findOptimalBushingPlacement, findExistingBushingSlots, isBushingCard } from '@/utils/bushingValidation';
 import { useAuth } from '@/hooks/useAuth';
 import { useQuoteValidation } from './QuoteFieldValidation';
@@ -817,6 +818,7 @@ const handleAddChassisAndCardsToBOM = () => {
   cpuLabel={cpuLabel}
   accessories={accessories}
   onAccessoryToggle={toggleAccessory}
+  partNumber={buildQTMSPartNumber({ chassis: configuringChassis, slotAssignments, hasRemoteDisplay, pnConfig, codeMap })}
 />
           
 {selectedSlot !== null && (
@@ -901,6 +903,7 @@ const handleAddChassisAndCardsToBOM = () => {
   cpuLabel={cpuLabel}
   accessories={accessories}
   onAccessoryToggle={toggleAccessory}
+  partNumber={buildQTMSPartNumber({ chassis: selectedChassis, slotAssignments, hasRemoteDisplay, pnConfig, codeMap })}
 />
              </div>
 
