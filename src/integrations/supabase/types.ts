@@ -413,9 +413,11 @@ export type Database = {
       }
       part_number_codes: {
         Row: {
+          color: string | null
           created_at: string
           designated_only: boolean
           designated_positions: number[]
+          exclusive_in_slots: boolean
           id: string
           is_standard: boolean
           level2_product_id: string | null
@@ -428,9 +430,11 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          color?: string | null
           created_at?: string
           designated_only?: boolean
           designated_positions?: number[]
+          exclusive_in_slots?: boolean
           id?: string
           is_standard?: boolean
           level2_product_id?: string | null
@@ -443,9 +447,11 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          color?: string | null
           created_at?: string
           designated_only?: boolean
           designated_positions?: number[]
+          exclusive_in_slots?: boolean
           id?: string
           is_standard?: boolean
           level2_product_id?: string | null
