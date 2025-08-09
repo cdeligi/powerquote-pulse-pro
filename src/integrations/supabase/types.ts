@@ -218,6 +218,45 @@ export type Database = {
           },
         ]
       }
+      chassis_types: {
+        Row: {
+          code: string
+          cpu_slot_index: number
+          created_at: string
+          enabled: boolean
+          id: string
+          layout_rows: Json | null
+          metadata: Json
+          name: string
+          total_slots: number
+          updated_at: string
+        }
+        Insert: {
+          code: string
+          cpu_slot_index?: number
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          layout_rows?: Json | null
+          metadata?: Json
+          name: string
+          total_slots: number
+          updated_at?: string
+        }
+        Update: {
+          code?: string
+          cpu_slot_index?: number
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          layout_rows?: Json | null
+          metadata?: Json
+          name?: string
+          total_slots?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       level1_level2_relationships: {
         Row: {
           created_at: string
