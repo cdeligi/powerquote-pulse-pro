@@ -146,11 +146,6 @@ const ChassisSelector = ({ onChassisSelect, selectedChassis, onAddToBOM, canSeeP
                     ${chassis.price.toLocaleString()}
                   </span>
                 )}
-                {chassis.partNumber && (
-                  <Badge variant="outline" className="text-xs">
-                    {chassis.partNumber}
-                  </Badge>
-                )}
               </div>
               
               {/* Configure or Add to BOM buttons */}
