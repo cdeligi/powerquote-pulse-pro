@@ -795,7 +795,7 @@ class ProductDataService {
     }
   }
 
-  async getPartNumberCodesForLevel2(level2Id: string): Promise<Record<string, { template: string; slot_span: number; is_standard?: boolean; standard_position?: number | null; designated_only?: boolean; designated_positions?: number[]; outside_chassis?: boolean; notes?: string | null }>> {
+  async getPartNumberCodesForLevel2(level2Id: string): Promise<Record<string, { template: string; slot_span: number; is_standard?: boolean; standard_position?: number | null; designated_only?: boolean; designated_positions?: number[]; outside_chassis?: boolean; notes?: string | null; exclusive_in_slots?: boolean; color?: string | null }>> {
     try {
       // Get all Level 3 under this Level 2
       const level3 = await this.getLevel3ProductsForLevel2(level2Id);
@@ -807,7 +807,7 @@ class ProductDataService {
         .in('level3_product_id', ids);
 
       if (error) throw error;
-      const map: Record<string, { template: string; slot_span: number; is_standard?: boolean; standard_position?: number | null; designated_only?: boolean; designated_positions?: number[]; outside_chassis?: boolean; notes?: string | null }> = {};
+      const map: Record<string, { template: string; slot_span: number; is_standard?: boolean; standard_position?: number | null; designated_only?: boolean; designated_positions?: number[]; outside_chassis?: boolean; notes?: string | null; exclusive_in_slots?: boolean; color?: string | null }> = {};
       (data || []).forEach((row: any) => {
         // Prefer overrides for this level2 if present
         const shouldOverride = row.level2_product_id === level2Id || !map[row.level3_product_id];
@@ -821,6 +821,8 @@ class ProductDataService {
             designated_positions: row.designated_positions ?? [],
             outside_chassis: row.outside_chassis ?? false,
             notes: row.notes ?? null,
+            exclusive_in_slots: row.exclusive_in_slots ?? false,
+            color: row.color ?? null,
           };
         }
       });
@@ -831,7 +833,7 @@ class ProductDataService {
     }
   }
 
-  async upsertPartNumberCodes(codes: Array<{ level3_product_id: string; level2_product_id?: string | null; template: string; slot_span?: number; is_standard?: boolean; standard_position?: number | null; designated_only?: boolean; designated_positions?: number[]; outside_chassis?: boolean; notes?: string | null }>): Promise<boolean> {
+  async upsertPartNumberCodes(codes: Array<{ level3_product_id: string; level2_product_id?: string | null; template: string; slot_span?: number; is_standard?: boolean; standard_position?: number | null; designated_only?: boolean; designated_positions?: number[]; outside_chassis?: boolean; notes?: string | null; exclusive_in_slots?: boolean; color?: string | null }>): Promise<boolean> {
     try {
       if (!codes || codes.length === 0) return true;
       const payload = codes.map(c => ({
@@ -845,6 +847,8 @@ class ProductDataService {
         designated_positions: c.designated_positions ?? [],
         outside_chassis: c.outside_chassis ?? false,
         notes: c.notes ?? null,
+        exclusive_in_slots: c.exclusive_in_slots ?? false,
+        color: c.color ?? null,
       }));
       const { error } = await supabase.from('part_number_codes').upsert(payload, { onConflict: 'level3_product_id,level2_product_id' });
       if (error) throw error;

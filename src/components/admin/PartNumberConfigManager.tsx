@@ -20,6 +20,8 @@ type CodeTemplate = {
   designated_positions_str?: string; // UI helper
   outside_chassis?: boolean;
   notes?: string | null;
+  exclusive_in_slots?: boolean;
+  color?: string | null;
 };
 
 type PartNumberConfigManagerProps = { initialSelectedL2?: string };
@@ -119,6 +121,8 @@ const PartNumberConfigManager: React.FC<PartNumberConfigManagerProps> = ({ initi
           designated_positions: designated,
           outside_chassis: !!t.outside_chassis,
           notes: t.notes ?? null,
+          exclusive_in_slots: !!t.exclusive_in_slots,
+          color: t.color ?? null,
         };
       });
       await productDataService.upsertPartNumberCodes(codesPayload);
@@ -283,17 +287,39 @@ const PartNumberConfigManager: React.FC<PartNumberConfigManagerProps> = ({ initi
                       className="bg-background border-border text-foreground"
                     />
                   </div>
-                  <div className="col-span-2">
-                    <Label className="text-xs">Notes</Label>
-                    <Input
-                      placeholder="Optional notes"
-                      value={templates[l3.id]?.notes ?? ''}
-                      onChange={(e) => setTemplates(prev => ({
+
+                  {/* Exclusivity: Only product allowed in the slot */}
+                  <div className="col-span-2 flex items-center justify-between rounded border border-border p-2">
+                    <div>
+                      <Label className="text-xs">Only Product Allowed in the slot</Label>
+                      <div className="text-foreground/70 text-xs">When ON, this card is the only one selectable for its Allowed slots</div>
+                    </div>
+                    <Switch
+                      checked={!!templates[l3.id]?.exclusive_in_slots}
+                      onCheckedChange={(v) => setTemplates(prev => ({
                         ...prev,
-                        [l3.id]: { ...(prev[l3.id] || {}), notes: e.target.value }
+                        [l3.id]: { ...(prev[l3.id] || {}), exclusive_in_slots: v }
                       }))}
-                      className="bg-background border-border text-foreground"
+                      disabled={!templates[l3.id]?.designated_only}
                     />
+                  </div>
+
+                  {/* Color selection for Rack Visualizer */}
+                  <div className="grid grid-cols-2 gap-2 items-center col-span-2">
+                    <Label className="text-xs">Color</Label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="color"
+                        value={templates[l3.id]?.color ?? '#6b7280'}
+                        onChange={(e) => setTemplates(prev => ({
+                          ...prev,
+                          [l3.id]: { ...(prev[l3.id] || {}), color: e.target.value }
+                        }))}
+                        className="h-8 w-12 rounded bg-transparent cursor-pointer"
+                        aria-label="Select color"
+                      />
+                      <span className="text-xs text-foreground/70">{templates[l3.id]?.color || '#6b7280'}</span>
+                    </div>
                   </div>
                 </div>
               </div>
