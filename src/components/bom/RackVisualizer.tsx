@@ -267,7 +267,7 @@ return (
           {/* Part Number - bottom left below rack */}
           <div className="mt-2 text-xs text-gray-300">
             <span className="mr-1">Part Number:</span>
-            <span className="font-mono text-white">{partNumber || '—'}</span>
+            <span className="font-mono text-white break-all">{partNumber || '—'}</span>
           </div>
           
           {/* Bushing Card Information */}
@@ -300,7 +300,7 @@ return (
                       <span className="inline-block h-3 w-3 rounded-full" style={acc.color ? { backgroundColor: acc.color } : undefined} />
                       <span className="text-white">{acc.product.name}</span>
                       {acc.pn && (
-                        <span className="text-red-500 font-semibold ml-2">{acc.pn}</span>
+                        <span className="text-red-500 font-mono text-sm ml-2 break-all">{acc.pn}</span>
                       )}
                     </div>
                     {onAccessoryToggle && (

@@ -229,7 +229,7 @@ const QuoteRequestView = ({
                         {item.slot && <p className="text-xs text-gray-500">Slot {item.slot}</p>}
                       </div>
                     </td>
-                    <td className="py-3 text-white font-mono text-sm">{item.partNumber}</td>
+                    <td className="py-3 text-white font-mono text-sm break-all">{item.partNumber}</td>
                     <td className="py-3 text-white">{item.quantity}</td>
                     <td className="py-3 text-white">${item.product.price.toLocaleString()}</td>
                     <td className="py-3 text-orange-400">${calculateItemCost(item).toLocaleString()}</td>

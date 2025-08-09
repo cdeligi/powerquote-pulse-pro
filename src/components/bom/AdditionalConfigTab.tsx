@@ -134,7 +134,7 @@ const AdditionalConfigTab = ({ onCardSelect, canSeePrices }: AdditionalConfigTab
                     <div className="flex justify-between items-center">
                       <div className="flex flex-col space-y-1">
                         {card.partNumber && (
-                          <Badge variant="outline" className="text-xs text-green-400 border-green-400">
+                          <Badge variant="outline" className="text-xs font-mono text-white border-gray-600 break-all">
                             {card.partNumber}
                           </Badge>
                         )}
@@ -191,7 +191,7 @@ const AdditionalConfigTab = ({ onCardSelect, canSeePrices }: AdditionalConfigTab
                     <div className="flex justify-between items-center">
                       <div className="flex flex-col space-y-1">
                         {card.partNumber && (
-                          <Badge variant="outline" className="text-xs text-green-400 border-green-400">
+                          <Badge variant="outline" className="text-xs font-mono text-white border-gray-600 break-all">
                             {card.partNumber}
                           </Badge>
                         )}

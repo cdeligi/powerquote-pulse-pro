@@ -297,7 +297,7 @@ const QuoteDetails = ({
                         <p className="text-gray-400 text-sm">{item.description}</p>
                       )}
                       {item.part_number && (
-                        <Badge variant="outline" className="text-xs text-green-400 border-green-400 mt-1">
+                        <Badge variant="outline" className="text-xs font-mono text-white border-gray-600 mt-1 break-all">
                           P/N: {item.part_number}
                         </Badge>
                       )}
