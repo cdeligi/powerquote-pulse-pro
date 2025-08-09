@@ -97,9 +97,18 @@ const QTMSConfigurationEditor = ({
   // Compute live part number from data-driven config
   const computedPartNumber = useMemo(() => {
     try {
-      if (!pnConfig) return consolidatedQTMS.partNumber;
-      const totalSlots = pnConfig.slot_count || consolidatedQTMS.configuration.chassis.specifications?.slots || 0;
-      const placeholder = pnConfig.slot_placeholder || '0';
+      // Provide sensible defaults when admin PN config is missing
+      const chassis = consolidatedQTMS.configuration.chassis;
+      const defaults = {
+        prefix: `QTMS-${(chassis.type || '').toUpperCase()}-`,
+        slot_count: chassis.specifications?.slots || 0,
+        slot_placeholder: '0',
+        suffix_separator: '-'
+      } as const;
+
+      const cfg = pnConfig ?? defaults;
+      const totalSlots = cfg.slot_count || 0;
+      const placeholder = cfg.slot_placeholder || '0';
       const slotsArr: string[] = Array(totalSlots).fill(placeholder);
       const occupied = new Set<number>();
 
@@ -125,7 +134,7 @@ const QTMSConfigurationEditor = ({
         const code = template.replace(/\{[^}]+\}/g, '');
         slotsArr[i - 1] = code;
 
-        const span = codeDef?.slot_span || card.specifications?.slotRequirement || 1;
+        const span = (codeDef?.slot_span || card.specifications?.slotRequirement || 1) as number;
         if (span > 1) {
           for (let s = 1; s < span; s++) occupied.add(i + s);
         }
@@ -134,13 +143,13 @@ const QTMSConfigurationEditor = ({
       const slotsStr = slotsArr.join('');
       // Accessory count suffix: currently counts selected accessories (Remote Display only for now)
       const accessoriesCount = editedHasRemoteDisplay ? 1 : 0;
-      const suffix = `${pnConfig.suffix_separator}${accessoriesCount}`;
-      return `${pnConfig.prefix}${slotsStr}${suffix}`;
+      const suffix = `${cfg.suffix_separator || '-'}${accessoriesCount}`;
+      return `${cfg.prefix}${slotsStr}${suffix}`;
     } catch (e) {
       console.error('Error computing part number:', e);
       return consolidatedQTMS.partNumber;
     }
-  }, [pnConfig, codeMap, editedSlotAssignments, editedHasRemoteDisplay, cardConfigurations, consolidatedQTMS.partNumber, consolidatedQTMS.configuration.chassis.specifications]);
+  }, [pnConfig, codeMap, editedSlotAssignments, editedHasRemoteDisplay, cardConfigurations, consolidatedQTMS.partNumber, consolidatedQTMS.configuration.chassis]);
 
   useEffect(() => {
     setLivePartNumber(computedPartNumber);
@@ -720,22 +729,28 @@ const totalPrice = baseTotalPrice + configurationCosts;
             </Card>
           </div>
 
-          <DialogFooter className="flex space-x-2">
-            <Button
-              variant="outline"
-              onClick={onClose}
-              className="border-gray-600 text-white hover:bg-gray-800"
-            >
-              {readOnly ? 'Close' : 'Cancel'}
-            </Button>
-            {!readOnly && (
+          <DialogFooter className="flex items-center justify-between">
+            <div className="text-left">
+              <div className="text-xs uppercase text-gray-400 tracking-wider">Part Number</div>
+              <div className="text-white font-semibold text-lg">{livePartNumber || consolidatedQTMS.partNumber || `QTMS-${(consolidatedQTMS.configuration.chassis.type||'').toUpperCase()}-`}</div>
+            </div>
+            <div className="flex space-x-2">
               <Button
-                onClick={handleSave}
-                className="bg-red-600 hover:bg-red-700 text-white"
+                variant="outline"
+                onClick={onClose}
+                className="border-gray-600 text-white hover:bg-gray-800"
               >
-                Save Configuration
+                {readOnly ? 'Close' : 'Cancel'}
               </Button>
-            )}
+              {!readOnly && (
+                <Button
+                  onClick={handleSave}
+                  className="bg-red-600 hover:bg-red-700 text-white"
+                >
+                  Save Configuration
+                </Button>
+              )}
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>
