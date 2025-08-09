@@ -52,7 +52,7 @@ const [editingOriginalItem, setEditingOriginalItem] = useState<BOMItem | null>(n
 
 // Admin-driven part number config and codes for the selected chassis
 const [pnConfig, setPnConfig] = useState<any | null>(null);
-const [codeMap, setCodeMap] = useState<Record<string, { template: string; slot_span: number; is_standard?: boolean; standard_position?: number | null; designated_only?: boolean; designated_positions?: number[]; outside_chassis?: boolean; notes?: string | null }>>({});
+const [codeMap, setCodeMap] = useState<Record<string, { template: string; slot_span: number; is_standard?: boolean; standard_position?: number | null; designated_only?: boolean; designated_positions?: number[]; outside_chassis?: boolean; notes?: string | null; exclusive_in_slots?: boolean; color?: string | null }>>({});
 const [level3Products, setLevel3Products] = useState<Level3Product[]>([]);
 const [autoPlaced, setAutoPlaced] = useState(false);
 
@@ -71,6 +71,15 @@ const standardSlotHints = useMemo(() => {
   });
   return hints;
 }, [codeMap, level3Products, slotAssignments]);
+
+// Map configured colors by Level3 id from admin codeMap
+const colorByProductId = useMemo(() => {
+  const map: Record<string, string> = {};
+  Object.entries(codeMap).forEach(([id, def]) => {
+    if (def && def.color) map[id] = def.color as string;
+  });
+  return map;
+}, [codeMap]);
 
   // Get available quote fields for validation
   const [availableQuoteFields, setAvailableQuoteFields] = useState<any[]>([]);
@@ -735,6 +744,7 @@ const handleAddChassisAndCardsToBOM = () => {
   hasRemoteDisplay={hasRemoteDisplay}
   onRemoteDisplayToggle={handleRemoteDisplayToggle}
   standardSlotHints={standardSlotHints}
+  colorByProductId={colorByProductId}
 />
           
 {selectedSlot !== null && (
@@ -814,6 +824,7 @@ const handleAddChassisAndCardsToBOM = () => {
   hasRemoteDisplay={hasRemoteDisplay}
   onRemoteDisplayToggle={handleRemoteDisplayToggle}
   standardSlotHints={standardSlotHints}
+  colorByProductId={colorByProductId}
 />
              </div>
 
