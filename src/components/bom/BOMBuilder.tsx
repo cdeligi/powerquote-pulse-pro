@@ -82,6 +82,12 @@ const colorByProductId = useMemo(() => {
   return map;
 }, [codeMap]);
 
+// Configured CPU tile color (std position 0)
+const cpuColor = useMemo(() => {
+  const entry = Object.entries(codeMap).find(([, def]) => def?.standard_position === 0 && !!def?.color);
+  return (entry?.[1]?.color as string) || undefined;
+}, [codeMap]);
+
   // Get available quote fields for validation
   const [availableQuoteFields, setAvailableQuoteFields] = useState<any[]>([]);
   
@@ -746,6 +752,7 @@ const handleAddChassisAndCardsToBOM = () => {
   onRemoteDisplayToggle={handleRemoteDisplayToggle}
   standardSlotHints={standardSlotHints}
   colorByProductId={colorByProductId}
+  cpuColor={cpuColor}
 />
           
 {selectedSlot !== null && (
@@ -826,6 +833,7 @@ const handleAddChassisAndCardsToBOM = () => {
   onRemoteDisplayToggle={handleRemoteDisplayToggle}
   standardSlotHints={standardSlotHints}
   colorByProductId={colorByProductId}
+  cpuColor={cpuColor}
 />
              </div>
 

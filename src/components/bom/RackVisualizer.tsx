@@ -15,6 +15,7 @@ interface RackVisualizerProps {
   onRemoteDisplayToggle?: (enabled: boolean) => void;
   standardSlotHints?: Record<number, string[]>;
   colorByProductId?: Record<string, string>;
+  cpuColor?: string;
 }
 
 const RackVisualizer = ({ 
@@ -26,7 +27,8 @@ const RackVisualizer = ({
   hasRemoteDisplay = false,
   onRemoteDisplayToggle,
   standardSlotHints,
-  colorByProductId
+  colorByProductId,
+  cpuColor
 }: RackVisualizerProps) => {
   
   const bushingSlots = getBushingOccupiedSlots(slotAssignments);
@@ -45,7 +47,8 @@ const RackVisualizer = ({
   };
 
 const getSlotColor = (slot: number) => {
-  if (slot === 0) return 'bg-blue-600'; // CPU slot (slot 0)
+  // CPU slot uses configured color via inline style; keep neutral base here
+  if (slot === 0) return 'bg-gray-700';
   // For selected empty slots, show highlight; for assigned slots we will use admin color via inline style
   if (!slotAssignments[slot] && selectedSlot === slot) return 'bg-yellow-600';
   if (slotAssignments[slot]) return 'bg-gray-700'; // base for assigned; real color via inline style
@@ -137,7 +140,7 @@ return (
         title={getSlotTitle(slot)}
         style={(() => {
           const assigned = slotAssignments[slot];
-          const adminColor = assigned ? (colorByProductId?.[assigned.id] || null) : null;
+          const adminColor = assigned ? (colorByProductId?.[assigned.id] || null) : (slot === 0 ? (cpuColor || null) : null);
           return adminColor ? { backgroundColor: adminColor } : undefined;
         })()}
       >

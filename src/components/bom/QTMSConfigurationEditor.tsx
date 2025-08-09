@@ -63,6 +63,8 @@ const QTMSConfigurationEditor = ({
     designated_positions?: number[];
     outside_chassis?: boolean;
     notes?: string | null;
+    exclusive_in_slots?: boolean;
+    color?: string | null;
   }>>({});
   const [level3Products, setLevel3Products] = useState<Level3Product[]>([]);
   const [autoPlaced, setAutoPlaced] = useState(false);
