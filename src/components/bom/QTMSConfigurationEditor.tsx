@@ -132,7 +132,9 @@ const QTMSConfigurationEditor = ({
       }
 
       const slotsStr = slotsArr.join('');
-      const suffix = `${pnConfig.suffix_separator}${editedHasRemoteDisplay ? pnConfig.remote_on_code : pnConfig.remote_off_code}`;
+      // Accessory count suffix: currently counts selected accessories (Remote Display only for now)
+      const accessoriesCount = editedHasRemoteDisplay ? 1 : 0;
+      const suffix = `${pnConfig.suffix_separator}${accessoriesCount}`;
       return `${pnConfig.prefix}${slotsStr}${suffix}`;
     } catch (e) {
       console.error('Error computing part number:', e);
@@ -616,11 +618,6 @@ const totalPrice = baseTotalPrice + configurationCosts;
                     <h4 className="text-white font-medium mb-2">Chassis</h4>
                     <div className="text-gray-300">{consolidatedQTMS.configuration.chassis.name}</div>
                     <div className="text-gray-400 text-sm">{consolidatedQTMS.configuration.chassis.description}</div>
-                    {consolidatedQTMS.configuration.chassis.type === 'LTX' && (
-                      <div className="text-purple-300 text-xs mt-1">
-                        Slot 8 reserved for Display Cards only
-                      </div>
-                    )}
                   </div>
                   
                   <div>
