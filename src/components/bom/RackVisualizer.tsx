@@ -297,49 +297,6 @@ return (
             </div>
           )}
           
-          {/* Updated Legend with Color Coding */}
-          <div className="flex flex-wrap gap-4 pt-4 border-t border-gray-700">
-            <div className="flex items-center space-x-2">
-              <div className="w-4 h-4 bg-blue-600 rounded"></div>
-              <span className="text-sm text-gray-400">CPU (Fixed)</span>
-            </div>
-            <div className="flex items-center space-x-2">
-              <div className="w-4 h-4 bg-yellow-600 rounded"></div>
-              <span className="text-sm text-gray-400">Selected</span>
-            </div>
-            <div className="flex items-center space-x-2">
-              <div className="w-4 h-4 bg-red-600 rounded"></div>
-              <span className="text-sm text-gray-400">Relay</span>
-            </div>
-            <div className="flex items-center space-x-2">
-              <div className="w-4 h-4 bg-blue-600 rounded"></div>
-              <span className="text-sm text-gray-400">Analog</span>
-            </div>
-            <div className="flex items-center space-x-2">
-              <div className="w-4 h-4 bg-orange-600 rounded"></div>
-              <span className="text-sm text-gray-400">Bushing</span>
-            </div>
-            <div className="flex items-center space-x-2">
-              <div className="w-4 h-4 bg-green-600 rounded"></div>
-              <span className="text-sm text-gray-400">Fiber</span>
-            </div>
-            <div className="flex items-center space-x-2">
-              <div className="w-4 h-4 bg-purple-600 rounded"></div>
-              <span className="text-sm text-gray-400">Display</span>
-            </div>
-            <div className="flex items-center space-x-2">
-              <div className="w-4 h-4 bg-cyan-600 rounded"></div>
-              <span className="text-sm text-gray-400">Communication</span>
-            </div>
-            <div className="flex items-center space-x-2">
-              <div className="w-4 h-4 bg-yellow-600 rounded"></div>
-              <span className="text-sm text-gray-400">Digital</span>
-            </div>
-            <div className="flex items-center space-x-2">
-              <div className="w-4 h-4 bg-gray-700 rounded"></div>
-              <span className="text-sm text-gray-400">Available</span>
-            </div>
-          </div>
           
           {/* Slot assignments summary */}
           {Object.keys(slotAssignments).length > 0 && (
