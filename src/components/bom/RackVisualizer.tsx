@@ -2,7 +2,7 @@ import { Chassis, Card as ProductCard, Level3Product } from "@/types/product";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { X, Monitor } from "lucide-react";
+import { X } from "lucide-react";
 import { getBushingOccupiedSlots, isBushingCard } from "@/utils/bushingValidation";
 
 interface RackVisualizerProps {
@@ -283,34 +283,12 @@ return (
             </div>
           )}
           
-          {/* Remote Display Option */}
-          {onRemoteDisplayToggle && (
-            <div className="pt-4 border-t border-gray-700">
-              <div className="flex items-center justify-between p-3 bg-gray-800 rounded">
-                <div className="flex items-center space-x-3">
-                  <Monitor className="h-5 w-5 text-blue-400" />
-                  <div>
-                    <span className="text-white font-medium">Remote Display</span>
-                    <p className="text-gray-400 text-sm">Add remote display capability</p>
-                  </div>
-                </div>
-                <Button
-                  variant={hasRemoteDisplay ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => onRemoteDisplayToggle(!hasRemoteDisplay)}
-                  className={hasRemoteDisplay ? "bg-green-600 hover:bg-green-700" : ""}
-                >
-                  {hasRemoteDisplay ? "Added" : "Add"}
-                </Button>
-              </div>
-            </div>
-          )}
           
           {/* Accessories Section */}
           {accessories && accessories.length > 0 && (
             <div className="pt-4 border-t border-gray-700">
               <h4 className="text-white font-medium mb-2">Accessories</h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+              <div className="space-y-2">
                 {accessories.map((acc) => (
                   <div key={acc.product.id} className="flex items-center justify-between p-3 bg-gray-800 rounded border border-gray-700">
                     <div className="flex items-center space-x-2">
