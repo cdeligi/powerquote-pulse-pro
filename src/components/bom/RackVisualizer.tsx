@@ -277,7 +277,7 @@ return (
               <div className="space-y-1 text-sm">
                 {Object.entries(bushingSlots).map(([slot, occupiedSlots]) => (
                   <div key={slot} className="text-orange-300">
-                    Slots {occupiedSlots.join(', ')}: {slotAssignments[parseInt(slot)]?.name}
+                    Slots {occupiedSlots.join(', ')}: {(() => { const c = slotAssignments[parseInt(slot)]; const t = c?.type || ''; return t ? t.charAt(0).toUpperCase() + t.slice(1) : c?.name; })()}
                     <br />
                     <span className="text-xs text-orange-200">
                       (Only one bushing card allowed per chassis)
@@ -300,7 +300,10 @@ return (
                       <span className="inline-block h-3 w-3 rounded-full" style={acc.color ? { backgroundColor: acc.color } : undefined} />
                       <span className="text-white">{acc.product.name}</span>
                       {acc.pn && (
-                        <span className="text-red-500 font-mono text-sm ml-2 break-all">{acc.pn}</span>
+                        <>
+                          <span className="mx-2 text-gray-400">•</span>
+                          <span className="font-mono text-white text-sm break-all">{acc.pn}</span>
+                        </>
                       )}
                     </div>
                     {onAccessoryToggle && (
@@ -341,7 +344,7 @@ return (
                   .map(([slot, card]) => (
                     <div key={slot} className="flex justify-between text-sm">
                       <span className="text-gray-400">Slot {slot}:</span>
-                      <span className="text-white">{card.name}</span>
+                      <span className="text-white">{card.type ? card.type.charAt(0).toUpperCase() + card.type.slice(1) : card.name}</span>
                     </div>
                   ))}
               </div>

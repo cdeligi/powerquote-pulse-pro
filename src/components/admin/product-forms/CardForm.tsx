@@ -87,7 +87,7 @@ const CardForm = ({ onSubmit, level2Products, initialData }: CardFormProps) => {
       </div>
 
       <div>
-        <Label htmlFor="type" className="text-white">Type (Auto-filled from Parent)</Label>
+        <Label htmlFor="type" className="text-white">Display Name (Auto-filled from Parent)</Label>
         <Input
           id="type"
           value={selectedParent?.name || formData.type}
