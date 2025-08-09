@@ -91,6 +91,13 @@ const getCompatibleCards = () => {
     allChassisProps: { ...chassis }
   });
 
+  // Check if any product is exclusive for this slot per admin config
+  const exclusiveProductIdsForSlot = codeMap
+    ? Object.entries(codeMap)
+        .filter(([, d]: any) => !!d?.designated_only && !!d?.exclusive_in_slots && Array.isArray(d?.designated_positions) && d.designated_positions.includes(slot))
+        .map(([id]) => id)
+    : [];
+
   const totalSlots = chassis.specifications?.slots || chassis.slots || pnConfig?.slot_count || 0;
   const canPlace = (start: number, span: number) => {
     if (start < 1 || start + span - 1 > totalSlots) return false;
@@ -118,6 +125,11 @@ const getCompatibleCards = () => {
 
     const def = codeMap?.[card.id];
 
+    // Enforce exclusivity: if any product is exclusive for this slot, only allow that/those products
+    if (exclusiveProductIdsForSlot.length > 0 && !exclusiveProductIdsForSlot.includes(card.id)) {
+      return false;
+    }
+
     // Designated-only enforcement when admin config exists
     if (def?.designated_only && def.designated_positions && !def.designated_positions.includes(slot)) {
       return false;
@@ -126,6 +138,21 @@ const getCompatibleCards = () => {
     // Exclude CPU Module (std position 0) from rack card selection
     if (def && def.standard_position === 0) {
       return false;
+    }
+
+    // Allowed slots by chassis from product specs (supports snake_case and camelCase)
+    const byChassis = card.specifications?.allowed_slots_by_chassis || card.specifications?.allowedSlotsByChassis;
+    if (byChassis) {
+      const typeKeys = [
+        chassis.chassisType,
+        chassis.type,
+        chassis.specifications?.chassisType,
+        chassis.specifications?.type
+      ].filter(Boolean).map((t: any) => t.toString().toUpperCase());
+      const allowedForType = typeKeys.map((k: string) => byChassis[k]).find((arr: any) => Array.isArray(arr));
+      if (Array.isArray(allowedForType) && allowedForType.length > 0 && !allowedForType.includes(slot)) {
+        return false;
+      }
     }
 
     // Slot span enforcement
