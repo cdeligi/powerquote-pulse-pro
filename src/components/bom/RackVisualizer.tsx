@@ -256,11 +256,6 @@ return (
         <div className="space-y-4">
           <p className="text-gray-400 text-sm">
             Click on any slot (except {cpuLabel || 'CPU'}) to add a card. Click the X to clear a slot.
-            {chassis.type === 'LTX' && (
-              <span className="block text-purple-300 mt-1">
-                Slot 8 is reserved for Display Cards only.
-              </span>
-            )}
           </p>
           
           {renderChassisLayout()}
