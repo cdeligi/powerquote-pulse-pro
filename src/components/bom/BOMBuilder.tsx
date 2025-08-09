@@ -102,11 +102,16 @@ const cpuLabel = useMemo(() => {
 const accessories = useMemo(() => {
   return level3Products
     .filter(p => codeMap[p.id]?.outside_chassis)
-    .map(p => ({
-      product: p,
-      selected: selectedAccessories.has(p.id),
-      color: (codeMap[p.id]?.color as string | null) || null
-    }));
+    .map(p => {
+      const template = codeMap[p.id]?.template as string | undefined;
+      const pn = template ? String(template).replace(/\{[^}]+\}/g, '') : (p.partNumber || undefined);
+      return {
+        product: p,
+        selected: selectedAccessories.has(p.id),
+        color: (codeMap[p.id]?.color as string | null) || null,
+        pn,
+      };
+    });
 }, [level3Products, codeMap, selectedAccessories]);
 
 const toggleAccessory = (id: string) => {
@@ -825,7 +830,7 @@ const handleAddChassisAndCardsToBOM = () => {
   cpuLabel={cpuLabel}
   accessories={accessories}
   onAccessoryToggle={toggleAccessory}
-  partNumber={buildQTMSPartNumber({ chassis: configuringChassis, slotAssignments, hasRemoteDisplay, pnConfig, codeMap })}
+  partNumber={buildQTMSPartNumber({ chassis: configuringChassis, slotAssignments, hasRemoteDisplay, pnConfig, codeMap, includeSuffix: false })}
 />
           
 {selectedSlot !== null && (
@@ -910,7 +915,7 @@ const handleAddChassisAndCardsToBOM = () => {
   cpuLabel={cpuLabel}
   accessories={accessories}
   onAccessoryToggle={toggleAccessory}
-  partNumber={buildQTMSPartNumber({ chassis: selectedChassis, slotAssignments, hasRemoteDisplay, pnConfig, codeMap })}
+  partNumber={buildQTMSPartNumber({ chassis: selectedChassis, slotAssignments, hasRemoteDisplay, pnConfig, codeMap, includeSuffix: false })}
 />
              </div>
 

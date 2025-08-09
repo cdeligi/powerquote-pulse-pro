@@ -17,7 +17,7 @@ interface RackVisualizerProps {
   colorByProductId?: Record<string, string>;
   cpuColor?: string;
   cpuLabel?: string;
-  accessories?: { product: Level3Product; selected: boolean; color?: string | null }[];
+  accessories?: { product: Level3Product; selected: boolean; color?: string | null; pn?: string | null }[];
   onAccessoryToggle?: (id: string) => void;
   partNumber?: string;
 }
@@ -299,6 +299,9 @@ return (
                     <div className="flex items-center space-x-2">
                       <span className="inline-block h-3 w-3 rounded-full" style={acc.color ? { backgroundColor: acc.color } : undefined} />
                       <span className="text-white">{acc.product.name}</span>
+                      {acc.pn && (
+                        <span className="text-red-500 font-semibold ml-2">{acc.pn}</span>
+                      )}
                     </div>
                     {onAccessoryToggle && (
                       <Button
