@@ -123,6 +123,11 @@ const getCompatibleCards = () => {
       return false;
     }
 
+    // Exclude CPU Module (std position 0) from rack card selection
+    if (def && def.standard_position === 0) {
+      return false;
+    }
+
     // Slot span enforcement
     const span = (def?.slot_span || card.slotRequirement || 1);
     if (!canPlace(slot, span)) {
@@ -171,7 +176,7 @@ const handleCardSelect = (card: any) => {
     return true;
   };
 
-  if (def?.standard_position && canPlace(def.standard_position, span)) {
+  if (def && def.standard_position !== null && def.standard_position !== undefined && def.standard_position !== 0 && canPlace(def.standard_position, span)) {
     onCardSelect(card, def.standard_position);
     return;
   }

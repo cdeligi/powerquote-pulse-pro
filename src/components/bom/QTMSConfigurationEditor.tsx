@@ -232,15 +232,18 @@ const QTMSConfigurationEditor = ({
       const span = def.slot_span || card.specifications?.slotRequirement || 1;
       let start: number | null = null;
 
-      if (def.standard_position && canPlace(def.standard_position, span, updated)) {
-        start = def.standard_position;
+      const pos = def.standard_position;
+      if (pos === 0) {
+        // CPU std position (logical slot 0) — do not place into rack slots 1..N
+      } else if (pos !== null && pos !== undefined && canPlace(pos, span, updated)) {
+        start = pos;
       } else if (def.designated_only && def.designated_positions?.length) {
-        for (const pos of def.designated_positions) {
-          if (canPlace(pos, span, updated)) { start = pos; break; }
+        for (const p of def.designated_positions) {
+          if (canPlace(p, span, updated)) { start = p; break; }
         }
       } else {
-        for (let pos = 1; pos <= totalSlots; pos++) {
-          if (canPlace(pos, span, updated)) { start = pos; break; }
+        for (let p = 1; p <= totalSlots; p++) {
+          if (canPlace(p, span, updated)) { start = p; break; }
         }
       }
 
@@ -264,12 +267,13 @@ const QTMSConfigurationEditor = ({
     const nameById = Object.fromEntries(level3Products.map(p => [p.id, p.name] as const));
     Object.entries(codeMap).forEach(([l3Id, def]) => {
       if (!def?.is_standard || def?.outside_chassis) return;
-      const pos = def.standard_position;
-      if (!pos) return;
-      if (!editedSlotAssignments[pos]) {
-        const name = nameById[l3Id] || 'Standard Item';
-        hints[pos] = hints[pos] ? [...hints[pos], name] : [name];
-      }
+    const pos = def.standard_position;
+    // Skip CPU std position (0) for hints and only show hints for 1..N
+    if (pos === 0 || pos === null || pos === undefined) return;
+    if (!editedSlotAssignments[pos]) {
+      const name = nameById[l3Id] || 'Standard Item';
+      hints[pos] = hints[pos] ? [...hints[pos], name] : [name];
+    }
     });
     return hints;
   }, [codeMap, level3Products, editedSlotAssignments]);
@@ -389,8 +393,8 @@ const QTMSConfigurationEditor = ({
         });
         return;
       }
-    } else if (codeDef.standard_position && targetSlot !== codeDef.standard_position) {
-      // Auto-route to standard position if available
+    } else if (codeDef.standard_position !== null && codeDef.standard_position !== undefined && codeDef.standard_position !== 0 && targetSlot !== codeDef.standard_position) {
+      // Auto-route to standard position if available (ignore CPU position 0)
       if (canPlaceHere(codeDef.standard_position, span)) {
         slot = codeDef.standard_position;
       }

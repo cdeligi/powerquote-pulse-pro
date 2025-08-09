@@ -63,7 +63,8 @@ const standardSlotHints = useMemo(() => {
   Object.entries(codeMap).forEach(([l3Id, def]) => {
     if (!def?.is_standard || def?.outside_chassis) return;
     const pos = def.standard_position;
-    if (!pos) return;
+    // Skip CPU std position (0) and ignore outside-chassis items
+    if (pos === 0 || pos === null || pos === undefined) return;
     if (!slotAssignments[pos]) {
       const name = nameById[l3Id] || 'Standard Item';
       hints[pos] = hints[pos] ? [...hints[pos], name] : [name];
