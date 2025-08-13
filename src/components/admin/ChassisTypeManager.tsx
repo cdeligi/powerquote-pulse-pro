@@ -10,11 +10,14 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Edit3, Trash2, Save, X, Plus, AlertCircle } from "lucide-react";
+import { Edit3, Trash2, Save, X, Plus, AlertCircle, Eye } from "lucide-react";
 import { ChassisType, ChassisTypeFormData, validateLayoutRows, generateDefaultLayout } from "@/types/product/chassis-types";
 import { productDataService } from "@/services/productDataService";
 import { useToast } from "@/hooks/use-toast";
+import { ChassisLayoutDesigner } from "./ChassisLayoutDesigner";
+import { ChassisPreviewModal } from "./ChassisPreviewModal";
 
 export const ChassisTypeManager: React.FC = () => {
   const { toast } = useToast();
@@ -31,6 +34,8 @@ export const ChassisTypeManager: React.FC = () => {
     metadata: {}
   });
   const [editFormData, setEditFormData] = useState<Partial<ChassisType>>({});
+  const [showPreview, setShowPreview] = useState(false);
+  const [previewData, setPreviewData] = useState<any>(null);
 
   useEffect(() => {
     loadChassisTypes();
@@ -194,61 +199,99 @@ export const ChassisTypeManager: React.FC = () => {
                 <CardHeader>
                   <CardTitle className="text-lg">Create New Chassis Type</CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="create-code">Code *</Label>
-                      <Input
-                        id="create-code"
-                        value={createFormData.code}
-                        onChange={(e) => setCreateFormData(prev => ({ ...prev, code: e.target.value.toUpperCase() }))}
-                        placeholder="e.g., LTX"
-                        required
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="create-name">Name *</Label>
-                      <Input
-                        id="create-name"
-                        value={createFormData.name}
-                        onChange={(e) => setCreateFormData(prev => ({ ...prev, name: e.target.value }))}
-                        placeholder="e.g., LTX Chassis"
-                        required
-                      />
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="create-slots">Total Slots *</Label>
-                      <Input
-                        id="create-slots"
-                        type="number"
-                        min="0"
-                        value={createFormData.totalSlots}
-                        onChange={(e) => setCreateFormData(prev => ({ ...prev, totalSlots: parseInt(e.target.value) || 0 }))}
-                        required
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="create-cpu">CPU Slot Index</Label>
-                      <Input
-                        id="create-cpu"
-                        type="number"
-                        min="0"
-                        value={createFormData.cpuSlotIndex}
-                        onChange={(e) => setCreateFormData(prev => ({ ...prev, cpuSlotIndex: parseInt(e.target.value) || 0 }))}
-                      />
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Switch
-                      id="create-enabled"
-                      checked={createFormData.enabled}
-                      onCheckedChange={(enabled) => setCreateFormData(prev => ({ ...prev, enabled }))}
-                    />
-                    <Label htmlFor="create-enabled">Enabled</Label>
-                  </div>
-                  <div className="flex justify-end space-x-2">
+                <CardContent>
+                  <Tabs defaultValue="basic" className="w-full">
+                    <TabsList className="grid w-full grid-cols-2">
+                      <TabsTrigger value="basic">Basic Info</TabsTrigger>
+                      <TabsTrigger value="layout" disabled={createFormData.totalSlots <= 0}>
+                        Layout Designer
+                      </TabsTrigger>
+                    </TabsList>
+                    
+                    <TabsContent value="basic" className="space-y-4 mt-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <Label htmlFor="create-code">Code *</Label>
+                          <Input
+                            id="create-code"
+                            value={createFormData.code}
+                            onChange={(e) => setCreateFormData(prev => ({ ...prev, code: e.target.value.toUpperCase() }))}
+                            placeholder="e.g., LTX"
+                            required
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="create-name">Name *</Label>
+                          <Input
+                            id="create-name"
+                            value={createFormData.name}
+                            onChange={(e) => setCreateFormData(prev => ({ ...prev, name: e.target.value }))}
+                            placeholder="e.g., LTX Chassis"
+                            required
+                          />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <Label htmlFor="create-slots">Total Slots *</Label>
+                          <Input
+                            id="create-slots"
+                            type="number"
+                            min="0"
+                            value={createFormData.totalSlots}
+                            onChange={(e) => setCreateFormData(prev => ({ ...prev, totalSlots: parseInt(e.target.value) || 0 }))}
+                            required
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="create-cpu">CPU Slot Index</Label>
+                          <Input
+                            id="create-cpu"
+                            type="number"
+                            min="0"
+                            max={createFormData.totalSlots}
+                            value={createFormData.cpuSlotIndex}
+                            onChange={(e) => setCreateFormData(prev => ({ ...prev, cpuSlotIndex: parseInt(e.target.value) || 0 }))}
+                          />
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Switch
+                          id="create-enabled"
+                          checked={createFormData.enabled}
+                          onCheckedChange={(enabled) => setCreateFormData(prev => ({ ...prev, enabled }))}
+                        />
+                        <Label htmlFor="create-enabled">Enabled</Label>
+                      </div>
+                    </TabsContent>
+                    
+                    <TabsContent value="layout" className="mt-4">
+                      {createFormData.totalSlots > 0 ? (
+                        <ChassisLayoutDesigner
+                          totalSlots={createFormData.totalSlots}
+                          cpuSlotIndex={createFormData.cpuSlotIndex}
+                          initialLayout={createFormData.layoutRows}
+                          onLayoutChange={(layout) => setCreateFormData(prev => ({ ...prev, layoutRows: layout }))}
+                          onPreview={() => {
+                            setPreviewData({
+                              code: createFormData.code || 'Preview',
+                              name: createFormData.name || 'Preview Chassis',
+                              totalSlots: createFormData.totalSlots,
+                              cpuSlotIndex: createFormData.cpuSlotIndex,
+                              layoutRows: createFormData.layoutRows
+                            });
+                            setShowPreview(true);
+                          }}
+                        />
+                      ) : (
+                        <div className="text-center py-8 text-muted-foreground">
+                          <p>Please set the total slots in Basic Info to use the Layout Designer.</p>
+                        </div>
+                      )}
+                    </TabsContent>
+                  </Tabs>
+                  
+                  <div className="flex justify-end space-x-2 mt-6 pt-4 border-t">
                     <Button 
                       variant="outline" 
                       onClick={() => setShowCreateForm(false)}
@@ -277,50 +320,88 @@ export const ChassisTypeManager: React.FC = () => {
                 <div key={chassisType.id} className="p-4 border rounded-lg">
                   {editingId === chassisType.id ? (
                     <div className="space-y-4">
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <Label>Code *</Label>
-                          <Input
-                            value={editFormData.code || ''}
-                            onChange={(e) => setEditFormData(prev => ({ ...prev, code: e.target.value.toUpperCase() }))}
-                          />
-                        </div>
-                        <div>
-                          <Label>Name *</Label>
-                          <Input
-                            value={editFormData.name || ''}
-                            onChange={(e) => setEditFormData(prev => ({ ...prev, name: e.target.value }))}
-                          />
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <Label>Total Slots *</Label>
-                          <Input
-                            type="number"
-                            min="0"
-                            value={editFormData.totalSlots || 0}
-                            onChange={(e) => setEditFormData(prev => ({ ...prev, totalSlots: parseInt(e.target.value) || 0 }))}
-                          />
-                        </div>
-                        <div>
-                          <Label>CPU Slot Index</Label>
-                          <Input
-                            type="number"
-                            min="0"
-                            value={editFormData.cpuSlotIndex || 0}
-                            onChange={(e) => setEditFormData(prev => ({ ...prev, cpuSlotIndex: parseInt(e.target.value) || 0 }))}
-                          />
-                        </div>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Switch
-                          checked={editFormData.enabled || false}
-                          onCheckedChange={(enabled) => setEditFormData(prev => ({ ...prev, enabled }))}
-                        />
-                        <Label>Enabled</Label>
-                      </div>
-                      <div className="flex space-x-2">
+                      <Tabs defaultValue="basic" className="w-full">
+                        <TabsList className="grid w-full grid-cols-2">
+                          <TabsTrigger value="basic">Basic Info</TabsTrigger>
+                          <TabsTrigger value="layout" disabled={(editFormData.totalSlots || 0) <= 0}>
+                            Layout Designer
+                          </TabsTrigger>
+                        </TabsList>
+                        
+                        <TabsContent value="basic" className="space-y-4 mt-4">
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <Label>Code *</Label>
+                              <Input
+                                value={editFormData.code || ''}
+                                onChange={(e) => setEditFormData(prev => ({ ...prev, code: e.target.value.toUpperCase() }))}
+                              />
+                            </div>
+                            <div>
+                              <Label>Name *</Label>
+                              <Input
+                                value={editFormData.name || ''}
+                                onChange={(e) => setEditFormData(prev => ({ ...prev, name: e.target.value }))}
+                              />
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <Label>Total Slots *</Label>
+                              <Input
+                                type="number"
+                                min="0"
+                                value={editFormData.totalSlots || 0}
+                                onChange={(e) => setEditFormData(prev => ({ ...prev, totalSlots: parseInt(e.target.value) || 0 }))}
+                              />
+                            </div>
+                            <div>
+                              <Label>CPU Slot Index</Label>
+                              <Input
+                                type="number"
+                                min="0"
+                                max={editFormData.totalSlots || 0}
+                                value={editFormData.cpuSlotIndex || 0}
+                                onChange={(e) => setEditFormData(prev => ({ ...prev, cpuSlotIndex: parseInt(e.target.value) || 0 }))}
+                              />
+                            </div>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <Switch
+                              checked={editFormData.enabled || false}
+                              onCheckedChange={(enabled) => setEditFormData(prev => ({ ...prev, enabled }))}
+                            />
+                            <Label>Enabled</Label>
+                          </div>
+                        </TabsContent>
+                        
+                        <TabsContent value="layout" className="mt-4">
+                          {(editFormData.totalSlots || 0) > 0 ? (
+                            <ChassisLayoutDesigner
+                              totalSlots={editFormData.totalSlots!}
+                              cpuSlotIndex={editFormData.cpuSlotIndex || 0}
+                              initialLayout={editFormData.layoutRows}
+                              onLayoutChange={(layout) => setEditFormData(prev => ({ ...prev, layoutRows: layout }))}
+                              onPreview={() => {
+                                setPreviewData({
+                                  code: editFormData.code || 'Preview',
+                                  name: editFormData.name || 'Preview Chassis',
+                                  totalSlots: editFormData.totalSlots!,
+                                  cpuSlotIndex: editFormData.cpuSlotIndex || 0,
+                                  layoutRows: editFormData.layoutRows
+                                });
+                                setShowPreview(true);
+                              }}
+                            />
+                          ) : (
+                            <div className="text-center py-8 text-muted-foreground">
+                              <p>Please set the total slots in Basic Info to use the Layout Designer.</p>
+                            </div>
+                          )}
+                        </TabsContent>
+                      </Tabs>
+                      
+                      <div className="flex space-x-2 pt-4 border-t">
                         <Button onClick={handleEditSave} disabled={!editFormData.code || !editFormData.name}>
                           <Save className="h-4 w-4 mr-2" />
                           Save
@@ -368,8 +449,25 @@ export const ChassisTypeManager: React.FC = () => {
                       <div className="grid grid-cols-2 gap-4 mt-4">
                         <div>
                           <span className="text-sm text-muted-foreground">Layout Preview:</span>
-                          <div className="mt-1">
+                          <div className="mt-1 space-y-2">
                             {renderLayoutPreview(chassisType.layoutRows)}
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                setPreviewData({
+                                  code: chassisType.code,
+                                  name: chassisType.name,
+                                  totalSlots: chassisType.totalSlots,
+                                  cpuSlotIndex: chassisType.cpuSlotIndex,
+                                  layoutRows: chassisType.layoutRows
+                                });
+                                setShowPreview(true);
+                              }}
+                            >
+                              <Eye className="h-3 w-3 mr-1" />
+                              Preview Layout
+                            </Button>
                           </div>
                         </div>
                         <div>
@@ -385,6 +483,14 @@ export const ChassisTypeManager: React.FC = () => {
           </div>
         </CardContent>
       </Card>
+      
+      {previewData && (
+        <ChassisPreviewModal
+          open={showPreview}
+          onOpenChange={setShowPreview}
+          chassisType={previewData}
+        />
+      )}
     </div>
   );
 };
