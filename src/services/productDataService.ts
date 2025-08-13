@@ -8,6 +8,7 @@ import {
   AnalogSensorOption,
   BushingTapModelOption,
 } from "@/types/product";
+import { ChassisType, ChassisTypeFormData } from "@/types/product/chassis-types";
 import { supabase } from "@/integrations/supabase/client";
 
 class ProductDataService {
@@ -709,8 +710,116 @@ class ProductDataService {
     }
   }
 
+  // Chassis Types CRUD operations
+  async getChassisTypes(): Promise<ChassisType[]> {
+    const { data, error } = await supabase
+      .from('chassis_types')
+      .select('*')
+      .order('name');
+
+    if (error) {
+      console.error('Error fetching chassis types:', error);
+      throw new Error(`Failed to fetch chassis types: ${error.message}`);
+    }
+
+    return (data || []).map(row => ({
+      id: row.id,
+      code: row.code,
+      name: row.name,
+      totalSlots: row.total_slots,
+      cpuSlotIndex: row.cpu_slot_index,
+      layoutRows: row.layout_rows,
+      enabled: row.enabled,
+      metadata: row.metadata || {},
+      createdAt: row.created_at,
+      updatedAt: row.updated_at
+    }));
+  }
+
+  async createChassisType(data: ChassisTypeFormData): Promise<ChassisType> {
+    const { data: result, error } = await supabase
+      .from('chassis_types')
+      .insert({
+        code: data.code,
+        name: data.name,
+        total_slots: data.totalSlots,
+        cpu_slot_index: data.cpuSlotIndex,
+        layout_rows: data.layoutRows,
+        enabled: data.enabled,
+        metadata: data.metadata || {}
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error creating chassis type:', error);
+      throw new Error(`Failed to create chassis type: ${error.message}`);
+    }
+
+    return {
+      id: result.id,
+      code: result.code,
+      name: result.name,
+      totalSlots: result.total_slots,
+      cpuSlotIndex: result.cpu_slot_index,
+      layoutRows: result.layout_rows,
+      enabled: result.enabled,
+      metadata: result.metadata || {},
+      createdAt: result.created_at,
+      updatedAt: result.updated_at
+    };
+  }
+
+  async updateChassisType(id: string, updates: Partial<ChassisType>): Promise<ChassisType> {
+    const updateData: any = {};
+    if (updates.code !== undefined) updateData.code = updates.code;
+    if (updates.name !== undefined) updateData.name = updates.name;
+    if (updates.totalSlots !== undefined) updateData.total_slots = updates.totalSlots;
+    if (updates.cpuSlotIndex !== undefined) updateData.cpu_slot_index = updates.cpuSlotIndex;
+    if (updates.layoutRows !== undefined) updateData.layout_rows = updates.layoutRows;
+    if (updates.enabled !== undefined) updateData.enabled = updates.enabled;
+    if (updates.metadata !== undefined) updateData.metadata = updates.metadata;
+
+    const { data, error } = await supabase
+      .from('chassis_types')
+      .update(updateData)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error updating chassis type:', error);
+      throw new Error(`Failed to update chassis type: ${error.message}`);
+    }
+
+    return {
+      id: data.id,
+      code: data.code,
+      name: data.name,
+      totalSlots: data.total_slots,
+      cpuSlotIndex: data.cpu_slot_index,
+      layoutRows: data.layout_rows,
+      enabled: data.enabled,
+      metadata: data.metadata || {},
+      createdAt: data.created_at,
+      updatedAt: data.updated_at
+    };
+  }
+
+  async deleteChassisType(id: string): Promise<void> {
+    const { error } = await supabase
+      .from('chassis_types')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      console.error('Error deleting chassis type:', error);
+      throw new Error(`Failed to delete chassis type: ${error.message}`);
+    }
+  }
+
   // Static sensor/bushing methods (can be enhanced to use Supabase later)
-  getAnalogSensorTypes(): AnalogSensorOption[] {
+  static getAnalogSensorTypes(): AnalogSensorOption[] {
     return [
       { id: 'temp', name: 'Temperature', description: 'Temperature sensor input' },
       { id: 'pressure', name: 'Pressure', description: 'Pressure sensor input' },

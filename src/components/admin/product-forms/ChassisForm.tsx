@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Level2Product, Level1Product } from "@/types/product";
+import { useChassisTypes } from "@/hooks/useProductQueries";
 
 interface ChassisFormProps {
   onSubmit: (chassis: Omit<Level2Product, 'id'>) => void;
@@ -15,6 +16,8 @@ interface ChassisFormProps {
 }
 
 const ChassisForm = ({ onSubmit, level1Products, initialData }: ChassisFormProps) => {
+  const { data: chassisTypes = [], isLoading: chassisTypesLoading } = useChassisTypes();
+  
   const [formData, setFormData] = useState({
     name: initialData?.name || '',
     parentProductId: initialData?.parentProductId || '',
@@ -29,6 +32,19 @@ const ChassisForm = ({ onSubmit, level1Products, initialData }: ChassisFormProps
     
     productInfoUrl: initialData?.productInfoUrl || ''
   });
+
+  // Auto-populate slots when chassis type changes
+  const handleChassisTypeChange = (value: string) => {
+    const selectedChassis = chassisTypes.find(ct => ct.code === value);
+    setFormData(prev => ({
+      ...prev,
+      chassisType: value,
+      specifications: {
+        ...prev.specifications,
+        slots: selectedChassis?.totalSlots || (value === 'LTX' ? 14 : value === 'MTX' ? 7 : value === 'STX' ? 4 : 0)
+      }
+    }));
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -73,16 +89,21 @@ const ChassisForm = ({ onSubmit, level1Products, initialData }: ChassisFormProps
           <Label htmlFor="chassisType" className="text-foreground">Chassis Type</Label>
           <Select
             value={formData.chassisType}
-            onValueChange={(value) => setFormData({ ...formData, chassisType: value })}
+            onValueChange={handleChassisTypeChange}
+            disabled={chassisTypesLoading}
           >
             <SelectTrigger className="bg-background border-border text-foreground">
-              <SelectValue placeholder="Select chassis type" />
+              <SelectValue placeholder={chassisTypesLoading ? "Loading..." : "Select chassis type"} />
             </SelectTrigger>
             <SelectContent className="bg-background border-border">
-              <SelectItem value="N/A" className="text-foreground">N/A (Not a chassis)</SelectItem>
-              <SelectItem value="LTX" className="text-foreground">LTX</SelectItem>
-              <SelectItem value="MTX" className="text-foreground">MTX</SelectItem>
-              <SelectItem value="STX" className="text-foreground">STX</SelectItem>
+              {chassisTypes
+                .filter(ct => ct.enabled)
+                .map(chassisType => (
+                  <SelectItem key={chassisType.code} value={chassisType.code} className="text-foreground">
+                    {chassisType.name} ({chassisType.totalSlots} slots)
+                  </SelectItem>
+                ))
+              }
             </SelectContent>
           </Select>
         </div>

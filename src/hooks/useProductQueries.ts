@@ -1,6 +1,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Level1Product, Level2Product, Level3Product } from '@/types/product';
 import { productDataService } from '@/services/productDataService';
+import { ChassisType } from '@/types/product/chassis-types';
 
 // Query keys for cache management
 export const productQueryKeys = {
@@ -10,6 +11,7 @@ export const productQueryKeys = {
   level3: () => [...productQueryKeys.all, 'level3'] as const,
   dga: () => [...productQueryKeys.all, 'dga'] as const,
   pd: () => [...productQueryKeys.all, 'pd'] as const,
+  chassisTypes: ['chassis-types'] as const,
 };
 
 // Hook for Level 1 products with caching
@@ -79,6 +81,17 @@ export const useLevel2ProductsByCategory = (category: 'dga' | 'pd' | 'qtms') => 
   });
 };
 
+// Chassis Types query
+export const useChassisTypes = () => {
+  return useQuery({
+    queryKey: productQueryKeys.chassisTypes,
+    queryFn: () => productDataService.getChassisTypes(),
+    staleTime: 10 * 60 * 1000, // 10 minutes
+    gcTime: 30 * 60 * 1000, // 30 minutes
+    refetchOnWindowFocus: false,
+  });
+};
+
 // Hook to prefetch products (for performance)
 export const usePrefetchProducts = () => {
   const queryClient = useQueryClient();
@@ -115,11 +128,20 @@ export const usePrefetchProducts = () => {
     });
   };
 
+  const prefetchChassisTypes = () => {
+    queryClient.prefetchQuery({
+      queryKey: productQueryKeys.chassisTypes,
+      queryFn: () => productDataService.getChassisTypes(),
+      staleTime: 10 * 60 * 1000,
+    });
+  };
+
   return {
     prefetchLevel1,
     prefetchLevel2,
     prefetchDGA,
     prefetchPD,
+    prefetchChassisTypes,
   };
 };
 
@@ -147,11 +169,16 @@ export const useProductMutations = () => {
     queryClient.invalidateQueries({ queryKey: productQueryKeys.pd() });
   };
 
+  const invalidateChassisTypes = () => {
+    queryClient.invalidateQueries({ queryKey: productQueryKeys.chassisTypes });
+  };
+
   return {
     invalidateAllProducts,
     invalidateLevel1,
     invalidateLevel2,
     invalidateDGA,
     invalidatePD,
+    invalidateChassisTypes,
   };
 };

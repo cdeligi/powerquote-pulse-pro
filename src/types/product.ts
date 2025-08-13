@@ -5,6 +5,7 @@ export * from './product/sensor-config';
 export * from './product/quote-types';
 export * from './product/type-guards';
 export * from './product/part-number-utils';
+export * from './product/chassis-types';
 
 // Explicit re-exports for commonly used types including Level 4
 export type {

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { productDataService } from "@/services/productDataService";
+import { productDataService, ProductDataService } from "@/services/productDataService";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,8 +11,8 @@ interface SensorConfigManagementProps {
 }
 
 const SensorConfigManagement = ({ showAnalog = true, showBushing = true }: SensorConfigManagementProps) => {
-  const [analogTypes, setAnalogTypes] = useState(productDataService.getAnalogSensorTypes());
-  const [bushingModels, setBushingModels] = useState(productDataService.getBushingTapModels());
+  const [analogTypes, setAnalogTypes] = useState(ProductDataService.getAnalogSensorTypes());
+  const [bushingModels, setBushingModels] = useState(ProductDataService.getBushingTapModels());
 
   const [analogForm, setAnalogForm] = useState({ name: "", description: "" });
   const [editingAnalogId, setEditingAnalogId] = useState<string | null>(null);
@@ -28,8 +28,8 @@ const SensorConfigManagement = ({ showAnalog = true, showBushing = true }: Senso
   };
 
   const refresh = () => {
-    setAnalogTypes(productDataService.getAnalogSensorTypes());
-    setBushingModels(productDataService.getBushingTapModels());
+    setAnalogTypes(ProductDataService.getAnalogSensorTypes());
+    setBushingModels(ProductDataService.getBushingTapModels());
   };
 
   const handleSaveAnalog = async () => {

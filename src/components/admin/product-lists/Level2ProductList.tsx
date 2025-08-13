@@ -12,6 +12,7 @@ import { Edit3, Trash2, Save, X, Filter } from "lucide-react";
 import { Level1Product, Level2Product } from "@/types/product";
 import { productDataService } from "@/services/productDataService";
 import { useToast } from "@/hooks/use-toast";
+import { useChassisTypes } from "@/hooks/useProductQueries";
 
 interface Level2ProductListProps {
   products: Level2Product[];
@@ -27,6 +28,7 @@ export const Level2ProductList: React.FC<Level2ProductListProps> = ({
   onEditPartNumbers
 }) => {
   const { toast } = useToast();
+  const { data: chassisTypes = [] } = useChassisTypes();
   const [editingProduct, setEditingProduct] = useState<string | null>(null);
   const [editFormData, setEditFormData] = useState<Partial<Level2Product>>({});
   const [parentFilter, setParentFilter] = useState<string>('all');
@@ -158,10 +160,11 @@ export const Level2ProductList: React.FC<Level2ProductListProps> = ({
               </SelectTrigger>
               <SelectContent className="bg-white border-gray-300">
                 <SelectItem value="all" className="text-gray-900">All Chassis Types</SelectItem>
-                <SelectItem value="N/A" className="text-gray-900">N/A</SelectItem>
-                <SelectItem value="LTX" className="text-gray-900">LTX</SelectItem>
-                <SelectItem value="MTX" className="text-gray-900">MTX</SelectItem>
-                <SelectItem value="STX" className="text-gray-900">STX</SelectItem>
+                {chassisTypes.map(ct => (
+                  <SelectItem key={ct.code} value={ct.code} className="text-gray-900">
+                    {ct.name}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -205,16 +208,27 @@ export const Level2ProductList: React.FC<Level2ProductListProps> = ({
                        <Label htmlFor={`chassisType-${product.id}`} className="text-gray-700">Chassis Type</Label>
                        <Select
                          value={editFormData.chassisType || 'N/A'}
-                         onValueChange={(value) => setEditFormData(prev => ({ ...prev, chassisType: value }))}
+                         onValueChange={(value) => {
+                           const selectedChassis = chassisTypes.find(ct => ct.code === value);
+                           setEditFormData(prev => ({
+                             ...prev,
+                             chassisType: value,
+                             specifications: {
+                               ...prev.specifications,
+                               slots: selectedChassis?.totalSlots || (value === 'LTX' ? 14 : value === 'MTX' ? 7 : value === 'STX' ? 4 : 0)
+                             }
+                           }));
+                         }}
                        >
                          <SelectTrigger className="bg-white border-gray-300 text-gray-900">
                            <SelectValue placeholder="Select Chassis Type" />
                          </SelectTrigger>
                          <SelectContent className="bg-white border-gray-300">
-                           <SelectItem value="N/A" className="text-gray-900">N/A (Not a chassis)</SelectItem>
-                           <SelectItem value="LTX" className="text-gray-900">LTX</SelectItem>
-                           <SelectItem value="MTX" className="text-gray-900">MTX</SelectItem>
-                           <SelectItem value="STX" className="text-gray-900">STX</SelectItem>
+                           {chassisTypes.filter(ct => ct.enabled).map(ct => (
+                             <SelectItem key={ct.code} value={ct.code} className="text-gray-900">
+                               {ct.name} ({ct.totalSlots} slots)
+                             </SelectItem>
+                           ))}
                          </SelectContent>
                        </Select>
                      </div>
