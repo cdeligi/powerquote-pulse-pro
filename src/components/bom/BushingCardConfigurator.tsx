@@ -5,7 +5,7 @@
 
 import { useState, useEffect } from "react";
 import { BOMItem, Level3Customization } from "@/types/product/interfaces";
-import { productDataService } from "@/services/productDataService";
+import { ProductDataService } from "@/services/productDataService";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -30,7 +30,7 @@ const BushingCardConfigurator = ({ bomItem, onSave, onClose }: BushingCardConfig
 
   useEffect(() => {
     try {
-      const models = productDataService.getBushingTapModels();
+      const models = ProductDataService.getBushingTapModels();
       console.log('Loaded bushing tap models:', models);
       setTapModels(models || []);
       

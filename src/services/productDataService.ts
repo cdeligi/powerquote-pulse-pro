@@ -828,7 +828,7 @@ class ProductDataService {
     ];
   }
 
-  getBushingTapModels(): BushingTapModelOption[] {
+  static getBushingTapModels(): BushingTapModelOption[] {
     return [
       { id: 'model-a', name: 'Model A' },
       { id: 'model-b', name: 'Model B' }
@@ -986,8 +986,9 @@ class ProductDataService {
   }
 }
 
-// Export singleton instance
+// Export singleton instance and class
 export const productDataService = new ProductDataService();
+export { ProductDataService };
 
 // Expose debug info for development
 if (typeof window !== 'undefined') {
