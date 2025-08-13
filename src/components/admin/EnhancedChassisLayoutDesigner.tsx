@@ -3,13 +3,13 @@
  */
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { Canvas as FabricCanvas, Rect, FabricText, Line } from 'fabric';
+import { Canvas as FabricCanvas, Rect, FabricText, Line, Group } from 'fabric';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Grid, Move, RotateCcw, Eye, Square, Hand, ZoomIn, ZoomOut } from "lucide-react";
+import { Grid, RotateCcw, Eye, Square, Hand, ArrowUp, ArrowDown, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { 
   ChassisVisualLayout, 
@@ -19,6 +19,7 @@ import {
   generateDefaultLayout, 
   generateDefaultVisualLayout 
 } from "@/types/product/chassis-types";
+import { CanvasKeyboardHandler } from "./CanvasKeyboardHandler";
 
 interface EnhancedChassisLayoutDesignerProps {
   totalSlots: number;
@@ -63,6 +64,7 @@ export const EnhancedChassisLayoutDesigner: React.FC<EnhancedChassisLayoutDesign
   const [fabricCanvas, setFabricCanvas] = useState<FabricCanvas | null>(null);
   const [selectedTool, setSelectedTool] = useState<'select' | 'draw'>('select');
   const [gridVisible, setGridVisible] = useState(true);
+  const [slotGroups, setSlotGroups] = useState<Map<number, Group>>(new Map());
   
   // Grid designer state
   const [dragState, setDragState] = useState<DragState>({
@@ -72,6 +74,7 @@ export const EnhancedChassisLayoutDesigner: React.FC<EnhancedChassisLayoutDesign
   });
   
   const [errors, setErrors] = useState<string[]>([]);
+  const [isEditing, setIsEditing] = useState(false);
 
   // Initialize Fabric.js canvas
   useEffect(() => {
@@ -90,7 +93,55 @@ export const EnhancedChassisLayoutDesigner: React.FC<EnhancedChassisLayoutDesign
     canvas.on('object:modified', handleCanvasObjectModified);
     canvas.on('mouse:down', handleCanvasMouseDown);
 
+    // Add keyboard support
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!canvas) return;
+      
+      const activeObject = canvas.getActiveObject();
+      if (!activeObject) return;
+      
+      // Delete key to remove slot
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        const slotNumber = activeObject.get('slotNumber');
+        if (typeof slotNumber === 'number') {
+          deleteSlotFromCanvas(slotNumber);
+          canvas.remove(activeObject);
+          canvas.renderAll();
+        }
+      }
+      
+      // Arrow keys for precise movement
+      const step = e.shiftKey ? 10 : 1;
+      switch (e.key) {
+        case 'ArrowLeft':
+          activeObject.set('left', (activeObject.left || 0) - step);
+          break;
+        case 'ArrowRight':
+          activeObject.set('left', (activeObject.left || 0) + step);
+          break;
+        case 'ArrowUp':
+          activeObject.set('top', (activeObject.top || 0) - step);
+          break;
+        case 'ArrowDown':
+          activeObject.set('top', (activeObject.top || 0) + step);
+          break;
+        default:
+          return;
+      }
+      
+      if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) {
+        e.preventDefault();
+        canvas.renderAll();
+        // Trigger the modified event manually
+        handleCanvasObjectModified({ target: activeObject });
+      }
+    };
+
+    // Add event listener when canvas is focused
+    document.addEventListener('keydown', handleKeyDown);
+
     return () => {
+      document.removeEventListener('keydown', handleKeyDown);
       canvas.dispose();
     };
   }, []);
@@ -115,17 +166,18 @@ export const EnhancedChassisLayoutDesigner: React.FC<EnhancedChassisLayoutDesign
     if (!fabricCanvas) return;
     
     fabricCanvas.clear();
+    const newSlotGroups = new Map<number, Group>();
     
     // Add grid if visible
     if (gridVisible) {
       drawGrid();
     }
     
-    // Add slots
+    // Add slots as grouped objects
     visualLayout.slots.forEach((slot) => {
       const rect = new Rect({
-        left: slot.x,
-        top: slot.y,
+        left: 0,
+        top: 0,
         width: slot.width,
         height: slot.height,
         fill: 'hsl(var(--accent))',
@@ -139,23 +191,33 @@ export const EnhancedChassisLayoutDesigner: React.FC<EnhancedChassisLayoutDesign
       });
       
       const text = new FabricText(slot.slotNumber.toString(), {
-        left: slot.x + slot.width / 2,
-        top: slot.y + slot.height / 2,
+        left: slot.width / 2,
+        top: slot.height / 2,
         fontSize: 14,
         fontFamily: 'Arial',
         fill: 'hsl(var(--foreground))',
         textAlign: 'center',
         originX: 'center',
-        originY: 'center',
-        selectable: false,
-        evented: false
+        originY: 'center'
       });
       
-      // Group rect and text together
-      rect.set('slotNumber', slot.slotNumber);
-      fabricCanvas.add(rect, text);
+      // Create group with rect and text
+      const group = new Group([rect, text], {
+        left: slot.x,
+        top: slot.y
+      });
+      
+      // Disable rotation for the group
+      group.setControlsVisibility({
+        mtr: false // Hide rotation control
+      });
+      
+      group.set('slotNumber', slot.slotNumber);
+      newSlotGroups.set(slot.slotNumber, group);
+      fabricCanvas.add(group);
     });
     
+    setSlotGroups(newSlotGroups);
     fabricCanvas.renderAll();
   }, [fabricCanvas, visualLayout, gridVisible]);
 
@@ -194,10 +256,22 @@ export const EnhancedChassisLayoutDesigner: React.FC<EnhancedChassisLayoutDesign
     if (!obj || typeof obj.slotNumber !== 'number') return;
     
     const slotNumber = obj.slotNumber;
-    const newX = Math.max(0, Math.min(obj.left, CANVAS_WIDTH - obj.width));
-    const newY = Math.max(0, Math.min(obj.top, CANVAS_HEIGHT - obj.height));
-    const newWidth = Math.max(SLOT_MIN_WIDTH, Math.min(obj.width * obj.scaleX, CANVAS_WIDTH - newX));
-    const newHeight = Math.max(SLOT_MIN_HEIGHT, Math.min(obj.height * obj.scaleY, CANVAS_HEIGHT - newY));
+    const group = obj as Group;
+    
+    // Get current dimensions
+    const groupWidth = group.width * group.scaleX;
+    const groupHeight = group.height * group.scaleY;
+    
+    // Snap to grid if enabled
+    const gridSize = 20;
+    const snappedX = gridVisible ? Math.round(group.left / gridSize) * gridSize : group.left;
+    const snappedY = gridVisible ? Math.round(group.top / gridSize) * gridSize : group.top;
+    
+    // Constrain to canvas bounds
+    const newX = Math.max(0, Math.min(snappedX, CANVAS_WIDTH - groupWidth));
+    const newY = Math.max(0, Math.min(snappedY, CANVAS_HEIGHT - groupHeight));
+    const newWidth = Math.max(SLOT_MIN_WIDTH, Math.min(groupWidth, CANVAS_WIDTH - newX));
+    const newHeight = Math.max(SLOT_MIN_HEIGHT, Math.min(groupHeight, CANVAS_HEIGHT - newY));
     
     // Update visual layout
     const updatedLayout = {
@@ -211,6 +285,7 @@ export const EnhancedChassisLayoutDesigner: React.FC<EnhancedChassisLayoutDesign
     
     setVisualLayout(updatedLayout);
     onVisualLayoutChange?.(updatedLayout);
+    setIsEditing(true);
   };
 
   const handleCanvasMouseDown = (e: any) => {
@@ -230,11 +305,16 @@ export const EnhancedChassisLayoutDesigner: React.FC<EnhancedChassisLayoutDesign
       return;
     }
     
+    // Snap to grid
+    const gridSize = 20;
+    const snappedX = gridVisible ? Math.round(pointer.x / gridSize) * gridSize : pointer.x;
+    const snappedY = gridVisible ? Math.round(pointer.y / gridSize) * gridSize : pointer.y;
+    
     // Create new slot
     const newSlot: VisualSlotLayout = {
       slotNumber: nextSlotNumber,
-      x: pointer.x,
-      y: pointer.y,
+      x: Math.max(0, Math.min(snappedX, CANVAS_WIDTH - 80)),
+      y: Math.max(0, Math.min(snappedY, CANVAS_HEIGHT - 60)),
       width: 80,
       height: 60
     };
@@ -246,6 +326,8 @@ export const EnhancedChassisLayoutDesigner: React.FC<EnhancedChassisLayoutDesign
     
     setVisualLayout(updatedLayout);
     onVisualLayoutChange?.(updatedLayout);
+    setIsEditing(true);
+    toast.success(`Added slot ${nextSlotNumber}`);
   };
 
   // Grid-based layout functions
@@ -310,6 +392,41 @@ export const EnhancedChassisLayoutDesigner: React.FC<EnhancedChassisLayoutDesign
     
     setLayout(newLayout);
     onLayoutChange?.(newLayout);
+    setIsEditing(true);
+  };
+
+  const moveRowUp = (rowIndex: number) => {
+    if (rowIndex === 0) return;
+    
+    const newLayout = [...layout];
+    [newLayout[rowIndex - 1], newLayout[rowIndex]] = [newLayout[rowIndex], newLayout[rowIndex - 1]];
+    
+    setLayout(newLayout);
+    onLayoutChange?.(newLayout);
+    setIsEditing(true);
+  };
+
+  const moveRowDown = (rowIndex: number) => {
+    if (rowIndex === layout.length - 1) return;
+    
+    const newLayout = [...layout];
+    [newLayout[rowIndex], newLayout[rowIndex + 1]] = [newLayout[rowIndex + 1], newLayout[rowIndex]];
+    
+    setLayout(newLayout);
+    onLayoutChange?.(newLayout);
+    setIsEditing(true);
+  };
+
+  const deleteSlotFromCanvas = (slotNumber: number) => {
+    const updatedLayout = {
+      ...visualLayout,
+      slots: visualLayout.slots.filter(slot => slot.slotNumber !== slotNumber)
+    };
+    
+    setVisualLayout(updatedLayout);
+    onVisualLayoutChange?.(updatedLayout);
+    setIsEditing(true);
+    toast.success(`Deleted slot ${slotNumber}`);
   };
 
   const resetGridLayout = () => {
@@ -328,20 +445,40 @@ export const EnhancedChassisLayoutDesigner: React.FC<EnhancedChassisLayoutDesign
     onPreview?.(layout, visualLayout);
   };
 
-  // Validation
+  // Flexible validation - only enforce completeness on save
   useEffect(() => {
     const newErrors: string[] = [];
     
-    if (!validateLayoutRows(layout, totalSlots)) {
-      newErrors.push("Grid layout must include all slots exactly once");
-    }
-    
-    if (!validateVisualLayout(visualLayout, totalSlots)) {
-      newErrors.push("Visual layout must include all slots exactly once");
+    // Only validate if not actively editing
+    if (!isEditing) {
+      if (!validateLayoutRows(layout, totalSlots)) {
+        const allSlots = layout.flat();
+        const missingSlots = Array.from({length: totalSlots}, (_, i) => i).filter(slot => !allSlots.includes(slot));
+        if (missingSlots.length > 0) {
+          newErrors.push(`Missing slots in grid: ${missingSlots.join(', ')}`);
+        }
+      }
+      
+      if (!validateVisualLayout(visualLayout, totalSlots)) {
+        const usedSlots = visualLayout.slots.map(s => s.slotNumber);
+        const missingSlots = Array.from({length: totalSlots}, (_, i) => i).filter(slot => !usedSlots.includes(slot));
+        if (missingSlots.length > 0) {
+          newErrors.push(`Missing slots in visual: ${missingSlots.join(', ')}`);
+        }
+      }
     }
     
     setErrors(newErrors);
-  }, [layout, visualLayout, totalSlots]);
+  }, [layout, visualLayout, totalSlots, isEditing]);
+
+  // Reset editing state after changes settle
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsEditing(false);
+    }, 1000);
+    
+    return () => clearTimeout(timer);
+  }, [layout, visualLayout]);
 
   return (
     <div className="space-y-4">
@@ -373,6 +510,26 @@ export const EnhancedChassisLayoutDesigner: React.FC<EnhancedChassisLayoutDesign
               <div className="space-y-2">
                 {layout.map((row, rowIndex) => (
                   <div key={rowIndex} className="flex items-center gap-2">
+                    <div className="flex flex-col gap-1">
+                      <Button
+                        onClick={() => moveRowUp(rowIndex)}
+                        variant="ghost"
+                        size="sm"
+                        disabled={rowIndex === 0}
+                        className="h-6 w-6 p-0"
+                      >
+                        <ArrowUp className="h-3 w-3" />
+                      </Button>
+                      <Button
+                        onClick={() => moveRowDown(rowIndex)}
+                        variant="ghost"
+                        size="sm"
+                        disabled={rowIndex === layout.length - 1}
+                        className="h-6 w-6 p-0"
+                      >
+                        <ArrowDown className="h-3 w-3" />
+                      </Button>
+                    </div>
                     <div 
                       className="flex-1 min-h-12 border-2 border-dashed border-muted-foreground/20 rounded-lg p-2 flex gap-2 items-center"
                       onDragOver={handleDragOver}
@@ -382,7 +539,7 @@ export const EnhancedChassisLayoutDesigner: React.FC<EnhancedChassisLayoutDesign
                         <Badge
                           key={`${rowIndex}-${slotIndex}`}
                           variant="secondary"
-                          className="cursor-move"
+                          className="cursor-move hover:bg-accent"
                           draggable
                           onDragStart={(e) => handleDragStart(e, slot, rowIndex, slotIndex)}
                         >
@@ -395,11 +552,12 @@ export const EnhancedChassisLayoutDesigner: React.FC<EnhancedChassisLayoutDesign
                     </div>
                     <Button
                       onClick={() => removeRow(rowIndex)}
-                      variant="outline"
+                      variant="ghost"
                       size="sm"
                       disabled={layout.length <= 1}
+                      className="text-destructive hover:text-destructive"
                     >
-                      Remove
+                      <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
                 ))}
@@ -452,13 +610,21 @@ export const EnhancedChassisLayoutDesigner: React.FC<EnhancedChassisLayoutDesign
               <div className="border border-border rounded-lg overflow-hidden">
                 <canvas 
                   ref={canvasRef} 
-                  className="bg-background"
+                  className="bg-background focus:outline-none focus:ring-2 focus:ring-primary"
+                  tabIndex={0}
+                />
+                <CanvasKeyboardHandler
+                  fabricCanvas={fabricCanvas}
+                  onDeleteSlot={deleteSlotFromCanvas}
+                  onObjectModified={handleCanvasObjectModified}
                 />
               </div>
               
-              <div className="text-sm text-muted-foreground">
-                <p><strong>Select Mode:</strong> Click and drag slots to move them around</p>
+              <div className="text-sm text-muted-foreground space-y-1">
+                <p><strong>Select Mode:</strong> Click and drag slots to move/resize them</p>
                 <p><strong>Draw Mode:</strong> Click on empty canvas to create new slots</p>
+                <p><strong>Delete:</strong> Select slot and press Delete key or right-click</p>
+                <p><strong>Grid:</strong> {gridVisible ? 'Enabled - objects snap to grid' : 'Disabled - free positioning'}</p>
               </div>
             </CardContent>
           </Card>
@@ -468,7 +634,7 @@ export const EnhancedChassisLayoutDesigner: React.FC<EnhancedChassisLayoutDesign
       {/* Validation and Actions */}
       <Card>
         <CardContent className="pt-6">
-          {errors.length > 0 && (
+          {errors.length > 0 && !isEditing && (
             <div className="mb-4 space-y-2">
               {errors.map((error, index) => (
                 <div key={index} className="text-destructive text-sm flex items-center gap-2">
@@ -476,6 +642,13 @@ export const EnhancedChassisLayoutDesigner: React.FC<EnhancedChassisLayoutDesign
                   {error}
                 </div>
               ))}
+            </div>
+          )}
+          
+          {isEditing && (
+            <div className="mb-4 text-sm text-muted-foreground flex items-center gap-2">
+              <span className="h-2 w-2 rounded-full bg-primary animate-pulse" />
+              Editing in progress...
             </div>
           )}
           
@@ -492,10 +665,12 @@ export const EnhancedChassisLayoutDesigner: React.FC<EnhancedChassisLayoutDesign
             )}
             
             <div className="text-sm text-muted-foreground flex items-center">
-              Status: {errors.length === 0 ? (
+              Status: {isEditing ? (
+                <Badge variant="secondary" className="ml-2">Editing</Badge>
+              ) : errors.length === 0 ? (
                 <Badge variant="default" className="ml-2">Valid</Badge>
               ) : (
-                <Badge variant="destructive" className="ml-2">Invalid</Badge>
+                <Badge variant="destructive" className="ml-2">Incomplete</Badge>
               )}
             </div>
           </div>

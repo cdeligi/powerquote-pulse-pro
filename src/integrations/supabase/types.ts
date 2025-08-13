@@ -221,7 +221,6 @@ export type Database = {
       chassis_types: {
         Row: {
           code: string
-          cpu_slot_index: number
           created_at: string
           enabled: boolean
           id: string
@@ -230,10 +229,10 @@ export type Database = {
           name: string
           total_slots: number
           updated_at: string
+          visual_layout: Json | null
         }
         Insert: {
           code: string
-          cpu_slot_index?: number
           created_at?: string
           enabled?: boolean
           id?: string
@@ -242,10 +241,10 @@ export type Database = {
           name: string
           total_slots: number
           updated_at?: string
+          visual_layout?: Json | null
         }
         Update: {
           code?: string
-          cpu_slot_index?: number
           created_at?: string
           enabled?: boolean
           id?: string
@@ -254,6 +253,7 @@ export type Database = {
           name?: string
           total_slots?: number
           updated_at?: string
+          visual_layout?: Json | null
         }
         Relationships: []
       }
