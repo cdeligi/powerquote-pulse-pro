@@ -16,8 +16,6 @@ interface RackVisualizerProps {
   onRemoteDisplayToggle?: (enabled: boolean) => void;
   standardSlotHints?: Record<number, string[]>;
   colorByProductId?: Record<string, string>;
-  cpuColor?: string;
-  cpuLabel?: string;
   accessories?: { product: Level3Product; selected: boolean; color?: string | null; pn?: string | null }[];
   onAccessoryToggle?: (id: string) => void;
   partNumber?: string;
@@ -34,8 +32,6 @@ const RackVisualizer = ({
   onRemoteDisplayToggle,
   standardSlotHints,
   colorByProductId,
-  cpuColor,
-  cpuLabel,
   accessories,
   onAccessoryToggle,
   partNumber,
@@ -58,8 +54,6 @@ const RackVisualizer = ({
   };
 
 const getSlotColor = (slot: number) => {
-  // CPU slot uses configured color via inline style; keep neutral base here
-  if (slot === 0) return 'bg-gray-700';
   // For selected empty slots, show highlight; for assigned slots we will use admin color via inline style
   if (!slotAssignments[slot] && selectedSlot === slot) return 'bg-yellow-600';
   if (slotAssignments[slot]) return 'bg-gray-700'; // base for assigned; real color via inline style
@@ -67,7 +61,6 @@ const getSlotColor = (slot: number) => {
 };
 
   const getSlotLabel = (slot: number) => {
-    if (slot === 0) return cpuLabel || 'CPU';
     if (slotAssignments[slot]) {
       const card = slotAssignments[slot];
       if (isBushingCard(card)) {
@@ -84,7 +77,6 @@ const getSlotColor = (slot: number) => {
   };
 
 const getSlotTitle = (slot: number) => {
-  if (slot === 0) return `${cpuLabel || 'CPU'} (Fixed)`;
   if (slotAssignments[slot]) {
     const card = slotAssignments[slot];
     const display = card?.type ? card.type.charAt(0).toUpperCase() + card.type.slice(1) : card?.name;
@@ -105,8 +97,6 @@ const getSlotTitle = (slot: number) => {
 };
 
   const isSlotClickable = (slot: number) => {
-    if (slot === 0) return false; // CPU slot not clickable
-    
     // Check if this is the secondary slot of a bushing card
     const isSecondaryBushingSlot = Object.values(bushingSlots).some(slots => 
       slots.includes(slot) && slots[0] !== slot
@@ -152,7 +142,7 @@ return (
         title={getSlotTitle(slot)}
         style={(() => {
           const assigned = slotAssignments[slot];
-          const adminColor = assigned ? (colorByProductId?.[assigned.id] || null) : (slot === 0 ? (cpuColor || null) : null);
+          const adminColor = assigned ? (colorByProductId?.[assigned.id] || null) : null;
           return adminColor ? { backgroundColor: adminColor } : undefined;
         })()}
       >
@@ -169,7 +159,7 @@ return (
 )}
 
 {/* Clear button for occupied slots */}
-{slot !== 0 && slotAssignments[slot] && !isSecondaryBushingSlot && (
+{slotAssignments[slot] && !isSecondaryBushingSlot && (
   <Button
     size="sm"
     variant="ghost"
@@ -245,15 +235,15 @@ return (
       );
     } else {
       // Fallback: render based on actual slot count from database
-      const slots = Array.from({ length: totalSlots + 1 }, (_, i) => i); // Include CPU slot 0
-      const slotsPerRow = Math.min(8, totalSlots + 1);
-      const rows = Math.ceil((totalSlots + 1) / slotsPerRow);
+      const slots = Array.from({ length: totalSlots }, (_, i) => i); // Start from 0
+      const slotsPerRow = Math.min(8, totalSlots);
+      const rows = Math.ceil(totalSlots / slotsPerRow);
       
       return (
         <div className="space-y-2">
           {Array.from({ length: rows }, (_, rowIndex) => {
             const startSlot = rowIndex * slotsPerRow;
-            const endSlot = Math.min(startSlot + slotsPerRow, totalSlots + 1);
+            const endSlot = Math.min(startSlot + slotsPerRow, totalSlots);
             const rowSlots = slots.slice(startSlot, endSlot);
             
             return (
@@ -282,7 +272,7 @@ return (
       <CardContent>
         <div className="space-y-4">
           <p className="text-gray-400 text-sm">
-            Click on any slot (except {cpuLabel || 'CPU'}) to add a card. Click the X to clear a slot.
+            Click on any slot to add a card. Click the X to clear a slot.
           </p>
           
           {renderChassisLayout()}
@@ -363,7 +353,7 @@ return (
                   </div>
                 ))}
                 {Object.entries(slotAssignments)
-                  .filter(([slot, card]) => parseInt(slot) !== 0 && !isBushingCard(card))
+                  .filter(([slot, card]) => !isBushingCard(card))
                   .map(([slot, card]) => (
                     <div key={slot} className="flex justify-between text-sm">
                       <span className="text-gray-400">Slot {slot}:</span>

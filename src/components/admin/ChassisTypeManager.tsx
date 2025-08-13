@@ -377,7 +377,7 @@ export const ChassisTypeManager: React.FC = () => {
                                 setPreviewData({
                                   code: editFormData.code || 'Preview',
                                   name: editFormData.name || 'Preview Chassis',
-                                  totalSlots: editFormData.totalSlots!,
+                                  totalSlots: editFormData.totalSlots || 0,
                                   layoutRows: layout,
                                   visualLayout: visualLayout
                                 });

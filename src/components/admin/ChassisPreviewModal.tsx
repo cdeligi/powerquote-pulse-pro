@@ -15,9 +15,9 @@ interface ChassisPreviewModalProps {
     code: string;
     name: string;
     totalSlots: number;
-    cpuSlotIndex: number;
     layoutRows?: number[][] | null;
-  };
+    visualLayout?: any;
+  } | null;
 }
 
 export const ChassisPreviewModal: React.FC<ChassisPreviewModalProps> = ({
@@ -25,6 +25,10 @@ export const ChassisPreviewModal: React.FC<ChassisPreviewModalProps> = ({
   onOpenChange,
   chassisType
 }) => {
+  if (!chassisType) {
+    return null;
+  }
+
   // Create a mock chassis for the visualizer
   const mockChassis = {
     id: 'preview',
@@ -49,8 +53,8 @@ export const ChassisPreviewModal: React.FC<ChassisPreviewModalProps> = ({
     code: chassisType.code,
     name: chassisType.name,
     totalSlots: chassisType.totalSlots,
-    
     layoutRows: chassisType.layoutRows,
+    visualLayout: chassisType.visualLayout,
     enabled: true,
     metadata: {},
     createdAt: new Date().toISOString(),
@@ -75,8 +79,6 @@ export const ChassisPreviewModal: React.FC<ChassisPreviewModalProps> = ({
             onSlotClick={() => {}}
             onSlotClear={() => {}}
             selectedSlot={null}
-            cpuLabel="CPU"
-            cpuColor="#3b82f6"
             chassisType={mockChassisTypeData}
           />
           
