@@ -10,6 +10,7 @@ import CardForm from "./product-forms/CardForm";
 import Level2OptionForm from "./product-forms/Level2OptionForm";
 import { Level4ConfigurationManager } from "./Level4ConfigurationManager";
 import PartNumberConfigManager from "./PartNumberConfigManager";
+import { ChassisTypeManager } from "./ChassisTypeManager";
 import { Level1ProductList } from "./product-lists/Level1ProductList";
 import { Level2ProductList } from "./product-lists/Level2ProductList";
 import { Level3ProductList } from "./product-lists/Level3ProductList";
@@ -252,11 +253,12 @@ export const ProductManagement = () => {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="level1">Level 1 Products</TabsTrigger>
           <TabsTrigger value="level2">Level 2 Products</TabsTrigger>
           <TabsTrigger value="level3">Level 3 Products</TabsTrigger>
           <TabsTrigger value="partnumbers">Part Numbers</TabsTrigger>
+          <TabsTrigger value="chassis-types">Chassis Types</TabsTrigger>
           <TabsTrigger value="level4">Level 4 Configuration</TabsTrigger>
         </TabsList>
 
@@ -392,6 +394,10 @@ export const ProductManagement = () => {
 
         <TabsContent value="partnumbers" className="space-y-4">
           <PartNumberConfigManager initialSelectedL2={selectedL2ForPN} />
+        </TabsContent>
+
+        <TabsContent value="chassis-types" className="space-y-4">
+          <ChassisTypeManager />
         </TabsContent>
 
         <TabsContent value="level4" className="space-y-4">

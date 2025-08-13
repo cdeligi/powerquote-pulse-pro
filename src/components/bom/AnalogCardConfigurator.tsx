@@ -5,7 +5,7 @@
 
 import { useState } from "react";
 import { BOMItem, Level3Customization } from "@/types/product/interfaces";
-import { productDataService } from "@/services/productDataService";
+import { productDataService, ProductDataService } from "@/services/productDataService";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -21,7 +21,7 @@ interface AnalogCardConfiguratorProps {
 }
 
 const AnalogCardConfigurator = ({ bomItem, onSave, onClose }: AnalogCardConfiguratorProps) => {
-  const sensorOptions = productDataService.getAnalogSensorTypes();
+  const sensorOptions = ProductDataService.getAnalogSensorTypes();
   const [channelConfigs, setChannelConfigs] = useState<Record<number, string>>(() => {
     // Initialize with existing configurations or default to first sensor type
     const configs: Record<number, string> = {};

@@ -1,4 +1,5 @@
 import { Chassis, Card as ProductCard, Level3Product } from "@/types/product";
+import { ChassisType } from "@/types/product/chassis-types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -20,6 +21,7 @@ interface RackVisualizerProps {
   accessories?: { product: Level3Product; selected: boolean; color?: string | null; pn?: string | null }[];
   onAccessoryToggle?: (id: string) => void;
   partNumber?: string;
+  chassisType?: ChassisType; // Optional chassis type for custom layouts
 }
 
 const RackVisualizer = ({ 
@@ -37,6 +39,7 @@ const RackVisualizer = ({
   accessories,
   onAccessoryToggle,
   partNumber,
+  chassisType,
 }: RackVisualizerProps) => {
   
   const bushingSlots = getBushingOccupiedSlots(slotAssignments);
@@ -185,12 +188,31 @@ return (
   };
 
   const renderChassisLayout = () => {
-    const chassisType = chassis.type?.toUpperCase() || chassis.chassisType?.toUpperCase() || '';
+    const chassisTypeCode = chassis.type?.toUpperCase() || chassis.chassisType?.toUpperCase() || '';
     const totalSlots = chassis.specifications?.slots || chassis.slots || 0;
     
-    console.log(`RackVisualizer: chassis type = ${chassisType}, total slots = ${totalSlots}`);
+    console.log(`RackVisualizer: chassis type = ${chassisTypeCode}, total slots = ${totalSlots}`);
     
-    if (chassisType === 'LTX' && totalSlots === 14) {
+    // Use custom layout from chassisType if available
+    if (chassisType?.layoutRows && chassisType.layoutRows.length > 0) {
+      console.log('Using custom layout from chassis type:', chassisType.layoutRows);
+      return (
+        <div className="space-y-2">
+          {chassisType.layoutRows.map((row, rowIndex) => (
+            <div 
+              key={rowIndex} 
+              className="grid gap-2" 
+              style={{ gridTemplateColumns: `repeat(${row.length}, minmax(0, 1fr))` }}
+            >
+              {row.map(renderSlot)}
+            </div>
+          ))}
+        </div>
+      );
+    }
+    
+    // Fallback to hardcoded layouts for backwards compatibility
+    if (chassisTypeCode === 'LTX' && totalSlots === 14) {
       // LTX with 14 slots: Top row slots 8-14 (7 slots), Bottom row CPU (0) + slots 1-7 (8 slots)
       const topRowSlots = [8, 9, 10, 11, 12, 13, 14];
       const bottomRowSlots = [0, 1, 2, 3, 4, 5, 6, 7];
@@ -205,7 +227,7 @@ return (
           </div>
         </div>
       );
-    } else if (chassisType === 'MTX' && totalSlots === 7) {
+    } else if (chassisTypeCode === 'MTX' && totalSlots === 7) {
       // MTX with 7 slots: Single row CPU (0) + slots 1-7
       const slots = [0, 1, 2, 3, 4, 5, 6, 7];
       return (
@@ -213,7 +235,7 @@ return (
           {slots.map(renderSlot)}
         </div>
       );
-    } else if (chassisType === 'STX' && totalSlots === 4) {
+    } else if (chassisTypeCode === 'STX' && totalSlots === 4) {
       // STX with 4 slots: Single row CPU (0) + slots 1-4
       const slots = [0, 1, 2, 3, 4];
       return (
