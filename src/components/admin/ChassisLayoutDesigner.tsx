@@ -36,7 +36,7 @@ export const ChassisLayoutDesigner: React.FC<ChassisLayoutDesignerProps> = ({
     if (initialLayout && initialLayout.length > 0) {
       return [...initialLayout];
     }
-    return generateDefaultLayout(totalSlots, cpuSlotIndex);
+    return generateDefaultLayout(totalSlots);
   });
   
   const [dragState, setDragState] = useState<DragState>({
@@ -140,7 +140,7 @@ export const ChassisLayoutDesigner: React.FC<ChassisLayoutDesignerProps> = ({
   };
 
   const resetToDefault = () => {
-    setLayout(generateDefaultLayout(totalSlots, cpuSlotIndex));
+    setLayout(generateDefaultLayout(totalSlots));
   };
 
   const getSlotColor = (slot: number) => {

@@ -49,7 +49,7 @@ export const ChassisPreviewModal: React.FC<ChassisPreviewModalProps> = ({
     code: chassisType.code,
     name: chassisType.name,
     totalSlots: chassisType.totalSlots,
-    cpuSlotIndex: chassisType.cpuSlotIndex,
+    
     layoutRows: chassisType.layoutRows,
     enabled: true,
     metadata: {},
