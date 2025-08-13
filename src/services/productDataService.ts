@@ -743,8 +743,8 @@ export class ProductDataService {
         code: data.code,
         name: data.name,
         total_slots: data.totalSlots,
-        cpu_slot_index: data.cpuSlotIndex,
         layout_rows: data.layoutRows,
+        visual_layout: data.visualLayout,
         enabled: data.enabled,
         metadata: data.metadata || {}
       })
@@ -761,8 +761,8 @@ export class ProductDataService {
       code: result.code,
       name: result.name,
       totalSlots: result.total_slots,
-      cpuSlotIndex: result.cpu_slot_index,
       layoutRows: result.layout_rows,
+      visualLayout: result.visual_layout,
       enabled: result.enabled,
       metadata: result.metadata || {},
       createdAt: result.created_at,
@@ -775,8 +775,8 @@ export class ProductDataService {
     if (updates.code !== undefined) updateData.code = updates.code;
     if (updates.name !== undefined) updateData.name = updates.name;
     if (updates.totalSlots !== undefined) updateData.total_slots = updates.totalSlots;
-    if (updates.cpuSlotIndex !== undefined) updateData.cpu_slot_index = updates.cpuSlotIndex;
     if (updates.layoutRows !== undefined) updateData.layout_rows = updates.layoutRows;
+    if (updates.visualLayout !== undefined) updateData.visual_layout = updates.visualLayout;
     if (updates.enabled !== undefined) updateData.enabled = updates.enabled;
     if (updates.metadata !== undefined) updateData.metadata = updates.metadata;
 
@@ -797,8 +797,8 @@ export class ProductDataService {
       code: data.code,
       name: data.name,
       totalSlots: data.total_slots,
-      cpuSlotIndex: data.cpu_slot_index,
       layoutRows: data.layout_rows,
+      visualLayout: data.visual_layout,
       enabled: data.enabled,
       metadata: data.metadata || {},
       createdAt: data.created_at,

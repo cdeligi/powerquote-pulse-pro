@@ -7,16 +7,23 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Edit3, Trash2, Save, X, Plus, AlertCircle, Eye } from "lucide-react";
-import { ChassisType, ChassisTypeFormData, validateLayoutRows, generateDefaultLayout } from "@/types/product/chassis-types";
+import { Edit3, Trash2, Save, X, Plus, Eye } from "lucide-react";
+import { 
+  ChassisType, 
+  ChassisTypeFormData, 
+  ChassisVisualLayout,
+  validateLayoutRows, 
+  validateVisualLayout,
+  generateDefaultLayout,
+  generateDefaultVisualLayout
+} from "@/types/product/chassis-types";
 import { productDataService } from "@/services/productDataService";
 import { useToast } from "@/hooks/use-toast";
-import { ChassisLayoutDesigner } from "./ChassisLayoutDesigner";
+import { EnhancedChassisLayoutDesigner } from "./EnhancedChassisLayoutDesigner";
 import { ChassisPreviewModal } from "./ChassisPreviewModal";
 
 export const ChassisTypeManager: React.FC = () => {
@@ -28,8 +35,9 @@ export const ChassisTypeManager: React.FC = () => {
   const [createFormData, setCreateFormData] = useState<ChassisTypeFormData>({
     code: '',
     name: '',
-    totalSlots: 0,
-    cpuSlotIndex: 0,
+    totalSlots: 8,
+    layoutRows: null,
+    visualLayout: null,
     enabled: true,
     metadata: {}
   });
@@ -62,7 +70,12 @@ export const ChassisTypeManager: React.FC = () => {
     try {
       // Auto-generate layout if not provided
       if (!createFormData.layoutRows && createFormData.totalSlots > 0) {
-        createFormData.layoutRows = generateDefaultLayout(createFormData.totalSlots, createFormData.cpuSlotIndex);
+        createFormData.layoutRows = generateDefaultLayout(createFormData.totalSlots);
+      }
+      
+      // Auto-generate visual layout if not provided
+      if (!createFormData.visualLayout && createFormData.totalSlots > 0) {
+        createFormData.visualLayout = generateDefaultVisualLayout(createFormData.totalSlots);
       }
 
       await productDataService.createChassisType(createFormData);
@@ -74,8 +87,9 @@ export const ChassisTypeManager: React.FC = () => {
       setCreateFormData({
         code: '',
         name: '',
-        totalSlots: 0,
-        cpuSlotIndex: 0,
+        totalSlots: 8,
+        layoutRows: null,
+        visualLayout: null,
         enabled: true,
         metadata: {}
       });
@@ -96,8 +110,8 @@ export const ChassisTypeManager: React.FC = () => {
       code: chassisType.code,
       name: chassisType.name,
       totalSlots: chassisType.totalSlots,
-      cpuSlotIndex: chassisType.cpuSlotIndex,
       layoutRows: chassisType.layoutRows,
+      visualLayout: chassisType.visualLayout,
       enabled: chassisType.enabled,
       metadata: chassisType.metadata
     });
@@ -231,29 +245,16 @@ export const ChassisTypeManager: React.FC = () => {
                           />
                         </div>
                       </div>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <Label htmlFor="create-slots">Total Slots *</Label>
-                          <Input
-                            id="create-slots"
-                            type="number"
-                            min="0"
-                            value={createFormData.totalSlots}
-                            onChange={(e) => setCreateFormData(prev => ({ ...prev, totalSlots: parseInt(e.target.value) || 0 }))}
-                            required
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor="create-cpu">CPU Slot Index</Label>
-                          <Input
-                            id="create-cpu"
-                            type="number"
-                            min="0"
-                            max={createFormData.totalSlots}
-                            value={createFormData.cpuSlotIndex}
-                            onChange={(e) => setCreateFormData(prev => ({ ...prev, cpuSlotIndex: parseInt(e.target.value) || 0 }))}
-                          />
-                        </div>
+                      <div>
+                        <Label htmlFor="create-slots">Total Slots *</Label>
+                        <Input
+                          id="create-slots"
+                          type="number"
+                          min="1"
+                          value={createFormData.totalSlots}
+                          onChange={(e) => setCreateFormData(prev => ({ ...prev, totalSlots: parseInt(e.target.value) || 0 }))}
+                          required
+                        />
                       </div>
                       <div className="flex items-center space-x-2">
                         <Switch
@@ -267,18 +268,19 @@ export const ChassisTypeManager: React.FC = () => {
                     
                     <TabsContent value="layout" className="mt-4">
                       {createFormData.totalSlots > 0 ? (
-                        <ChassisLayoutDesigner
+                        <EnhancedChassisLayoutDesigner
                           totalSlots={createFormData.totalSlots}
-                          cpuSlotIndex={createFormData.cpuSlotIndex}
                           initialLayout={createFormData.layoutRows}
+                          initialVisualLayout={createFormData.visualLayout}
                           onLayoutChange={(layout) => setCreateFormData(prev => ({ ...prev, layoutRows: layout }))}
-                          onPreview={() => {
+                          onVisualLayoutChange={(visualLayout) => setCreateFormData(prev => ({ ...prev, visualLayout }))}
+                          onPreview={(layout, visualLayout) => {
                             setPreviewData({
                               code: createFormData.code || 'Preview',
                               name: createFormData.name || 'Preview Chassis',
                               totalSlots: createFormData.totalSlots,
-                              cpuSlotIndex: createFormData.cpuSlotIndex,
-                              layoutRows: createFormData.layoutRows
+                              layoutRows: layout,
+                              visualLayout: visualLayout
                             });
                             setShowPreview(true);
                           }}
@@ -345,26 +347,14 @@ export const ChassisTypeManager: React.FC = () => {
                               />
                             </div>
                           </div>
-                          <div className="grid grid-cols-2 gap-4">
-                            <div>
-                              <Label>Total Slots *</Label>
-                              <Input
-                                type="number"
-                                min="0"
-                                value={editFormData.totalSlots || 0}
-                                onChange={(e) => setEditFormData(prev => ({ ...prev, totalSlots: parseInt(e.target.value) || 0 }))}
-                              />
-                            </div>
-                            <div>
-                              <Label>CPU Slot Index</Label>
-                              <Input
-                                type="number"
-                                min="0"
-                                max={editFormData.totalSlots || 0}
-                                value={editFormData.cpuSlotIndex || 0}
-                                onChange={(e) => setEditFormData(prev => ({ ...prev, cpuSlotIndex: parseInt(e.target.value) || 0 }))}
-                              />
-                            </div>
+                          <div>
+                            <Label>Total Slots *</Label>
+                            <Input
+                              type="number"
+                              min="1"
+                              value={editFormData.totalSlots || 0}
+                              onChange={(e) => setEditFormData(prev => ({ ...prev, totalSlots: parseInt(e.target.value) || 0 }))}
+                            />
                           </div>
                           <div className="flex items-center space-x-2">
                             <Switch
@@ -377,18 +367,19 @@ export const ChassisTypeManager: React.FC = () => {
                         
                         <TabsContent value="layout" className="mt-4">
                           {(editFormData.totalSlots || 0) > 0 ? (
-                            <ChassisLayoutDesigner
+                            <EnhancedChassisLayoutDesigner
                               totalSlots={editFormData.totalSlots!}
-                              cpuSlotIndex={editFormData.cpuSlotIndex || 0}
                               initialLayout={editFormData.layoutRows}
+                              initialVisualLayout={editFormData.visualLayout}
                               onLayoutChange={(layout) => setEditFormData(prev => ({ ...prev, layoutRows: layout }))}
-                              onPreview={() => {
+                              onVisualLayoutChange={(visualLayout) => setEditFormData(prev => ({ ...prev, visualLayout }))}
+                              onPreview={(layout, visualLayout) => {
                                 setPreviewData({
                                   code: editFormData.code || 'Preview',
                                   name: editFormData.name || 'Preview Chassis',
                                   totalSlots: editFormData.totalSlots!,
-                                  cpuSlotIndex: editFormData.cpuSlotIndex || 0,
-                                  layoutRows: editFormData.layoutRows
+                                  layoutRows: layout,
+                                  visualLayout: visualLayout
                                 });
                                 setShowPreview(true);
                               }}
@@ -414,65 +405,58 @@ export const ChassisTypeManager: React.FC = () => {
                     </div>
                   ) : (
                     <div>
-                      <div className="flex justify-between items-start mb-3">
-                        <div className="flex-1">
-                          <h4 className="font-medium text-lg flex items-center gap-2">
-                            {chassisType.name}
-                            <Badge variant="outline">{chassisType.code}</Badge>
-                          </h4>
-                          <div className="flex items-center space-x-4 mt-2 text-sm text-muted-foreground">
-                            <span>Slots: {chassisType.totalSlots}</span>
-                            <span>CPU: Slot {chassisType.cpuSlotIndex}</span>
+                      <div className="flex justify-between items-start mb-4">
+                        <div>
+                          <div className="flex items-center gap-2 mb-2">
+                            <h3 className="text-lg font-semibold">{chassisType.name}</h3>
                             <Badge variant={chassisType.enabled ? "default" : "secondary"}>
                               {chassisType.enabled ? 'Enabled' : 'Disabled'}
                             </Badge>
                           </div>
+                          <div className="text-sm text-muted-foreground space-y-1">
+                            <p><strong>Code:</strong> {chassisType.code}</p>
+                            <p><strong>Total Slots:</strong> {chassisType.totalSlots}</p>
+                            <p><strong>Created:</strong> {new Date(chassisType.createdAt).toLocaleDateString()}</p>
+                          </div>
                         </div>
+                        
                         <div className="flex space-x-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setPreviewData(chassisType);
+                              setShowPreview(true);
+                            }}
+                          >
+                            <Eye className="h-4 w-4 mr-2" />
+                            Preview
+                          </Button>
                           <Button
                             variant="outline"
                             size="sm"
                             onClick={() => handleEditStart(chassisType)}
                           >
-                            <Edit3 className="h-4 w-4" />
+                            <Edit3 className="h-4 w-4 mr-2" />
+                            Edit
                           </Button>
                           <Button
-                            variant="outline"
+                            variant="destructive"
                             size="sm"
                             onClick={() => handleDelete(chassisType.id, chassisType.name)}
-                            className="hover:bg-destructive/10"
                           >
-                            <Trash2 className="h-4 w-4" />
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Delete
                           </Button>
                         </div>
                       </div>
-                      <div className="grid grid-cols-2 gap-4 mt-4">
-                        <div>
-                          <span className="text-sm text-muted-foreground">Layout Preview:</span>
-                          <div className="mt-1 space-y-2">
+                      
+                      <div className="mt-4 pt-4 border-t">
+                        <div className="text-sm">
+                          <span className="font-medium">Layout Preview:</span>
+                          <div className="mt-2">
                             {renderLayoutPreview(chassisType.layoutRows)}
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => {
-                                setPreviewData({
-                                  code: chassisType.code,
-                                  name: chassisType.name,
-                                  totalSlots: chassisType.totalSlots,
-                                  cpuSlotIndex: chassisType.cpuSlotIndex,
-                                  layoutRows: chassisType.layoutRows
-                                });
-                                setShowPreview(true);
-                              }}
-                            >
-                              <Eye className="h-3 w-3 mr-1" />
-                              Preview Layout
-                            </Button>
                           </div>
-                        </div>
-                        <div>
-                          <span className="text-sm text-muted-foreground">Created:</span>
-                          <div className="text-sm">{new Date(chassisType.createdAt).toLocaleDateString()}</div>
                         </div>
                       </div>
                     </div>
@@ -483,14 +467,12 @@ export const ChassisTypeManager: React.FC = () => {
           </div>
         </CardContent>
       </Card>
-      
-      {previewData && (
-        <ChassisPreviewModal
-          open={showPreview}
-          onOpenChange={setShowPreview}
-          chassisType={previewData}
-        />
-      )}
+
+      <ChassisPreviewModal
+        open={showPreview}
+        onOpenChange={setShowPreview}
+        chassisType={previewData}
+      />
     </div>
   );
 };
