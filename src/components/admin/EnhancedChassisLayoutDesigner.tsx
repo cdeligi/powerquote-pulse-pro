@@ -176,7 +176,7 @@ export const EnhancedChassisLayoutDesigner: React.FC<EnhancedChassisLayoutDesign
       fabricCanvas.add(group);
     });
     
-    setSlotGroups(newSlotGroups);
+    // Store slot groups for reference
     fabricCanvas.renderAll();
   }, [fabricCanvas, visualLayout, gridVisible]);
 
@@ -572,11 +572,7 @@ export const EnhancedChassisLayoutDesigner: React.FC<EnhancedChassisLayoutDesign
                   className="bg-background focus:outline-none focus:ring-2 focus:ring-primary"
                   tabIndex={0}
                 />
-                <CanvasKeyboardHandler
-                  fabricCanvas={fabricCanvas}
-                  onDeleteSlot={deleteSlotFromCanvas}
-                  onObjectModified={handleCanvasObjectModified}
-                />
+                {/* Keyboard handling is done through canvas event listeners */}
               </div>
               
               <div className="text-sm text-muted-foreground space-y-1">
