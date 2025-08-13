@@ -12,7 +12,6 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface ChassisLayoutDesignerProps {
   totalSlots: number;
-  cpuSlotIndex: number;
   initialLayout?: number[][] | null;
   onLayoutChange: (layout: number[][]) => void;
   onPreview?: () => void;
@@ -27,7 +26,6 @@ interface DragState {
 
 export const ChassisLayoutDesigner: React.FC<ChassisLayoutDesignerProps> = ({
   totalSlots,
-  cpuSlotIndex,
   initialLayout,
   onLayoutChange,
   onPreview
@@ -56,7 +54,7 @@ export const ChassisLayoutDesigner: React.FC<ChassisLayoutDesignerProps> = ({
       const missing = [];
       const duplicates = [];
       
-      for (let i = 0; i <= totalSlots; i++) {
+      for (let i = 0; i < totalSlots; i++) {
         const count = allSlots.filter(slot => slot === i).length;
         if (count === 0) missing.push(i);
         if (count > 1) duplicates.push(i);
@@ -144,30 +142,24 @@ export const ChassisLayoutDesigner: React.FC<ChassisLayoutDesignerProps> = ({
   };
 
   const getSlotColor = (slot: number) => {
-    if (slot === cpuSlotIndex) return 'bg-blue-600 text-white';
-    if (dragState.draggedSlot === slot) return 'bg-yellow-600 text-white opacity-50';
-    return 'bg-gray-700 text-white hover:bg-gray-600';
+    if (dragState.draggedSlot === slot) return 'bg-accent/50 text-accent-foreground opacity-50';
+    return 'bg-secondary text-secondary-foreground hover:bg-secondary/80';
   };
 
   const renderSlot = (slot: number, rowIndex: number, slotIndex: number) => (
     <div
       key={`${rowIndex}-${slotIndex}-${slot}`}
       className={`
-        relative h-10 min-w-[40px] border border-gray-500 rounded flex items-center justify-center 
+        relative h-10 min-w-[40px] border border-border rounded flex items-center justify-center 
         text-sm font-medium cursor-move transition-all select-none
         ${getSlotColor(slot)}
         ${dragState.isDragging ? 'pointer-events-none' : ''}
       `}
       draggable
       onDragStart={() => handleDragStart(slot, rowIndex, slotIndex)}
-      title={slot === cpuSlotIndex ? `Slot ${slot} (CPU)` : `Slot ${slot}`}
+      title={`Slot ${slot}`}
     >
       {slot}
-      {slot === cpuSlotIndex && (
-        <Badge variant="secondary" className="absolute -top-2 -right-2 text-xs h-4">
-          CPU
-        </Badge>
-      )}
     </div>
   );
 
@@ -176,7 +168,7 @@ export const ChassisLayoutDesigner: React.FC<ChassisLayoutDesignerProps> = ({
       key={`drop-${rowIndex}-${slotIndex}`}
       className={`
         w-2 h-10 border-2 border-dashed border-transparent rounded
-        ${dragState.isDragging ? 'border-blue-400 bg-blue-100' : ''}
+        ${dragState.isDragging ? 'border-primary bg-primary/10' : ''}
       `}
       onDragOver={handleDragOver}
       onDrop={() => handleDropBetweenSlots(rowIndex, slotIndex)}
@@ -189,7 +181,7 @@ export const ChassisLayoutDesigner: React.FC<ChassisLayoutDesignerProps> = ({
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center gap-2">
             Layout Designer
-            <Badge variant="outline">{totalSlots + 1} slots total</Badge>
+            <Badge variant="outline">{totalSlots} slots total</Badge>
           </CardTitle>
           <div className="flex gap-2">
             {onPreview && (
@@ -214,7 +206,7 @@ export const ChassisLayoutDesigner: React.FC<ChassisLayoutDesignerProps> = ({
         )}
 
         <div className="text-sm text-muted-foreground">
-          Drag slots between rows to create your custom layout. CPU slot ({cpuSlotIndex}) is highlighted in blue.
+          Drag slots between rows to create your custom layout. All slots are equal and configurable.
         </div>
 
         <div ref={dragRef} className="space-y-3 p-4 border-2 border-dashed border-gray-300 rounded-lg">
@@ -239,7 +231,7 @@ export const ChassisLayoutDesigner: React.FC<ChassisLayoutDesignerProps> = ({
               <div
                 className={`
                   flex items-center gap-1 p-2 border rounded min-h-[56px]
-                  ${dragState.isDragging ? 'border-blue-400 bg-blue-50' : 'border-gray-300'}
+                  ${dragState.isDragging ? 'border-primary bg-primary/5' : 'border-border'}
                 `}
                 onDragOver={handleDragOver}
                 onDrop={() => handleDrop(rowIndex)}
@@ -254,7 +246,7 @@ export const ChassisLayoutDesigner: React.FC<ChassisLayoutDesignerProps> = ({
                 ))}
                 
                 {row.length === 0 && (
-                  <div className="text-gray-400 text-sm italic p-2">
+                  <div className="text-muted-foreground text-sm italic p-2">
                     Drop slots here
                   </div>
                 )}
@@ -275,8 +267,8 @@ export const ChassisLayoutDesigner: React.FC<ChassisLayoutDesignerProps> = ({
           <ul className="list-disc list-inside space-y-1 mt-1">
             <li>Drag slots between rows to rearrange the layout</li>
             <li>Add new rows for multi-row chassis designs</li>
-            <li>All slots (0-{totalSlots}) must be placed exactly once</li>
-            <li>CPU slot ({cpuSlotIndex}) is automatically highlighted</li>
+            <li>All slots (0-{totalSlots - 1}) must be placed exactly once</li>
+            <li>Slots can be freely rearranged to create custom layouts</li>
           </ul>
         </div>
       </CardContent>
