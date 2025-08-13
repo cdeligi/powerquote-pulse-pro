@@ -19,7 +19,6 @@ import {
   generateDefaultLayout, 
   generateDefaultVisualLayout 
 } from "@/types/product/chassis-types";
-import { CanvasKeyboardHandler } from "./CanvasKeyboardHandler";
 
 interface EnhancedChassisLayoutDesignerProps {
   totalSlots: number;
@@ -64,7 +63,7 @@ export const EnhancedChassisLayoutDesigner: React.FC<EnhancedChassisLayoutDesign
   const [fabricCanvas, setFabricCanvas] = useState<FabricCanvas | null>(null);
   const [selectedTool, setSelectedTool] = useState<'select' | 'draw'>('select');
   const [gridVisible, setGridVisible] = useState(true);
-  const [slotGroups, setSlotGroups] = useState<Map<number, Group>>(new Map());
+  const rendererRef = useRef<any>(null);
   
   // Grid designer state
   const [dragState, setDragState] = useState<DragState>({
@@ -83,65 +82,25 @@ export const EnhancedChassisLayoutDesigner: React.FC<EnhancedChassisLayoutDesign
     const canvas = new FabricCanvas(canvasRef.current, {
       width: CANVAS_WIDTH,
       height: CANVAS_HEIGHT,
-      backgroundColor: '#ffffff',
+      backgroundColor: '#f8f9fa',
       selection: selectedTool === 'select'
     });
 
+    console.log('Canvas initialized:', canvas);
     setFabricCanvas(canvas);
     
     // Setup canvas event handlers
     canvas.on('object:modified', handleCanvasObjectModified);
     canvas.on('mouse:down', handleCanvasMouseDown);
 
-    // Add keyboard support
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (!canvas) return;
-      
-      const activeObject = canvas.getActiveObject();
-      if (!activeObject) return;
-      
-      // Delete key to remove slot
-      if (e.key === 'Delete' || e.key === 'Backspace') {
-        const slotNumber = activeObject.get('slotNumber');
-        if (typeof slotNumber === 'number') {
-          deleteSlotFromCanvas(slotNumber);
-          canvas.remove(activeObject);
-          canvas.renderAll();
-        }
-      }
-      
-      // Arrow keys for precise movement
-      const step = e.shiftKey ? 10 : 1;
-      switch (e.key) {
-        case 'ArrowLeft':
-          activeObject.set('left', (activeObject.left || 0) - step);
-          break;
-        case 'ArrowRight':
-          activeObject.set('left', (activeObject.left || 0) + step);
-          break;
-        case 'ArrowUp':
-          activeObject.set('top', (activeObject.top || 0) - step);
-          break;
-        case 'ArrowDown':
-          activeObject.set('top', (activeObject.top || 0) + step);
-          break;
-        default:
-          return;
-      }
-      
-      if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) {
-        e.preventDefault();
-        canvas.renderAll();
-        // Trigger the modified event manually
-        handleCanvasObjectModified({ target: activeObject });
-      }
-    };
-
-    // Add event listener when canvas is focused
-    document.addEventListener('keydown', handleKeyDown);
+    // Make canvas focusable for keyboard events
+    const canvasElement = canvas.getElement();
+    if (canvasElement) {
+      canvasElement.tabIndex = 0;
+      canvasElement.style.outline = 'none';
+    }
 
     return () => {
-      document.removeEventListener('keydown', handleKeyDown);
       canvas.dispose();
     };
   }, []);
