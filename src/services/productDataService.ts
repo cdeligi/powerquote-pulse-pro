@@ -11,7 +11,7 @@ import {
 import { ChassisType, ChassisTypeFormData } from "@/types/product/chassis-types";
 import { supabase } from "@/integrations/supabase/client";
 
-class ProductDataService {
+export class ProductDataService {
   private initialized: boolean = false;
 
   constructor() {
@@ -986,9 +986,8 @@ class ProductDataService {
   }
 }
 
-// Export singleton instance and class
+// Export singleton instance
 export const productDataService = new ProductDataService();
-export { ProductDataService };
 
 // Expose debug info for development
 if (typeof window !== 'undefined') {
