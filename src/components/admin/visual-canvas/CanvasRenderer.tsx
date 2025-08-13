@@ -152,7 +152,7 @@ export class CanvasRenderer {
     }
 
     // Send grid to back
-    this.gridLines.forEach(line => this.canvas.sendToBack(line));
+    this.gridLines.forEach(line => this.canvas.sendObjectToBack(line));
     this.canvas.renderAll();
   }
 
