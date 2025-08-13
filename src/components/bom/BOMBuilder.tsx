@@ -84,19 +84,6 @@ const colorByProductId = useMemo(() => {
   return map;
 }, [codeMap]);
 
-// Configured CPU tile color (std position 0)
-const cpuColor = useMemo(() => {
-  const entry = Object.entries(codeMap).find(([, def]) => def?.standard_position === 0 && !!def?.color);
-  return (entry?.[1]?.color as string) || undefined;
-}, [codeMap]);
-
-// CPU label from admin L3 (standard_position 0)
-const cpuLabel = useMemo(() => {
-  const entry = Object.entries(codeMap).find(([, def]) => def?.standard_position === 0);
-  if (!entry) return undefined;
-  const l3 = level3Products.find(p => p.id === entry[0]);
-  return l3?.name;
-}, [codeMap, level3Products]);
 
 // Accessories list from admin config (outside_chassis)
 const accessories = useMemo(() => {
@@ -826,8 +813,6 @@ const handleAddChassisAndCardsToBOM = () => {
   onRemoteDisplayToggle={handleRemoteDisplayToggle}
   standardSlotHints={standardSlotHints}
   colorByProductId={colorByProductId}
-  cpuColor={cpuColor}
-  cpuLabel={cpuLabel}
   accessories={accessories}
   onAccessoryToggle={toggleAccessory}
   partNumber={buildQTMSPartNumber({ chassis: configuringChassis, slotAssignments, hasRemoteDisplay, pnConfig, codeMap, includeSuffix: false })}
@@ -911,8 +896,6 @@ const handleAddChassisAndCardsToBOM = () => {
   onRemoteDisplayToggle={handleRemoteDisplayToggle}
   standardSlotHints={standardSlotHints}
   colorByProductId={colorByProductId}
-  cpuColor={cpuColor}
-  cpuLabel={cpuLabel}
   accessories={accessories}
   onAccessoryToggle={toggleAccessory}
   partNumber={buildQTMSPartNumber({ chassis: selectedChassis, slotAssignments, hasRemoteDisplay, pnConfig, codeMap, includeSuffix: false })}
