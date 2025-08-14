@@ -7,7 +7,7 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instanciate createClient with right options
+  // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
     PostgrestVersion: "12.2.3 (519615d)"
@@ -1291,31 +1291,31 @@ export type Database = {
     Functions: {
       admin_create_user: {
         Args: {
+          p_department?: string
           p_email: string
-          p_password: string
           p_first_name: string
           p_last_name: string
+          p_password: string
           p_role: string
-          p_department?: string
         }
         Returns: Json
       }
       admin_list_users: {
         Args: Record<PropertyKey, never>
         Returns: {
-          id: string
+          created_at: string
+          department: string
           email: string
           first_name: string
+          id: string
           last_name: string
           role: string
-          department: string
-          user_status: string
-          created_at: string
           updated_at: string
+          user_status: string
         }[]
       }
       admin_update_user_status: {
-        Args: { p_user_id: string; p_status: string }
+        Args: { p_status: string; p_user_id: string }
         Returns: Json
       }
       array_all_positive: {
@@ -1328,12 +1328,12 @@ export type Database = {
       }
       create_user: {
         Args: {
+          department: string
           email: string
-          password: string
           first_name: string
           last_name: string
+          password: string
           role: string
-          department: string
         }
         Returns: string
       }
@@ -1348,114 +1348,114 @@ export type Database = {
       get_dga_products: {
         Args: Record<PropertyKey, never>
         Returns: {
-          id: string
-          name: string
-          description: string
-          price: number
-          cost: number
-          enabled: boolean
           category: string
-          subcategory: string
+          cost: number
+          description: string
+          enabled: boolean
+          id: string
+          image_url: string
+          name: string
           parent_product_id: string
           part_number: string
-          image_url: string
+          price: number
           product_info_url: string
           specifications: Json
+          subcategory: string
         }[]
       }
       get_level1_products_with_asset_types: {
         Args: Record<PropertyKey, never>
         Returns: {
-          id: string
-          name: string
-          description: string
-          price: number
-          cost: number
-          enabled: boolean
-          category: string
-          subcategory: string
-          part_number: string
-          image_url: string
-          product_info_url: string
-          specifications: Json
           asset_type_id: string
           asset_type_name: string
+          category: string
+          cost: number
+          description: string
+          enabled: boolean
+          id: string
+          image_url: string
+          name: string
+          part_number: string
+          price: number
+          product_info_url: string
+          specifications: Json
+          subcategory: string
         }[]
       }
       get_level2_products_by_parent: {
         Args: { parent_id: string }
         Returns: {
-          id: string
-          name: string
-          description: string
-          price: number
-          cost: number
-          enabled: boolean
           category: string
-          subcategory: string
+          chassis_type: string
+          cost: number
+          description: string
+          enabled: boolean
+          id: string
+          image_url: string
+          name: string
           parent_product_id: string
           part_number: string
-          image_url: string
+          price: number
           product_info_url: string
           specifications: Json
-          chassis_type: string
+          subcategory: string
         }[]
       }
       get_level2_products_for_category: {
         Args: { category_filter: string }
         Returns: {
-          id: string
-          name: string
-          description: string
-          price: number
-          cost: number
-          enabled: boolean
           category: string
-          subcategory: string
+          chassis_type: string
+          cost: number
+          description: string
+          enabled: boolean
+          id: string
+          image_url: string
+          name: string
           parent_product_id: string
           part_number: string
-          image_url: string
+          price: number
           product_info_url: string
           specifications: Json
-          chassis_type: string
+          subcategory: string
         }[]
       }
       get_pd_products: {
         Args: Record<PropertyKey, never>
         Returns: {
-          id: string
-          name: string
-          description: string
-          price: number
-          cost: number
-          enabled: boolean
           category: string
-          subcategory: string
+          cost: number
+          description: string
+          enabled: boolean
+          id: string
+          image_url: string
+          name: string
           parent_product_id: string
           part_number: string
-          image_url: string
+          price: number
           product_info_url: string
           specifications: Json
+          subcategory: string
         }[]
       }
       get_products_by_level: {
         Args: { level_filter: number }
         Returns: {
-          id: string
-          name: string
-          description: string
-          price: number
-          cost: number
-          enabled: boolean
           category: string
-          subcategory: string
+          chassis_type: string
+          cost: number
+          description: string
+          enabled: boolean
+          id: string
+          image_url: string
+          name: string
           parent_product_id: string
           part_number: string
-          image_url: string
+          price: number
           product_info_url: string
-          specifications: Json
           slot_requirement: number
-          chassis_type: string
+          specifications: Json
+          subcategory: string
         }[]
       }
       get_user_role: {
@@ -1473,46 +1473,46 @@ export type Database = {
       log_security_event: {
         Args:
           | {
-              p_user_id: string
               p_action: string
               p_details: string
               p_ip_address: string
-              p_user_agent: string
               p_severity?: string
+              p_user_agent: string
+              p_user_id: string
             }
           | {
-              p_user_id: string
               p_action: string
               p_details?: Json
               p_ip_address?: string
-              p_user_agent?: string
               p_severity?: string
+              p_user_agent?: string
+              p_user_id: string
             }
         Returns: undefined
       }
       log_user_security_event: {
         Args: {
-          p_user_id: string
           p_action: string
           p_details: string
           p_ip_address: string
-          p_user_agent: string
           p_severity?: string
+          p_user_agent: string
+          p_user_id: string
         }
         Returns: undefined
       }
       revoke_user_access: {
-        Args: { p_target_user_id: string; p_reason?: string }
+        Args: { p_reason?: string; p_target_user_id: string }
         Returns: boolean
       }
       track_user_session: {
         Args: {
-          p_user_id: string
-          p_session_token: string
-          p_ip_address?: string
-          p_user_agent?: string
           p_device_info?: Json
+          p_ip_address?: string
           p_location_data?: Json
+          p_session_token: string
+          p_user_agent?: string
+          p_user_id: string
         }
         Returns: string
       }
@@ -1526,10 +1526,10 @@ export type Database = {
       }
       update_user_login: {
         Args: {
-          p_user_id: string
-          p_success: boolean
           p_ip_address?: string
+          p_success: boolean
           p_user_agent?: string
+          p_user_id: string
         }
         Returns: string
       }
