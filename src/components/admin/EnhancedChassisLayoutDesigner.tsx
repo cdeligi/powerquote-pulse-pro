@@ -24,6 +24,7 @@ import { FixedCanvasRenderer } from "./visual-canvas/FixedCanvasRenderer";
 import { FixedCanvasEventHandler } from "./visual-canvas/FixedCanvasEventHandler";
 import { CanvasToolbar } from "./visual-canvas/CanvasToolbar";
 import { CanvasInstructions } from "./visual-canvas/CanvasInstructions";
+import { getCanvasHTMLElement } from './visual-canvas/canvasDom';
 
 interface EnhancedChassisLayoutDesignerProps {
   totalSlots: number;
@@ -105,7 +106,7 @@ export const EnhancedChassisLayoutDesigner: React.FC<EnhancedChassisLayoutDesign
     });
 
     // Configure canvas element properties for proper interaction
-    const canvasElement = canvas.getElement();
+    const canvasElement = getCanvasHTMLElement(canvas);
     if (canvasElement) {
       canvasElement.tabIndex = 0; // Make focusable
       canvasElement.style.outline = 'none';

@@ -4,6 +4,7 @@
 
 import { Canvas as FabricCanvas, Rect, FabricText, Line, Group, FabricImage } from 'fabric';
 import { VisualSlotLayout } from "@/types/product/chassis-types";
+import { getCanvasHTMLElement } from './canvasDom';
 
 const GRID_SIZE = 20;
 
@@ -384,7 +385,7 @@ export class FixedCanvasRenderer {
 
   // Enhanced canvas focus with improved accessibility and interaction
   focusCanvas(): void {
-    const canvasElement = this.canvas.getElement();
+    const canvasElement = getCanvasHTMLElement(this.canvas);
     if (canvasElement) {
       // Ensure element is focusable
       if (!canvasElement.hasAttribute('tabindex')) {
