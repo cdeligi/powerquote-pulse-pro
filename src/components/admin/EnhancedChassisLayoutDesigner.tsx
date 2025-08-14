@@ -138,31 +138,71 @@ export const EnhancedChassisLayoutDesigner: React.FC<EnhancedChassisLayoutDesign
     };
   }, [debugMode]);
 
-  // Render slots when layout changes with proper error handling
+  // Enhanced slot rendering with comprehensive debugging and immediate feedback
   useEffect(() => {
     if (!fabricCanvas || !rendererRef.current) {
       console.log('Canvas or renderer not ready for slot rendering');
       return;
     }
     
-    console.log('Updating canvas with new layout:', {
+    console.log('=== CANVAS RENDER TRIGGER ===');
+    console.log('Canvas state:', {
       slotsCount: visualLayout.slots.length,
+      slots: visualLayout.slots,
       gridVisible,
       canvasReady: !!fabricCanvas,
-      rendererReady: !!rendererRef.current
+      rendererReady: !!rendererRef.current,
+      canvasSize: { width: fabricCanvas.width, height: fabricCanvas.height },
+      canvasObjects: fabricCanvas.getObjects().length
     });
 
-    // Use async rendering for better performance with error handling
-    rendererRef.current.renderSlots(visualLayout.slots)
-      .then(() => {
-        if (rendererRef.current) {
-          rendererRef.current.drawGrid(gridVisible);
-          console.log('Canvas slots and grid rendered successfully');
+    // Force render with comprehensive error handling
+    const renderWithFeedback = async () => {
+      try {
+        console.log('Starting slot rendering...');
+        
+        // First render slots
+        await rendererRef.current!.renderSlots(visualLayout.slots);
+        console.log('Slots rendered, now rendering grid...');
+        
+        // Then render grid
+        rendererRef.current!.drawGrid(gridVisible);
+        console.log('Grid rendered');
+        
+        // Force canvas update
+        fabricCanvas.requestRenderAll();
+        console.log('Canvas render requested');
+        
+        // Verify results
+        const objects = fabricCanvas.getObjects();
+        const slotObjects = objects.filter(obj => obj.get('type') === 'slot');
+        const gridObjects = objects.filter(obj => obj.get('excludeFromExport') === true);
+        
+        console.log('Render verification:', {
+          totalObjects: objects.length,
+          slotObjects: slotObjects.length,
+          gridObjects: gridObjects.length,
+          expectedSlots: visualLayout.slots.length
+        });
+        
+        // Show success feedback
+        if (slotObjects.length > 0) {
+          toast.success(`Canvas updated: ${slotObjects.length} slots visible`);
+        } else if (visualLayout.slots.length > 0) {
+          toast.error('Slots not visible on canvas - rendering failed');
         }
-      })
-      .catch((error) => {
-        console.error('Error rendering canvas slots:', error);
-      });
+        
+      } catch (error) {
+        console.error('=== CANVAS RENDER ERROR ===', error);
+        toast.error('Failed to render canvas: ' + error.message);
+      }
+    };
+
+    // Execute render with timing for better reliability
+    requestAnimationFrame(() => {
+      setTimeout(renderWithFeedback, 50);
+    });
+    
   }, [fabricCanvas, visualLayout, gridVisible]);
 
   // Handle visual layout changes from canvas with enhanced logging

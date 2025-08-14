@@ -27,97 +27,109 @@ export class FixedCanvasRenderer {
     }
   }
 
-  // Create slot group with enhanced styling and customization
+  // Create slot group with enhanced styling and immediate visual feedback
   private async createSlotGroup(slot: VisualSlotLayout): Promise<Group> {
-    this.log('Creating slot group for slot:', slot.slotNumber);
+    try {
+      this.log('Creating slot group for slot:', slot.slotNumber, 'at:', slot.x, slot.y, 'size:', slot.width, 'x', slot.height);
 
-    // Create rectangle with enhanced styling
-    const rect = new Rect({
-      left: 0,
-      top: 0,
-      width: slot.width,
-      height: slot.height,
-      fill: 'hsl(var(--card))',
-      stroke: 'hsl(var(--border))',
-      strokeWidth: 2,
-      rx: 8,
-      ry: 8,
-      selectable: false,
-      evented: false
-    });
+      // Create rectangle with visible styling
+      const rect = new Rect({
+        left: 0,
+        top: 0,
+        width: slot.width,
+        height: slot.height,
+        fill: '#ffffff',  // Use solid white background for visibility
+        stroke: '#2563eb', // Use solid blue border for visibility
+        strokeWidth: 2,
+        rx: 8,
+        ry: 8,
+        selectable: false,
+        evented: false
+      });
 
-    // Create text with proper positioning
-    const displayText = (slot as any).name || `Slot ${slot.slotNumber}`;
-    const text = new FabricText(displayText, {
-      left: slot.width / 2,
-      top: slot.height / 2,
-      fontSize: Math.max(10, Math.min(14, slot.width / 8)),
-      fontFamily: 'Inter, system-ui, sans-serif',
-      fontWeight: '500',
-      fill: 'hsl(var(--foreground))',
-      textAlign: 'center',
-      originX: 'center',
-      originY: 'center',
-      selectable: false,
-      evented: false
-    });
+      // Create text with high contrast
+      const displayText = (slot as any).name || `Slot ${slot.slotNumber}`;
+      const text = new FabricText(displayText, {
+        left: slot.width / 2,
+        top: slot.height / 2,
+        fontSize: Math.max(12, Math.min(16, slot.width / 6)),
+        fontFamily: 'Arial, sans-serif',
+        fontWeight: 'bold',
+        fill: '#1f2937', // Dark gray for contrast
+        textAlign: 'center',
+        originX: 'center',
+        originY: 'center',
+        selectable: false,
+        evented: false
+      });
 
-    // Start with base objects
-    const objects: any[] = [rect, text];
+      // Start with base objects
+      const objects: any[] = [rect, text];
 
-    // Add image if provided
-    if (slot.imageUrl) {
-      try {
-        const img = await this.loadSlotImage(slot);
-        if (img) {
-          objects.splice(1, 0, img); // Insert before text
-          // Adjust text position when image is present
-          text.set({
-            top: slot.height * 0.75,
-            fontSize: Math.max(8, Math.min(12, slot.width / 10))
-          });
+      // Add image if provided (simplified for now)
+      if (slot.imageUrl) {
+        try {
+          const img = await this.loadSlotImage(slot);
+          if (img) {
+            objects.splice(1, 0, img); // Insert before text
+            // Adjust text position when image is present
+            text.set({
+              top: slot.height * 0.8,
+              fontSize: Math.max(10, Math.min(14, slot.width / 8))
+            });
+          }
+        } catch (error) {
+          this.log('Failed to load image for slot', slot.slotNumber, error);
+          // Continue without image
         }
-      } catch (error) {
-        this.log('Failed to load image for slot', slot.slotNumber, error);
       }
+
+      // Create group with visible properties
+      const group = new Group(objects, {
+        left: slot.x,
+        top: slot.y,
+        selectable: true,
+        hasControls: true,
+        hasBorders: true,
+        lockRotation: true,
+        borderColor: '#ef4444', // Red border when selected
+        borderScaleFactor: 3,
+        cornerColor: '#ef4444',
+        cornerSize: 10,
+        transparentCorners: false,
+        cornerStyle: 'circle'
+      });
+
+      // Configure controls
+      group.setControlsVisibility({
+        mtr: false, // No rotation
+        ml: true,   // Middle left
+        mr: true,   // Middle right
+        mt: true,   // Middle top
+        mb: true,   // Middle bottom
+        tl: true,   // Top left
+        tr: true,   // Top right
+        bl: true,   // Bottom left
+        br: true    // Bottom right
+      });
+
+      // Store custom properties
+      group.set('slotNumber', slot.slotNumber);
+      group.set('type', 'slot');
+      group.set('slotData', slot);
+
+      this.log('Successfully created slot group:', {
+        slotNumber: group.get('slotNumber'),
+        position: { x: group.left, y: group.top },
+        size: { width: group.width, height: group.height },
+        objectCount: objects.length
+      });
+      
+      return group;
+    } catch (error) {
+      console.error('Error creating slot group for slot', slot.slotNumber, ':', error);
+      throw error;
     }
-
-    // Create group with proper Fabric.js v6 API
-    const group = new Group(objects, {
-      left: slot.x,
-      top: slot.y,
-      selectable: true,
-      hasControls: true,
-      hasBorders: true,
-      lockRotation: true,
-      borderColor: 'hsl(var(--primary))',
-      borderScaleFactor: 2,
-      cornerColor: 'hsl(var(--primary))',
-      cornerSize: 8,
-      transparentCorners: false,
-      cornerStyle: 'circle'
-    });
-
-    // Disable rotation control and configure resize controls
-    group.setControlsVisibility({
-      mtr: false, // No rotation
-      ml: true,   // Middle left
-      mr: true,   // Middle right
-      mt: true,   // Middle top
-      mb: true,   // Middle bottom
-      tl: true,   // Top left
-      tr: true,   // Top right
-      bl: true,   // Bottom left
-      br: true    // Bottom right
-    });
-
-    // Store custom properties
-    group.set('slotNumber', slot.slotNumber);
-    group.set('type', 'slot');
-    group.set('slotData', slot);
-
-    this.log('Created slot group with slotNumber:', group.get('slotNumber'));
-    return group;
   }
 
   // Load slot image with proper scaling and positioning
@@ -154,48 +166,62 @@ export class FixedCanvasRenderer {
     });
   }
 
-  // Render slots with optimized updates
+  // Render slots with comprehensive error handling and immediate visual feedback
   async renderSlots(slots: VisualSlotLayout[]): Promise<void> {
-    this.log('Rendering slots:', slots.length);
-    
-    const currentSlotNumbers = new Set(Array.from(this.slotGroups.keys()));
-    const newSlotNumbers = new Set(slots.map(s => s.slotNumber));
+    try {
+      this.log('=== Starting slot rendering ===');
+      this.log('Input slots:', slots.length, slots);
+      this.log('Current slot groups:', this.slotGroups.size);
+      
+      if (!this.canvas) {
+        throw new Error('Canvas not initialized');
+      }
 
-    // Remove slots that no longer exist
-    for (const slotNumber of currentSlotNumbers) {
-      if (!newSlotNumbers.has(slotNumber)) {
-        const group = this.slotGroups.get(slotNumber);
-        if (group) {
-          this.log('Removing slot:', slotNumber);
-          this.canvas.remove(group);
-          this.slotGroups.delete(slotNumber);
+      // Clear all existing slots first for a clean render
+      this.clearSlots();
+      this.log('Cleared existing slots');
+
+      // Add each slot with proper error handling
+      for (const slot of slots) {
+        try {
+          this.log('Creating slot:', slot.slotNumber, 'at position:', slot.x, slot.y);
+          
+          const group = await this.createSlotGroup(slot);
+          this.slotGroups.set(slot.slotNumber, group);
+          this.canvas.add(group);
+          
+          this.log('Successfully added slot:', slot.slotNumber);
+        } catch (slotError) {
+          console.error('Error creating slot', slot.slotNumber, ':', slotError);
+          // Continue with other slots even if one fails
         }
       }
-    }
 
-    // Add or update slots
-    for (const slot of slots) {
-      let group = this.slotGroups.get(slot.slotNumber);
-      
-      if (!group) {
-        // Create new slot
-        this.log('Creating new slot:', slot.slotNumber);
-        group = await this.createSlotGroup(slot);
-        this.slotGroups.set(slot.slotNumber, group);
-        this.canvas.add(group);
-      } else {
-        // Update existing slot if properties changed
-        await this.updateSlotGroup(group, slot);
+      // Maintain grid layer order
+      if (this.isGridVisible) {
+        this.sendGridToBack();
       }
-    }
 
-    // Maintain grid layer order
-    if (this.isGridVisible) {
-      this.sendGridToBack();
+      // Force immediate render
+      this.canvas.requestRenderAll();
+      
+      this.log('=== Slot rendering complete ===');
+      this.log('Final slot groups count:', this.slotGroups.size);
+      this.log('Canvas objects count:', this.canvas.getObjects().length);
+      
+      // Verify rendering success
+      const canvasObjects = this.canvas.getObjects();
+      const slotObjects = canvasObjects.filter(obj => obj.get('type') === 'slot');
+      this.log('Slot objects on canvas:', slotObjects.length);
+      
+      if (slotObjects.length !== slots.length) {
+        console.warn('Mismatch: Expected', slots.length, 'slots, but found', slotObjects.length, 'on canvas');
+      }
+      
+    } catch (error) {
+      console.error('Critical error in renderSlots:', error);
+      throw error;
     }
-
-    this.canvas.requestRenderAll();
-    this.log('Slots rendered successfully');
   }
 
   // Update existing slot group properties
