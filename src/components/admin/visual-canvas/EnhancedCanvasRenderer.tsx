@@ -2,7 +2,7 @@
  * Enhanced Canvas renderer with selective updates and proper Fabric.js v6 integration
  */
 
-import { Canvas as FabricCanvas, Rect, FabricText, Line, Group } from 'fabric';
+import { Canvas as FabricCanvas, Rect, FabricText, Line, Group, FabricImage } from 'fabric';
 import { VisualSlotLayout } from "@/types/product/chassis-types";
 
 const GRID_SIZE = 20;
@@ -76,8 +76,50 @@ export class EnhancedCanvasRenderer {
     group.set('slotNumber', slot.slotNumber);
     group.set('type', 'slot');
 
+    // Add image if URL is provided
+    this.addSlotImageIfAny(group, slot);
+
     console.log('Created slot group with slotNumber:', group.get('slotNumber'));
     return group;
+  }
+
+  // Add slot image if URL is provided
+  private async addSlotImageIfAny(group: Group, slot: VisualSlotLayout): Promise<void> {
+    if (!slot.imageUrl) return;
+
+    try {
+      FabricImage.fromURL(slot.imageUrl, {
+        crossOrigin: 'anonymous'
+      }).then((img) => {
+        const rect = group.getObjects()[0] as Rect;
+        const maxW = (rect.width as number) - 20;
+        const maxH = (rect.height as number) - 40; // Leave space for text
+        
+        const scale = Math.min(
+          maxW / (img.width || maxW),
+          maxH / (img.height || maxH),
+          1 // Don't scale up
+        );
+        
+        img.set({
+          left: rect.width! / 2,
+          top: rect.height! / 2 - 10, // Offset up to leave space for text
+          originX: 'center',
+          originY: 'center',
+          selectable: false,
+          evented: false,
+          scaleX: scale,
+          scaleY: scale
+        });
+        
+        group.add(img);
+        this.canvas.requestRenderAll();
+      }).catch((error) => {
+        console.warn('Failed to load slot image:', slot.imageUrl, error);
+      });
+    } catch (error) {
+      console.warn('Error loading slot image:', error);
+    }
   }
 
   // Render slots efficiently - only update changed slots
