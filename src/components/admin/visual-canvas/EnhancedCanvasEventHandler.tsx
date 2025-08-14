@@ -166,6 +166,9 @@ export const EnhancedCanvasEventHandler: React.FC<EnhancedCanvasEventHandlerProp
 
   // Handle right-click context menu
   const handleContextMenu = useCallback((e: any) => {
+    // Only handle right-click events
+    if (e.e.button !== 2) return;
+    
     e.e.preventDefault();
     
     if (!fabricCanvas) return;
