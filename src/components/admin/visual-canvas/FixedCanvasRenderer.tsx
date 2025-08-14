@@ -42,8 +42,7 @@ export class FixedCanvasRenderer {
       rx: 8,
       ry: 8,
       selectable: false,
-      evented: false,
-      shadow: 'rgba(0,0,0,0.1) 2px 2px 4px'
+      evented: false
     });
 
     // Create text with proper positioning
