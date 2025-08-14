@@ -8,6 +8,7 @@ import { VisualSlotLayout, ChassisVisualLayout } from "@/types/product/chassis-t
 import { FixedCanvasRenderer } from './FixedCanvasRenderer';
 import { EnhancedSlotEditDialog } from './EnhancedSlotEditDialog';
 import { toast } from 'sonner';
+import { getCanvasHTMLElement } from './canvasDom';
 
 interface FixedCanvasEventHandlerProps {
   fabricCanvas: FabricCanvas | null;
@@ -356,6 +357,11 @@ export const FixedCanvasEventHandler: React.FC<FixedCanvasEventHandlerProps> = (
     fabricCanvas.on('object:modified', wrappedObjectModified);
     fabricCanvas.on('mouse:down', wrappedMouseDown);
     fabricCanvas.on('mouse:dblclick', wrappedDoubleClick);
+    
+    // Fallback: treat a second click as dblclick for better reliability
+    fabricCanvas.on('mouse:down', (e: any) => {
+      if (e?.e?.detail === 2) handleDoubleClick(e);
+    });
 
     // Configure canvas interaction properties based on selected tool
     const isSelectMode = selectedTool === 'select';
@@ -378,7 +384,7 @@ export const FixedCanvasEventHandler: React.FC<FixedCanvasEventHandlerProps> = (
     }
 
     // Enhanced keyboard event handling
-    const canvasElement = fabricCanvas.getElement();
+    const canvasElement = getCanvasHTMLElement(fabricCanvas);
     if (canvasElement) {
       // Ensure proper element configuration for interaction
       canvasElement.tabIndex = 0;
@@ -397,7 +403,7 @@ export const FixedCanvasEventHandler: React.FC<FixedCanvasEventHandlerProps> = (
     }
 
     // Enhanced right-click context menu with proper prevention
-    const canvasEl = fabricCanvas.getElement();
+    const canvasEl = getCanvasHTMLElement(fabricCanvas);
     if (canvasEl) {
       const preventContextMenu = (e: MouseEvent) => {
         e.preventDefault();
@@ -449,7 +455,7 @@ export const FixedCanvasEventHandler: React.FC<FixedCanvasEventHandlerProps> = (
           log('Canvas focused successfully for tool:', selectedTool);
           
           // Additional verification
-          const canvasElement = fabricCanvas.getElement();
+          const canvasElement = getCanvasHTMLElement(fabricCanvas);
           const isFocused = document.activeElement === canvasElement;
           log('Canvas focus verification:', { isFocused, activeElement: document.activeElement?.tagName });
           
