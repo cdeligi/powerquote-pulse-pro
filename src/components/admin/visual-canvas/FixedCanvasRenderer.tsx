@@ -382,12 +382,31 @@ export class FixedCanvasRenderer {
     this.canvas.requestRenderAll();
   }
 
-  // Focus canvas for keyboard events
+  // Enhanced canvas focus with improved accessibility and interaction
   focusCanvas(): void {
     const canvasElement = this.canvas.getElement();
     if (canvasElement) {
-      canvasElement.focus();
-      this.log('Canvas focused');
+      // Ensure element is focusable
+      if (!canvasElement.hasAttribute('tabindex')) {
+        canvasElement.tabIndex = 0;
+      }
+      
+      // Focus with proper error handling
+      try {
+        canvasElement.focus({ preventScroll: true });
+        this.log('Canvas focused successfully');
+        
+        // Trigger a small visual feedback to confirm focus
+        canvasElement.style.outline = '2px solid hsl(var(--primary))';
+        setTimeout(() => {
+          canvasElement.style.outline = 'none';
+        }, 200);
+        
+      } catch (error) {
+        this.log('Error focusing canvas:', error);
+      }
+    } else {
+      this.log('Canvas element not found for focusing');
     }
   }
 
