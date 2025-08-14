@@ -9,6 +9,9 @@ export interface VisualSlotLayout {
   y: number; // Y coordinate on canvas
   width: number; // Slot width
   height: number; // Slot height
+  name?: string; // human-friendly label, e.g., "I/O 1", "TX A"
+  imageUrl?: string; // optional icon shown inside the slot
+  allowedLevel3ProductIds?: string[]; // optional allowed L3 products
 }
 
 // Visual layout data structure
