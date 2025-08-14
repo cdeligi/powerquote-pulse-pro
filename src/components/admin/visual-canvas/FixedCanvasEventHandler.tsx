@@ -327,55 +327,105 @@ export const FixedCanvasEventHandler: React.FC<FixedCanvasEventHandlerProps> = (
     toast.success(`Slot ${originalSlotNumber} ${originalSlotNumber !== updatedSlot.slotNumber ? `renamed to ${updatedSlot.slotNumber}` : 'updated'}`);
   }, [visualLayout, onVisualLayoutChange, renderer, editDialog.slotNumber, log]);
 
-  // Setup event listeners and canvas configuration
+  // Enhanced event listeners setup with comprehensive interaction support
   useEffect(() => {
-    if (!fabricCanvas) return;
+    if (!fabricCanvas) {
+      log('Canvas not ready for event setup');
+      return;
+    }
 
-    log('Setting up canvas event listeners');
+    log('Setting up enhanced canvas event listeners for tool:', selectedTool);
 
-    // Canvas events
-    fabricCanvas.on('object:modified', handleObjectModified);
-    fabricCanvas.on('mouse:down', handleMouseDown);
-    fabricCanvas.on('mouse:dblclick', handleDoubleClick);
+    // Canvas interaction events with detailed logging
+    const wrappedObjectModified = (e: any) => {
+      log('Object modified event triggered:', e.target?.get('type'), e.target?.get('slotNumber'));
+      handleObjectModified(e);
+    };
 
-    // Configure canvas based on selected tool
-    fabricCanvas.selection = selectedTool === 'select';
-    fabricCanvas.isDrawingMode = false; // We handle drawing manually
+    const wrappedMouseDown = (e: any) => {
+      log('Mouse down event:', { button: e.e.button, tool: selectedTool, hasTarget: !!e.target });
+      handleMouseDown(e);
+    };
+
+    const wrappedDoubleClick = (e: any) => {
+      log('Double click event:', { tool: selectedTool, hasTarget: !!e.target });
+      handleDoubleClick(e);
+    };
+
+    // Register enhanced event handlers
+    fabricCanvas.on('object:modified', wrappedObjectModified);
+    fabricCanvas.on('mouse:down', wrappedMouseDown);
+    fabricCanvas.on('mouse:dblclick', wrappedDoubleClick);
+
+    // Configure canvas interaction properties based on selected tool
+    const isSelectMode = selectedTool === 'select';
+    fabricCanvas.selection = isSelectMode;
+    fabricCanvas.isDrawingMode = false; // We handle drawing manually for better control
     
-    // Update cursors based on tool
-    if (selectedTool === 'select') {
+    // Enhanced cursor management with tool-specific behavior
+    if (isSelectMode) {
       fabricCanvas.defaultCursor = 'default';
       fabricCanvas.hoverCursor = 'move';
       fabricCanvas.moveCursor = 'move';
+      fabricCanvas.freeDrawingCursor = 'default';
+      log('Canvas configured for SELECT mode');
     } else {
       fabricCanvas.defaultCursor = 'crosshair';
       fabricCanvas.hoverCursor = 'crosshair';
       fabricCanvas.moveCursor = 'crosshair';
+      fabricCanvas.freeDrawingCursor = 'crosshair';
+      log('Canvas configured for DRAW mode');
     }
 
-    // Keyboard events
+    // Enhanced keyboard event handling
     const canvasElement = fabricCanvas.getElement();
     if (canvasElement) {
-      canvasElement.addEventListener('keydown', handleKeyDown);
-      canvasElement.tabIndex = 0; // Make canvas focusable
+      // Ensure proper element configuration for interaction
+      canvasElement.tabIndex = 0;
       canvasElement.style.outline = 'none';
+      canvasElement.style.userSelect = 'none';
+      (canvasElement.style as any).webkitUserSelect = 'none';
+      
+      canvasElement.addEventListener('keydown', handleKeyDown, { passive: false });
+      log('Keyboard events configured for canvas');
+      
+      // Focus management for immediate interaction
+      requestAnimationFrame(() => {
+        canvasElement.focus({ preventScroll: true });
+        log('Canvas automatically focused');
+      });
     }
 
-    // Enable right-click context menu
+    // Enhanced right-click context menu with proper prevention
     const canvasEl = fabricCanvas.getElement();
     if (canvasEl) {
-      canvasEl.addEventListener('contextmenu', (e) => e.preventDefault());
+      const preventContextMenu = (e: MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        log('Context menu prevented, right-click handling active');
+        return false;
+      };
+      
+      canvasEl.addEventListener('contextmenu', preventContextMenu, { passive: false });
+      
+      // Additional right-click configuration
+      canvasEl.oncontextmenu = () => false;
     }
 
+    log('Canvas event listeners setup completed');
+
     return () => {
-      log('Cleaning up canvas event listeners');
-      fabricCanvas.off('object:modified', handleObjectModified);
-      fabricCanvas.off('mouse:down', handleMouseDown);
-      fabricCanvas.off('mouse:dblclick', handleDoubleClick);
+      log('Cleaning up enhanced canvas event listeners');
+      
+      fabricCanvas.off('object:modified', wrappedObjectModified);
+      fabricCanvas.off('mouse:down', wrappedMouseDown);
+      fabricCanvas.off('mouse:dblclick', wrappedDoubleClick);
       
       if (canvasElement) {
         canvasElement.removeEventListener('keydown', handleKeyDown);
       }
+      
+      log('Event listeners cleanup completed');
     };
   }, [
     fabricCanvas, 
@@ -387,13 +437,24 @@ export const FixedCanvasEventHandler: React.FC<FixedCanvasEventHandlerProps> = (
     log
   ]);
 
-  // Focus canvas when tool changes to select or when component mounts
+  // Enhanced canvas focus management with tool-specific timing
   useEffect(() => {
     if (renderer && fabricCanvas) {
-      setTimeout(() => {
-        renderer.focusCanvas();
-        log('Canvas focused for tool:', selectedTool);
-      }, 100);
+      log('Requesting canvas focus for tool change:', selectedTool);
+      
+      // Use requestAnimationFrame for better timing with DOM updates
+      requestAnimationFrame(() => {
+        setTimeout(() => {
+          renderer.focusCanvas();
+          log('Canvas focused successfully for tool:', selectedTool);
+          
+          // Additional verification
+          const canvasElement = fabricCanvas.getElement();
+          const isFocused = document.activeElement === canvasElement;
+          log('Canvas focus verification:', { isFocused, activeElement: document.activeElement?.tagName });
+          
+        }, 150); // Slightly longer delay for better reliability
+      });
     }
   }, [selectedTool, renderer, fabricCanvas, log]);
 

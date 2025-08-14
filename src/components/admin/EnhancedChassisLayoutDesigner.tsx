@@ -81,9 +81,11 @@ export const EnhancedChassisLayoutDesigner: React.FC<EnhancedChassisLayoutDesign
   const [errors, setErrors] = useState<string[]>([]);
   const [isEditing, setIsEditing] = useState(false);
 
-  // Initialize Fabric.js canvas and renderer
+  // Initialize Fabric.js canvas and renderer with proper setup
   useEffect(() => {
     if (!canvasRef.current) return;
+
+    console.log('Initializing enhanced canvas with proper configuration...');
 
     const canvas = new FabricCanvas(canvasRef.current, {
       width: CANVAS_WIDTH,
@@ -92,53 +94,112 @@ export const EnhancedChassisLayoutDesigner: React.FC<EnhancedChassisLayoutDesign
       selection: true,
       preserveObjectStacking: true,
       renderOnAddRemove: true,
-      stateful: true
+      stateful: true,
+      interactive: true,
+      enableRetinaScaling: true,
+      // Proper event handling configuration
+      allowTouchScrolling: false,
+      stopContextMenu: true,
+      fireRightClick: true,
+      fireMiddleClick: false
     });
 
-    console.log('Fixed canvas initialized:', canvas);
+    // Configure canvas element properties for proper interaction
+    const canvasElement = canvas.getElement();
+    if (canvasElement) {
+      canvasElement.tabIndex = 0; // Make focusable
+      canvasElement.style.outline = 'none';
+      canvasElement.style.userSelect = 'none';
+      (canvasElement.style as any).webkitUserSelect = 'none';
+    }
+
+    console.log('Enhanced canvas initialized with properties:', {
+      width: canvas.width,
+      height: canvas.height,
+      selection: canvas.selection
+    });
+
     setFabricCanvas(canvas);
     
     // Initialize fixed renderer with debug mode
     const renderer = new FixedCanvasRenderer(canvas, debugMode);
     rendererRef.current = renderer;
 
+    console.log('Canvas renderer initialized successfully');
+
     return () => {
+      console.log('Cleaning up canvas and renderer...');
       if (rendererRef.current) {
         rendererRef.current.dispose();
         rendererRef.current = null;
       }
       canvas.dispose();
     };
-  }, []);
+  }, [debugMode]);
 
-  // Render slots when layout changes
+  // Render slots when layout changes with proper error handling
   useEffect(() => {
-    if (!fabricCanvas || !rendererRef.current) return;
+    if (!fabricCanvas || !rendererRef.current) {
+      console.log('Canvas or renderer not ready for slot rendering');
+      return;
+    }
     
-    console.log('Updating canvas with new layout');
-    // Use async rendering for better performance
-    rendererRef.current.renderSlots(visualLayout.slots).then(() => {
-      rendererRef.current?.drawGrid(gridVisible);
+    console.log('Updating canvas with new layout:', {
+      slotsCount: visualLayout.slots.length,
+      gridVisible,
+      canvasReady: !!fabricCanvas,
+      rendererReady: !!rendererRef.current
     });
+
+    // Use async rendering for better performance with error handling
+    rendererRef.current.renderSlots(visualLayout.slots)
+      .then(() => {
+        if (rendererRef.current) {
+          rendererRef.current.drawGrid(gridVisible);
+          console.log('Canvas slots and grid rendered successfully');
+        }
+      })
+      .catch((error) => {
+        console.error('Error rendering canvas slots:', error);
+      });
   }, [fabricCanvas, visualLayout, gridVisible]);
 
-  // Handle visual layout changes from canvas
+  // Handle visual layout changes from canvas with enhanced logging
   const handleVisualLayoutChange = useCallback((newLayout: ChassisVisualLayout) => {
+    console.log('Visual layout changed:', {
+      previousSlots: visualLayout.slots.length,
+      newSlots: newLayout.slots.length,
+      changes: newLayout.slots.map(s => ({ slot: s.slotNumber, x: s.x, y: s.y }))
+    });
+    
     setVisualLayout(newLayout);
     onVisualLayoutChange?.(newLayout);
     setIsEditing(true);
-  }, [onVisualLayoutChange]);
+    
+    // Show success feedback
+    toast.success('Canvas layout updated');
+  }, [onVisualLayoutChange, visualLayout.slots.length]);
 
-  // Handle slot deletion from canvas
+  // Handle slot deletion from canvas with proper state management
   const handleDeleteSlot = useCallback((slotNumber: number) => {
+    console.log('Deleting slot from layout:', slotNumber);
+    
     const updatedLayout = {
       ...visualLayout,
       slots: visualLayout.slots.filter(slot => slot.slotNumber !== slotNumber)
     };
     
+    console.log('Updated layout after deletion:', {
+      previousCount: visualLayout.slots.length,
+      newCount: updatedLayout.slots.length,
+      deletedSlot: slotNumber
+    });
+    
     setVisualLayout(updatedLayout);
     onVisualLayoutChange?.(updatedLayout);
     setIsEditing(true);
+    
+    toast.success(`Slot ${slotNumber} deleted successfully`);
   }, [visualLayout, onVisualLayoutChange]);
 
   // Grid-based layout functions with improved state management
@@ -328,15 +389,20 @@ export const EnhancedChassisLayoutDesigner: React.FC<EnhancedChassisLayoutDesign
     return () => clearTimeout(timer);
   }, [layout, visualLayout]);
 
-  // Focus canvas when switching tools or visual tab becomes active
+  // Enhanced canvas focus management with better timing
   useEffect(() => {
-    if (rendererRef.current && selectedTool) {
-      setTimeout(() => {
+    if (rendererRef.current && fabricCanvas && selectedTool) {
+      // Use requestAnimationFrame for better timing
+      const focusCanvas = () => {
         rendererRef.current?.focusCanvas();
-        console.log('Canvas focused for tool:', selectedTool);
-      }, 200);
+        console.log('Canvas focused for tool:', selectedTool, 'at:', new Date().toISOString());
+      };
+      
+      requestAnimationFrame(() => {
+        setTimeout(focusCanvas, 100);
+      });
     }
-  }, [selectedTool]);
+  }, [selectedTool, fabricCanvas]);
 
   return (
     <div className="space-y-4">
