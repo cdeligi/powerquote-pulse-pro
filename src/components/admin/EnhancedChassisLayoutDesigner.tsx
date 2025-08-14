@@ -82,12 +82,28 @@ export const EnhancedChassisLayoutDesigner: React.FC<EnhancedChassisLayoutDesign
   const [errors, setErrors] = useState<string[]>([]);
   const [isEditing, setIsEditing] = useState(false);
 
-  // Initialize Fabric.js canvas and renderer with proper setup
+  // Comprehensive sanitization to handle ghost slots
+  const sanitizeSlots = (slots: VisualSlotLayout[]): VisualSlotLayout[] => {
+    if (!Array.isArray(slots)) return [];
+    return slots.filter(s => {
+      const w = Number(s.width ?? 0);
+      const h = Number(s.height ?? 0);
+      const x = Number(s.x ?? 0);
+      const y = Number(s.y ?? 0);
+      return isFinite(w) && isFinite(h) && w >= 8 && h >= 8 && isFinite(x) && isFinite(y);
+    });
+  };
+
+  // Enhanced Fabric.js canvas initialization with comprehensive setup
   useEffect(() => {
-    if (!canvasRef.current) return;
+    if (!canvasRef.current) {
+      console.log('Canvas ref not ready');
+      return;
+    }
 
-    console.log('Initializing enhanced canvas with proper configuration...');
+    console.log('Initializing enhanced canvas with comprehensive configuration...');
 
+    // Create canvas with optimal settings for stability and interaction
     const canvas = new FabricCanvas(canvasRef.current, {
       width: CANVAS_WIDTH,
       height: CANVAS_HEIGHT,
@@ -98,112 +114,196 @@ export const EnhancedChassisLayoutDesigner: React.FC<EnhancedChassisLayoutDesign
       stateful: true,
       interactive: true,
       enableRetinaScaling: true,
-      // Proper event handling configuration
+      // Enhanced event handling for better reliability
       allowTouchScrolling: false,
       stopContextMenu: true,
       fireRightClick: true,
-      fireMiddleClick: false
+      fireMiddleClick: false,
+      // Prevent canvas from being too sensitive
+      targetFindTolerance: 5,
+      // Ensure proper object selection
+      perPixelTargetFind: true,
+      // Better performance settings
+      skipTargetFind: false
     });
 
-    // Configure canvas element properties for proper interaction
+    // Enhanced canvas element configuration for robust interaction
     const canvasElement = getCanvasHTMLElement(canvas);
     if (canvasElement) {
-      canvasElement.tabIndex = 0; // Make focusable
+      canvasElement.tabIndex = 0; // Make focusable for keyboard events
       canvasElement.style.outline = 'none';
       canvasElement.style.userSelect = 'none';
-      (canvasElement.style as any).webkitUserSelect = 'none';
+      canvasElement.style.webkitUserSelect = 'none';
+      canvasElement.style.touchAction = 'none'; // Prevent touch scrolling
+      canvasElement.style.position = 'relative'; // Ensure proper positioning
+      
+      // Add visual debugging border in debug mode
+      if (debugMode) {
+        canvasElement.style.border = '2px solid hsl(var(--primary) / 0.5)';
+      }
+      
+      console.log('Canvas DOM element configured:', {
+        tabIndex: canvasElement.tabIndex,
+        style: {
+          outline: canvasElement.style.outline,
+          userSelect: canvasElement.style.userSelect,
+          touchAction: canvasElement.style.touchAction
+        }
+      });
     }
 
-    console.log('Enhanced canvas initialized with properties:', {
+    // Verify canvas is properly created and accessible
+    console.log('Enhanced canvas initialized with verified properties:', {
       width: canvas.width,
       height: canvas.height,
-      selection: canvas.selection
+      selection: canvas.selection,
+      elementReady: !!canvasElement,
+      backgroundColor: canvas.backgroundColor
     });
+
+    // Test canvas basic functionality
+    try {
+      canvas.requestRenderAll();
+      console.log('Canvas initial render test successful');
+    } catch (error) {
+      console.error('Canvas initial render test failed:', error);
+    }
 
     setFabricCanvas(canvas);
     
-    // Initialize fixed renderer with debug mode
-    const renderer = new FixedCanvasRenderer(canvas, debugMode);
-    rendererRef.current = renderer;
-
-    console.log('Canvas renderer initialized successfully');
+    // Initialize enhanced renderer with comprehensive error handling
+    try {
+      const renderer = new FixedCanvasRenderer(canvas, debugMode);
+      rendererRef.current = renderer;
+      console.log('Canvas renderer initialized successfully');
+      
+      // Test renderer basic functionality
+      renderer.drawGrid(true);
+      renderer.drawGrid(false);
+      console.log('Renderer basic functionality test successful');
+      
+    } catch (error) {
+      console.error('Renderer initialization failed:', error);
+      toast.error('Canvas renderer initialization failed');
+    }
 
     return () => {
-      console.log('Cleaning up canvas and renderer...');
-      if (rendererRef.current) {
-        rendererRef.current.dispose();
-        rendererRef.current = null;
+      console.log('Starting comprehensive canvas cleanup...');
+      try {
+        if (rendererRef.current) {
+          rendererRef.current.dispose();
+          rendererRef.current = null;
+          console.log('Renderer disposed successfully');
+        }
+        canvas.dispose();
+        console.log('Canvas disposed successfully');
+      } catch (error) {
+        console.error('Error during canvas cleanup:', error);
       }
-      canvas.dispose();
     };
   }, [debugMode]);
 
-  // Enhanced slot rendering with comprehensive debugging and immediate feedback
+  // Enhanced slot rendering with sanitization and comprehensive debugging
   useEffect(() => {
     if (!fabricCanvas || !rendererRef.current) {
       console.log('Canvas or renderer not ready for slot rendering');
       return;
     }
     
+    // Sanitize slots before rendering to prevent ghost slot issues
+    const validSlots = sanitizeSlots(visualLayout.slots);
+    
     console.log('=== CANVAS RENDER TRIGGER ===');
     console.log('Canvas state:', {
-      slotsCount: visualLayout.slots.length,
-      slots: visualLayout.slots,
+      totalSlots: visualLayout.slots.length,
+      validSlots: validSlots.length,
+      filteredOut: visualLayout.slots.length - validSlots.length,
       gridVisible,
       canvasReady: !!fabricCanvas,
       rendererReady: !!rendererRef.current,
       canvasSize: { width: fabricCanvas.width, height: fabricCanvas.height },
-      canvasObjects: fabricCanvas.getObjects().length
+      canvasObjects: fabricCanvas.getObjects().length,
+      validSlotsData: validSlots.map(s => ({ slot: s.slotNumber, x: s.x, y: s.y, w: s.width, h: s.height }))
     });
 
-    // Force render with comprehensive error handling
+    // Force render with comprehensive error handling and visual feedback
     const renderWithFeedback = async () => {
       try {
-        console.log('Starting slot rendering...');
+        console.log('Starting enhanced slot rendering...');
         
-        // First render slots
-        await rendererRef.current!.renderSlots(visualLayout.slots);
-        console.log('Slots rendered, now rendering grid...');
+        // Clear existing objects first to prevent accumulation
+        fabricCanvas.clear();
+        fabricCanvas.backgroundColor = 'hsl(var(--background))';
         
-        // Then render grid
-        rendererRef.current!.drawGrid(gridVisible);
-        console.log('Grid rendered');
+        // Render only valid slots
+        await rendererRef.current!.renderSlots(validSlots);
+        console.log(`${validSlots.length} valid slots rendered`);
         
-        // Force canvas update
+        // Render grid if enabled
+        if (gridVisible) {
+          rendererRef.current!.drawGrid(true, 'hsl(var(--border))', 0.3);
+          console.log('Grid rendered with enhanced visibility');
+        }
+        
+        // Force immediate canvas update
         fabricCanvas.requestRenderAll();
-        console.log('Canvas render requested');
+        console.log('Canvas render completed');
         
-        // Verify results
+        // Comprehensive verification
         const objects = fabricCanvas.getObjects();
-        const slotObjects = objects.filter(obj => obj.get('type') === 'slot');
+        const slotObjects = objects.filter(obj => obj.get('data')?.type === 'slot' || obj.get('type') === 'slot');
         const gridObjects = objects.filter(obj => obj.get('excludeFromExport') === true);
         
         console.log('Render verification:', {
           totalObjects: objects.length,
           slotObjects: slotObjects.length,
           gridObjects: gridObjects.length,
-          expectedSlots: visualLayout.slots.length
+          expectedSlots: validSlots.length,
+          canvasBackground: fabricCanvas.backgroundColor,
+          renderingSuccess: slotObjects.length === validSlots.length
         });
         
-        // Show success feedback
+        // Enhanced user feedback
         if (slotObjects.length > 0) {
-          toast.success(`Canvas updated: ${slotObjects.length} slots visible`);
-        } else if (visualLayout.slots.length > 0) {
-          toast.error('Slots not visible on canvas - rendering failed');
+          toast.success(`Canvas rendered: ${slotObjects.length} slots visible`);
+        } else if (validSlots.length > 0) {
+          toast.error('Rendering failed - slots not visible on canvas');
+          console.error('Rendering failure detected:', { validSlots, objects });
+        } else if (visualLayout.slots.length > validSlots.length) {
+          toast.warning(`${visualLayout.slots.length - validSlots.length} invalid slots filtered out`);
+        }
+        
+        // Update visual layout if we filtered out invalid slots
+        if (visualLayout.slots.length !== validSlots.length) {
+          const cleanedLayout = { ...visualLayout, slots: validSlots };
+          setVisualLayout(cleanedLayout);
+          onVisualLayoutChange?.(cleanedLayout);
         }
         
       } catch (error) {
         console.error('=== CANVAS RENDER ERROR ===', error);
-        toast.error('Failed to render canvas: ' + error.message);
+        toast.error(`Canvas rendering failed: ${error.message}`);
+        
+        // Attempt recovery
+        try {
+          fabricCanvas.clear();
+          fabricCanvas.backgroundColor = 'hsl(var(--background))';
+          fabricCanvas.requestRenderAll();
+          console.log('Canvas cleared for recovery');
+        } catch (recoveryError) {
+          console.error('Canvas recovery failed:', recoveryError);
+        }
       }
     };
 
-    // Execute render with timing for better reliability
-    requestAnimationFrame(() => {
-      setTimeout(renderWithFeedback, 50);
-    });
+    // Enhanced timing for better reliability
+    const timeoutId = setTimeout(() => {
+      requestAnimationFrame(renderWithFeedback);
+    }, 100);
+
+    return () => clearTimeout(timeoutId);
     
-  }, [fabricCanvas, visualLayout, gridVisible]);
+  }, [fabricCanvas, visualLayout, gridVisible, onVisualLayoutChange]);
 
   // Handle visual layout changes from canvas with enhanced logging
   const handleVisualLayoutChange = useCallback((newLayout: ChassisVisualLayout) => {
@@ -556,17 +656,72 @@ export const EnhancedChassisLayoutDesigner: React.FC<EnhancedChassisLayoutDesign
                 gridVisible={gridVisible}
                 onGridToggle={() => setGridVisible(!gridVisible)}
                 onReset={resetVisualLayout}
-                slotsCount={visualLayout.slots.length}
+                slotsCount={sanitizeSlots(visualLayout.slots).length}
                 maxSlots={totalSlots}
                 canvasRef={canvasRef}
               />
               
-              <div className="border border-border rounded-lg overflow-hidden">
-                <canvas 
-                  ref={canvasRef} 
-                  className="bg-background focus:outline-none focus:ring-2 focus:ring-primary"
-                  tabIndex={0}
-                />
+              {/* Enhanced Canvas Section with comprehensive debugging */}
+              <div className="space-y-4">
+                {/* Status Bar with debug information */}
+                {debugMode && (
+                  <Alert>
+                    <AlertDescription className="flex items-center justify-between">
+                      <span>
+                        Canvas ready: {fabricCanvas ? 'Yes' : 'No'} | 
+                        Slots: {sanitizeSlots(visualLayout.slots).length}/{totalSlots} valid | 
+                        Objects: {fabricCanvas?.getObjects().length || 0}
+                      </span>
+                      <Button onClick={resetVisualLayout} variant="outline" size="sm">
+                        Reset Canvas
+                      </Button>
+                    </AlertDescription>
+                  </Alert>
+                )}
+                
+                {/* Main Canvas Container with explicit dimensions */}
+                <div className="relative">
+                  <div 
+                    className="border-2 border-border rounded-lg bg-background shadow-lg overflow-hidden relative"
+                    style={{ 
+                      width: CANVAS_WIDTH, 
+                      height: CANVAS_HEIGHT,
+                      minHeight: CANVAS_HEIGHT,
+                      maxHeight: CANVAS_HEIGHT
+                    }}
+                  >
+                    <canvas
+                      ref={canvasRef}
+                      className="absolute inset-0 w-full h-full focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 z-10"
+                      tabIndex={0}
+                      style={{ 
+                        cursor: selectedTool === 'draw' ? 'crosshair' : 'default',
+                        background: 'transparent'
+                      }}
+                    />
+                    
+                    {/* Canvas ready indicator */}
+                    {fabricCanvas && (
+                      <div className="absolute top-2 left-2 z-20">
+                        <Badge variant="outline" className="text-xs bg-background/80">
+                          Canvas Ready • {fabricCanvas.getObjects().length} objects
+                        </Badge>
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* Loading state overlay */}
+                  {!fabricCanvas && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-background/80 rounded-lg z-30">
+                      <div className="text-center">
+                        <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full mx-auto mb-2"></div>
+                        <p className="text-sm text-muted-foreground">Initializing Canvas...</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+                
+                {/* Event Handler Component */}
                 {fabricCanvas && rendererRef.current && (
                   <FixedCanvasEventHandler
                     fabricCanvas={fabricCanvas}
@@ -576,7 +731,6 @@ export const EnhancedChassisLayoutDesigner: React.FC<EnhancedChassisLayoutDesign
                     visualLayout={visualLayout}
                     onVisualLayoutChange={handleVisualLayoutChange}
                     onDeleteSlot={handleDeleteSlot}
-                    debugMode={debugMode}
                   />
                 )}
               </div>
