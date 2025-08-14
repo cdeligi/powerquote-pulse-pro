@@ -37,8 +37,9 @@ export class EnhancedCanvasRenderer {
       evented: false
     });
 
-    // Create text
-    const text = new FabricText(slot.slotNumber.toString(), {
+    // Create text - use slot name if available, otherwise slot number
+    const displayText = (slot as any).name || slot.slotNumber.toString();
+    const text = new FabricText(displayText, {
       left: slot.width / 2,
       top: slot.height / 2,
       fontSize: 14,
@@ -130,7 +131,11 @@ export class EnhancedCanvasRenderer {
               width: slot.width,
               height: slot.height
             });
+            
+            // Update text content and position
+            const displayText = (slot as any).name || slot.slotNumber.toString();
             text.set({
+              text: displayText,
               left: slot.width / 2,
               top: slot.height / 2
             });

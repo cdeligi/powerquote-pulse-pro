@@ -283,13 +283,15 @@ export const EnhancedCanvasEventHandler: React.FC<EnhancedCanvasEventHandlerProp
     }
   }, [fabricCanvas, renderer, visualLayout, onVisualLayoutChange, onDeleteSlot]);
 
-  // Handle slot edit save
+  // Handle slot edit save with canvas updates
   const handleSlotEditSave = useCallback((
     originalSlotNumber: number, 
     newSlotNumber: number, 
     name?: string
   ) => {
-    if (!onVisualLayoutChange) return;
+    if (!onVisualLayoutChange || !renderer) return;
+
+    console.log('Saving slot edit:', { originalSlotNumber, newSlotNumber, name });
 
     const updatedSlots = visualLayout.slots.map(slot => 
       slot.slotNumber === originalSlotNumber 
@@ -301,13 +303,34 @@ export const EnhancedCanvasEventHandler: React.FC<EnhancedCanvasEventHandlerProp
         : slot
     );
 
+    // Update visual layout state
     onVisualLayoutChange({
       ...visualLayout,
       slots: updatedSlots
     });
 
+    // Update canvas object properties
+    const group = renderer.getSlotGroup(originalSlotNumber);
+    if (group) {
+      // Update group properties
+      group.set('slotNumber', newSlotNumber);
+      
+      // Update text content in the group
+      const [, text] = group.getObjects() as [any, any];
+      if (text && text.set) {
+        text.set('text', name || newSlotNumber.toString());
+      }
+      
+      // Update slot groups mapping
+      renderer.getAllSlotGroups().delete(originalSlotNumber);
+      renderer.getAllSlotGroups().set(newSlotNumber, group);
+      
+      group.setCoords();
+      fabricCanvas?.renderAll();
+    }
+
     toast.success(`Slot ${originalSlotNumber} ${originalSlotNumber !== newSlotNumber ? `renamed to ${newSlotNumber}` : 'updated'}`);
-  }, [visualLayout, onVisualLayoutChange]);
+  }, [visualLayout, onVisualLayoutChange, renderer, fabricCanvas]);
 
   // Setup event listeners
   useEffect(() => {
@@ -328,11 +351,17 @@ export const EnhancedCanvasEventHandler: React.FC<EnhancedCanvasEventHandlerProp
       canvasElement.style.outline = 'none';
     }
 
-    // Update canvas selection mode
+    // Update canvas selection mode and visual feedback
     fabricCanvas.selection = selectedTool === 'select';
     fabricCanvas.isDrawingMode = false;
     fabricCanvas.defaultCursor = selectedTool === 'select' ? 'default' : 'crosshair';
     fabricCanvas.hoverCursor = selectedTool === 'select' ? 'move' : 'crosshair';
+
+    // Enable right-click context menu
+    const canvasEl = fabricCanvas.getElement();
+    if (canvasEl) {
+      canvasEl.addEventListener('contextmenu', (e) => e.preventDefault());
+    }
 
     return () => {
       console.log('Cleaning up enhanced canvas event listeners');

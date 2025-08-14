@@ -167,23 +167,34 @@ export const EnhancedChassisLayoutDesigner: React.FC<EnhancedChassisLayoutDesign
     const newLayout = [...layout];
     const { rowIndex: sourceRowIndex, slotIndex: sourceSlotIndex } = dragState.sourcePosition;
     
-    console.log('Dropping slot:', { draggedSlot, sourceRowIndex, sourceSlotIndex, targetRowIndex, targetSlotIndex });
+    console.log('Drop operation:', { 
+      draggedSlot, 
+      from: { row: sourceRowIndex, slot: sourceSlotIndex }, 
+      to: { row: targetRowIndex, slot: targetSlotIndex }
+    });
     
-    // Remove from source first
-    newLayout[sourceRowIndex].splice(sourceSlotIndex, 1);
+    // Remove from source first to avoid duplication
+    const removedSlot = newLayout[sourceRowIndex].splice(sourceSlotIndex, 1)[0];
+    console.log('Removed slot:', removedSlot, 'from position:', sourceRowIndex, sourceSlotIndex);
     
-    // Calculate insertion index after removal
+    // Calculate correct insertion index based on the movement direction
     let insertIndex = targetSlotIndex !== undefined ? targetSlotIndex : newLayout[targetRowIndex].length;
     
-    // If dropping in same row and target was after source, adjust for the removal
-    if (sourceRowIndex === targetRowIndex && targetSlotIndex !== undefined && targetSlotIndex > sourceSlotIndex) {
-      insertIndex = targetSlotIndex - 1;
+    // CRITICAL FIX: Adjust index for same-row moves after removal
+    if (sourceRowIndex === targetRowIndex && targetSlotIndex !== undefined) {
+      if (targetSlotIndex > sourceSlotIndex) {
+        // Moving right: target index should be reduced by 1 after removal
+        insertIndex = targetSlotIndex - 1;
+      } else {
+        // Moving left: use target index as-is
+        insertIndex = targetSlotIndex;
+      }
     }
     
-    // Add to target position
-    newLayout[targetRowIndex].splice(insertIndex, 0, draggedSlot);
+    // Insert at calculated position
+    newLayout[targetRowIndex].splice(insertIndex, 0, removedSlot);
     
-    console.log('After drop operation:', { insertIndex, newLayout: newLayout.map(row => [...row]) });
+    console.log('Final layout after drop:', newLayout.map((row, i) => ({ row: i, slots: [...row] })));
     
     // Clean up empty rows
     const cleanedLayout = newLayout.filter(row => row.length > 0);
@@ -308,6 +319,16 @@ export const EnhancedChassisLayoutDesigner: React.FC<EnhancedChassisLayoutDesign
     
     return () => clearTimeout(timer);
   }, [layout, visualLayout]);
+
+  // Focus canvas when switching tools or visual tab becomes active
+  useEffect(() => {
+    if (rendererRef.current && selectedTool) {
+      setTimeout(() => {
+        rendererRef.current?.focusCanvas();
+        console.log('Canvas focused for tool:', selectedTool);
+      }, 200);
+    }
+  }, [selectedTool]);
 
   return (
     <div className="space-y-4">
@@ -466,9 +487,10 @@ export const EnhancedChassisLayoutDesigner: React.FC<EnhancedChassisLayoutDesign
               </div>
               
               <div className="text-sm text-muted-foreground space-y-1">
-                <p><strong>Select Mode:</strong> Click and drag slots to move/resize them</p>
+                <p><strong>Select Mode:</strong> Click and drag slots to move/resize them. Double-click to edit.</p>
                 <p><strong>Draw Mode:</strong> Click on empty canvas to create new slots</p>
                 <p><strong>Delete:</strong> Select slot and press Delete key or right-click</p>
+                <p><strong>Keyboard:</strong> Arrow keys to move, Shift+Arrow for grid snap</p>
                 <p><strong>Grid:</strong> {gridVisible ? 'Enabled - objects snap to grid' : 'Disabled - free positioning'}</p>
               </div>
             </CardContent>
