@@ -260,13 +260,8 @@ return (
   return (
     <Card className="bg-gray-900 border-gray-800">
       <CardHeader>
-        <CardTitle className="text-white flex items-center justify-between">
-          <span>Rack Configuration - {chassis.name}</span>
-          <div className="flex items-center gap-2">
-            <Badge variant="outline" className="text-sm text-white border-gray-500">
-              {chassis.specifications?.height || (chassis as any).height || '6U'} • {chassis.specifications?.slots || (chassis as any).slots || 14} slots
-            </Badge>
-          </div>
+        <CardTitle className="text-white">
+          Rack Configuration - {chassis.name}
         </CardTitle>
       </CardHeader>
       <CardContent>

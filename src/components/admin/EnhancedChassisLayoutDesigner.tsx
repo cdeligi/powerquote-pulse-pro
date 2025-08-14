@@ -3,13 +3,14 @@
  */
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { Canvas as FabricCanvas, Rect, FabricText, Line, Group } from 'fabric';
+import { Canvas as FabricCanvas } from 'fabric';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Grid, RotateCcw, Eye, Square, Hand, ArrowUp, ArrowDown, Trash2 } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Grid, RotateCcw, Eye, Square, Hand, ArrowUp, ArrowDown, Trash2, MousePointer, Edit } from "lucide-react";
 import { toast } from "sonner";
 import { 
   ChassisVisualLayout, 
@@ -19,6 +20,8 @@ import {
   generateDefaultLayout, 
   generateDefaultVisualLayout 
 } from "@/types/product/chassis-types";
+import { EnhancedCanvasRenderer } from "./visual-canvas/EnhancedCanvasRenderer";
+import { EnhancedCanvasEventHandler } from "./visual-canvas/EnhancedCanvasEventHandler";
 
 interface EnhancedChassisLayoutDesignerProps {
   totalSlots: number;
@@ -63,7 +66,7 @@ export const EnhancedChassisLayoutDesigner: React.FC<EnhancedChassisLayoutDesign
   const [fabricCanvas, setFabricCanvas] = useState<FabricCanvas | null>(null);
   const [selectedTool, setSelectedTool] = useState<'select' | 'draw'>('select');
   const [gridVisible, setGridVisible] = useState(true);
-  const rendererRef = useRef<any>(null);
+  const rendererRef = useRef<EnhancedCanvasRenderer | null>(null);
   
   // Grid designer state
   const [dragState, setDragState] = useState<DragState>({
@@ -75,263 +78,118 @@ export const EnhancedChassisLayoutDesigner: React.FC<EnhancedChassisLayoutDesign
   const [errors, setErrors] = useState<string[]>([]);
   const [isEditing, setIsEditing] = useState(false);
 
-  // Initialize Fabric.js canvas
+  // Initialize Fabric.js canvas and renderer
   useEffect(() => {
     if (!canvasRef.current) return;
 
     const canvas = new FabricCanvas(canvasRef.current, {
       width: CANVAS_WIDTH,
       height: CANVAS_HEIGHT,
-      backgroundColor: '#f8f9fa',
-      selection: selectedTool === 'select'
+      backgroundColor: 'hsl(0 0% 100%)',
+      selection: true
     });
 
-    console.log('Canvas initialized:', canvas);
+    console.log('Enhanced canvas initialized:', canvas);
     setFabricCanvas(canvas);
     
-    // Setup canvas event handlers
-    canvas.on('object:modified', handleCanvasObjectModified);
-    canvas.on('mouse:down', handleCanvasMouseDown);
-
-    // Make canvas focusable for keyboard events
-    const canvasElement = canvas.getElement();
-    if (canvasElement) {
-      canvasElement.tabIndex = 0;
-      canvasElement.style.outline = 'none';
-    }
+    // Initialize enhanced renderer
+    const renderer = new EnhancedCanvasRenderer(canvas);
+    rendererRef.current = renderer;
 
     return () => {
+      if (rendererRef.current) {
+        rendererRef.current.dispose();
+        rendererRef.current = null;
+      }
       canvas.dispose();
     };
   }, []);
 
-  // Update canvas selection mode based on tool
+  // Render slots when layout changes
   useEffect(() => {
-    if (!fabricCanvas) return;
+    if (!fabricCanvas || !rendererRef.current) return;
     
-    fabricCanvas.selection = selectedTool === 'select';
-    fabricCanvas.defaultCursor = selectedTool === 'select' ? 'default' : 'crosshair';
-    fabricCanvas.hoverCursor = selectedTool === 'select' ? 'move' : 'crosshair';
-  }, [selectedTool, fabricCanvas]);
-
-  // Render slots on canvas
-  useEffect(() => {
-    if (!fabricCanvas) return;
-    
-    renderSlotsOnCanvas();
-  }, [fabricCanvas, visualLayout]);
-
-  const renderSlotsOnCanvas = useCallback(() => {
-    if (!fabricCanvas) return;
-    
-    fabricCanvas.clear();
-    const newSlotGroups = new Map<number, Group>();
-    
-    // Add grid if visible
-    if (gridVisible) {
-      drawGrid();
-    }
-    
-    // Add slots as grouped objects
-    visualLayout.slots.forEach((slot) => {
-      const rect = new Rect({
-        left: 0,
-        top: 0,
-        width: slot.width,
-        height: slot.height,
-        fill: 'hsl(var(--accent))',
-        stroke: 'hsl(var(--border))',
-        strokeWidth: 2,
-        cornerSize: 6,
-        transparentCorners: false,
-        borderColor: 'hsl(var(--primary))',
-        borderScaleFactor: 2,
-        hasRotatingPoint: false
-      });
-      
-      const text = new FabricText(slot.slotNumber.toString(), {
-        left: slot.width / 2,
-        top: slot.height / 2,
-        fontSize: 14,
-        fontFamily: 'Arial',
-        fill: 'hsl(var(--foreground))',
-        textAlign: 'center',
-        originX: 'center',
-        originY: 'center'
-      });
-      
-      // Create group with rect and text
-      const group = new Group([rect, text], {
-        left: slot.x,
-        top: slot.y
-      });
-      
-      // Disable rotation for the group
-      group.setControlsVisibility({
-        mtr: false // Hide rotation control
-      });
-      
-      group.set('slotNumber', slot.slotNumber);
-      newSlotGroups.set(slot.slotNumber, group);
-      fabricCanvas.add(group);
-    });
-    
-    // Store slot groups for reference
-    fabricCanvas.renderAll();
+    console.log('Updating canvas with new layout');
+    rendererRef.current.renderSlots(visualLayout.slots);
+    rendererRef.current.drawGrid(gridVisible);
   }, [fabricCanvas, visualLayout, gridVisible]);
 
-  const drawGrid = () => {
-    if (!fabricCanvas) return;
-    
-    const gridSize = 20;
-    
-    // Vertical lines
-    for (let i = 0; i <= CANVAS_WIDTH; i += gridSize) {
-      const line = new Line([i, 0, i, CANVAS_HEIGHT], {
-        stroke: 'hsl(var(--muted))',
-        strokeWidth: 1,
-        selectable: false,
-        evented: false,
-        opacity: 0.3
-      });
-      fabricCanvas.add(line);
-    }
-    
-    // Horizontal lines
-    for (let i = 0; i <= CANVAS_HEIGHT; i += gridSize) {
-      const line = new Line([0, i, CANVAS_WIDTH, i], {
-        stroke: 'hsl(var(--muted))',
-        strokeWidth: 1,
-        selectable: false,
-        evented: false,
-        opacity: 0.3
-      });
-      fabricCanvas.add(line);
-    }
-  };
+  // Handle visual layout changes from canvas
+  const handleVisualLayoutChange = useCallback((newLayout: ChassisVisualLayout) => {
+    setVisualLayout(newLayout);
+    onVisualLayoutChange?.(newLayout);
+    setIsEditing(true);
+  }, [onVisualLayoutChange]);
 
-  const handleCanvasObjectModified = (e: any) => {
-    const obj = e.target;
-    if (!obj || typeof obj.slotNumber !== 'number') return;
-    
-    const slotNumber = obj.slotNumber;
-    const group = obj as Group;
-    
-    // Get current dimensions
-    const groupWidth = group.width * group.scaleX;
-    const groupHeight = group.height * group.scaleY;
-    
-    // Snap to grid if enabled
-    const gridSize = 20;
-    const snappedX = gridVisible ? Math.round(group.left / gridSize) * gridSize : group.left;
-    const snappedY = gridVisible ? Math.round(group.top / gridSize) * gridSize : group.top;
-    
-    // Constrain to canvas bounds
-    const newX = Math.max(0, Math.min(snappedX, CANVAS_WIDTH - groupWidth));
-    const newY = Math.max(0, Math.min(snappedY, CANVAS_HEIGHT - groupHeight));
-    const newWidth = Math.max(SLOT_MIN_WIDTH, Math.min(groupWidth, CANVAS_WIDTH - newX));
-    const newHeight = Math.max(SLOT_MIN_HEIGHT, Math.min(groupHeight, CANVAS_HEIGHT - newY));
-    
-    // Update visual layout
+  // Handle slot deletion from canvas
+  const handleDeleteSlot = useCallback((slotNumber: number) => {
     const updatedLayout = {
       ...visualLayout,
-      slots: visualLayout.slots.map(slot => 
-        slot.slotNumber === slotNumber 
-          ? { ...slot, x: newX, y: newY, width: newWidth, height: newHeight }
-          : slot
-      )
+      slots: visualLayout.slots.filter(slot => slot.slotNumber !== slotNumber)
     };
     
     setVisualLayout(updatedLayout);
     onVisualLayoutChange?.(updatedLayout);
     setIsEditing(true);
-  };
+  }, [visualLayout, onVisualLayoutChange]);
 
-  const handleCanvasMouseDown = (e: any) => {
-    if (selectedTool !== 'draw') return;
-    
-    const pointer = fabricCanvas!.getPointer(e.e);
-    
-    // Find available slot number
-    const usedSlots = new Set(visualLayout.slots.map(s => s.slotNumber));
-    let nextSlotNumber = 0;
-    while (usedSlots.has(nextSlotNumber) && nextSlotNumber < totalSlots) {
-      nextSlotNumber++;
-    }
-    
-    if (nextSlotNumber >= totalSlots) {
-      toast.error("Maximum number of slots reached");
-      return;
-    }
-    
-    // Snap to grid
-    const gridSize = 20;
-    const snappedX = gridVisible ? Math.round(pointer.x / gridSize) * gridSize : pointer.x;
-    const snappedY = gridVisible ? Math.round(pointer.y / gridSize) * gridSize : pointer.y;
-    
-    // Create new slot
-    const newSlot: VisualSlotLayout = {
-      slotNumber: nextSlotNumber,
-      x: Math.max(0, Math.min(snappedX, CANVAS_WIDTH - 80)),
-      y: Math.max(0, Math.min(snappedY, CANVAS_HEIGHT - 60)),
-      width: 80,
-      height: 60
-    };
-    
-    const updatedLayout = {
-      ...visualLayout,
-      slots: [...visualLayout.slots, newSlot]
-    };
-    
-    setVisualLayout(updatedLayout);
-    onVisualLayoutChange?.(updatedLayout);
-    setIsEditing(true);
-    toast.success(`Added slot ${nextSlotNumber}`);
-  };
-
-  // Grid-based layout functions
+  // Grid-based layout functions with improved state management
   const handleDragStart = (e: React.DragEvent, slot: number, rowIndex: number, slotIndex: number) => {
     e.dataTransfer.setData("text/plain", slot.toString());
+    e.dataTransfer.effectAllowed = 'move';
+    
     setDragState({
       isDragging: true,
       draggedSlot: slot,
       sourcePosition: { rowIndex, slotIndex }
     });
+    
+    console.log('Drag started:', { slot, rowIndex, slotIndex });
   };
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
   };
 
   const handleDrop = (e: React.DragEvent, targetRowIndex: number, targetSlotIndex?: number) => {
     e.preventDefault();
     
-    if (!dragState.draggedSlot || !dragState.sourcePosition) return;
+    const draggedSlotData = e.dataTransfer.getData("text/plain");
+    const draggedSlot = parseInt(draggedSlotData);
+    
+    if (!dragState.sourcePosition || draggedSlot !== dragState.draggedSlot) {
+      console.error('Invalid drag state');
+      setDragState({ isDragging: false, draggedSlot: null, sourcePosition: null });
+      return;
+    }
     
     const newLayout = [...layout];
     const { rowIndex: sourceRowIndex, slotIndex: sourceSlotIndex } = dragState.sourcePosition;
+    
+    console.log('Dropping slot:', { draggedSlot, sourceRowIndex, sourceSlotIndex, targetRowIndex, targetSlotIndex });
     
     // Remove from source
     newLayout[sourceRowIndex].splice(sourceSlotIndex, 1);
     
     // Add to target
-    if (targetSlotIndex !== undefined) {
-      newLayout[targetRowIndex].splice(targetSlotIndex, 0, dragState.draggedSlot);
-    } else {
-      newLayout[targetRowIndex].push(dragState.draggedSlot);
-    }
+    const insertIndex = targetSlotIndex !== undefined ? targetSlotIndex : newLayout[targetRowIndex].length;
+    newLayout[targetRowIndex].splice(insertIndex, 0, draggedSlot);
     
     // Clean up empty rows
     const cleanedLayout = newLayout.filter(row => row.length > 0);
     
     setLayout(cleanedLayout);
     onLayoutChange?.(cleanedLayout);
+    setIsEditing(true);
     
     setDragState({
       isDragging: false,
       draggedSlot: null,
       sourcePosition: null
     });
+    
+    toast.success(`Moved slot ${draggedSlot} to row ${targetRowIndex + 1}`);
   };
 
   const addNewRow = () => {
@@ -376,17 +234,6 @@ export const EnhancedChassisLayoutDesigner: React.FC<EnhancedChassisLayoutDesign
     setIsEditing(true);
   };
 
-  const deleteSlotFromCanvas = (slotNumber: number) => {
-    const updatedLayout = {
-      ...visualLayout,
-      slots: visualLayout.slots.filter(slot => slot.slotNumber !== slotNumber)
-    };
-    
-    setVisualLayout(updatedLayout);
-    onVisualLayoutChange?.(updatedLayout);
-    setIsEditing(true);
-    toast.success(`Deleted slot ${slotNumber}`);
-  };
 
   const resetGridLayout = () => {
     const defaultLayout = generateDefaultLayout(totalSlots);
@@ -404,26 +251,40 @@ export const EnhancedChassisLayoutDesigner: React.FC<EnhancedChassisLayoutDesign
     onPreview?.(layout, visualLayout);
   };
 
-  // Flexible validation - only enforce completeness on save
+  // Progressive validation - show issues but don't block editing
   useEffect(() => {
     const newErrors: string[] = [];
     
-    // Only validate if not actively editing
+    // Only show validation errors, don't block editing
     if (!isEditing) {
-      if (!validateLayoutRows(layout, totalSlots)) {
-        const allSlots = layout.flat();
-        const missingSlots = Array.from({length: totalSlots}, (_, i) => i).filter(slot => !allSlots.includes(slot));
-        if (missingSlots.length > 0) {
-          newErrors.push(`Missing slots in grid: ${missingSlots.join(', ')}`);
+      const gridSlots = layout.flat();
+      const visualSlots = visualLayout.slots.map(s => s.slotNumber);
+      
+      // Check for missing slots in grid
+      if (gridSlots.length < totalSlots) {
+        const missingGridSlots = Array.from({length: totalSlots}, (_, i) => i).filter(slot => !gridSlots.includes(slot));
+        if (missingGridSlots.length > 0) {
+          newErrors.push(`Grid layout missing slots: ${missingGridSlots.join(', ')}`);
         }
       }
       
-      if (!validateVisualLayout(visualLayout, totalSlots)) {
-        const usedSlots = visualLayout.slots.map(s => s.slotNumber);
-        const missingSlots = Array.from({length: totalSlots}, (_, i) => i).filter(slot => !usedSlots.includes(slot));
-        if (missingSlots.length > 0) {
-          newErrors.push(`Missing slots in visual: ${missingSlots.join(', ')}`);
+      // Check for missing slots in visual
+      if (visualSlots.length < totalSlots) {
+        const missingVisualSlots = Array.from({length: totalSlots}, (_, i) => i).filter(slot => !visualSlots.includes(slot));
+        if (missingVisualSlots.length > 0) {
+          newErrors.push(`Visual layout missing slots: ${missingVisualSlots.join(', ')}`);
         }
+      }
+      
+      // Check for duplicate slots
+      const duplicateGridSlots = gridSlots.filter((slot, index) => gridSlots.indexOf(slot) !== index);
+      if (duplicateGridSlots.length > 0) {
+        newErrors.push(`Duplicate slots in grid: ${[...new Set(duplicateGridSlots)].join(', ')}`);
+      }
+      
+      const duplicateVisualSlots = visualSlots.filter((slot, index) => visualSlots.indexOf(slot) !== index);
+      if (duplicateVisualSlots.length > 0) {
+        newErrors.push(`Duplicate slots in visual: ${[...new Set(duplicateVisualSlots)].join(', ')}`);
       }
     }
     
@@ -490,23 +351,33 @@ export const EnhancedChassisLayoutDesigner: React.FC<EnhancedChassisLayoutDesign
                       </Button>
                     </div>
                     <div 
-                      className="flex-1 min-h-12 border-2 border-dashed border-muted-foreground/20 rounded-lg p-2 flex gap-2 items-center"
+                      className={`flex-1 min-h-12 border-2 border-dashed rounded-lg p-2 flex gap-2 items-center transition-colors ${
+                        dragState.isDragging ? 'border-primary bg-primary/5' : 'border-muted-foreground/20'
+                      }`}
                       onDragOver={handleDragOver}
                       onDrop={(e) => handleDrop(e, rowIndex)}
                     >
                       {row.map((slot, slotIndex) => (
-                        <Badge
+                        <div
                           key={`${rowIndex}-${slotIndex}`}
-                          variant="secondary"
-                          className="cursor-move hover:bg-accent"
-                          draggable
-                          onDragStart={(e) => handleDragStart(e, slot, rowIndex, slotIndex)}
+                          className="relative"
+                          onDragOver={handleDragOver}
+                          onDrop={(e) => handleDrop(e, rowIndex, slotIndex)}
                         >
-                          Slot {slot}
-                        </Badge>
+                          <Badge
+                            variant="secondary"
+                            className={`cursor-move transition-all ${
+                              dragState.draggedSlot === slot ? 'opacity-50 scale-95' : 'hover:bg-secondary/80'
+                            }`}
+                            draggable
+                            onDragStart={(e) => handleDragStart(e, slot, rowIndex, slotIndex)}
+                          >
+                            Slot {slot}
+                          </Badge>
+                        </div>
                       ))}
                       {row.length === 0 && (
-                        <span className="text-muted-foreground text-sm">Drop slots here</span>
+                        <span className="text-muted-foreground text-sm italic">Drop slots here</span>
                       )}
                     </div>
                     <Button
