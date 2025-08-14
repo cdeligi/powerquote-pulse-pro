@@ -96,14 +96,47 @@ export const EnhancedCanvasEventHandler: React.FC<EnhancedCanvasEventHandlerProp
     fabricCanvas?.renderAll();
   }, [renderer, fabricCanvas, visualLayout, onVisualLayoutChange]);
 
-  // Handle mouse down events for drawing new slots
+  // Handle all mouse down events (left-click draw, right-click context)
   const handleMouseDown = useCallback((e: any) => {
-    if (!fabricCanvas || !renderer || selectedTool !== 'draw' || !onVisualLayoutChange) return;
+    if (!fabricCanvas || !renderer) return;
 
-    const pointer = fabricCanvas.getPointer(e.e);
-    if (!pointer) return;
+    // Handle right-click context menu
+    if (e.e.button === 2) {
+      e.e.preventDefault();
+      
+      const target = e.target;
+      if (!target || target.get('type') !== 'slot') return;
 
-    console.log('Mouse down in draw mode:', pointer);
+      const slotNumber = target.get('slotNumber');
+      if (typeof slotNumber !== 'number') return;
+
+      console.log('Right-click on slot:', slotNumber);
+
+      // Select the object
+      fabricCanvas.setActiveObject(target);
+      
+      // Delete the slot
+      if (onDeleteSlot) {
+        onDeleteSlot(slotNumber);
+      } else if (onVisualLayoutChange) {
+        const updatedSlots = visualLayout.slots.filter(s => s.slotNumber !== slotNumber);
+        onVisualLayoutChange({
+          ...visualLayout,
+          slots: updatedSlots
+        });
+      }
+
+      renderer?.deleteSlot(slotNumber);
+      toast.success(`Deleted slot ${slotNumber}`);
+      return;
+    }
+
+    // Handle left-click for drawing new slots
+    if (e.e.button === 0 && selectedTool === 'draw' && onVisualLayoutChange) {
+      const pointer = fabricCanvas.getPointer(e.e);
+      if (!pointer) return;
+
+      console.log('Mouse down in draw mode:', pointer);
 
     // Find next available slot number
     const usedSlots = new Set(visualLayout.slots.map(s => s.slotNumber));
@@ -139,8 +172,9 @@ export const EnhancedCanvasEventHandler: React.FC<EnhancedCanvasEventHandlerProp
       slots: updatedSlots
     });
 
-    toast.success(`Added slot ${nextSlotNumber}`);
-  }, [fabricCanvas, renderer, selectedTool, totalSlots, visualLayout, onVisualLayoutChange]);
+      toast.success(`Added slot ${nextSlotNumber}`);
+    }
+  }, [fabricCanvas, renderer, selectedTool, totalSlots, visualLayout, onVisualLayoutChange, onDeleteSlot]);
 
   // Handle double-click for editing slots
   const handleDoubleClick = useCallback((e: any) => {
@@ -163,41 +197,6 @@ export const EnhancedCanvasEventHandler: React.FC<EnhancedCanvasEventHandlerProp
       slotName: (slotData as any)?.name
     });
   }, [fabricCanvas, selectedTool, visualLayout]);
-
-  // Handle right-click context menu
-  const handleContextMenu = useCallback((e: any) => {
-    // Only handle right-click events
-    if (e.e.button !== 2) return;
-    
-    e.e.preventDefault();
-    
-    if (!fabricCanvas) return;
-
-    const target = e.target;
-    if (!target || target.get('type') !== 'slot') return;
-
-    const slotNumber = target.get('slotNumber');
-    if (typeof slotNumber !== 'number') return;
-
-    console.log('Right-click on slot:', slotNumber);
-
-    // Select the object
-    fabricCanvas.setActiveObject(target);
-    
-    // Delete the slot
-    if (onDeleteSlot) {
-      onDeleteSlot(slotNumber);
-    } else if (onVisualLayoutChange) {
-      const updatedSlots = visualLayout.slots.filter(s => s.slotNumber !== slotNumber);
-      onVisualLayoutChange({
-        ...visualLayout,
-        slots: updatedSlots
-      });
-    }
-
-    renderer?.deleteSlot(slotNumber);
-    toast.success(`Deleted slot ${slotNumber}`);
-  }, [fabricCanvas, renderer, visualLayout, onVisualLayoutChange, onDeleteSlot]);
 
   // Handle keyboard events
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
@@ -320,7 +319,6 @@ export const EnhancedCanvasEventHandler: React.FC<EnhancedCanvasEventHandlerProp
     fabricCanvas.on('object:modified', handleObjectModified);
     fabricCanvas.on('mouse:down', handleMouseDown);
     fabricCanvas.on('mouse:dblclick', handleDoubleClick);
-    fabricCanvas.on('mouse:down', handleContextMenu);
 
     // Keyboard events
     const canvasElement = fabricCanvas.getElement();
@@ -341,7 +339,6 @@ export const EnhancedCanvasEventHandler: React.FC<EnhancedCanvasEventHandlerProp
       fabricCanvas.off('object:modified', handleObjectModified);
       fabricCanvas.off('mouse:down', handleMouseDown);
       fabricCanvas.off('mouse:dblclick', handleDoubleClick);
-      fabricCanvas.off('mouse:down', handleContextMenu);
       
       if (canvasElement) {
         canvasElement.removeEventListener('keydown', handleKeyDown);
@@ -353,7 +350,6 @@ export const EnhancedCanvasEventHandler: React.FC<EnhancedCanvasEventHandlerProp
     handleObjectModified, 
     handleMouseDown, 
     handleDoubleClick, 
-    handleContextMenu,
     handleKeyDown
   ]);
 

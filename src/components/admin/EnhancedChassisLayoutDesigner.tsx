@@ -169,19 +169,21 @@ export const EnhancedChassisLayoutDesigner: React.FC<EnhancedChassisLayoutDesign
     
     console.log('Dropping slot:', { draggedSlot, sourceRowIndex, sourceSlotIndex, targetRowIndex, targetSlotIndex });
     
-    // Calculate proper insertion index
+    // Remove from source first
+    newLayout[sourceRowIndex].splice(sourceSlotIndex, 1);
+    
+    // Calculate insertion index after removal
     let insertIndex = targetSlotIndex !== undefined ? targetSlotIndex : newLayout[targetRowIndex].length;
     
-    // If dropping in same row and after the source position, adjust index
+    // If dropping in same row and target was after source, adjust for the removal
     if (sourceRowIndex === targetRowIndex && targetSlotIndex !== undefined && targetSlotIndex > sourceSlotIndex) {
       insertIndex = targetSlotIndex - 1;
     }
     
-    // Remove from source first
-    newLayout[sourceRowIndex].splice(sourceSlotIndex, 1);
-    
     // Add to target position
     newLayout[targetRowIndex].splice(insertIndex, 0, draggedSlot);
+    
+    console.log('After drop operation:', { insertIndex, newLayout: newLayout.map(row => [...row]) });
     
     // Clean up empty rows
     const cleanedLayout = newLayout.filter(row => row.length > 0);
