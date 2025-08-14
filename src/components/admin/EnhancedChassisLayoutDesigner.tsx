@@ -20,8 +20,10 @@ import {
   generateDefaultLayout, 
   generateDefaultVisualLayout 
 } from "@/types/product/chassis-types";
-import { EnhancedCanvasRenderer } from "./visual-canvas/EnhancedCanvasRenderer";
-import { EnhancedCanvasEventHandler } from "./visual-canvas/EnhancedCanvasEventHandler";
+import { FixedCanvasRenderer } from "./visual-canvas/FixedCanvasRenderer";
+import { FixedCanvasEventHandler } from "./visual-canvas/FixedCanvasEventHandler";
+import { CanvasToolbar } from "./visual-canvas/CanvasToolbar";
+import { CanvasInstructions } from "./visual-canvas/CanvasInstructions";
 
 interface EnhancedChassisLayoutDesignerProps {
   totalSlots: number;
@@ -66,7 +68,8 @@ export const EnhancedChassisLayoutDesigner: React.FC<EnhancedChassisLayoutDesign
   const [fabricCanvas, setFabricCanvas] = useState<FabricCanvas | null>(null);
   const [selectedTool, setSelectedTool] = useState<'select' | 'draw'>('select');
   const [gridVisible, setGridVisible] = useState(true);
-  const rendererRef = useRef<EnhancedCanvasRenderer | null>(null);
+  const rendererRef = useRef<FixedCanvasRenderer | null>(null);
+  const [debugMode] = useState(true); // Enable debug mode for better troubleshooting
   
   // Grid designer state
   const [dragState, setDragState] = useState<DragState>({
@@ -85,15 +88,18 @@ export const EnhancedChassisLayoutDesigner: React.FC<EnhancedChassisLayoutDesign
     const canvas = new FabricCanvas(canvasRef.current, {
       width: CANVAS_WIDTH,
       height: CANVAS_HEIGHT,
-      backgroundColor: 'hsl(0 0% 100%)',
-      selection: true
+      backgroundColor: 'hsl(var(--background))',
+      selection: true,
+      preserveObjectStacking: true,
+      renderOnAddRemove: true,
+      stateful: true
     });
 
-    console.log('Enhanced canvas initialized:', canvas);
+    console.log('Fixed canvas initialized:', canvas);
     setFabricCanvas(canvas);
     
-    // Initialize enhanced renderer
-    const renderer = new EnhancedCanvasRenderer(canvas);
+    // Initialize fixed renderer with debug mode
+    const renderer = new FixedCanvasRenderer(canvas, debugMode);
     rendererRef.current = renderer;
 
     return () => {
@@ -110,8 +116,10 @@ export const EnhancedChassisLayoutDesigner: React.FC<EnhancedChassisLayoutDesign
     if (!fabricCanvas || !rendererRef.current) return;
     
     console.log('Updating canvas with new layout');
-    rendererRef.current.renderSlots(visualLayout.slots);
-    rendererRef.current.drawGrid(gridVisible);
+    // Use async rendering for better performance
+    rendererRef.current.renderSlots(visualLayout.slots).then(() => {
+      rendererRef.current?.drawGrid(gridVisible);
+    });
   }, [fabricCanvas, visualLayout, gridVisible]);
 
   // Handle visual layout changes from canvas
@@ -435,37 +443,16 @@ export const EnhancedChassisLayoutDesigner: React.FC<EnhancedChassisLayoutDesign
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex gap-2 items-center">
-                <Button
-                  onClick={() => setSelectedTool('select')}
-                  variant={selectedTool === 'select' ? 'default' : 'outline'}
-                  size="sm"
-                >
-                  <Hand className="h-4 w-4 mr-2" />
-                  Select
-                </Button>
-                <Button
-                  onClick={() => setSelectedTool('draw')}
-                  variant={selectedTool === 'draw' ? 'default' : 'outline'}
-                  size="sm"
-                >
-                  <Square className="h-4 w-4 mr-2" />
-                  Draw Slot
-                </Button>
-                <Separator orientation="vertical" className="h-6" />
-                <Button
-                  onClick={() => setGridVisible(!gridVisible)}
-                  variant="outline"
-                  size="sm"
-                >
-                  <Grid className="h-4 w-4 mr-2" />
-                  Grid: {gridVisible ? 'On' : 'Off'}
-                </Button>
-                <Button onClick={resetVisualLayout} variant="outline" size="sm">
-                  <RotateCcw className="h-4 w-4 mr-2" />
-                  Reset
-                </Button>
-              </div>
+              <CanvasToolbar
+                selectedTool={selectedTool}
+                onToolChange={setSelectedTool}
+                gridVisible={gridVisible}
+                onGridToggle={() => setGridVisible(!gridVisible)}
+                onReset={resetVisualLayout}
+                slotsCount={visualLayout.slots.length}
+                maxSlots={totalSlots}
+                canvasRef={canvasRef}
+              />
               
               <div className="border border-border rounded-lg overflow-hidden">
                 <canvas 
@@ -474,7 +461,7 @@ export const EnhancedChassisLayoutDesigner: React.FC<EnhancedChassisLayoutDesign
                   tabIndex={0}
                 />
                 {fabricCanvas && rendererRef.current && (
-                  <EnhancedCanvasEventHandler
+                  <FixedCanvasEventHandler
                     fabricCanvas={fabricCanvas}
                     renderer={rendererRef.current}
                     selectedTool={selectedTool}
@@ -482,17 +469,15 @@ export const EnhancedChassisLayoutDesigner: React.FC<EnhancedChassisLayoutDesign
                     visualLayout={visualLayout}
                     onVisualLayoutChange={handleVisualLayoutChange}
                     onDeleteSlot={handleDeleteSlot}
+                    debugMode={debugMode}
                   />
                 )}
               </div>
               
-              <div className="text-sm text-muted-foreground space-y-1">
-                <p><strong>Select Mode:</strong> Click and drag slots to move/resize them. Double-click to edit.</p>
-                <p><strong>Draw Mode:</strong> Click on empty canvas to create new slots</p>
-                <p><strong>Delete:</strong> Select slot and press Delete key or right-click</p>
-                <p><strong>Keyboard:</strong> Arrow keys to move, Shift+Arrow for grid snap</p>
-                <p><strong>Grid:</strong> {gridVisible ? 'Enabled - objects snap to grid' : 'Disabled - free positioning'}</p>
-              </div>
+              <CanvasInstructions
+                selectedTool={selectedTool}
+                gridVisible={gridVisible}
+              />
             </CardContent>
           </Card>
         </TabsContent>
