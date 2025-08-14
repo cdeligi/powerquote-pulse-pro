@@ -218,6 +218,45 @@ export type Database = {
           },
         ]
       }
+      chassis_slot_options: {
+        Row: {
+          chassis_type_id: string
+          created_at: string
+          id: string
+          level3_product_id: string
+          slot_number: number
+        }
+        Insert: {
+          chassis_type_id: string
+          created_at?: string
+          id?: string
+          level3_product_id: string
+          slot_number: number
+        }
+        Update: {
+          chassis_type_id?: string
+          created_at?: string
+          id?: string
+          level3_product_id?: string
+          slot_number?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chassis_slot_options_chassis_type_id_fkey"
+            columns: ["chassis_type_id"]
+            isOneToOne: false
+            referencedRelation: "chassis_types"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chassis_slot_options_level3_product_id_fkey"
+            columns: ["level3_product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       chassis_types: {
         Row: {
           code: string

@@ -13,7 +13,8 @@ interface SlotEditDialogProps {
   onOpenChange: (open: boolean) => void;
   slotNumber: number;
   slotName?: string;
-  onSave: (slotNumber: number, newSlotNumber: number, name?: string) => void;
+  imageUrl?: string;
+  onSave: (slotNumber: number, newSlotNumber: number, name?: string, imageUrl?: string) => void;
   usedSlotNumbers: Set<number>;
   maxSlots: number;
 }
@@ -23,21 +24,24 @@ export const SlotEditDialog: React.FC<SlotEditDialogProps> = ({
   onOpenChange,
   slotNumber,
   slotName,
+  imageUrl,
   onSave,
   usedSlotNumbers,
   maxSlots
 }) => {
   const [newSlotNumber, setNewSlotNumber] = useState(slotNumber);
   const [name, setName] = useState(slotName || '');
+  const [newImageUrl, setNewImageUrl] = useState(imageUrl || '');
   const [error, setError] = useState('');
 
   useEffect(() => {
     if (open) {
       setNewSlotNumber(slotNumber);
       setName(slotName || '');
+      setNewImageUrl(imageUrl || '');
       setError('');
     }
-  }, [open, slotNumber, slotName]);
+  }, [open, slotNumber, slotName, imageUrl]);
 
   const handleSave = () => {
     setError('');
@@ -54,7 +58,7 @@ export const SlotEditDialog: React.FC<SlotEditDialogProps> = ({
       return;
     }
 
-    onSave(slotNumber, newSlotNumber, name.trim() || undefined);
+    onSave(slotNumber, newSlotNumber, name.trim() || undefined, newImageUrl.trim() || undefined);
     onOpenChange(false);
   };
 
@@ -99,6 +103,18 @@ export const SlotEditDialog: React.FC<SlotEditDialogProps> = ({
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Enter slot name"
+              className="w-full"
+            />
+          </div>
+          
+          <div className="space-y-2">
+            <Label htmlFor="slot-image">Image URL (Optional)</Label>
+            <Input
+              id="slot-image"
+              type="url"
+              value={newImageUrl}
+              onChange={(e) => setNewImageUrl(e.target.value)}
+              placeholder="Enter image URL"
               className="w-full"
             />
           </div>

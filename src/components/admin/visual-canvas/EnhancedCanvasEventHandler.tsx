@@ -287,18 +287,20 @@ export const EnhancedCanvasEventHandler: React.FC<EnhancedCanvasEventHandlerProp
   const handleSlotEditSave = useCallback((
     originalSlotNumber: number, 
     newSlotNumber: number, 
-    name?: string
+    name?: string,
+    imageUrl?: string
   ) => {
     if (!onVisualLayoutChange || !renderer) return;
 
-    console.log('Saving slot edit:', { originalSlotNumber, newSlotNumber, name });
+    console.log('Saving slot edit:', { originalSlotNumber, newSlotNumber, name, imageUrl });
 
     const updatedSlots = visualLayout.slots.map(slot => 
       slot.slotNumber === originalSlotNumber 
         ? { 
             ...slot, 
             slotNumber: newSlotNumber,
-            ...(name && { name })
+            ...(name && { name }),
+            ...(imageUrl && { imageUrl })
           }
         : slot
     );
@@ -397,6 +399,7 @@ export const EnhancedCanvasEventHandler: React.FC<EnhancedCanvasEventHandlerProp
       onOpenChange={(open) => setEditDialog(prev => ({ ...prev, open }))}
       slotNumber={editDialog.slotNumber}
       slotName={editDialog.slotName}
+      imageUrl={(visualLayout.slots.find(s => s.slotNumber === editDialog.slotNumber) as any)?.imageUrl}
       onSave={handleSlotEditSave}
       usedSlotNumbers={usedSlotNumbers}
       maxSlots={totalSlots}

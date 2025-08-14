@@ -727,8 +727,8 @@ export class ProductDataService {
       code: row.code,
       name: row.name,
       totalSlots: row.total_slots,
-      cpuSlotIndex: row.cpu_slot_index,
       layoutRows: row.layout_rows,
+      visualLayout: row.visual_layout, // Map visual_layout from DB
       enabled: row.enabled,
       metadata: row.metadata || {},
       createdAt: row.created_at,
@@ -815,6 +815,74 @@ export class ProductDataService {
     if (error) {
       console.error('Error deleting chassis type:', error);
       throw new Error(`Failed to delete chassis type: ${error.message}`);
+    }
+  }
+
+  // Get allowed Level-3 products for a specific slot
+  async getAllowedLevel3ProductsForSlot(
+    chassisTypeId: string,
+    slotNumber: number
+  ): Promise<Level3Product[]> {
+    try {
+      const { data: links, error: e1 } = await supabase
+        .from('chassis_slot_options')
+        .select('level3_product_id')
+        .eq('chassis_type_id', chassisTypeId)
+        .eq('slot_number', slotNumber);
+      
+      if (e1) throw e1;
+
+      const ids = (links || []).map(l => l.level3_product_id);
+      if (!ids.length) return [];
+
+      const { data: prods, error: e2 } = await supabase
+        .from('products')
+        .select('*')
+        .in('id', ids)
+        .eq('enabled', true);
+      
+      if (e2) throw e2;
+
+      return (prods || []).map(row => this.transformDbToLevel3(row));
+    } catch (error) {
+      console.error('Error fetching allowed Level 3 products for slot:', error);
+      return [];
+    }
+  }
+
+  // Save slot options for a chassis type
+  async saveSlotOptions(
+    chassisTypeId: string,
+    slotNumber: number,
+    level3ProductIds: string[]
+  ): Promise<void> {
+    try {
+      // First, delete existing options for this slot
+      const { error: deleteError } = await supabase
+        .from('chassis_slot_options')
+        .delete()
+        .eq('chassis_type_id', chassisTypeId)
+        .eq('slot_number', slotNumber);
+
+      if (deleteError) throw deleteError;
+
+      // Then insert new options if any
+      if (level3ProductIds.length > 0) {
+        const insertData = level3ProductIds.map(productId => ({
+          chassis_type_id: chassisTypeId,
+          slot_number: slotNumber,
+          level3_product_id: productId
+        }));
+
+        const { error: insertError } = await supabase
+          .from('chassis_slot_options')
+          .insert(insertData);
+
+        if (insertError) throw insertError;
+      }
+    } catch (error) {
+      console.error('Error saving slot options:', error);
+      throw error;
     }
   }
 
