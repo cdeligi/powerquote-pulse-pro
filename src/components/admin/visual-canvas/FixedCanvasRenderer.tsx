@@ -8,6 +8,21 @@ import { getCanvasHTMLElement } from './canvasDom';
 
 const GRID_SIZE = 20;
 
+// Constants for slot validation
+const MIN_SLOT_SIZE = 8; // Minimum slot size in pixels
+
+// Utility function to sanitize slots (filter out invalid/ghost slots)
+function sanitizeSlots(slots: VisualSlotLayout[]): VisualSlotLayout[] {
+  if (!Array.isArray(slots)) return [];
+  return slots.filter(s => {
+    const w = Number(s.width ?? 0);
+    const h = Number(s.height ?? 0);
+    const x = Number(s.x ?? 0);
+    const y = Number(s.y ?? 0);
+    return isFinite(w) && isFinite(h) && w >= MIN_SLOT_SIZE && h >= MIN_SLOT_SIZE && isFinite(x) && isFinite(y);
+  });
+}
+
 export class FixedCanvasRenderer {
   private canvas: FabricCanvas;
   private slotGroups: Map<number, Group> = new Map();
@@ -170,7 +185,17 @@ export class FixedCanvasRenderer {
   async renderSlots(slots: VisualSlotLayout[]): Promise<void> {
     try {
       this.log('=== Starting slot rendering ===');
-      this.log('Input slots:', slots.length, slots);
+      this.log('Raw input slots:', slots.length, slots);
+      
+      // Sanitize slots to filter out ghost/invalid slots
+      const validSlots = sanitizeSlots(slots);
+      this.log('Valid slots after sanitization:', validSlots.length, validSlots);
+      
+      if (validSlots.length !== slots.length) {
+        const invalidCount = slots.length - validSlots.length;
+        console.warn(`Filtered out ${invalidCount} invalid/ghost slots`);
+      }
+      
       this.log('Current slot groups:', this.slotGroups.size);
       
       if (!this.canvas) {
@@ -182,7 +207,7 @@ export class FixedCanvasRenderer {
       this.log('Cleared existing slots');
 
       // Add each slot with proper error handling
-      for (const slot of slots) {
+      for (const slot of validSlots) {
         try {
           this.log('Creating slot:', slot.slotNumber, 'at position:', slot.x, slot.y);
           
@@ -214,9 +239,16 @@ export class FixedCanvasRenderer {
       const slotObjects = canvasObjects.filter(obj => obj.get('type') === 'slot');
       this.log('Slot objects on canvas:', slotObjects.length);
       
-      if (slotObjects.length !== slots.length) {
-        console.warn('Mismatch: Expected', slots.length, 'slots, but found', slotObjects.length, 'on canvas');
+      if (slotObjects.length !== validSlots.length) {
+        console.warn('Mismatch: Expected', validSlots.length, 'valid slots, but found', slotObjects.length, 'on canvas');
       }
+      
+      // Return count info for caller
+      return {
+        totalInput: slots.length,
+        validSlots: validSlots.length,
+        rendered: slotObjects.length
+      } as any;
       
     } catch (error) {
       console.error('Critical error in renderSlots:', error);

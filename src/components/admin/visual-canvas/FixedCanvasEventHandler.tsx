@@ -146,7 +146,7 @@ export const FixedCanvasEventHandler: React.FC<FixedCanvasEventHandlerProps> = (
       return;
     }
 
-    // Handle left-click for drawing new slots
+  // Handle left-click for drawing new slots
     if (e.e.button === 0 && selectedTool === 'draw' && onVisualLayoutChange) {
       const pointer = fabricCanvas.getPointer(e.e);
       if (!pointer) return;
@@ -157,15 +157,22 @@ export const FixedCanvasEventHandler: React.FC<FixedCanvasEventHandlerProps> = (
       log('Drawing new slot at:', pointer);
       setIsDrawing(true);
 
+      // Use sanitized slots for accurate count
+      const validSlots = visualLayout.slots.filter(s => {
+        const w = Number(s.width ?? 0);
+        const h = Number(s.height ?? 0);
+        return w >= 8 && h >= 8 && isFinite(w) && isFinite(h);
+      });
+
       // Find next available slot number
-      const usedSlots = new Set(visualLayout.slots.map(s => s.slotNumber));
+      const usedSlots = new Set(validSlots.map(s => s.slotNumber));
       let nextSlotNumber = 0;
       while (usedSlots.has(nextSlotNumber) && nextSlotNumber < totalSlots) {
         nextSlotNumber++;
       }
 
-      if (nextSlotNumber >= totalSlots) {
-        toast.error(`Maximum number of slots reached (${totalSlots})`);
+      if (validSlots.length >= totalSlots) {
+        toast.error(`Maximum number of valid slots reached (${totalSlots})`);
         setIsDrawing(false);
         return;
       }
