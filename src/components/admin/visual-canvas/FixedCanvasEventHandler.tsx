@@ -328,110 +328,150 @@ export const FixedCanvasEventHandler: React.FC<FixedCanvasEventHandlerProps> = (
     toast.success(`Slot ${originalSlotNumber} ${originalSlotNumber !== updatedSlot.slotNumber ? `renamed to ${updatedSlot.slotNumber}` : 'updated'}`);
   }, [visualLayout, onVisualLayoutChange, renderer, editDialog.slotNumber, log]);
 
-  // Enhanced event listeners setup with comprehensive interaction support
+  // Enhanced event listeners with immediate feedback and comprehensive debugging
   useEffect(() => {
     if (!fabricCanvas) {
       log('Canvas not ready for event setup');
       return;
     }
 
-    log('Setting up enhanced canvas event listeners for tool:', selectedTool);
+    log('=== SETTING UP CANVAS EVENTS ===');
+    log('Tool:', selectedTool, 'Canvas ready:', !!fabricCanvas);
 
-    // Canvas interaction events with detailed logging
+    // Test canvas responsiveness immediately
+    const testCanvas = () => {
+      log('Testing canvas responsiveness...');
+      const objects = fabricCanvas.getObjects();
+      log('Canvas objects count:', objects.length);
+      
+      // Add a test object to verify canvas is working
+      if (objects.length === 0) {
+        log('Canvas appears empty, this might indicate rendering issues');
+      }
+    };
+    
+    testCanvas();
+
+    // Enhanced event handlers with immediate feedback
     const wrappedObjectModified = (e: any) => {
-      log('Object modified event triggered:', e.target?.get('type'), e.target?.get('slotNumber'));
+      log('✓ Object modified event triggered:', e.target?.get('type'), e.target?.get('slotNumber'));
+      toast.success('Slot modified');
       handleObjectModified(e);
     };
 
     const wrappedMouseDown = (e: any) => {
-      log('Mouse down event:', { button: e.e.button, tool: selectedTool, hasTarget: !!e.target });
+      log('✓ Mouse down event:', { 
+        button: e.e.button, 
+        tool: selectedTool, 
+        hasTarget: !!e.target,
+        pointer: fabricCanvas.getPointer(e.e)
+      });
+      
+      // Show visual feedback for clicks
+      if (selectedTool === 'draw' && e.e.button === 0 && !e.target) {
+        toast.info('Creating new slot...');
+      }
+      
       handleMouseDown(e);
     };
 
     const wrappedDoubleClick = (e: any) => {
-      log('Double click event:', { tool: selectedTool, hasTarget: !!e.target });
+      log('✓ Double click event:', { tool: selectedTool, hasTarget: !!e.target });
+      if (e.target?.get('type') === 'slot') {
+        toast.info('Opening slot editor...');
+      }
       handleDoubleClick(e);
     };
 
-    // Register enhanced event handlers
+    // Register all event handlers
     fabricCanvas.on('object:modified', wrappedObjectModified);
     fabricCanvas.on('mouse:down', wrappedMouseDown);
     fabricCanvas.on('mouse:dblclick', wrappedDoubleClick);
     
-    // Fallback: treat a second click as dblclick for better reliability
+    // Additional event for debugging
+    fabricCanvas.on('mouse:up', (e: any) => {
+      log('Mouse up event:', { hasTarget: !!e.target });
+    });
+    
+    // Fallback double-click detection
     fabricCanvas.on('mouse:down', (e: any) => {
-      if (e?.e?.detail === 2) handleDoubleClick(e);
+      if (e?.e?.detail === 2) {
+        log('Fallback double-click detected');
+        handleDoubleClick(e);
+      }
     });
 
-    // Configure canvas interaction properties based on selected tool
+    // Configure canvas interaction properties
     const isSelectMode = selectedTool === 'select';
     fabricCanvas.selection = isSelectMode;
-    fabricCanvas.isDrawingMode = false; // We handle drawing manually for better control
+    fabricCanvas.isDrawingMode = false;
     
-    // Enhanced cursor management with tool-specific behavior
+    // Tool-specific cursor and behavior
     if (isSelectMode) {
       fabricCanvas.defaultCursor = 'default';
       fabricCanvas.hoverCursor = 'move';
       fabricCanvas.moveCursor = 'move';
-      fabricCanvas.freeDrawingCursor = 'default';
-      log('Canvas configured for SELECT mode');
+      log('✓ Canvas configured for SELECT mode');
+      toast.info('Select mode: Click and drag to move/resize slots');
     } else {
       fabricCanvas.defaultCursor = 'crosshair';
       fabricCanvas.hoverCursor = 'crosshair';
       fabricCanvas.moveCursor = 'crosshair';
-      fabricCanvas.freeDrawingCursor = 'crosshair';
-      log('Canvas configured for DRAW mode');
+      log('✓ Canvas configured for DRAW mode');
+      toast.info('Draw mode: Click empty space to create slots');
     }
 
-    // Enhanced keyboard event handling
+    // Enhanced keyboard and focus setup
     const canvasElement = getCanvasHTMLElement(fabricCanvas);
     if (canvasElement) {
-      // Ensure proper element configuration for interaction
       canvasElement.tabIndex = 0;
       canvasElement.style.outline = 'none';
       canvasElement.style.userSelect = 'none';
       (canvasElement.style as any).webkitUserSelect = 'none';
       
       canvasElement.addEventListener('keydown', handleKeyDown, { passive: false });
-      log('Keyboard events configured for canvas');
       
-      // Focus management for immediate interaction
-      requestAnimationFrame(() => {
+      // Immediate focus with feedback
+      const focusCanvas = () => {
         canvasElement.focus({ preventScroll: true });
-        log('Canvas automatically focused');
-      });
+        log('✓ Canvas focused and ready for interaction');
+        
+        // Visual focus indicator
+        canvasElement.style.border = '2px solid #2563eb';
+        setTimeout(() => {
+          canvasElement.style.border = '1px solid #e2e8f0';
+        }, 1000);
+      };
+      
+      requestAnimationFrame(focusCanvas);
     }
 
-    // Enhanced right-click context menu with proper prevention
+    // Right-click handling
     const canvasEl = getCanvasHTMLElement(fabricCanvas);
     if (canvasEl) {
       const preventContextMenu = (e: MouseEvent) => {
         e.preventDefault();
         e.stopPropagation();
-        log('Context menu prevented, right-click handling active');
         return false;
       };
       
       canvasEl.addEventListener('contextmenu', preventContextMenu, { passive: false });
-      
-      // Additional right-click configuration
       canvasEl.oncontextmenu = () => false;
     }
 
-    log('Canvas event listeners setup completed');
+    log('✓ Event listeners setup completed successfully');
 
     return () => {
-      log('Cleaning up enhanced canvas event listeners');
+      log('Cleaning up canvas event listeners');
       
       fabricCanvas.off('object:modified', wrappedObjectModified);
       fabricCanvas.off('mouse:down', wrappedMouseDown);
       fabricCanvas.off('mouse:dblclick', wrappedDoubleClick);
+      fabricCanvas.off('mouse:up');
       
       if (canvasElement) {
         canvasElement.removeEventListener('keydown', handleKeyDown);
       }
-      
-      log('Event listeners cleanup completed');
     };
   }, [
     fabricCanvas, 
