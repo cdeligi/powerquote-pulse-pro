@@ -169,11 +169,18 @@ export const EnhancedChassisLayoutDesigner: React.FC<EnhancedChassisLayoutDesign
     
     console.log('Dropping slot:', { draggedSlot, sourceRowIndex, sourceSlotIndex, targetRowIndex, targetSlotIndex });
     
-    // Remove from source
+    // Calculate proper insertion index
+    let insertIndex = targetSlotIndex !== undefined ? targetSlotIndex : newLayout[targetRowIndex].length;
+    
+    // If dropping in same row and after the source position, adjust index
+    if (sourceRowIndex === targetRowIndex && targetSlotIndex !== undefined && targetSlotIndex > sourceSlotIndex) {
+      insertIndex = targetSlotIndex - 1;
+    }
+    
+    // Remove from source first
     newLayout[sourceRowIndex].splice(sourceSlotIndex, 1);
     
-    // Add to target
-    const insertIndex = targetSlotIndex !== undefined ? targetSlotIndex : newLayout[targetRowIndex].length;
+    // Add to target position
     newLayout[targetRowIndex].splice(insertIndex, 0, draggedSlot);
     
     // Clean up empty rows
@@ -443,7 +450,17 @@ export const EnhancedChassisLayoutDesigner: React.FC<EnhancedChassisLayoutDesign
                   className="bg-background focus:outline-none focus:ring-2 focus:ring-primary"
                   tabIndex={0}
                 />
-                {/* Keyboard handling is done through canvas event listeners */}
+                {fabricCanvas && rendererRef.current && (
+                  <EnhancedCanvasEventHandler
+                    fabricCanvas={fabricCanvas}
+                    renderer={rendererRef.current}
+                    selectedTool={selectedTool}
+                    totalSlots={totalSlots}
+                    visualLayout={visualLayout}
+                    onVisualLayoutChange={handleVisualLayoutChange}
+                    onDeleteSlot={handleDeleteSlot}
+                  />
+                )}
               </div>
               
               <div className="text-sm text-muted-foreground space-y-1">
