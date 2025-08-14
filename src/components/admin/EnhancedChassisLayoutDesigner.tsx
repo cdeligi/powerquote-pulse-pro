@@ -94,114 +94,164 @@ export const EnhancedChassisLayoutDesigner: React.FC<EnhancedChassisLayoutDesign
     });
   };
 
-  // Enhanced Fabric.js canvas initialization with comprehensive setup
+  // State for canvas initialization
+  const [canvasInitialized, setCanvasInitialized] = useState(false);
+  const [initializationError, setInitializationError] = useState<string | null>(null);
+  const [initializationRetries, setInitializationRetries] = useState(0);
+  const maxRetries = 3;
+
+  // Enhanced Fabric.js canvas initialization with robust error handling and retry mechanism
   useEffect(() => {
-    if (!canvasRef.current) {
-      console.log('Canvas ref not ready');
-      return;
-    }
-
-    console.log('Initializing enhanced canvas with comprehensive configuration...');
-
-    // Create canvas with optimal settings for stability and interaction
-    const canvas = new FabricCanvas(canvasRef.current, {
-      width: CANVAS_WIDTH,
-      height: CANVAS_HEIGHT,
-      backgroundColor: 'hsl(var(--background))',
-      selection: true,
-      preserveObjectStacking: true,
-      renderOnAddRemove: true,
-      stateful: true,
-      interactive: true,
-      enableRetinaScaling: true,
-      // Enhanced event handling for better reliability
-      allowTouchScrolling: false,
-      stopContextMenu: true,
-      fireRightClick: true,
-      fireMiddleClick: false,
-      // Prevent canvas from being too sensitive
-      targetFindTolerance: 5,
-      // Ensure proper object selection
-      perPixelTargetFind: true,
-      // Better performance settings
-      skipTargetFind: false
-    });
-
-    // Enhanced canvas element configuration for robust interaction
-    const canvasElement = getCanvasHTMLElement(canvas);
-    if (canvasElement) {
-      canvasElement.tabIndex = 0; // Make focusable for keyboard events
-      canvasElement.style.outline = 'none';
-      canvasElement.style.userSelect = 'none';
-      canvasElement.style.webkitUserSelect = 'none';
-      canvasElement.style.touchAction = 'none'; // Prevent touch scrolling
-      canvasElement.style.position = 'relative'; // Ensure proper positioning
-      
-      // Add visual debugging border in debug mode
-      if (debugMode) {
-        canvasElement.style.border = '2px solid hsl(var(--primary) / 0.5)';
+    const initializeCanvas = async () => {
+      if (!canvasRef.current) {
+        console.log('Canvas ref not ready, waiting...');
+        return;
       }
+
+      // Clear previous error state
+      setInitializationError(null);
       
-      console.log('Canvas DOM element configured:', {
-        tabIndex: canvasElement.tabIndex,
-        style: {
-          outline: canvasElement.style.outline,
-          userSelect: canvasElement.style.userSelect,
-          touchAction: canvasElement.style.touchAction
-        }
-      });
-    }
-
-    // Verify canvas is properly created and accessible
-    console.log('Enhanced canvas initialized with verified properties:', {
-      width: canvas.width,
-      height: canvas.height,
-      selection: canvas.selection,
-      elementReady: !!canvasElement,
-      backgroundColor: canvas.backgroundColor
-    });
-
-    // Test canvas basic functionality
-    try {
-      canvas.requestRenderAll();
-      console.log('Canvas initial render test successful');
-    } catch (error) {
-      console.error('Canvas initial render test failed:', error);
-    }
-
-    setFabricCanvas(canvas);
-    
-    // Initialize enhanced renderer with comprehensive error handling
-    try {
-      const renderer = new FixedCanvasRenderer(canvas, debugMode);
-      rendererRef.current = renderer;
-      console.log('Canvas renderer initialized successfully');
-      
-      // Test renderer basic functionality
-      renderer.drawGrid(true);
-      renderer.drawGrid(false);
-      console.log('Renderer basic functionality test successful');
-      
-    } catch (error) {
-      console.error('Renderer initialization failed:', error);
-      toast.error('Canvas renderer initialization failed');
-    }
-
-    return () => {
-      console.log('Starting comprehensive canvas cleanup...');
       try {
-        if (rendererRef.current) {
-          rendererRef.current.dispose();
-          rendererRef.current = null;
-          console.log('Renderer disposed successfully');
+        console.log(`Initializing canvas (attempt ${initializationRetries + 1}/${maxRetries + 1})...`);
+        
+        // Verify DOM element is properly mounted and visible
+        const canvasElement = canvasRef.current;
+        const rect = canvasElement.getBoundingClientRect();
+        
+        console.log('Canvas DOM validation:', {
+          element: !!canvasElement,
+          inDocument: document.body.contains(canvasElement),
+          visible: rect.width > 0 && rect.height > 0,
+          rect: { width: rect.width, height: rect.height, x: rect.x, y: rect.y },
+          parentElement: !!canvasElement.parentElement
+        });
+
+        if (rect.width === 0 || rect.height === 0) {
+          throw new Error('Canvas element has zero dimensions');
         }
-        canvas.dispose();
-        console.log('Canvas disposed successfully');
+
+        // Create canvas with defensive configuration
+        console.log('Creating Fabric.js canvas instance...');
+        const canvas = new FabricCanvas(canvasElement, {
+          width: CANVAS_WIDTH,
+          height: CANVAS_HEIGHT,
+          backgroundColor: '#ffffff', // Use explicit white for better visibility
+          selection: true,
+          preserveObjectStacking: true,
+          renderOnAddRemove: true,
+          stateful: true,
+          interactive: true,
+          enableRetinaScaling: true,
+          allowTouchScrolling: false,
+          stopContextMenu: true,
+          fireRightClick: true,
+          fireMiddleClick: false,
+          targetFindTolerance: 5,
+          perPixelTargetFind: true,
+          skipTargetFind: false
+        });
+
+        // Verify canvas was created successfully
+        if (!canvas || typeof canvas.getWidth !== 'function') {
+          throw new Error('Fabric.js canvas creation failed');
+        }
+
+        console.log('Canvas created successfully:', {
+          width: canvas.getWidth(),
+          height: canvas.getHeight(),
+          backgroundColor: canvas.backgroundColor
+        });
+
+        // Enhanced canvas element configuration
+        const htmlCanvasElement = getCanvasHTMLElement(canvas);
+        if (htmlCanvasElement) {
+          htmlCanvasElement.tabIndex = 0;
+          htmlCanvasElement.style.outline = 'none';
+          htmlCanvasElement.style.userSelect = 'none';
+          htmlCanvasElement.style.webkitUserSelect = 'none';
+          htmlCanvasElement.style.touchAction = 'none';
+          htmlCanvasElement.style.position = 'relative';
+          htmlCanvasElement.style.border = debugMode ? '2px solid #3b82f6' : 'none';
+          
+          console.log('Canvas DOM element configured');
+        }
+
+        // Test basic canvas functionality
+        console.log('Testing canvas basic functionality...');
+        canvas.requestRenderAll();
+        
+        // Wait for render to complete
+        await new Promise(resolve => setTimeout(resolve, 50));
+
+        // Initialize renderer
+        console.log('Initializing canvas renderer...');
+        const renderer = new FixedCanvasRenderer(canvas, debugMode);
+        rendererRef.current = renderer;
+
+        // Test renderer functionality
+        renderer.drawGrid(true);
+        await new Promise(resolve => setTimeout(resolve, 10));
+        renderer.drawGrid(false);
+        
+        console.log('Canvas and renderer initialized successfully');
+
+        // Set canvas state
+        setFabricCanvas(canvas);
+        setCanvasInitialized(true);
+        setInitializationRetries(0);
+        
+        toast.success('Canvas initialized successfully!');
+
       } catch (error) {
-        console.error('Error during canvas cleanup:', error);
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        console.error('Canvas initialization failed:', error);
+        
+        setInitializationError(errorMessage);
+        
+        // Retry logic
+        if (initializationRetries < maxRetries) {
+          console.log(`Retrying canvas initialization in 1 second... (${initializationRetries + 1}/${maxRetries})`);
+          setInitializationRetries(prev => prev + 1);
+          
+          setTimeout(() => {
+            initializeCanvas();
+          }, 1000);
+        } else {
+          console.error('Canvas initialization failed after maximum retries');
+          toast.error(`Canvas initialization failed: ${errorMessage}`);
+        }
       }
     };
-  }, [debugMode]);
+
+    // Start initialization with slight delay for DOM readiness
+    const timeoutId = setTimeout(initializeCanvas, 100);
+
+    return () => {
+      clearTimeout(timeoutId);
+      
+      // Cleanup
+      if (fabricCanvas) {
+        try {
+          if (rendererRef.current) {
+            rendererRef.current.dispose();
+            rendererRef.current = null;
+          }
+          fabricCanvas.dispose();
+          console.log('Canvas cleaned up successfully');
+        } catch (error) {
+          console.error('Error during canvas cleanup:', error);
+        }
+      }
+    };
+  }, [debugMode, initializationRetries]);
+
+  // Manual initialization trigger for failed cases
+  const retryCanvasInitialization = () => {
+    setInitializationRetries(0);
+    setInitializationError(null);
+    setCanvasInitialized(false);
+    setFabricCanvas(null);
+  };
 
   // Enhanced slot rendering with sanitization and comprehensive debugging
   useEffect(() => {
@@ -661,20 +711,51 @@ export const EnhancedChassisLayoutDesigner: React.FC<EnhancedChassisLayoutDesign
                 canvasRef={canvasRef}
               />
               
+              {/* Canvas Initialization Status */}
+              {!canvasInitialized && !initializationError && (
+                <Alert>
+                  <AlertDescription>
+                    Initializing Canvas... {initializationRetries > 0 && `(Retry ${initializationRetries}/${maxRetries})`}
+                  </AlertDescription>
+                </Alert>
+              )}
+              
+              {initializationError && (
+                <Alert variant="destructive">
+                  <AlertDescription className="flex items-center justify-between">
+                    <span>Canvas initialization failed: {initializationError}</span>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={retryCanvasInitialization}
+                      disabled={initializationRetries >= maxRetries}
+                    >
+                      Retry
+                    </Button>
+                  </AlertDescription>
+                </Alert>
+              )}
+
               {/* Enhanced Canvas Section with comprehensive debugging */}
               <div className="space-y-4">
                 {/* Status Bar with debug information */}
-                {debugMode && (
+                {debugMode && canvasInitialized && (
                   <Alert>
                     <AlertDescription className="flex items-center justify-between">
                       <span>
                         Canvas ready: {fabricCanvas ? 'Yes' : 'No'} | 
                         Slots: {sanitizeSlots(visualLayout.slots).length}/{totalSlots} valid | 
-                        Objects: {fabricCanvas?.getObjects().length || 0}
+                        Objects: {fabricCanvas?.getObjects().length || 0} |
+                        Grid: {gridVisible ? 'On' : 'Off'}
                       </span>
-                      <Button onClick={resetVisualLayout} variant="outline" size="sm">
-                        Reset Canvas
-                      </Button>
+                      <div className="flex gap-2">
+                        <Button onClick={retryCanvasInitialization} variant="outline" size="sm">
+                          Restart Canvas
+                        </Button>
+                        <Button onClick={resetVisualLayout} variant="outline" size="sm">
+                          Reset Layout
+                        </Button>
+                      </div>
                     </AlertDescription>
                   </Alert>
                 )}
