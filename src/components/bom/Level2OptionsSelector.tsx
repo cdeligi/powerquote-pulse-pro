@@ -131,44 +131,59 @@ const Level2OptionsSelector = ({
                       Requires chassis configuration
                     </p>
                   )}
-                  <div className="flex justify-between items-center mb-3">
-                    {canSeePrices && option.price && (
-                      <span className="text-foreground font-medium">
-                        ${option.price.toLocaleString()}
-                      </span>
+                   <div className="flex justify-between items-center mb-3">
+                     {canSeePrices && option.price && (
+                       <span className="text-foreground font-medium">
+                         ${option.price.toLocaleString()}
+                       </span>
+                     )}
+                   </div>
+                   
+                    {/* Add to Bill of Material Button */}
+                    {onAddToBOM && !requiresChassisConfig && (
+                      <div className="mb-3">
+                         <Button
+                           onClick={(e) => {
+                             e.stopPropagation();
+                             onAddToBOM(option);
+                           }}
+                           size="sm"
+                           className="w-full"
+                         >
+                           Add to Bill of Material
+                         </Button>
+                      </div>
                     )}
-                    {option.partNumber && (
-                      <Badge variant="outline" className="text-xs">
-                        {option.partNumber}
-                      </Badge>
+                   
+                    {/* Part Number Configuration Button for non-chassis products */}
+                    {!requiresChassisConfig && (
+                      <div className="mb-3">
+                         <Button
+                           onClick={(e) => {
+                             e.stopPropagation();
+                             // TODO: Implement part number configuration modal
+                           }}
+                           variant="outline"
+                           size="sm"
+                           className="w-full"
+                         >
+                           Configure Part Number
+                         </Button>
+                      </div>
                     )}
-                  </div>
-                  
-                   {/* Add to Bill of Material Button */}
-                   {onAddToBOM && !requiresChassisConfig && (
-                     <div className="mb-3">
-                        <Button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onAddToBOM(option);
-                          }}
-                          size="sm"
-                          className="w-full"
-                        >
-                          Add to Bill of Material
-                        </Button>
+                   
+                   {option.specifications && (
+                     <div className="mt-2 p-3 border-2 border-destructive rounded-md bg-destructive/5">
+                       {Object.entries(option.specifications)
+                         .filter(([key]) => key !== 'partNumber' && key !== 'productInfoUrl')
+                         .map(([key, value]) => (
+                           <div key={key} className="flex justify-between py-1 text-sm">
+                             <span className="font-medium">{key}:</span>
+                             <span>{Array.isArray(value) ? value.join(', ') : value}</span>
+                           </div>
+                         ))}
                      </div>
                    )}
-                  
-                  {option.specifications && (
-                    <div className="mt-2 flex flex-wrap gap-1">
-                      {Object.entries(option.specifications).map(([key, value]) => (
-                        <Badge key={key} variant="secondary" className="text-xs">
-                          {key}: {value}
-                        </Badge>
-                      ))}
-                    </div>
-                  )}
                 </CardContent>
               </Card>
             );
