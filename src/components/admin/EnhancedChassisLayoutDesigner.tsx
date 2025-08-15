@@ -115,23 +115,19 @@ export const EnhancedChassisLayoutDesigner: React.FC<EnhancedChassisLayoutDesign
       setInitializationError(null);
       
       try {
-        if (debugMode) {
-          console.log(`Initializing canvas (attempt ${initializationRetries + 1}/${maxRetries + 1})...`);
-        }
+        console.log(`Initializing canvas (attempt ${initializationRetries + 1}/${maxRetries + 1})...`);
         
         // Verify DOM element is properly mounted and visible
         const canvasElement = canvasRef.current;
         const rect = canvasElement.getBoundingClientRect();
         
-        if (debugMode) {
-          console.log('Canvas DOM validation:', {
-            element: !!canvasElement,
-            inDocument: document.body.contains(canvasElement),
-            visible: rect.width > 0 && rect.height > 0,
-            rect: { width: rect.width, height: rect.height, x: rect.x, y: rect.y },
-            parentElement: !!canvasElement.parentElement
-          });
-        }
+        console.log('Canvas DOM validation:', {
+          element: !!canvasElement,
+          inDocument: document.body.contains(canvasElement),
+          visible: rect.width > 0 && rect.height > 0,
+          rect: { width: rect.width, height: rect.height, x: rect.x, y: rect.y },
+          parentElement: !!canvasElement.parentElement
+        });
 
         if (rect.width === 0 || rect.height === 0) {
           throw new Error('Canvas element has zero dimensions');
@@ -291,10 +287,12 @@ export const EnhancedChassisLayoutDesigner: React.FC<EnhancedChassisLayoutDesign
     setFabricCanvas(null);
   };
 
-  // Enhanced slot rendering with sanitization and comprehensive debugging
+  // Enhanced slot rendering with sanitization and one-time logging
   useEffect(() => {
     if (!fabricCanvas || !rendererRef.current) {
-      console.log('Canvas or renderer not ready for slot rendering');
+      if (debugMode) {
+        console.log('Canvas or renderer not ready for slot rendering');
+      }
       return;
     }
     
