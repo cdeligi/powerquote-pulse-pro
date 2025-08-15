@@ -99,6 +99,7 @@ export const EnhancedChassisLayoutDesigner: React.FC<EnhancedChassisLayoutDesign
   const [initializationError, setInitializationError] = useState<string | null>(null);
   const [initializationRetries, setInitializationRetries] = useState(0);
   const maxRetries = 3;
+  const loggedCanvasNotReady = useRef(false);
 
   // Enhanced Fabric.js canvas initialization with robust error handling and retry mechanism
   // Only initialize when component is active and visible
@@ -202,6 +203,7 @@ export const EnhancedChassisLayoutDesigner: React.FC<EnhancedChassisLayoutDesign
         setFabricCanvas(canvas);
         setCanvasInitialized(true);
         setInitializationRetries(0);
+        loggedCanvasNotReady.current = false; // Reset logging flag
         
         toast.success('Canvas initialized successfully!');
 
@@ -290,8 +292,10 @@ export const EnhancedChassisLayoutDesigner: React.FC<EnhancedChassisLayoutDesign
   // Enhanced slot rendering with sanitization and one-time logging
   useEffect(() => {
     if (!fabricCanvas || !rendererRef.current) {
-      if (debugMode) {
+      // Only log once to avoid spam
+      if (debugMode && !loggedCanvasNotReady.current) {
         console.log('Canvas or renderer not ready for slot rendering');
+        loggedCanvasNotReady.current = true;
       }
       return;
     }
