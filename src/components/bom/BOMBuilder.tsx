@@ -190,9 +190,11 @@ const toggleAccessory = (id: string) => {
   const handleAddToBOM = (product: Level1Product | Level2Product | Level3Product) => {
     console.log('Adding product to BOM:', product.name);
     
-    // For Level 2 products, use the Admin-configured prefix as part number
+    // For Level 2 products with "Not Applicable" chassis type, use the Admin-configured prefix as part number
     let partNumber = product.partNumber;
-    if ('partNumberPrefix' in product && product.partNumberPrefix) {
+    if ('chassisType' in product && product.chassisType === 'N/A' && 'partNumberPrefix' in product && product.partNumberPrefix) {
+      partNumber = String(product.partNumberPrefix);
+    } else if ('partNumberPrefix' in product && product.partNumberPrefix) {
       partNumber = String(product.partNumberPrefix);
     }
     
@@ -258,6 +260,31 @@ const handleChassisSelect = (chassis: Level2Product) => {
         setCodeMap(codes);
         setLevel3Products(l3);
         setAutoPlaced(false);
+        
+        // Auto-include standard items based on admin configuration
+        const autoIncludeAssignments: Record<number, Level3Product> = {};
+        
+        // Check for standard items to auto-include
+        Object.entries(codes).forEach(([l3Id, def]) => {
+          if (def?.is_standard && !def?.outside_chassis) {
+            const standardProduct = l3.find(p => p.id === l3Id);
+            if (standardProduct && def.standard_position !== null && def.standard_position !== undefined) {
+              // Handle special case for position 0 (CPU position)
+              const position = def.standard_position === 0 ? 1 : def.standard_position;
+              autoIncludeAssignments[position] = standardProduct;
+              console.log(`Auto-including standard item "${standardProduct.name}" at position ${position}`);
+            }
+          }
+        });
+        
+        if (Object.keys(autoIncludeAssignments).length > 0) {
+          setSlotAssignments(autoIncludeAssignments);
+          toast({
+            title: 'Standard Items Added',
+            description: `${Object.keys(autoIncludeAssignments).length} standard items have been automatically included.`,
+          });
+        }
+        
       } catch (e) {
         console.error('Failed to load PN config/codes for chassis:', e);
       }
