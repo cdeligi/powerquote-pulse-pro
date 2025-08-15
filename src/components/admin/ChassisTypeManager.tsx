@@ -245,16 +245,33 @@ export const ChassisTypeManager: React.FC = () => {
                           />
                         </div>
                       </div>
-                      <div>
-                        <Label htmlFor="create-slots">Total Slots *</Label>
-                        <Input
-                          id="create-slots"
-                          type="number"
-                          min="1"
-                          value={createFormData.totalSlots}
-                          onChange={(e) => setCreateFormData(prev => ({ ...prev, totalSlots: parseInt(e.target.value) || 0 }))}
-                          required
-                        />
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <Label htmlFor="create-slots">Total Slots *</Label>
+                          <Input
+                            id="create-slots"
+                            type="number"
+                            min="1"
+                            value={createFormData.totalSlots}
+                            onChange={(e) => setCreateFormData(prev => ({ ...prev, totalSlots: parseInt(e.target.value) || 0 }))}
+                            required
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="create-numbering">Slot numbering starts at *</Label>
+                          <select
+                            id="create-numbering"
+                            value={createFormData.metadata?.slotNumberingStart || 0}
+                            onChange={(e) => setCreateFormData(prev => ({ 
+                              ...prev, 
+                              metadata: { ...prev.metadata, slotNumberingStart: parseInt(e.target.value) }
+                            }))}
+                            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
+                          >
+                            <option value={0}>0 (zero-based)</option>
+                            <option value={1}>1 (one-based)</option>
+                          </select>
+                        </div>
                       </div>
                       <div className="flex items-center space-x-2">
                         <Switch
@@ -347,14 +364,30 @@ export const ChassisTypeManager: React.FC = () => {
                               />
                             </div>
                           </div>
-                          <div>
-                            <Label>Total Slots *</Label>
-                            <Input
-                              type="number"
-                              min="1"
-                              value={editFormData.totalSlots || 0}
-                              onChange={(e) => setEditFormData(prev => ({ ...prev, totalSlots: parseInt(e.target.value) || 0 }))}
-                            />
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <Label>Total Slots *</Label>
+                              <Input
+                                type="number"
+                                min="1"
+                                value={editFormData.totalSlots || 0}
+                                onChange={(e) => setEditFormData(prev => ({ ...prev, totalSlots: parseInt(e.target.value) || 0 }))}
+                              />
+                            </div>
+                            <div>
+                              <Label>Slot numbering starts at *</Label>
+                              <select
+                                value={editFormData.metadata?.slotNumberingStart || 0}
+                                onChange={(e) => setEditFormData(prev => ({ 
+                                  ...prev, 
+                                  metadata: { ...prev.metadata, slotNumberingStart: parseInt(e.target.value) }
+                                }))}
+                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
+                              >
+                                <option value={0}>0 (zero-based)</option>
+                                <option value={1}>1 (one-based)</option>
+                              </select>
+                            </div>
                           </div>
                           <div className="flex items-center space-x-2">
                             <Switch
@@ -416,6 +449,7 @@ export const ChassisTypeManager: React.FC = () => {
                           <div className="text-sm text-muted-foreground space-y-1">
                             <p><strong>Code:</strong> {chassisType.code}</p>
                             <p><strong>Total Slots:</strong> {chassisType.totalSlots}</p>
+                            <p><strong>Slot Numbering:</strong> Starts at {chassisType.metadata?.slotNumberingStart || 0}</p>
                             <p><strong>Created:</strong> {new Date(chassisType.createdAt).toLocaleDateString()}</p>
                           </div>
                         </div>

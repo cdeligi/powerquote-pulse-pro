@@ -72,11 +72,16 @@ const getSlotColor = (slot: number) => {
       }
       return card.type.charAt(0).toUpperCase() + card.type.slice(1);
     }
-    // For empty slots, just show the slot number
-    return `${slot}`;
+    // For empty slots, show the display label based on chassis numbering
+    const slotNumberingStart = chassisType?.metadata?.slotNumberingStart || 0;
+    const displayNumber = slot + slotNumberingStart;
+    return `${displayNumber}`;
   };
 
 const getSlotTitle = (slot: number) => {
+  const slotNumberingStart = chassisType?.metadata?.slotNumberingStart || 0;
+  const displayNumber = slot + slotNumberingStart;
+  
   if (slotAssignments[slot]) {
     const card = slotAssignments[slot];
     const display = card?.type ? card.type.charAt(0).toUpperCase() + card.type.slice(1) : card?.name;
@@ -91,9 +96,9 @@ const getSlotTitle = (slot: number) => {
   // Empty slots - show standard hints when available
   const hints = standardSlotHints?.[slot];
   if (hints && hints.length) {
-    return `Slot ${slot} - Standard: ${hints.join(', ')}`;
+    return `Slot ${displayNumber} - Standard: ${hints.join(', ')}`;
   }
-  return `Slot ${slot} - Click to add card`;
+  return `Slot ${displayNumber} - Click to add card`;
 };
 
   const isSlotClickable = (slot: number) => {

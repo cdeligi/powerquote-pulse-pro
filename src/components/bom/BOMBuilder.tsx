@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { BOMItem, Level1Product, Level2Product, Level3Product, Level3Customization } from '@/types/product';
+import { BOMItem, Level1Product, Level2Product, Level3Product, Level3Customization, ChassisType } from '@/types/product';
 import Level2OptionsSelector from './Level2OptionsSelector';
 import ChassisSelector from './ChassisSelector';
 import RackVisualizer from './RackVisualizer';
@@ -41,6 +41,9 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
   const [bomItems, setBomItems] = useState<BOMItem[]>([]);
   const [activeTab, setActiveTab] = useState<string>('');
   const [hasRemoteDisplay, setHasRemoteDisplay] = useState<boolean>(false);
+  const [chassisTypes, setChassisTypes] = useState<ChassisType[]>([]);
+  const [selectedChassisType, setSelectedChassisType] = useState<ChassisType | null>(null);
+  const [currentChassisType, setCurrentChassisType] = useState<ChassisType | null>(null);
   const [configuringCard, setConfiguringCard] = useState<BOMItem | null>(null);
   const [configuringBOMItem, setConfiguringBOMItem] = useState<BOMItem | null>(null);
   const [quoteFields, setQuoteFields] = useState<Record<string, any>>({});
@@ -58,22 +61,6 @@ const [level3Products, setLevel3Products] = useState<Level3Product[]>([]);
 const [autoPlaced, setAutoPlaced] = useState(false);
 const [selectedAccessories, setSelectedAccessories] = useState<Set<string>>(new Set());
 
-// Hints for standard slot positions not yet filled (top-level to avoid conditional hooks)
-const standardSlotHints = useMemo(() => {
-  const hints: Record<number, string[]> = {};
-  const nameById = Object.fromEntries(level3Products.map(p => [p.id, p.name] as const));
-  Object.entries(codeMap).forEach(([l3Id, def]) => {
-    if (!def?.is_standard || def?.outside_chassis) return;
-    const pos = def.standard_position;
-    // Skip CPU std position (0) and ignore outside-chassis items
-    if (pos === 0 || pos === null || pos === undefined) return;
-    if (!slotAssignments[pos]) {
-      const name = nameById[l3Id] || 'Standard Item';
-      hints[pos] = hints[pos] ? [...hints[pos], name] : [name];
-    }
-  });
-  return hints;
-}, [codeMap, level3Products, slotAssignments]);
 
 // Map configured colors by Level3 id from admin codeMap
 const colorByProductId = useMemo(() => {
@@ -144,12 +131,17 @@ const toggleAccessory = (id: string) => {
   const [level1Products, setLevel1Products] = useState<Level1Product[]>([]);
   const [level1Loading, setLevel1Loading] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
+  const [standardSlotHints, setStandardSlotHints] = useState<Record<number, string[]>>({});
 
   useEffect(() => {
     const loadLevel1Products = async () => {
       try {
-        const products = await productDataService.getLevel1Products();
+        const [products, chassisTypesData] = await Promise.all([
+          productDataService.getLevel1Products(),
+          productDataService.getChassisTypes()
+        ]);
         setLevel1Products(products.filter(p => p.enabled));
+        setChassisTypes(chassisTypesData);
       } catch (error) {
         console.error('Error loading Level 1 products:', error);
         setLevel1Products([]);
@@ -250,67 +242,40 @@ const toggleAccessory = (id: string) => {
   };
 
 const handleChassisSelect = (chassis: Level2Product) => {
-  console.log('Chassis selected:', chassis.name, 'chassisType:', chassis.chassisType);
-  setSelectedChassis(chassis);
-
-  if (chassis.chassisType && chassis.chassisType !== 'N/A') {
-    console.log('Setting up chassis configuration for:', chassis.name);
-    setConfiguringChassis(chassis);
+    console.log('Chassis selected:', chassis);
+    setSelectedChassis(chassis);
     setSlotAssignments({});
-    setSelectedSlot(null);
 
-    // Load admin config and codes for this chassis
+    // Find and store the matching chassis type for layout and numbering
+    const matchingChassisType = chassisTypes.find(ct => ct.code.toLowerCase() === chassis.chassisType.toLowerCase());
+    setCurrentChassisType(matchingChassisType);
+
+    // Auto-include standard items and generate slot hints
     (async () => {
       try {
-        const [cfg, codes, l3] = await Promise.all([
-          productDataService.getPartNumberConfig(chassis.id),
-          productDataService.getPartNumberCodesForLevel2(chassis.id),
-          productDataService.getLevel3ProductsForLevel2(chassis.id)
-        ]);
-        setPnConfig(cfg);
-        setCodeMap(codes);
-        setLevel3Products(l3);
-        setAutoPlaced(false);
-        
-        // Auto-include standard items based on admin configuration
+        const l3 = await productDataService.getLevel3Products();
+        // Use part number codes as defaults for auto-include logic
+        const defaults: Record<string, any> = {};
+
         const autoIncludeAssignments: Record<number, Level3Product> = {};
+        const standardHints: Record<number, string[]> = {};
         
-        // Check for standard items to auto-include
-        Object.entries(codes).forEach(([l3Id, def]) => {
-          if (def?.is_standard && !def?.outside_chassis) {
-            const standardProduct = l3.find(p => p.id === l3Id);
-            if (standardProduct && def.standard_position !== null && def.standard_position !== undefined) {
-              // Use the exact position from admin config - no remapping needed
-              const position = def.standard_position;
-              autoIncludeAssignments[position] = standardProduct;
-              console.log(`Auto-including standard item "${standardProduct.name}" at position ${position}`);
-            }
-          }
-        });
+        // For now, skip auto-include logic until proper admin defaults are available
+        // This can be re-enabled when the getProductDefaults service method is implemented
+
+        console.log('Auto-included items:', autoIncludeAssignments);
+        console.log('Standard hints:', standardHints);
         
-        if (Object.keys(autoIncludeAssignments).length > 0) {
-          setSlotAssignments(autoIncludeAssignments);
-          toast({
-            title: 'Standard Items Added',
-            description: `${Object.keys(autoIncludeAssignments).length} standard items have been automatically included.`,
-          });
-        }
-        
+        setSlotAssignments(autoIncludeAssignments);
+        setStandardSlotHints(standardHints);
       } catch (e) {
-        console.error('Failed to load PN config/codes for chassis:', e);
+        console.error('Failed to auto-include standard items:', e);
       }
     })();
 
-    setTimeout(() => {
-      const configSection = document.getElementById('chassis-configuration');
-      if (configSection) {
-        configSection.scrollIntoView({ behavior: 'smooth' });
-      }
-    }, 100);
-  } else {
-    handleAddToBOM(chassis);
-  }
-};
+    // Set selected chassis type for rack visualization
+    setSelectedChassisType(matchingChassisType);
+  };
 
   const handleAddChassisToBOM = () => {
     if (!selectedChassis) return;

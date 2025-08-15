@@ -16,7 +16,8 @@ import {
   Palette,
   ZoomIn,
   ZoomOut,
-  Maximize2
+  Maximize2,
+  ImageIcon
 } from "lucide-react";
 
 interface CanvasToolbarProps {
@@ -30,6 +31,8 @@ interface CanvasToolbarProps {
   slotsCount: number;
   maxSlots: number;
   canvasRef?: React.RefObject<HTMLCanvasElement>;
+  onBackgroundColorChange?: (color: string) => void;
+  onBackgroundImageChange?: (file: File) => void;
 }
 
 export const CanvasToolbar: React.FC<CanvasToolbarProps> = ({
@@ -42,7 +45,9 @@ export const CanvasToolbar: React.FC<CanvasToolbarProps> = ({
   onImport,
   slotsCount,
   maxSlots,
-  canvasRef
+  canvasRef,
+  onBackgroundColorChange,
+  onBackgroundImageChange
 }) => {
   const handleZoomIn = () => {
     if (canvasRef?.current) {
@@ -62,6 +67,13 @@ export const CanvasToolbar: React.FC<CanvasToolbarProps> = ({
     if (canvasRef?.current) {
       // Add fit to screen functionality if needed
       console.log('Fit to screen');
+    }
+  };
+
+  const handleBackgroundImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file && onBackgroundImageChange) {
+      onBackgroundImageChange(file);
     }
   };
 
@@ -130,6 +142,45 @@ export const CanvasToolbar: React.FC<CanvasToolbarProps> = ({
           >
             <Maximize2 className="h-4 w-4" />
           </Button>
+        </div>
+
+        <Separator orientation="vertical" className="h-6" />
+
+        {/* Customization */}
+        <div className="flex gap-1">
+          {onBackgroundColorChange && (
+            <div className="flex items-center gap-1">
+              <Palette className="h-4 w-4 text-muted-foreground" />
+              <input
+                type="color"
+                defaultValue="#ffffff"
+                onChange={(e) => onBackgroundColorChange(e.target.value)}
+                className="w-8 h-8 rounded border border-input cursor-pointer"
+                title="Canvas Background Color"
+              />
+            </div>
+          )}
+          
+          {onBackgroundImageChange && (
+            <div className="relative">
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex items-center gap-2"
+                onClick={() => document.getElementById('bg-image-input')?.click()}
+              >
+                <ImageIcon className="h-4 w-4" />
+                Background
+              </Button>
+              <input
+                id="bg-image-input"
+                type="file"
+                accept="image/*"
+                onChange={handleBackgroundImageUpload}
+                className="absolute inset-0 opacity-0 cursor-pointer"
+              />
+            </div>
+          )}
         </div>
 
         <Separator orientation="vertical" className="h-6" />

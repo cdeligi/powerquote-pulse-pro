@@ -100,6 +100,7 @@ export const EnhancedChassisLayoutDesigner: React.FC<EnhancedChassisLayoutDesign
   const [initializationRetries, setInitializationRetries] = useState(0);
   const maxRetries = 3;
   const loggedCanvasNotReady = useRef(false);
+  const [activeTab, setActiveTab] = useState<string>('grid');
 
   // Enhanced Fabric.js canvas initialization with robust error handling and retry mechanism
   // Only initialize when component is active and visible
@@ -637,7 +638,7 @@ export const EnhancedChassisLayoutDesigner: React.FC<EnhancedChassisLayoutDesign
 
   return (
     <div className="space-y-4">
-      <Tabs defaultValue="grid" className="w-full">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="grid">Grid Designer</TabsTrigger>
           <TabsTrigger value="visual">Visual Designer</TabsTrigger>
