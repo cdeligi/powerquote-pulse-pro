@@ -73,7 +73,7 @@ const getSlotColor = (slot: number) => {
       return card.type.charAt(0).toUpperCase() + card.type.slice(1);
     }
     // For empty slots, show the display label based on chassis numbering
-    const slotNumberingStart = chassisType?.metadata?.slotNumberingStart || 0;
+    const slotNumberingStart = chassisType?.metadata?.slotNumberingStart || 1;
     const displayNumber = slot + slotNumberingStart;
     return `${displayNumber}`;
   };

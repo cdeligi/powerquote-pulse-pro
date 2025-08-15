@@ -249,6 +249,7 @@ const handleLevel2OptionToggle = (option: Level2Product) => {
 const handleChassisSelect = (chassis: Level2Product) => {
     console.log('Chassis selected:', chassis);
     setSelectedChassis(chassis);
+    setConfiguringChassis(chassis); // This was missing - needed to show the rack visualizer!
     setSlotAssignments({});
 
     // Find and store the matching chassis type for layout and numbering
