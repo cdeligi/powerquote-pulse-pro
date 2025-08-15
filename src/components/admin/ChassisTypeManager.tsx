@@ -173,7 +173,7 @@ export const ChassisTypeManager: React.FC = () => {
         {layout.map((row, i) => (
           <div key={i} className="flex gap-1">
             {row.map(slot => {
-              const displayNumber = slot + slotNumberingStart - 1;
+              const displayNumber = slot + slotNumberingStart;
               return (
                 <span key={slot} className="inline-block w-6 h-6 bg-primary/20 text-xs flex items-center justify-center rounded border">
                   {displayNumber}
