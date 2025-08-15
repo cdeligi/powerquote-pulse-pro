@@ -78,7 +78,7 @@ const getSlotColor = (slot: number) => {
     return `${displayNumber}`;
   };
 
-const getSlotTitle = (slot: number) => {
+  const getSlotTitle = (slot: number) => {
   const slotNumberingStart = chassisType?.metadata?.slotNumberingStart || 0;
   const displayNumber = slot + slotNumberingStart;
   
@@ -354,12 +354,16 @@ return (
                 ))}
                 {Object.entries(slotAssignments)
                   .filter(([slot, card]) => !isBushingCard(card))
-                  .map(([slot, card]) => (
-                    <div key={slot} className="flex justify-between text-sm">
-                      <span className="text-gray-400">Slot {slot}:</span>
-                      <span className="text-white">{card.type ? card.type.charAt(0).toUpperCase() + card.type.slice(1) : card.name}</span>
-                    </div>
-                  ))}
+                  .map(([slot, card]) => {
+                    const slotNumberingStart = chassisType?.metadata?.slotNumberingStart || 0;
+                    const displaySlot = parseInt(slot) + slotNumberingStart;
+                    return (
+                      <div key={slot} className="flex justify-between text-sm">
+                        <span className="text-gray-400">Slot {displaySlot}:</span>
+                        <span className="text-white">{card.type ? card.type.charAt(0).toUpperCase() + card.type.slice(1) : card.name}</span>
+                      </div>
+                    );
+                  })}
               </div>
             </div>
           )}

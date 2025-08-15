@@ -32,8 +32,9 @@ export class CanvasRenderer {
       ry: 4
     });
 
-    // Create text
-    const text = new FabricText(slot.slotNumber.toString(), {
+    // Create text with display number (slot + 1 for visual canvas)
+    const displayNumber = slot.slotNumber + 1; // Always show 1-based in visual canvas
+    const text = new FabricText(displayNumber.toString(), {
       fontSize: 14,
       fontFamily: 'Inter, sans-serif',
       fill: 'hsl(var(--foreground))',
