@@ -103,9 +103,11 @@ export const EnhancedChassisLayoutDesigner: React.FC<EnhancedChassisLayoutDesign
   // Enhanced Fabric.js canvas initialization with robust error handling and retry mechanism
   // Only initialize when component is active and visible
   useEffect(() => {
+    let observer: IntersectionObserver | null = null;
+    let resizeObserver: ResizeObserver | null = null;
+    
     const initializeCanvas = async () => {
       if (!canvasRef.current) {
-        console.log('Canvas ref not ready, waiting...');
         return;
       }
 
@@ -113,19 +115,23 @@ export const EnhancedChassisLayoutDesigner: React.FC<EnhancedChassisLayoutDesign
       setInitializationError(null);
       
       try {
-        console.log(`Initializing canvas (attempt ${initializationRetries + 1}/${maxRetries + 1})...`);
+        if (debugMode) {
+          console.log(`Initializing canvas (attempt ${initializationRetries + 1}/${maxRetries + 1})...`);
+        }
         
         // Verify DOM element is properly mounted and visible
         const canvasElement = canvasRef.current;
         const rect = canvasElement.getBoundingClientRect();
         
-        console.log('Canvas DOM validation:', {
-          element: !!canvasElement,
-          inDocument: document.body.contains(canvasElement),
-          visible: rect.width > 0 && rect.height > 0,
-          rect: { width: rect.width, height: rect.height, x: rect.x, y: rect.y },
-          parentElement: !!canvasElement.parentElement
-        });
+        if (debugMode) {
+          console.log('Canvas DOM validation:', {
+            element: !!canvasElement,
+            inDocument: document.body.contains(canvasElement),
+            visible: rect.width > 0 && rect.height > 0,
+            rect: { width: rect.width, height: rect.height, x: rect.x, y: rect.y },
+            parentElement: !!canvasElement.parentElement
+          });
+        }
 
         if (rect.width === 0 || rect.height === 0) {
           throw new Error('Canvas element has zero dimensions');
@@ -224,25 +230,42 @@ export const EnhancedChassisLayoutDesigner: React.FC<EnhancedChassisLayoutDesign
       }
     };
 
-    // Only initialize if the canvas element is visible (tab is active)
-    if (!canvasRef.current) return;
-    
-    const canvasElement = canvasRef.current;
-    const rect = canvasElement.getBoundingClientRect();
-    
-    // Check if canvas is actually visible (not in hidden tab)
-    if (rect.width === 0 || rect.height === 0) {
-      console.log('Canvas not visible, skipping initialization');
-      return;
+    // Use IntersectionObserver to detect when canvas becomes visible
+    if (canvasRef.current) {
+      observer = new IntersectionObserver(
+        (entries) => {
+          const [entry] = entries;
+          if (entry.isIntersecting && !canvasInitialized && !fabricCanvas) {
+            // Small delay to ensure DOM is fully ready
+            setTimeout(initializeCanvas, 200);
+          }
+        },
+        { threshold: 0.1 }
+      );
+      
+      observer.observe(canvasRef.current);
+      
+      // Use ResizeObserver to trigger initialization when canvas gets proper dimensions
+      resizeObserver = new ResizeObserver((entries) => {
+        const [entry] = entries;
+        if (entry.contentRect.width > 0 && entry.contentRect.height > 0 && !canvasInitialized && !fabricCanvas) {
+          setTimeout(initializeCanvas, 100);
+        }
+      });
+      
+      resizeObserver.observe(canvasRef.current);
     }
-    
-    // Start initialization with slight delay for DOM readiness
-    const timeoutId = setTimeout(initializeCanvas, 100);
 
     return () => {
-      clearTimeout(timeoutId);
+      // Cleanup observers
+      if (observer) {
+        observer.disconnect();
+      }
+      if (resizeObserver) {
+        resizeObserver.disconnect();
+      }
       
-      // Cleanup
+      // Cleanup canvas
       if (fabricCanvas) {
         try {
           if (rendererRef.current) {
@@ -250,7 +273,9 @@ export const EnhancedChassisLayoutDesigner: React.FC<EnhancedChassisLayoutDesign
             rendererRef.current = null;
           }
           fabricCanvas.dispose();
-          console.log('Canvas cleaned up successfully');
+          if (debugMode) {
+            console.log('Canvas cleaned up successfully');
+          }
         } catch (error) {
           console.error('Error during canvas cleanup:', error);
         }
