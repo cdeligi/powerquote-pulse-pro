@@ -100,46 +100,125 @@ export const EnhancedChassisLayoutDesigner: React.FC<EnhancedChassisLayoutDesign
   const [initializationRetries, setInitializationRetries] = useState(0);
   const maxRetries = 3;
 
-  // Simple, robust canvas initialization
+  // Enhanced Fabric.js canvas initialization with robust error handling and retry mechanism
   useEffect(() => {
-    const initializeCanvas = () => {
-      console.log('[Canvas] Starting initialization...');
-      
+    const initializeCanvas = async () => {
       if (!canvasRef.current) {
-        console.log('[Canvas] Canvas ref not ready');
+        console.log('Canvas ref not ready, waiting...');
         return;
       }
 
+      // Clear previous error state
+      setInitializationError(null);
+      
       try {
-        // Simple canvas creation
-        const canvas = new FabricCanvas(canvasRef.current, {
-          width: CANVAS_WIDTH,
-          height: CANVAS_HEIGHT,
-          backgroundColor: '#ffffff',
+        console.log(`Initializing canvas (attempt ${initializationRetries + 1}/${maxRetries + 1})...`);
+        
+        // Verify DOM element is properly mounted and visible
+        const canvasElement = canvasRef.current;
+        const rect = canvasElement.getBoundingClientRect();
+        
+        console.log('Canvas DOM validation:', {
+          element: !!canvasElement,
+          inDocument: document.body.contains(canvasElement),
+          visible: rect.width > 0 && rect.height > 0,
+          rect: { width: rect.width, height: rect.height, x: rect.x, y: rect.y },
+          parentElement: !!canvasElement.parentElement
         });
 
-        console.log('[Canvas] Canvas created successfully');
+        if (rect.width === 0 || rect.height === 0) {
+          throw new Error('Canvas element has zero dimensions');
+        }
+
+        // Create canvas with defensive configuration
+        console.log('Creating Fabric.js canvas instance...');
+        const canvas = new FabricCanvas(canvasElement, {
+          width: CANVAS_WIDTH,
+          height: CANVAS_HEIGHT,
+          backgroundColor: '#ffffff', // Use explicit white for better visibility
+          selection: true,
+          preserveObjectStacking: true,
+          renderOnAddRemove: true,
+          stateful: true,
+          interactive: true,
+          enableRetinaScaling: true,
+          allowTouchScrolling: false,
+          stopContextMenu: true,
+          fireRightClick: true,
+          fireMiddleClick: false,
+          targetFindTolerance: 5,
+          perPixelTargetFind: true,
+          skipTargetFind: false
+        });
+
+        // Verify canvas was created successfully
+        if (!canvas || typeof canvas.getWidth !== 'function') {
+          throw new Error('Fabric.js canvas creation failed');
+        }
+
+        console.log('Canvas created successfully:', {
+          width: canvas.getWidth(),
+          height: canvas.getHeight(),
+          backgroundColor: canvas.backgroundColor
+        });
+
+        // Enhanced canvas element configuration
+        const htmlCanvasElement = getCanvasHTMLElement(canvas);
+        if (htmlCanvasElement) {
+          htmlCanvasElement.tabIndex = 0;
+          htmlCanvasElement.style.outline = 'none';
+          htmlCanvasElement.style.userSelect = 'none';
+          htmlCanvasElement.style.webkitUserSelect = 'none';
+          htmlCanvasElement.style.touchAction = 'none';
+          htmlCanvasElement.style.position = 'relative';
+          htmlCanvasElement.style.border = debugMode ? '2px solid #3b82f6' : 'none';
+          
+          console.log('Canvas DOM element configured');
+        }
+
+        // Test basic canvas functionality
+        console.log('Testing canvas basic functionality...');
+        canvas.requestRenderAll();
         
+        // Wait for render to complete
+        await new Promise(resolve => setTimeout(resolve, 50));
+
         // Initialize renderer
+        console.log('Initializing canvas renderer...');
         const renderer = new FixedCanvasRenderer(canvas, debugMode);
         rendererRef.current = renderer;
+
+        // Test renderer functionality
+        renderer.drawGrid(true);
+        await new Promise(resolve => setTimeout(resolve, 10));
+        renderer.drawGrid(false);
         
-        // Set state immediately
+        console.log('Canvas and renderer initialized successfully');
+
+        // Set canvas state
         setFabricCanvas(canvas);
         setCanvasInitialized(true);
-        setInitializationError(null);
+        setInitializationRetries(0);
         
-        console.log('[Canvas] Canvas state updated');
-        
+        toast.success('Canvas initialized successfully!');
+
       } catch (error) {
-        console.error('[Canvas] Initialization failed:', error);
-        setInitializationError(error instanceof Error ? error.message : 'Canvas creation failed');
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        console.error('Canvas initialization failed:', error);
         
-        // Simple retry after delay
+        setInitializationError(errorMessage);
+        
+        // Retry logic
         if (initializationRetries < maxRetries) {
+          console.log(`Retrying canvas initialization in 1 second... (${initializationRetries + 1}/${maxRetries})`);
+          setInitializationRetries(prev => prev + 1);
+          
           setTimeout(() => {
-            setInitializationRetries(prev => prev + 1);
+            initializeCanvas();
           }, 1000);
+        } else {
+          console.error('Canvas initialization failed after maximum retries');
+          toast.error(`Canvas initialization failed: ${errorMessage}`);
         }
       }
     };
