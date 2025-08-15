@@ -870,6 +870,7 @@ const handleAddChassisAndCardsToBOM = () => {
     // Rack configurable products - show chassis selector or configuration
     if (product.rackConfigurable || product.name?.toLowerCase().includes('qtms')) {
       console.log('Rendering rack configurable product content, configuringChassis:', configuringChassis);
+      console.log('Product for chassis:', product);
       
       // If configuring a chassis, show rack visualizer
       if (configuringChassis && selectedChassis) {
@@ -960,6 +961,7 @@ const handleAddChassisAndCardsToBOM = () => {
             selectedChassis={selectedChassis}
             onAddToBOM={handleAddToBOM}
             canSeePrices={canSeePrices}
+            level1ProductId={product.id}
           />
         </div>
       );
