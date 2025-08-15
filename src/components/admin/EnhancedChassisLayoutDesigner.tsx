@@ -102,6 +102,20 @@ export const EnhancedChassisLayoutDesigner: React.FC<EnhancedChassisLayoutDesign
   const loggedCanvasNotReady = useRef(false);
   const [activeTab, setActiveTab] = useState<string>('grid');
 
+  // Initialize canvas when Visual tab becomes active
+  useEffect(() => {
+    if (activeTab === 'visual' && !canvasInitialized && canvasRef.current) {
+      const timeoutId = setTimeout(() => {
+        if (canvasRef.current && !fabricCanvas) {
+          console.log('Visual tab active - triggering canvas initialization');
+          setInitializationRetries(0);
+          setInitializationError(null);
+        }
+      }, 100);
+      return () => clearTimeout(timeoutId);
+    }
+  }, [activeTab, canvasInitialized, fabricCanvas]);
+
   // Enhanced Fabric.js canvas initialization with robust error handling and retry mechanism
   // Only initialize when component is active and visible
   useEffect(() => {
@@ -131,9 +145,8 @@ export const EnhancedChassisLayoutDesigner: React.FC<EnhancedChassisLayoutDesign
           parentElement: !!canvasElement.parentElement
         });
 
-        if (rect.width === 0 || rect.height === 0) {
-          throw new Error('Canvas element has zero dimensions');
-        }
+        // Allow canvas initialization even with zero dimensions initially
+        // The canvas will be properly sized during the rendering phase
 
         // Create canvas with defensive configuration
         console.log('Creating Fabric.js canvas instance...');
@@ -747,6 +760,25 @@ export const EnhancedChassisLayoutDesigner: React.FC<EnhancedChassisLayoutDesign
                 gridVisible={gridVisible}
                 onGridToggle={() => setGridVisible(!gridVisible)}
                 onReset={resetVisualLayout}
+                onExport={() => {
+                  if (rendererRef.current) {
+                    const imageData = rendererRef.current.exportAsImage('png', 1.0);
+                    const link = document.createElement('a');
+                    link.download = 'chassis-layout.png';
+                    link.href = imageData;
+                    link.click();
+                  }
+                }}
+                onBackgroundColorChange={(color) => {
+                  if (rendererRef.current) {
+                    rendererRef.current.setCanvasBackground(color);
+                  }
+                }}
+                onBackgroundImageChange={(file) => {
+                  if (rendererRef.current) {
+                    rendererRef.current.setCanvasBackgroundImage(file);
+                  }
+                }}
                 slotsCount={sanitizeSlots(visualLayout.slots).length}
                 maxSlots={totalSlots}
                 canvasRef={canvasRef}
