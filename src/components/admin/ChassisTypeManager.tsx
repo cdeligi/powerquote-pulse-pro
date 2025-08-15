@@ -161,7 +161,7 @@ export const ChassisTypeManager: React.FC = () => {
 
   const renderLayoutPreview = (chassisType: ChassisType) => {
     const { layoutRows, totalSlots, metadata } = chassisType;
-    const slotNumberingStart = metadata?.slotNumberingStart || 0;
+    const slotNumberingStart = metadata?.slotNumberingStart || 1;
     
     // Generate layout if none exists
     const layout = layoutRows && layoutRows.length > 0 
@@ -173,7 +173,7 @@ export const ChassisTypeManager: React.FC = () => {
         {layout.map((row, i) => (
           <div key={i} className="flex gap-1">
             {row.map(slot => {
-              const displayNumber = slot + slotNumberingStart;
+              const displayNumber = slot + slotNumberingStart - 1;
               return (
                 <span key={slot} className="inline-block w-6 h-6 bg-primary/20 text-xs flex items-center justify-center rounded border">
                   {displayNumber}
@@ -300,13 +300,15 @@ export const ChassisTypeManager: React.FC = () => {
                           initialVisualLayout={createFormData.visualLayout}
                           onLayoutChange={(layout) => setCreateFormData(prev => ({ ...prev, layoutRows: layout }))}
                           onVisualLayoutChange={(visualLayout) => setCreateFormData(prev => ({ ...prev, visualLayout }))}
+                          slotNumberingStart={createFormData.metadata?.slotNumberingStart || 1}
                           onPreview={(layout, visualLayout) => {
                             setPreviewData({
                               code: createFormData.code || 'Preview',
                               name: createFormData.name || 'Preview Chassis',
                               totalSlots: createFormData.totalSlots,
                               layoutRows: layout,
-                              visualLayout: visualLayout
+                              visualLayout: visualLayout,
+                              metadata: createFormData.metadata
                             });
                             setShowPreview(true);
                           }}
@@ -415,6 +417,7 @@ export const ChassisTypeManager: React.FC = () => {
                               initialVisualLayout={editFormData.visualLayout}
                               onLayoutChange={(layout) => setEditFormData(prev => ({ ...prev, layoutRows: layout }))}
                               onVisualLayoutChange={(visualLayout) => setEditFormData(prev => ({ ...prev, visualLayout }))}
+                              slotNumberingStart={editFormData.metadata?.slotNumberingStart || 1}
                               onPreview={(layout, visualLayout) => {
                                 setPreviewData({
                                   code: editFormData.code || 'Preview',

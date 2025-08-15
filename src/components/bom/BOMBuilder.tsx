@@ -210,7 +210,7 @@ const toggleAccessory = (id: string) => {
     });
   };
 
-  const handleLevel2OptionToggle = (option: Level2Product) => {
+const handleLevel2OptionToggle = (option: Level2Product) => {
     console.log('Level2OptionToggle called with option:', option.name, 'chassisType:', option.chassisType);
     
     // Check if this is a single-selection context (clear other selections first)
@@ -223,6 +223,11 @@ const toggleAccessory = (id: string) => {
       setSelectedChassis(option);
       setSlotAssignments({});
       setSelectedSlot(null);
+      
+      // Find and set the matching chassis type for layout and numbering
+      const matchingChassisType = chassisTypes.find(ct => ct.code.toLowerCase() === option.chassisType.toLowerCase());
+      setCurrentChassisType(matchingChassisType);
+      
       return;
     }
 

@@ -33,6 +33,7 @@ interface EnhancedChassisLayoutDesignerProps {
   onLayoutChange?: (layout: number[][]) => void;
   onVisualLayoutChange?: (layout: ChassisVisualLayout) => void;
   onPreview?: (layout: number[][], visualLayout?: ChassisVisualLayout) => void;
+  slotNumberingStart?: number;
 }
 
 interface DragState {
@@ -52,7 +53,8 @@ export const EnhancedChassisLayoutDesigner: React.FC<EnhancedChassisLayoutDesign
   initialVisualLayout,
   onLayoutChange,
   onVisualLayoutChange,
-  onPreview
+  onPreview,
+  slotNumberingStart = 1
 }) => {
   // Grid-based layout state
   const [layout, setLayout] = useState<number[][]>(() => 
@@ -728,7 +730,7 @@ export const EnhancedChassisLayoutDesigner: React.FC<EnhancedChassisLayoutDesign
                             draggable
                             onDragStart={(e) => handleDragStart(e, slot, rowIndex, slotIndex)}
                           >
-                            Slot {slot + 1}
+                            Slot {slot + slotNumberingStart}
                           </Badge>
                         </div>
                       ))}
