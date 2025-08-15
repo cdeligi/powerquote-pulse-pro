@@ -125,35 +125,38 @@ const Level2OptionsSelector = ({
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-muted-foreground text-sm mb-3">{option.description}</p>
-                  {requiresChassisConfig && (
-                    <p className="text-xs text-muted-foreground mb-2">
-                      Requires chassis configuration
-                    </p>
-                  )}
-                   <div className="flex justify-between items-center mb-3">
-                     {canSeePrices && option.price && (
-                       <span className="text-foreground font-medium">
-                         ${option.price.toLocaleString()}
-                       </span>
+                   <div className="flex flex-col h-full">
+                     <p className="text-muted-foreground text-sm mb-3">{option.description}</p>
+                     {requiresChassisConfig && (
+                       <p className="text-xs text-muted-foreground mb-2">
+                         Requires chassis configuration
+                       </p>
+                     )}
+                     <div className="flex justify-between items-center mb-3">
+                       {canSeePrices && option.price && (
+                         <span className="text-foreground font-medium">
+                           ${option.price.toLocaleString()}
+                         </span>
+                       )}
+                     </div>
+                     
+                     {/* Spacer to push button to bottom */}
+                     <div className="flex-grow"></div>
+                     
+                     {/* Add to Bill of Material Button */}
+                     {onAddToBOM && !requiresChassisConfig && (
+                       <Button
+                         onClick={(e) => {
+                           e.stopPropagation();
+                           onAddToBOM(option);
+                         }}
+                         size="sm"
+                         className="w-full mt-auto"
+                       >
+                         Add to Bill of Material
+                       </Button>
                      )}
                    </div>
-                  
-                   {/* Add to Bill of Material Button */}
-                   {onAddToBOM && !requiresChassisConfig && (
-                     <div className="mb-3">
-                        <Button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onAddToBOM(option);
-                          }}
-                          size="sm"
-                          className="w-full"
-                        >
-                          Add to Bill of Material
-                        </Button>
-                     </div>
-                   )}
                   
                 </CardContent>
               </Card>

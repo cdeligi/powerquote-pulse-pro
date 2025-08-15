@@ -190,11 +190,18 @@ const toggleAccessory = (id: string) => {
   const handleAddToBOM = (product: Level1Product | Level2Product | Level3Product) => {
     console.log('Adding product to BOM:', product.name);
     
+    // For Level 2 products, use the Admin-configured prefix as part number
+    let partNumber = product.partNumber;
+    if ('partNumberPrefix' in product && product.partNumberPrefix) {
+      partNumber = String(product.partNumberPrefix);
+    }
+    
     const newItem: BOMItem = {
       id: `${product.id}-${Date.now()}`,
       product: product,
       quantity: 1,
-      enabled: true
+      enabled: true,
+      partNumber: partNumber
     };
     
     // Add to BOM
