@@ -826,6 +826,7 @@ const handleAddChassisAndCardsToBOM = () => {
   accessories={accessories}
   onAccessoryToggle={toggleAccessory}
   partNumber={buildQTMSPartNumber({ chassis: configuringChassis, slotAssignments, hasRemoteDisplay, pnConfig, codeMap, includeSuffix: false })}
+  chassisType={currentChassisType}
 />
           
 {selectedSlot !== null && (
@@ -866,9 +867,9 @@ const handleAddChassisAndCardsToBOM = () => {
       );
     }
 
-    // QTMS tab - show chassis selector or configuration
-    if (productId.toLowerCase() === 'qtms') {
-      console.log('Rendering QTMS tab content, configuringChassis:', configuringChassis);
+    // Rack configurable products - show chassis selector or configuration
+    if (product.rackConfigurable || product.name?.toLowerCase().includes('qtms')) {
+      console.log('Rendering rack configurable product content, configuringChassis:', configuringChassis);
       
       // If configuring a chassis, show rack visualizer
       if (configuringChassis && selectedChassis) {
