@@ -909,6 +909,7 @@ const handleAddChassisAndCardsToBOM = () => {
   accessories={accessories}
   onAccessoryToggle={toggleAccessory}
   partNumber={buildQTMSPartNumber({ chassis: selectedChassis, slotAssignments, hasRemoteDisplay, pnConfig, codeMap, includeSuffix: false })}
+  chassisType={currentChassisType}
 />
              </div>
 
