@@ -42,9 +42,38 @@ const ChassisSelector = ({ onChassisSelect, selectedChassis, onAddToBOM, canSeeP
           console.log('Chassis products from category:', chassisProducts);
           
           if (!chassisProducts || chassisProducts.length === 0) {
-            console.warn('No chassis products found using category-based method, trying parent-based...');
-            chassisProducts = await productDataService.getLevel2ProductsForLevel1('qtms');
-            console.log('Fallback chassis products:', chassisProducts);
+            console.warn('No chassis products found using category-based method, trying different approaches...');
+            
+            // Try different fallback approaches for QTMS
+            const fallbackMethods = [
+              () => productDataService.getLevel2ProductsForLevel1('qtms'),
+              () => productDataService.getLevel2Products(),
+              () => productDataService.getLevel2Products() // Remove invalid category call
+            ];
+            
+            for (const method of fallbackMethods) {
+              try {
+                const result = await method();
+                if (result && result.length > 0) {
+                  // Filter for QTMS-related chassis
+                  chassisProducts = result.filter(product => 
+                    product.name?.toLowerCase().includes('qtms') ||
+                    product.description?.toLowerCase().includes('qtms') ||
+                    product.chassisType?.toLowerCase().includes('qtms') ||
+                    ['LTX', 'MTX', 'STX'].some(type => 
+                      product.name?.includes(type) || product.chassisType?.includes(type)
+                    )
+                  );
+                  
+                  if (chassisProducts.length > 0) {
+                    console.log('Found QTMS chassis products via fallback:', chassisProducts);
+                    break;
+                  }
+                }
+              } catch (error) {
+                console.warn('Fallback method failed:', error);
+              }
+            }
           }
         }
         
