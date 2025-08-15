@@ -104,14 +104,21 @@ export const EnhancedChassisLayoutDesigner: React.FC<EnhancedChassisLayoutDesign
 
   // Initialize canvas when Visual tab becomes active
   useEffect(() => {
-    if (activeTab === 'visual' && !canvasInitialized && canvasRef.current) {
+    if (activeTab === 'visual' && !canvasInitialized && canvasRef.current && !fabricCanvas) {
+      console.log('Visual tab active - starting canvas initialization timer');
       const timeoutId = setTimeout(() => {
         if (canvasRef.current && !fabricCanvas) {
-          console.log('Visual tab active - triggering canvas initialization');
-          setInitializationRetries(0);
-          setInitializationError(null);
+          console.log('Triggering canvas initialization from tab switch');
+          // Force a re-initialization attempt
+          const canvasElement = canvasRef.current;
+          if (canvasElement.offsetWidth > 0 && canvasElement.offsetHeight > 0) {
+            setInitializationRetries(0);
+            setInitializationError(null);
+            // Trigger the main initialization effect by setting a flag
+            setCanvasInitialized(false);
+          }
         }
-      }, 100);
+      }, 200);
       return () => clearTimeout(timeoutId);
     }
   }, [activeTab, canvasInitialized, fabricCanvas]);
@@ -721,7 +728,7 @@ export const EnhancedChassisLayoutDesigner: React.FC<EnhancedChassisLayoutDesign
                             draggable
                             onDragStart={(e) => handleDragStart(e, slot, rowIndex, slotIndex)}
                           >
-                            Slot {slot}
+                            Slot {slot + 1}
                           </Badge>
                         </div>
                       ))}

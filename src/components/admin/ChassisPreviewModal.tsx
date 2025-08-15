@@ -56,7 +56,7 @@ export const ChassisPreviewModal: React.FC<ChassisPreviewModalProps> = ({
     layoutRows: chassisType.layoutRows,
     visualLayout: chassisType.visualLayout,
     enabled: true,
-    metadata: {},
+    metadata: (chassisType as any).metadata || {},
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()
   };
