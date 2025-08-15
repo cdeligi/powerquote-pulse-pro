@@ -101,6 +101,7 @@ export const EnhancedChassisLayoutDesigner: React.FC<EnhancedChassisLayoutDesign
   const maxRetries = 3;
 
   // Enhanced Fabric.js canvas initialization with robust error handling and retry mechanism
+  // Only initialize when component is active and visible
   useEffect(() => {
     const initializeCanvas = async () => {
       if (!canvasRef.current) {
@@ -223,6 +224,18 @@ export const EnhancedChassisLayoutDesigner: React.FC<EnhancedChassisLayoutDesign
       }
     };
 
+    // Only initialize if the canvas element is visible (tab is active)
+    if (!canvasRef.current) return;
+    
+    const canvasElement = canvasRef.current;
+    const rect = canvasElement.getBoundingClientRect();
+    
+    // Check if canvas is actually visible (not in hidden tab)
+    if (rect.width === 0 || rect.height === 0) {
+      console.log('Canvas not visible, skipping initialization');
+      return;
+    }
+    
     // Start initialization with slight delay for DOM readiness
     const timeoutId = setTimeout(initializeCanvas, 100);
 

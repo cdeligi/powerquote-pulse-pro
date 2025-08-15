@@ -131,18 +131,13 @@ const Level2OptionsSelector = ({
                       Requires chassis configuration
                     </p>
                   )}
-                  <div className="flex justify-between items-center mb-3">
-                    {canSeePrices && option.price && (
-                      <span className="text-foreground font-medium">
-                        ${option.price.toLocaleString()}
-                      </span>
-                    )}
-                    {option.partNumber && (
-                      <Badge variant="outline" className="text-xs">
-                        {option.partNumber}
-                      </Badge>
-                    )}
-                  </div>
+                   <div className="flex justify-between items-center mb-3">
+                     {canSeePrices && option.price && (
+                       <span className="text-foreground font-medium">
+                         ${option.price.toLocaleString()}
+                       </span>
+                     )}
+                   </div>
                   
                    {/* Add to Bill of Material Button */}
                    {onAddToBOM && !requiresChassisConfig && (
@@ -160,15 +155,6 @@ const Level2OptionsSelector = ({
                      </div>
                    )}
                   
-                  {option.specifications && (
-                    <div className="mt-2 flex flex-wrap gap-1">
-                      {Object.entries(option.specifications).map(([key, value]) => (
-                        <Badge key={key} variant="secondary" className="text-xs">
-                          {key}: {value}
-                        </Badge>
-                      ))}
-                    </div>
-                  )}
                 </CardContent>
               </Card>
             );
