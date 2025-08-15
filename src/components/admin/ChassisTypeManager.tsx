@@ -159,18 +159,27 @@ export const ChassisTypeManager: React.FC = () => {
     }
   };
 
-  const renderLayoutPreview = (layoutRows?: number[][] | null) => {
-    if (!layoutRows || layoutRows.length === 0) return <span className="text-muted-foreground">Auto-generated</span>;
+  const renderLayoutPreview = (chassisType: ChassisType) => {
+    const { layoutRows, totalSlots, metadata } = chassisType;
+    const slotNumberingStart = metadata?.slotNumberingStart || 0;
+    
+    // Generate layout if none exists
+    const layout = layoutRows && layoutRows.length > 0 
+      ? layoutRows 
+      : generateDefaultLayout(totalSlots);
     
     return (
       <div className="space-y-1">
-        {layoutRows.map((row, i) => (
+        {layout.map((row, i) => (
           <div key={i} className="flex gap-1">
-            {row.map(slot => (
-              <span key={slot} className="inline-block w-6 h-6 bg-primary/20 text-xs flex items-center justify-center rounded border">
-                {slot}
-              </span>
-            ))}
+            {row.map(slot => {
+              const displayNumber = slot + slotNumberingStart;
+              return (
+                <span key={slot} className="inline-block w-6 h-6 bg-primary/20 text-xs flex items-center justify-center rounded border">
+                  {displayNumber}
+                </span>
+              );
+            })}
           </div>
         ))}
       </div>
@@ -489,7 +498,7 @@ export const ChassisTypeManager: React.FC = () => {
                         <div className="text-sm">
                           <span className="font-medium">Layout Preview:</span>
                           <div className="mt-2">
-                            {renderLayoutPreview(chassisType.layoutRows)}
+                            {renderLayoutPreview(chassisType)}
                           </div>
                         </div>
                       </div>
