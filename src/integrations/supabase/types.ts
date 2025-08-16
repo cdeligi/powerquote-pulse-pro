@@ -601,7 +601,7 @@ export type Database = {
           created_at: string
           id: string
           level2_product_id: string
-          part_number: string
+          prefix: string
           slot_count: number
           slot_placeholder: string
           updated_at: string
@@ -610,7 +610,7 @@ export type Database = {
           created_at?: string
           id?: string
           level2_product_id: string
-          part_number: string
+          prefix: string
           slot_count: number
           slot_placeholder?: string
           updated_at?: string
@@ -619,7 +619,7 @@ export type Database = {
           created_at?: string
           id?: string
           level2_product_id?: string
-          part_number?: string
+          prefix?: string
           slot_count?: number
           slot_placeholder?: string
           updated_at?: string
