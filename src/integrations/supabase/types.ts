@@ -296,6 +296,59 @@ export type Database = {
         }
         Relationships: []
       }
+      features: {
+        Row: {
+          created_at: string | null
+          description: string
+          key: string
+          label: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          description: string
+          key: string
+          label: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string
+          key?: string
+          label?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      legal_pages: {
+        Row: {
+          content: string
+          slug: string
+          updated_at: string | null
+          updated_by: string | null
+        }
+        Insert: {
+          content?: string
+          slug: string
+          updated_at?: string | null
+          updated_by?: string | null
+        }
+        Update: {
+          content?: string
+          slug?: string
+          updated_at?: string | null
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "legal_pages_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       level1_level2_relationships: {
         Row: {
           created_at: string
@@ -1041,6 +1094,38 @@ export type Database = {
           },
         ]
       }
+      role_feature_defaults: {
+        Row: {
+          allowed: boolean
+          created_at: string | null
+          feature_key: string
+          id: string
+          role: Database["public"]["Enums"]["user_role"]
+        }
+        Insert: {
+          allowed?: boolean
+          created_at?: string | null
+          feature_key: string
+          id?: string
+          role: Database["public"]["Enums"]["user_role"]
+        }
+        Update: {
+          allowed?: boolean
+          created_at?: string | null
+          feature_key?: string
+          id?: string
+          role?: Database["public"]["Enums"]["user_role"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "role_feature_defaults_feature_key_fkey"
+            columns: ["feature_key"]
+            isOneToOne: false
+            referencedRelation: "features"
+            referencedColumns: ["key"]
+          },
+        ]
+      }
       security_events: {
         Row: {
           action: string
@@ -1073,6 +1158,48 @@ export type Database = {
           user_id?: string | null
         }
         Relationships: []
+      }
+      user_feature_overrides: {
+        Row: {
+          allowed: boolean | null
+          created_at: string | null
+          feature_key: string
+          id: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          allowed?: boolean | null
+          created_at?: string | null
+          feature_key: string
+          id?: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          allowed?: boolean | null
+          created_at?: string | null
+          feature_key?: string
+          id?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_feature_overrides_feature_key_fkey"
+            columns: ["feature_key"]
+            isOneToOne: false
+            referencedRelation: "features"
+            referencedColumns: ["key"]
+          },
+          {
+            foreignKeyName: "user_feature_overrides_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_login_attempts: {
         Row: {
@@ -1574,7 +1701,7 @@ export type Database = {
       }
     }
     Enums: {
-      [_ in never]: never
+      user_role: "LEVEL_1" | "LEVEL_2" | "LEVEL_3" | "ADMIN" | "FINANCE"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1701,6 +1828,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      user_role: ["LEVEL_1", "LEVEL_2", "LEVEL_3", "ADMIN", "FINANCE"],
+    },
   },
 } as const

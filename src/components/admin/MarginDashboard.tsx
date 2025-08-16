@@ -19,7 +19,7 @@ interface MarginDashboardProps {
 
 const MarginDashboard = ({ bomItems, user, className }: MarginDashboardProps) => {
   // Only show for admin users
-  if (user.role !== 'admin') return null;
+  if (user.role !== 'ADMIN') return null;
 
   const { totalRevenue, totalCost, marginPercentage, grossProfit } = calculateTotalMargin(bomItems);
   

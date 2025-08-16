@@ -78,7 +78,7 @@ const DashboardOverview = ({ user }: DashboardOverviewProps) => {
       </div>
 
       {/* Analytics Dashboard */}
-      <QuoteAnalyticsDashboard analytics={analytics} isAdmin={user.role === 'admin'} />
+      <QuoteAnalyticsDashboard analytics={analytics} isAdmin={user.role === 'ADMIN'} />
 
       {/* Quick Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -159,7 +159,7 @@ const DashboardOverview = ({ user }: DashboardOverviewProps) => {
                   </div>
                   <div className="text-right">
                     <p className="text-white font-bold">
-                      {user.role === 'level1' ? '—' : quote.value}
+                      {user.role === 'LEVEL_1' ? '—' : quote.value}
                     </p>
                     <p className="text-gray-400 text-sm">{quote.date}</p>
                   </div>

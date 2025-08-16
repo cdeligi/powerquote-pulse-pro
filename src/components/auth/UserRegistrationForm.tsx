@@ -10,6 +10,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { UserRegistrationRequest } from "@/types/user-management";
 import { Shield, User, Mail, Phone, Building, FileText, ArrowLeft } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import LegalDocumentModal from "@/components/admin/LegalDocumentModal";
 
 interface UserRegistrationFormProps {
   onSubmit?: (data: Partial<UserRegistrationRequest>) => void;
@@ -33,6 +34,8 @@ const UserRegistrationForm = ({ onSubmit, onBack }: UserRegistrationFormProps) =
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showTerms, setShowTerms] = useState(false);
+  const [showPrivacy, setShowPrivacy] = useState(false);
 
   const handleInputChange = (field: string, value: string | boolean) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -343,7 +346,7 @@ const UserRegistrationForm = ({ onSubmit, onBack }: UserRegistrationFormProps) =
                     className="border-gray-600 data-[state=checked]:bg-red-600 data-[state=checked]:border-red-600"
                   />
                   <Label htmlFor="terms" className="text-white text-sm leading-relaxed">
-                    I agree to the Terms of Service and understand that this system is for authorized business use only. 
+                    I agree to the <button type="button" onClick={() => setShowTerms(true)} className="text-red-400 hover:text-red-300 underline">Terms of Service</button> and understand that this system is for authorized business use only. 
                     I acknowledge that all activities may be monitored and logged for security purposes.
                   </Label>
                 </div>
@@ -356,7 +359,7 @@ const UserRegistrationForm = ({ onSubmit, onBack }: UserRegistrationFormProps) =
                     className="border-gray-600 data-[state=checked]:bg-red-600 data-[state=checked]:border-red-600"
                   />
                   <Label htmlFor="privacy" className="text-white text-sm leading-relaxed">
-                    I agree to the Privacy Policy and understand how my personal information will be collected, 
+                    I agree to the <button type="button" onClick={() => setShowPrivacy(true)} className="text-red-400 hover:text-red-300 underline">Privacy Policy</button> and understand how my personal information will be collected, 
                     used, and protected in accordance with applicable privacy laws.
                   </Label>
                 </div>
@@ -380,6 +383,18 @@ const UserRegistrationForm = ({ onSubmit, onBack }: UserRegistrationFormProps) =
           </form>
         </CardContent>
       </Card>
+
+      {/* Legal Document Modals */}
+      <LegalDocumentModal
+        isOpen={showTerms}
+        onClose={() => setShowTerms(false)}
+        documentType="terms"
+      />
+      <LegalDocumentModal
+        isOpen={showPrivacy}
+        onClose={() => setShowPrivacy(false)}
+        documentType="privacy"
+      />
     </div>
   );
 };

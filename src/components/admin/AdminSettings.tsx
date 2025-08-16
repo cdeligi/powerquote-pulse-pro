@@ -1,259 +1,202 @@
+import { useState, useEffect } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
+import { Loader2, Save } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from '@/hooks/use-toast';
+import { useAuth } from '@/hooks/useAuth';
 
-import { useState } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Settings, Save, Mail, AlertTriangle } from "lucide-react";
+const AdminSettings = () => {
+  const { user } = useAuth();
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [termsContent, setTermsContent] = useState('');
+  const [privacyContent, setPrivacyContent] = useState('');
 
-interface AdminSettingsProps {
-  onSettingsSave?: (settings: AdminSettings) => void;
-}
+  const fetchLegalContent = async () => {
+    try {
+      setLoading(true);
 
-interface AdminSettings {
-  ordersTeamEmail: string;
-  ccEmails: string[];
-  emailSubjectPrefix: string;
-  marginWarningThreshold: number;
-}
+      const { data, error } = await supabase
+        .from('legal_pages')
+        .select('slug, content')
+        .in('slug', ['terms', 'privacy']);
 
-const AdminSettings = ({ onSettingsSave }: AdminSettingsProps) => {
-  const [ordersTeamEmail, setOrdersTeamEmail] = useState('orders@qualitrolcorp.com');
-  const [ccEmails, setCcEmails] = useState<string[]>(['orders-backup@qualitrolcorp.com']);
-  const [newCcEmail, setNewCcEmail] = useState('');
-  const [emailSubjectPrefix, setEmailSubjectPrefix] = useState('[PowerQuotePro]');
-  const [marginWarningThreshold, setMarginWarningThreshold] = useState(25);
+      if (error) throw error;
 
-  const handleAddCcEmail = () => {
-    if (newCcEmail && !ccEmails.includes(newCcEmail)) {
-      setCcEmails([...ccEmails, newCcEmail]);
-      setNewCcEmail('');
+      const termsPage = data?.find(page => page.slug === 'terms');
+      const privacyPage = data?.find(page => page.slug === 'privacy');
+
+      setTermsContent(termsPage?.content || '');
+      setPrivacyContent(privacyPage?.content || '');
+
+    } catch (error) {
+      console.error('Error fetching legal content:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to load legal content.',
+        variant: 'destructive'
+      });
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleRemoveCcEmail = (email: string) => {
-    setCcEmails(ccEmails.filter(e => e !== email));
+  useEffect(() => {
+    fetchLegalContent();
+  }, []);
+
+  const saveLegalContent = async (slug: 'terms' | 'privacy', content: string) => {
+    try {
+      setSaving(true);
+
+      const { error } = await supabase
+        .from('legal_pages')
+        .upsert({
+          slug,
+          content,
+          updated_by: user?.id
+        });
+
+      if (error) throw error;
+
+      toast({
+        title: 'Success',
+        description: `${slug === 'terms' ? 'Terms of Service' : 'Privacy Policy'} updated successfully.`
+      });
+
+    } catch (error) {
+      console.error('Error saving legal content:', error);
+      toast({
+        title: 'Error',
+        description: `Failed to save ${slug === 'terms' ? 'Terms of Service' : 'Privacy Policy'}.`,
+        variant: 'destructive'
+      });
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const handleSave = () => {
-    const settings: AdminSettings = {
-      ordersTeamEmail,
-      ccEmails,
-      emailSubjectPrefix,
-      marginWarningThreshold
-    };
-    
-    // Save to localStorage or send to backend
-    localStorage.setItem('adminSettings', JSON.stringify(settings));
-    
-    if (onSettingsSave) {
-      onSettingsSave(settings);
-    }
-    
-    alert('Settings saved successfully!');
-  };
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-8">
+        <Loader2 className="h-6 w-6 animate-spin text-white" />
+        <span className="ml-2 text-white">Loading settings...</span>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-2xl font-bold text-white mb-2">
-          System Settings
-        </h2>
-        <p className="text-gray-400">
-          Configure system-wide settings and email notifications
-        </p>
+        <h2 className="text-2xl font-bold text-white mb-2">Admin Settings</h2>
+        <p className="text-gray-400">Configure system settings and legal documents</p>
       </div>
 
-      {/* Margin Warning Threshold Settings */}
-      <Card className="bg-gray-900 border-gray-800">
-        <CardHeader>
-          <CardTitle className="text-white flex items-center">
-            <AlertTriangle className="mr-2 h-5 w-5" />
-            Margin Warning Configuration
-          </CardTitle>
-          <CardDescription className="text-gray-400">
-            Configure when discount warnings should appear in the quote approval process
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div>
-            <Label htmlFor="margin-threshold" className="text-white font-medium mb-2 block">
-              Margin Warning Threshold (%) *
-            </Label>
-            <Input
-              id="margin-threshold"
-              type="number"
-              min="0"
-              max="100"
-              value={marginWarningThreshold}
-              onChange={(e) => setMarginWarningThreshold(Number(e.target.value))}
-              className="bg-gray-800 border-gray-600 text-white placeholder:text-gray-400 focus:border-red-500 focus:ring-red-500"
-              placeholder="25"
-            />
-            <p className="text-gray-400 text-sm mt-1">
-              Warning will appear when requested discount reduces margin below this percentage. 
-              Current setting: {marginWarningThreshold}%
-            </p>
-          </div>
+      <Tabs defaultValue="general" className="w-full">
+        <TabsList className="grid w-full grid-cols-2 bg-gray-800">
+          <TabsTrigger value="general" className="text-white data-[state=active]:bg-red-600">
+            General
+          </TabsTrigger>
+          <TabsTrigger value="legal" className="text-white data-[state=active]:bg-red-600">
+            Legal
+          </TabsTrigger>
+        </TabsList>
 
-          {/* Preview warning message */}
-          <div className="bg-gray-800 p-4 rounded border border-yellow-600">
-            <div className="flex items-center space-x-2">
-              <AlertTriangle className="h-4 w-4 text-yellow-500" />
-              <span className="text-yellow-500 font-medium">Preview Warning Message:</span>
-            </div>
-            <p className="text-yellow-400 mt-2 text-sm">
-              "Warning: Requested discount will reduce margin to X.X% (below {marginWarningThreshold}% threshold)"
-            </p>
-          </div>
-        </CardContent>
-      </Card>
+        <TabsContent value="general">
+          <Card className="bg-gray-900 border-gray-800">
+            <CardHeader>
+              <CardTitle className="text-white">General Settings</CardTitle>
+            </CardHeader>
+            <CardContent className="text-gray-400">
+              <p>General system settings will be available here in future updates.</p>
+            </CardContent>
+          </Card>
+        </TabsContent>
 
-      <Card className="bg-gray-900 border-gray-800">
-        <CardHeader>
-          <CardTitle className="text-white flex items-center">
-            <Mail className="mr-2 h-5 w-5" />
-            Orders Team Email Configuration
-          </CardTitle>
-          <CardDescription className="text-gray-400">
-            Configure email settings for PO submissions and order notifications
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          {/* Primary Orders Email */}
-          <div>
-            <Label htmlFor="orders-email" className="text-white font-medium mb-2 block">
-              Primary Orders Team Email *
-            </Label>
-            <Input
-              id="orders-email"
-              type="email"
-              value={ordersTeamEmail}
-              onChange={(e) => setOrdersTeamEmail(e.target.value)}
-              className="bg-gray-800 border-gray-600 text-white placeholder:text-gray-400 focus:border-red-500 focus:ring-red-500"
-              placeholder="orders@company.com"
-            />
-            <p className="text-gray-400 text-sm mt-1">
-              Main email address that will receive PO submissions and BOM attachments
-            </p>
-          </div>
-
-          {/* CC Emails */}
-          <div>
-            <Label className="text-white font-medium mb-2 block">
-              CC Email Addresses (Optional)
-            </Label>
-            <div className="space-y-3">
-              {/* Existing CC emails */}
-              {ccEmails.map((email, index) => (
-                <div key={index} className="flex items-center space-x-2">
-                  <Input
-                    value={email}
-                    readOnly
-                    className="bg-gray-800 border-gray-600 text-white flex-1"
-                  />
+        <TabsContent value="legal">
+          <div className="space-y-6">
+            {/* Terms of Service */}
+            <Card className="bg-gray-900 border-gray-800">
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-white">Terms of Service</CardTitle>
                   <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleRemoveCcEmail(email)}
-                    className="border-gray-600 text-red-400 hover:bg-red-900/20 hover:border-red-500"
+                    onClick={() => saveLegalContent('terms', termsContent)}
+                    disabled={saving}
+                    className="bg-red-600 hover:bg-red-700"
                   >
-                    Remove
+                    {saving ? (
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    ) : (
+                      <Save className="h-4 w-4 mr-2" />
+                    )}
+                    Save Terms
                   </Button>
                 </div>
-              ))}
-              
-              {/* Add new CC email */}
-              <div className="flex items-center space-x-2">
-                <Input
-                  type="email"
-                  value={newCcEmail}
-                  onChange={(e) => setNewCcEmail(e.target.value)}
-                  placeholder="additional-email@company.com"
-                  className="bg-gray-800 border-gray-600 text-white placeholder:text-gray-400 focus:border-red-500 focus:ring-red-500 flex-1"
-                />
-                <Button
-                  onClick={handleAddCcEmail}
-                  disabled={!newCcEmail}
-                  className="bg-red-600 hover:bg-red-700 text-white"
-                >
-                  Add CC
-                </Button>
-              </div>
-            </div>
-            <p className="text-gray-400 text-sm mt-1">
-              Additional email addresses that will receive copies of order notifications
-            </p>
-          </div>
-
-          {/* Email Subject Prefix */}
-          <div>
-            <Label htmlFor="subject-prefix" className="text-white font-medium mb-2 block">
-              Email Subject Prefix
-            </Label>
-            <Input
-              id="subject-prefix"
-              value={emailSubjectPrefix}
-              onChange={(e) => setEmailSubjectPrefix(e.target.value)}
-              className="bg-gray-800 border-gray-600 text-white placeholder:text-gray-400 focus:border-red-500 focus:ring-red-500"
-              placeholder="[PowerQuotePro]"
-            />
-            <p className="text-gray-400 text-sm mt-1">
-              Prefix that will be added to all order notification email subjects
-            </p>
-          </div>
-
-          {/* Save Button */}
-          <div className="pt-4 border-t border-gray-700">
-            <Button
-              onClick={handleSave}
-              className="bg-red-600 hover:bg-red-700 text-white"
-            >
-              <Save className="mr-2 h-4 w-4" />
-              Save Settings
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Email Template Preview */}
-      <Card className="bg-gray-900 border-gray-800">
-        <CardHeader>
-          <CardTitle className="text-white">Email Template Preview</CardTitle>
-          <CardDescription className="text-gray-400">
-            Preview of how order notification emails will appear
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="bg-gray-800 p-4 rounded font-mono text-sm text-gray-300">
-            <div className="space-y-2">
-              <div><strong>To:</strong> {ordersTeamEmail}</div>
-              {ccEmails.length > 0 && (
-                <div><strong>CC:</strong> {ccEmails.join(', ')}</div>
-              )}
-              <div><strong>Subject:</strong> {emailSubjectPrefix} New PO Submission - [Customer Name] - [Quote ID]</div>
-              <div className="border-t border-gray-600 pt-2 mt-3">
-                <div><strong>Body:</strong></div>
-                <div className="mt-2 text-gray-400">
-                  New Purchase Order submitted for processing:<br/>
-                  <br/>
-                  Customer: [Customer Name]<br/>
-                  Oracle Customer ID: [Oracle ID]<br/>
-                  SFDC Opportunity: [Opportunity ID]<br/>
-                  Quote ID: [Quote ID]<br/>
-                  Total Value: [Total Value]<br/>
-                  <br/>
-                  Please find the attached PO and BOM documents.<br/>
-                  <br/>
-                  Attachments:<br/>
-                  - Purchase Order (PDF)<br/>
-                  - Bill of Materials (PDF)
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  <Label htmlFor="terms" className="text-white">
+                    Terms of Service Content (Markdown supported)
+                  </Label>
+                  <Textarea
+                    id="terms"
+                    value={termsContent}
+                    onChange={(e) => setTermsContent(e.target.value)}
+                    className="bg-gray-800 border-gray-600 text-white placeholder:text-gray-400 focus:border-red-500 focus:ring-red-500 min-h-[300px] font-mono text-sm"
+                    placeholder="Enter Terms of Service content..."
+                  />
+                  <p className="text-sm text-gray-400">
+                    This content will be displayed when users click on the Terms of Service link during registration.
+                  </p>
                 </div>
-              </div>
-            </div>
+              </CardContent>
+            </Card>
+
+            {/* Privacy Policy */}
+            <Card className="bg-gray-900 border-gray-800">
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-white">Privacy Policy</CardTitle>
+                  <Button
+                    onClick={() => saveLegalContent('privacy', privacyContent)}
+                    disabled={saving}
+                    className="bg-red-600 hover:bg-red-700"
+                  >
+                    {saving ? (
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    ) : (
+                      <Save className="h-4 w-4 mr-2" />
+                    )}
+                    Save Privacy Policy
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  <Label htmlFor="privacy" className="text-white">
+                    Privacy Policy Content (Markdown supported)
+                  </Label>
+                  <Textarea
+                    id="privacy"
+                    value={privacyContent}
+                    onChange={(e) => setPrivacyContent(e.target.value)}
+                    className="bg-gray-800 border-gray-600 text-white placeholder:text-gray-400 focus:border-red-500 focus:ring-red-500 min-h-[300px] font-mono text-sm"
+                    placeholder="Enter Privacy Policy content..."
+                  />
+                  <p className="text-sm text-gray-400">
+                    This content will be displayed when users click on the Privacy Policy link during registration.
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
           </div>
-        </CardContent>
-      </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };

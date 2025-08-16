@@ -1,8 +1,29 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
-import { User, AuthError } from '@/types/auth';
+import { User, AuthError, Role } from '@/types/auth';
 import { toast } from '@/hooks/use-toast';
+
+// Helper function to map database role to app role
+const mapDatabaseRoleToAppRole = (dbRole: string): Role => {
+  switch (dbRole) {
+    case 'level1':
+    case 'LEVEL_1':
+      return 'LEVEL_1';
+    case 'level2':
+    case 'LEVEL_2':
+      return 'LEVEL_2';
+    case 'admin':
+    case 'ADMIN':
+      return 'ADMIN';
+    case 'LEVEL_3':
+      return 'LEVEL_3';
+    case 'FINANCE':
+      return 'FINANCE';
+    default:
+      return 'LEVEL_1';
+  }
+};
 
 interface AuthContextType {
   user: User | null;
@@ -346,7 +367,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             id: createdProfile.id,
             name: 'User',
             email: createdProfile.email,
-            role: createdProfile.role as 'level1' | 'level2' | 'admin',
+            role: mapDatabaseRoleToAppRole(createdProfile.role),
             department: createdProfile.department
           };
           setUser(appUser);
@@ -365,7 +386,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         id: data.id,
         name: `${data.first_name || ''} ${data.last_name || ''}`.trim() || 'User',
         email: data.email,
-        role: data.role as 'level1' | 'level2' | 'admin',
+        role: mapDatabaseRoleToAppRole(data.role),
         department: data.department
       };
       setUser(appUser);

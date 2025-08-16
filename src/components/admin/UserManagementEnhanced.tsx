@@ -25,7 +25,8 @@ import {
   UserX,
   Activity,
   Trash2,
-  RefreshCw
+  RefreshCw,
+  Shield
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/use-toast";
@@ -54,6 +55,7 @@ const UserManagementEnhanced = ({ user }: UserManagementEnhancedProps) => {
   const [loading, setLoading] = useState(true);
   const [selectedUserToRemove, setSelectedUserToRemove] = useState<UserProfile | null>(null);
   const [isRemoveDialogOpen, setIsRemoveDialogOpen] = useState(false);
+  const [selectedUserForPermissions, setSelectedUserForPermissions] = useState<UserProfile | null>(null);
 
   // Mock data for registration requests - in real app this would come from API
   const [pendingRequests, setPendingRequests] = useState<UserRegistrationRequest[]>([
@@ -387,8 +389,17 @@ const UserManagementEnhanced = ({ user }: UserManagementEnhancedProps) => {
                           {new Date(profile.created_at).toLocaleDateString()}
                         </TableCell>
                         <TableCell>
-                          <div className="flex space-x-2">
-                            {profile.role !== 'admin' && profile.user_status === 'active' && (
+            <div className="flex space-x-2">
+                            <Button
+                              onClick={() => setSelectedUserForPermissions(profile)}
+                              size="sm"
+                              variant="outline"
+                              className="text-white border-gray-600 hover:bg-gray-700"
+                              title="Manage Permissions"
+                            >
+                              <Shield className="h-4 w-4" />
+                            </Button>
+                            {profile.role !== 'ADMIN' && profile.user_status === 'active' && (
                               <Button
                                 onClick={() => {
                                   setSelectedUserToRemove(profile);
