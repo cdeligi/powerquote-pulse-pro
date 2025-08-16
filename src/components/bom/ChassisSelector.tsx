@@ -11,10 +11,9 @@ interface ChassisSelectorProps {
   selectedChassis: Level2Product | null;
   onAddToBOM?: (product: Level1Product | Level2Product | Level3Product) => void;
   canSeePrices?: boolean;
-  level1ProductId?: string; // For fetching chassis based on parent product
 }
 
-const ChassisSelector = ({ onChassisSelect, selectedChassis, onAddToBOM, canSeePrices = true, level1ProductId }: ChassisSelectorProps) => {
+const ChassisSelector = ({ onChassisSelect, selectedChassis, onAddToBOM, canSeePrices = true }: ChassisSelectorProps) => {
   const [chassisOptions, setChassisOptions] = useState<Level2Product[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -28,64 +27,44 @@ const ChassisSelector = ({ onChassisSelect, selectedChassis, onAddToBOM, canSeeP
         console.log('Initializing product data service...');
         await productDataService.initialize();
         
-        let chassisProducts: Level2Product[] = [];
+        // Get chassis options using the category-based method
+        console.log("Fetching QTMS chassis products by category");
+        const qtmsChassisProducts = await productDataService.getLevel2ProductsByCategory('qtms');
         
-        // If we have a specific level1ProductId, use it to fetch chassis
-        if (level1ProductId) {
-          console.log(`Fetching chassis for Level 1 product: ${level1ProductId}`);
-          chassisProducts = await productDataService.getLevel2ProductsForLevel1(level1ProductId);
-          console.log('Chassis products from parent ID:', chassisProducts);
-        } else {
-          // Fallback to category-based method for QTMS
-          console.log("Fetching QTMS chassis products by category");
-          chassisProducts = await productDataService.getLevel2ProductsByCategory('qtms');
-          console.log('Chassis products from category:', chassisProducts);
+        console.log('Raw chassis products from service:', qtmsChassisProducts);
+        
+        if (!qtmsChassisProducts || qtmsChassisProducts.length === 0) {
+          console.warn('No QTMS chassis products found using category-based method');
           
-          if (!chassisProducts || chassisProducts.length === 0) {
-            console.warn('No chassis products found using category-based method, trying different approaches...');
-            
-            // Try different fallback approaches for QTMS
-            const fallbackMethods = [
-              () => productDataService.getLevel2ProductsForLevel1('qtms'),
-              () => productDataService.getLevel2Products(),
-              () => productDataService.getLevel2Products() // Remove invalid category call
-            ];
-            
-            for (const method of fallbackMethods) {
-              try {
-                const result = await method();
-                if (result && result.length > 0) {
-                  // Filter for QTMS-related chassis
-                  chassisProducts = result.filter(product => 
-                    product.name?.toLowerCase().includes('qtms') ||
-                    product.description?.toLowerCase().includes('qtms') ||
-                    product.chassisType?.toLowerCase().includes('qtms') ||
-                    ['LTX', 'MTX', 'STX'].some(type => 
-                      product.name?.includes(type) || product.chassisType?.includes(type)
-                    )
-                  );
-                  
-                  if (chassisProducts.length > 0) {
-                    console.log('Found QTMS chassis products via fallback:', chassisProducts);
-                    break;
-                  }
-                }
-              } catch (error) {
-                console.warn('Fallback method failed:', error);
-              }
-            }
+          // Fallback to parent-based method
+          console.log('Falling back to parent-based method...');
+          const fallbackChassis = await productDataService.getLevel2ProductsForLevel1('qtms');
+          console.log('Fallback chassis products:', fallbackChassis);
+          
+          if (!fallbackChassis || fallbackChassis.length === 0) {
+            console.error('No QTMS chassis products found using either method');
+            setChassisOptions([]);
+            console.groupEnd();
+            return;
           }
-        }
-        
-        if (!chassisProducts || chassisProducts.length === 0) {
-          console.error('No chassis products found');
-          setChassisOptions([]);
+          
+          // Filter out any disabled chassis
+          const enabledChassis = fallbackChassis.filter(chassis => {
+            const isEnabled = chassis.enabled !== false; // Default to true if undefined
+            if (!isEnabled) {
+              console.log(`Skipping disabled chassis: ${chassis.id} (${chassis.name})`);
+            }
+            return isEnabled;
+          });
+          
+          console.log(`Setting ${enabledChassis.length} valid chassis options`);
+          setChassisOptions(enabledChassis);
           console.groupEnd();
           return;
         }
         
-        // Filter out any disabled chassis
-        const enabledChassis = chassisProducts.filter(chassis => {
+        // If we got here, the category-based method returned products
+        const enabledChassis = qtmsChassisProducts.filter(chassis => {
           const isEnabled = chassis.enabled !== false; // Default to true if undefined
           if (!isEnabled) {
             console.log(`Skipping disabled chassis: ${chassis.id} (${chassis.name})`);
@@ -106,7 +85,7 @@ const ChassisSelector = ({ onChassisSelect, selectedChassis, onAddToBOM, canSeeP
     };
 
     loadChassis();
-  }, [level1ProductId]);
+  }, []);
 
   if (loading) {
     return (

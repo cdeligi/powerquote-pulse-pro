@@ -159,27 +159,18 @@ export const ChassisTypeManager: React.FC = () => {
     }
   };
 
-  const renderLayoutPreview = (chassisType: ChassisType) => {
-    const { layoutRows, totalSlots, metadata } = chassisType;
-    const slotNumberingStart = metadata?.slotNumberingStart || 1;
-    
-    // Generate layout if none exists
-    const layout = layoutRows && layoutRows.length > 0 
-      ? layoutRows 
-      : generateDefaultLayout(totalSlots);
+  const renderLayoutPreview = (layoutRows?: number[][] | null) => {
+    if (!layoutRows || layoutRows.length === 0) return <span className="text-muted-foreground">Auto-generated</span>;
     
     return (
       <div className="space-y-1">
-        {layout.map((row, i) => (
+        {layoutRows.map((row, i) => (
           <div key={i} className="flex gap-1">
-            {row.map(slot => {
-              const displayNumber = slot + slotNumberingStart;
-              return (
-                <span key={slot} className="inline-block w-6 h-6 bg-primary/20 text-xs flex items-center justify-center rounded border">
-                  {displayNumber}
-                </span>
-              );
-            })}
+            {row.map(slot => (
+              <span key={slot} className="inline-block w-6 h-6 bg-primary/20 text-xs flex items-center justify-center rounded border">
+                {slot}
+              </span>
+            ))}
           </div>
         ))}
       </div>
@@ -254,33 +245,16 @@ export const ChassisTypeManager: React.FC = () => {
                           />
                         </div>
                       </div>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <Label htmlFor="create-slots">Total Slots *</Label>
-                          <Input
-                            id="create-slots"
-                            type="number"
-                            min="1"
-                            value={createFormData.totalSlots}
-                            onChange={(e) => setCreateFormData(prev => ({ ...prev, totalSlots: parseInt(e.target.value) || 0 }))}
-                            required
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor="create-numbering">Slot numbering starts at *</Label>
-                          <select
-                            id="create-numbering"
-                            value={createFormData.metadata?.slotNumberingStart || 0}
-                            onChange={(e) => setCreateFormData(prev => ({ 
-                              ...prev, 
-                              metadata: { ...prev.metadata, slotNumberingStart: parseInt(e.target.value) }
-                            }))}
-                            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
-                          >
-                            <option value={0}>0 (zero-based)</option>
-                            <option value={1}>1 (one-based)</option>
-                          </select>
-                        </div>
+                      <div>
+                        <Label htmlFor="create-slots">Total Slots *</Label>
+                        <Input
+                          id="create-slots"
+                          type="number"
+                          min="1"
+                          value={createFormData.totalSlots}
+                          onChange={(e) => setCreateFormData(prev => ({ ...prev, totalSlots: parseInt(e.target.value) || 0 }))}
+                          required
+                        />
                       </div>
                       <div className="flex items-center space-x-2">
                         <Switch
@@ -300,15 +274,13 @@ export const ChassisTypeManager: React.FC = () => {
                           initialVisualLayout={createFormData.visualLayout}
                           onLayoutChange={(layout) => setCreateFormData(prev => ({ ...prev, layoutRows: layout }))}
                           onVisualLayoutChange={(visualLayout) => setCreateFormData(prev => ({ ...prev, visualLayout }))}
-                          slotNumberingStart={createFormData.metadata?.slotNumberingStart || 1}
                           onPreview={(layout, visualLayout) => {
                             setPreviewData({
                               code: createFormData.code || 'Preview',
                               name: createFormData.name || 'Preview Chassis',
                               totalSlots: createFormData.totalSlots,
                               layoutRows: layout,
-                              visualLayout: visualLayout,
-                              metadata: createFormData.metadata
+                              visualLayout: visualLayout
                             });
                             setShowPreview(true);
                           }}
@@ -375,30 +347,14 @@ export const ChassisTypeManager: React.FC = () => {
                               />
                             </div>
                           </div>
-                          <div className="grid grid-cols-2 gap-4">
-                            <div>
-                              <Label>Total Slots *</Label>
-                              <Input
-                                type="number"
-                                min="1"
-                                value={editFormData.totalSlots || 0}
-                                onChange={(e) => setEditFormData(prev => ({ ...prev, totalSlots: parseInt(e.target.value) || 0 }))}
-                              />
-                            </div>
-                            <div>
-                              <Label>Slot numbering starts at *</Label>
-                              <select
-                                value={editFormData.metadata?.slotNumberingStart || 0}
-                                onChange={(e) => setEditFormData(prev => ({ 
-                                  ...prev, 
-                                  metadata: { ...prev.metadata, slotNumberingStart: parseInt(e.target.value) }
-                                }))}
-                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
-                              >
-                                <option value={0}>0 (zero-based)</option>
-                                <option value={1}>1 (one-based)</option>
-                              </select>
-                            </div>
+                          <div>
+                            <Label>Total Slots *</Label>
+                            <Input
+                              type="number"
+                              min="1"
+                              value={editFormData.totalSlots || 0}
+                              onChange={(e) => setEditFormData(prev => ({ ...prev, totalSlots: parseInt(e.target.value) || 0 }))}
+                            />
                           </div>
                           <div className="flex items-center space-x-2">
                             <Switch
@@ -417,7 +373,6 @@ export const ChassisTypeManager: React.FC = () => {
                               initialVisualLayout={editFormData.visualLayout}
                               onLayoutChange={(layout) => setEditFormData(prev => ({ ...prev, layoutRows: layout }))}
                               onVisualLayoutChange={(visualLayout) => setEditFormData(prev => ({ ...prev, visualLayout }))}
-                              slotNumberingStart={editFormData.metadata?.slotNumberingStart || 1}
                               onPreview={(layout, visualLayout) => {
                                 setPreviewData({
                                   code: editFormData.code || 'Preview',
@@ -461,7 +416,6 @@ export const ChassisTypeManager: React.FC = () => {
                           <div className="text-sm text-muted-foreground space-y-1">
                             <p><strong>Code:</strong> {chassisType.code}</p>
                             <p><strong>Total Slots:</strong> {chassisType.totalSlots}</p>
-                            <p><strong>Slot Numbering:</strong> Starts at {chassisType.metadata?.slotNumberingStart || 0}</p>
                             <p><strong>Created:</strong> {new Date(chassisType.createdAt).toLocaleDateString()}</p>
                           </div>
                         </div>
@@ -501,7 +455,7 @@ export const ChassisTypeManager: React.FC = () => {
                         <div className="text-sm">
                           <span className="font-medium">Layout Preview:</span>
                           <div className="mt-2">
-                            {renderLayoutPreview(chassisType)}
+                            {renderLayoutPreview(chassisType.layoutRows)}
                           </div>
                         </div>
                       </div>

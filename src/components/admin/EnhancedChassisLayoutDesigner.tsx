@@ -33,7 +33,6 @@ interface EnhancedChassisLayoutDesignerProps {
   onLayoutChange?: (layout: number[][]) => void;
   onVisualLayoutChange?: (layout: ChassisVisualLayout) => void;
   onPreview?: (layout: number[][], visualLayout?: ChassisVisualLayout) => void;
-  slotNumberingStart?: number;
 }
 
 interface DragState {
@@ -53,8 +52,7 @@ export const EnhancedChassisLayoutDesigner: React.FC<EnhancedChassisLayoutDesign
   initialVisualLayout,
   onLayoutChange,
   onVisualLayoutChange,
-  onPreview,
-  slotNumberingStart = 1
+  onPreview
 }) => {
   // Grid-based layout state
   const [layout, setLayout] = useState<number[][]>(() => 
@@ -102,28 +100,6 @@ export const EnhancedChassisLayoutDesigner: React.FC<EnhancedChassisLayoutDesign
   const [initializationRetries, setInitializationRetries] = useState(0);
   const maxRetries = 3;
   const loggedCanvasNotReady = useRef(false);
-  const [activeTab, setActiveTab] = useState<string>('grid');
-
-  // Initialize canvas when Visual tab becomes active
-  useEffect(() => {
-    if (activeTab === 'visual' && !canvasInitialized && canvasRef.current && !fabricCanvas) {
-      console.log('Visual tab active - starting canvas initialization timer');
-      const timeoutId = setTimeout(() => {
-        if (canvasRef.current && !fabricCanvas) {
-          console.log('Triggering canvas initialization from tab switch');
-          // Force a re-initialization attempt
-          const canvasElement = canvasRef.current;
-          if (canvasElement.offsetWidth > 0 && canvasElement.offsetHeight > 0) {
-            setInitializationRetries(0);
-            setInitializationError(null);
-            // Trigger the main initialization effect by setting a flag
-            setCanvasInitialized(false);
-          }
-        }
-      }, 200);
-      return () => clearTimeout(timeoutId);
-    }
-  }, [activeTab, canvasInitialized, fabricCanvas]);
 
   // Enhanced Fabric.js canvas initialization with robust error handling and retry mechanism
   // Only initialize when component is active and visible
@@ -154,8 +130,9 @@ export const EnhancedChassisLayoutDesigner: React.FC<EnhancedChassisLayoutDesign
           parentElement: !!canvasElement.parentElement
         });
 
-        // Allow canvas initialization even with zero dimensions initially
-        // The canvas will be properly sized during the rendering phase
+        if (rect.width === 0 || rect.height === 0) {
+          throw new Error('Canvas element has zero dimensions');
+        }
 
         // Create canvas with defensive configuration
         console.log('Creating Fabric.js canvas instance...');
@@ -660,7 +637,7 @@ export const EnhancedChassisLayoutDesigner: React.FC<EnhancedChassisLayoutDesign
 
   return (
     <div className="space-y-4">
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+      <Tabs defaultValue="grid" className="w-full">
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="grid">Grid Designer</TabsTrigger>
           <TabsTrigger value="visual">Visual Designer</TabsTrigger>
@@ -730,7 +707,7 @@ export const EnhancedChassisLayoutDesigner: React.FC<EnhancedChassisLayoutDesign
                             draggable
                             onDragStart={(e) => handleDragStart(e, slot, rowIndex, slotIndex)}
                           >
-                            Slot {slot + slotNumberingStart}
+                            Slot {slot}
                           </Badge>
                         </div>
                       ))}
@@ -769,25 +746,6 @@ export const EnhancedChassisLayoutDesigner: React.FC<EnhancedChassisLayoutDesign
                 gridVisible={gridVisible}
                 onGridToggle={() => setGridVisible(!gridVisible)}
                 onReset={resetVisualLayout}
-                onExport={() => {
-                  if (rendererRef.current) {
-                    const imageData = rendererRef.current.exportAsImage('png', 1.0);
-                    const link = document.createElement('a');
-                    link.download = 'chassis-layout.png';
-                    link.href = imageData;
-                    link.click();
-                  }
-                }}
-                onBackgroundColorChange={(color) => {
-                  if (rendererRef.current) {
-                    rendererRef.current.setCanvasBackground(color);
-                  }
-                }}
-                onBackgroundImageChange={(file) => {
-                  if (rendererRef.current) {
-                    rendererRef.current.setCanvasBackgroundImage(file);
-                  }
-                }}
                 slotsCount={sanitizeSlots(visualLayout.slots).length}
                 maxSlots={totalSlots}
                 canvasRef={canvasRef}

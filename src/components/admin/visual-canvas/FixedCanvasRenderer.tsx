@@ -475,54 +475,6 @@ export class FixedCanvasRenderer {
     this.canvas.requestRenderAll();
   }
 
-  // Set canvas background image
-  setCanvasBackgroundImage(file: File): Promise<void> {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const dataURL = e.target?.result as string;
-        FabricImage.fromURL(dataURL).then((img) => {
-          // Scale image to fit canvas
-          const scaleX = this.canvas.width! / (img.width || 1);
-          const scaleY = this.canvas.height! / (img.height || 1);
-          const scale = Math.min(scaleX, scaleY);
-          
-          img.set({
-            scaleX: scale,
-            scaleY: scale,
-            left: this.canvas.width! / 2,
-            top: this.canvas.height! / 2,
-            originX: 'center',
-            originY: 'center',
-            selectable: false,
-            evented: false,
-            opacity: 0.3 // Semi-transparent background
-          });
-          
-          // Remove existing background image if any
-          const existingBg = this.canvas.getObjects().find(obj => obj.get('isBackgroundImage'));
-          if (existingBg) {
-            this.canvas.remove(existingBg);
-          }
-          
-          img.set('isBackgroundImage', true);
-          this.canvas.add(img);
-          this.canvas.sendObjectToBack(img);
-          
-          // Ensure grid is still behind slots but above background
-          if (this.isGridVisible) {
-            this.sendGridToBack();
-          }
-          
-          this.canvas.requestRenderAll();
-          resolve();
-        }).catch(reject);
-      };
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    });
-  }
-
   // Export canvas as image
   exportAsImage(format: 'png' | 'jpeg' = 'png', quality: number = 1): string {
     // Temporarily hide grid for export
