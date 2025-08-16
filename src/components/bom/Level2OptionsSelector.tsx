@@ -109,8 +109,8 @@ const Level2OptionsSelector = ({
                 )}
                 onClick={() => handleOptionClick(option)}
               >
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm leading-tight">
+                <CardHeader className="pb-1">
+                  <CardTitle className="text-sm leading-tight truncate">
                     {option.name}
                     <div className="flex items-center gap-1 mt-1">
                       {requiresChassisConfig && (
@@ -121,35 +121,23 @@ const Level2OptionsSelector = ({
                     </div>
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="pt-0 flex flex-col h-full">
-                  <div className="flex flex-col flex-1">
-                    {option.partNumber && (
-                      <div className="mb-2">
-                        <code className="text-xs bg-muted px-1 py-0.5 rounded font-mono break-all">
-                          {option.partNumber}
-                        </code>
-                      </div>
-                    )}
-                    <p className="text-muted-foreground text-xs mb-2 line-clamp-2">
+                <CardContent className="pt-0 flex flex-col h-full space-y-1">
+                  {option.partNumber && (
+                    <div className="text-xs font-mono bg-muted px-1 py-0.5 rounded break-all">
+                      {option.partNumber}
+                    </div>
+                  )}
+                  {option.description && (
+                    <p className="text-muted-foreground text-xs line-clamp-2 leading-tight">
                       {option.description}
                     </p>
-                    {requiresChassisConfig && (
-                      <p className="text-xs text-muted-foreground mb-2">
-                        Requires chassis configuration
-                      </p>
+                  )}
+                  <div className="flex items-center justify-between pt-1">
+                    {canSeePrices && option.price && (
+                      <span className="text-foreground font-medium text-xs">
+                        ${option.price.toLocaleString()}
+                      </span>
                     )}
-                    <div className="flex justify-between items-center mb-2">
-                      {canSeePrices && option.price && (
-                        <span className="text-foreground font-medium text-sm">
-                          ${option.price.toLocaleString()}
-                        </span>
-                      )}
-                    </div>
-                    
-                    {/* Spacer to push button to bottom */}
-                    <div className="flex-1"></div>
-                    
-                    {/* Add to Bill of Material Button */}
                     {onAddToBOM && !requiresChassisConfig && (
                       <Button
                         onClick={(e) => {
@@ -157,7 +145,7 @@ const Level2OptionsSelector = ({
                           onAddToBOM(option);
                         }}
                         size="sm"
-                        className="w-full mt-2 text-xs"
+                        className="text-xs h-6 px-2"
                       >
                         Add to BOM
                       </Button>
