@@ -130,51 +130,38 @@ const ChassisSelector = ({ onChassisSelect, selectedChassis, onAddToBOM, canSeeP
               selectedChassis?.id === chassis.id ? "ring-2 ring-primary" : "hover:border-primary"
             )}
           >
-            <CardHeader>
-              <CardTitle className="flex items-center justify-between">
+            <CardHeader className="pb-2">
+              <CardTitle className="flex items-center justify-between text-sm leading-tight">
                 {chassis.name}
                 <Badge variant="outline" className="text-xs">
                   QTMS
                 </Badge>
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <p className="text-muted-foreground text-sm mb-3">{chassis.description}</p>
-              <div className="flex justify-between items-center mb-3">
-                {canSeePrices && chassis.price && (
-                  <span className="text-foreground font-medium">
-                    ${chassis.price.toLocaleString()}
-                  </span>
-                )}
-              </div>
+            <CardContent className="space-y-2">
+              {chassis.description && (
+                <p className="text-muted-foreground text-xs line-clamp-2 leading-tight">
+                  {chassis.description}
+                </p>
+              )}
+              {canSeePrices && chassis.price && (
+                <div className="text-foreground font-medium text-xs">
+                  ${chassis.price.toLocaleString()}
+                </div>
+              )}
               
-              {/* Configure or Add to BOM buttons */}
-              <div className="flex flex-col sm:flex-row flex-wrap gap-2 mb-3">
-                <Button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    console.log('Configure Chassis clicked for:', chassis.name, 'chassisType:', chassis.chassisType);
-                    onChassisSelect(chassis);
-                  }}
-                  size="sm"
-                  className="w-full sm:flex-1"
-                >
-                  Configure Chassis
-                </Button>
-                {onAddToBOM && (
-                  <Button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onAddToBOM(chassis);
-                    }}
-                    size="sm"
-                    variant="secondary"
-                    className="w-full sm:flex-1"
-                  >
-                    Add to BOM
-                  </Button>
-                )}
-              </div>
+              {/* Configure Chassis button only */}
+              <Button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  console.log('Configure Chassis clicked for:', chassis.name, 'chassisType:', chassis.chassisType);
+                  onChassisSelect(chassis);
+                }}
+                size="sm"
+                className="w-full text-xs"
+              >
+                Configure Chassis
+              </Button>
               
               {chassis.specifications && (
                 <div className="mt-2 flex flex-wrap gap-1">
