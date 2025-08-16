@@ -16,7 +16,7 @@ interface SlotCardSelectorProps {
   onClose: () => void;
   canSeePrices: boolean;
   currentSlotAssignments?: Record<number, any>;
-  codeMap?: Record<string, { template: string; slot_span: number; is_standard?: boolean; standard_position?: number | null; designated_only?: boolean; designated_positions?: number[]; outside_chassis?: boolean; notes?: string | null }>;
+  codeMap?: Record<string, { template: string; slot_span: number; is_standard?: boolean; standard_position?: number | null; designated_only?: boolean; designated_positions?: number[]; outside_chassis?: boolean; notes?: string | null; exclusive_in_slots?: boolean; color?: string | null }>;
   pnConfig?: any;
 }
 

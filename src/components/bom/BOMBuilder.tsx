@@ -251,31 +251,86 @@ const handleChassisSelect = (chassis: Level2Product) => {
     setSelectedChassis(chassis);
     setConfiguringChassis(chassis); // This was missing - needed to show the rack visualizer!
     setSlotAssignments({});
+    setAutoPlaced(false);
+    setSelectedAccessories(new Set());
 
     // Find and store the matching chassis type for layout and numbering
     const matchingChassisType = chassisTypes.find(ct => ct.code.toLowerCase() === chassis.chassisType.toLowerCase());
     setCurrentChassisType(matchingChassisType);
 
-    // Auto-include standard items and generate slot hints
+    // Load Level 2 part number configuration and Level 3 products
     (async () => {
       try {
-        const l3 = await productDataService.getLevel3Products();
-        // Use part number codes as defaults for auto-include logic
-        const defaults: Record<string, any> = {};
+        // Fetch part number config for this chassis
+        const { data: pnData, error: pnError } = await supabase
+          .from('level2_products')
+          .select('part_number_config')
+          .eq('id', chassis.id)
+          .single();
 
+        if (pnError) throw pnError;
+        setPnConfig(pnData?.part_number_config || null);
+
+        // Fetch Level 3 products and their admin configuration
+        const [l3Products, { data: codeData }] = await Promise.all([
+          productDataService.getLevel3ProductsForLevel2(chassis.id),
+          supabase.from('level3_products').select('id, admin_config').neq('admin_config', null)
+        ]);
+
+        setLevel3Products(l3Products);
+
+        // Build code map from admin_config
+        const newCodeMap: Record<string, any> = {};
+        if (codeData) {
+          codeData.forEach(item => {
+            if (item.admin_config) {
+              newCodeMap[item.id] = item.admin_config;
+            }
+          });
+        }
+        setCodeMap(newCodeMap);
+
+        // Auto-place standard items and build hints
         const autoIncludeAssignments: Record<number, Level3Product> = {};
         const standardHints: Record<number, string[]> = {};
-        
-        // For now, skip auto-include logic until proper admin defaults are available
-        // This can be re-enabled when the getProductDefaults service method is implemented
+        const autoAccessories = new Set<string>();
+
+        l3Products.forEach(product => {
+          const config = newCodeMap[product.id];
+          if (config?.is_standard) {
+            if (config.outside_chassis) {
+              // Auto-select standard accessories
+              autoAccessories.add(product.id);
+            } else if (config.standard_position && config.standard_position > 0) {
+              // Auto-place standard items in their designated slots
+              autoIncludeAssignments[config.standard_position] = product;
+            }
+          }
+
+          // Build standard slot hints for empty slots
+          if (config?.designated_only && config.designated_positions) {
+            config.designated_positions.forEach((slot: number) => {
+              if (!standardHints[slot]) standardHints[slot] = [];
+              standardHints[slot].push(product.name);
+            });
+          }
+        });
 
         console.log('Auto-included items:', autoIncludeAssignments);
         console.log('Standard hints:', standardHints);
+        console.log('Auto accessories:', autoAccessories);
         
         setSlotAssignments(autoIncludeAssignments);
         setStandardSlotHints(standardHints);
+        setSelectedAccessories(autoAccessories);
+        setAutoPlaced(true);
       } catch (e) {
-        console.error('Failed to auto-include standard items:', e);
+        console.error('Failed to load chassis configuration:', e);
+        // Reset states on error
+        setPnConfig(null);
+        setCodeMap({});
+        setLevel3Products([]);
+        setStandardSlotHints({});
       }
     })();
 
@@ -826,12 +881,19 @@ const handleAddChassisAndCardsToBOM = () => {
   onSlotClick={handleSlotClick}
   onSlotClear={handleSlotClear}
   hasRemoteDisplay={hasRemoteDisplay}
-  onRemoteDisplayToggle={handleRemoteDisplayToggle}
+  onRemoteDisplayToggle={setHasRemoteDisplay}
   standardSlotHints={standardSlotHints}
   colorByProductId={colorByProductId}
   accessories={accessories}
   onAccessoryToggle={toggleAccessory}
-  partNumber={buildQTMSPartNumber({ chassis: configuringChassis, slotAssignments, hasRemoteDisplay, pnConfig, codeMap, includeSuffix: false })}
+  partNumber={configuringChassis ? buildQTMSPartNumber({
+    chassis: configuringChassis,
+    slotAssignments,
+    hasRemoteDisplay,
+    pnConfig,
+    codeMap,
+    includeSuffix: true
+  }) : ''}
   chassisType={currentChassisType}
 />
           
@@ -911,12 +973,19 @@ const handleAddChassisAndCardsToBOM = () => {
   onSlotClear={handleSlotClear}
   selectedSlot={selectedSlot}
   hasRemoteDisplay={hasRemoteDisplay}
-  onRemoteDisplayToggle={handleRemoteDisplayToggle}
+  onRemoteDisplayToggle={setHasRemoteDisplay}
   standardSlotHints={standardSlotHints}
   colorByProductId={colorByProductId}
   accessories={accessories}
   onAccessoryToggle={toggleAccessory}
-  partNumber={buildQTMSPartNumber({ chassis: selectedChassis, slotAssignments, hasRemoteDisplay, pnConfig, codeMap, includeSuffix: false })}
+  partNumber={selectedChassis ? buildQTMSPartNumber({
+    chassis: selectedChassis,
+    slotAssignments,
+    hasRemoteDisplay,
+    pnConfig,
+    codeMap,
+    includeSuffix: true
+  }) : ''}
   chassisType={currentChassisType}
 />
              </div>
