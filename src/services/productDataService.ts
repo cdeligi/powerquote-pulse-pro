@@ -1,12 +1,13 @@
-import { createClient } from '@supabase/supabase-js';
-import { Database } from '@/types/supabase';
-import { Level1Product, Level2Product, Level3Product, DGAProduct, PDProduct, ChassisType } from '@/types/product';
+import { supabase } from '@/integrations/supabase/client';
+import { Level1Product, Level2Product, Level3Product, ChassisType } from '@/types/product';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
-const supabase = createClient<Database>(supabaseUrl, supabaseKey);
 
 export const productDataService = {
+  // Initialize method (placeholder for compatibility)
+  async initialize() {
+    // No-op for compatibility with existing components
+  },
+
   // Level 1 Products
   async getLevel1Products(): Promise<Level1Product[]> {
     const { data, error } = await supabase
@@ -20,6 +21,12 @@ export const productDataService = {
     }
 
     return data || [];
+  },
+
+  // Sync versions for compatibility
+  getLevel1ProductsSync(): Level1Product[] {
+    // Return empty array for sync compatibility - components should use async versions
+    return [];
   },
 
   async createLevel1Product(product: Omit<Level1Product, 'id'>): Promise<Level1Product> {
@@ -78,6 +85,11 @@ export const productDataService = {
     }
 
     return data || [];
+  },
+
+  // Sync versions for compatibility
+  getLevel2ProductsSync(): Level2Product[] {
+    return [];
   },
 
   async getLevel2ProductsForLevel1(level1ProductId: string): Promise<Level2Product[]> {
@@ -168,6 +180,11 @@ export const productDataService = {
     return data || [];
   },
 
+  // Sync versions for compatibility
+  getLevel3ProductsSync(): Level3Product[] {
+    return [];
+  },
+
   async getLevel3ProductsForLevel2(level2ProductId: string): Promise<Level3Product[]> {
     const { data, error } = await supabase
       .from('level3_products')
@@ -227,10 +244,11 @@ export const productDataService = {
   },
 
   // DGA Products
-  async getDGAProducts(): Promise<DGAProduct[]> {
+  async getDGAProducts(): Promise<any[]> {
     const { data, error } = await supabase
-      .from('dga_products')
+      .from('products')
       .select('*')
+      .eq('category', 'DGA')
       .order('name', { ascending: true });
 
     if (error) {
@@ -242,10 +260,11 @@ export const productDataService = {
   },
 
    // PD Products
-  async getPDProducts(): Promise<PDProduct[]> {
+  async getPDProducts(): Promise<any[]> {
     const { data, error } = await supabase
-      .from('pd_products')
+      .from('products')
       .select('*')
+      .eq('category', 'PD')
       .order('name', { ascending: true });
 
     if (error) {
@@ -254,6 +273,49 @@ export const productDataService = {
     }
 
     return data || [];
+  },
+
+  // Level 4 Products (placeholder methods for compatibility)
+  async getLevel4Products(): Promise<any[]> {
+    return [];
+  },
+
+  getLevel4ProductsSync(): any[] {
+    return [];
+  },
+
+  async createLevel4Product(product: any): Promise<any> {
+    console.warn('Level 4 products not yet implemented');
+    return product;
+  },
+
+  async updateLevel4Product(id: string, updates: any): Promise<any> {
+    console.warn('Level 4 products not yet implemented');
+    return updates;
+  },
+
+  async deleteLevel4Product(id: string): Promise<void> {
+    console.warn('Level 4 products not yet implemented');
+  },
+
+  // Asset Types (placeholder methods for compatibility)
+  async getAssetTypes(): Promise<any[]> {
+    const { data, error } = await supabase
+      .from('asset_types')
+      .select('*')
+      .eq('enabled', true)
+      .order('name', { ascending: true });
+
+    if (error) {
+      console.error('Error fetching asset types:', error);
+      return [];
+    }
+
+    return data || [];
+  },
+
+  getAssetTypesSync(): any[] {
+    return [];
   },
 
   // Chassis Types
@@ -269,6 +331,88 @@ export const productDataService = {
     }
 
     return data || [];
+  },
+
+  async createChassisType(chassisType: any): Promise<ChassisType> {
+    const { data, error } = await supabase
+      .from('chassis_types')
+      .insert([chassisType])
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error creating chassis type:', error);
+      throw error;
+    }
+
+    return data;
+  },
+
+  async updateChassisType(id: string, updates: Partial<ChassisType>): Promise<ChassisType> {
+    const { data, error } = await supabase
+      .from('chassis_types')
+      .update(updates)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error updating chassis type:', error);
+      throw error;
+    }
+
+    return data;
+  },
+
+  async deleteChassisType(id: string): Promise<void> {
+    const { error } = await supabase
+      .from('chassis_types')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      console.error('Error deleting chassis type:', error);
+      throw error;
+    }
+  },
+
+  // Sensor Configuration Methods (placeholder for compatibility)
+  async updateAnalogSensorType(id: string, updates: any): Promise<any> {
+    console.warn('Analog sensor types not yet implemented');
+    return updates;
+  },
+
+  async createAnalogSensorType(sensorType: any): Promise<any> {
+    console.warn('Analog sensor types not yet implemented');
+    return sensorType;
+  },
+
+  async deleteAnalogSensorType(id: string): Promise<void> {
+    console.warn('Analog sensor types not yet implemented');
+  },
+
+  async getAnalogSensorTypes(): Promise<any[]> {
+    console.warn('Analog sensor types not yet implemented');
+    return [];
+  },
+
+  async updateBushingTapModel(id: string, updates: any): Promise<any> {
+    console.warn('Bushing tap models not yet implemented');
+    return updates;
+  },
+
+  async createBushingTapModel(model: any): Promise<any> {
+    console.warn('Bushing tap models not yet implemented');
+    return model;
+  },
+
+  async deleteBushingTapModel(id: string): Promise<void> {
+    console.warn('Bushing tap models not yet implemented');
+  },
+
+  async getBushingTapModels(): Promise<any[]> {
+    console.warn('Bushing tap models not yet implemented');
+    return [];
   },
 
   // Part Number Codes
@@ -342,3 +486,6 @@ export const productDataService = {
     return data;
   },
 };
+
+// Export for backwards compatibility
+export { productDataService as ProductDataService };
