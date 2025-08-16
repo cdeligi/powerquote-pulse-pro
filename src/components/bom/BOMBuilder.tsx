@@ -1098,7 +1098,7 @@ const handleAddChassisAndCardsToBOM = () => {
             selectedAccessories={selectedAccessories}
             onToggleAccessory={toggleAccessory}
             onAddToBOM={handleAddNonChassisToBOM}
-            canOverridePartNumber={user?.role === 'level2'}
+            canOverridePartNumber={user?.role === 'LEVEL_2' || user?.role === 'LEVEL_3' || user?.role === 'ADMIN' || user?.role === 'FINANCE'}
           />
         </div>
       );

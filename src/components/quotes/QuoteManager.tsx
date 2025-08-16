@@ -112,7 +112,7 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
     return matchesSearch && matchesPriority;
   });
 
-  const canSeePrices = user.role !== 'level1';
+  const canSeePrices = user.role !== 'LEVEL_1';
 
   const handleViewQuote = (quote: any) => {
     if (quote.pdfUrl) {

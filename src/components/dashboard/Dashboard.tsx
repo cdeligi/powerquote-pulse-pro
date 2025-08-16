@@ -31,13 +31,13 @@ const Dashboard = ({ user, onLogout }: DashboardProps) => {
         return (
           <BOMBuilder 
             onBOMUpdate={handleBOMUpdate}
-            canSeePrices={user.role === 'admin'}
+            canSeePrices={user.role === 'ADMIN' || user.role === 'FINANCE' || user.role === 'LEVEL_3'}
           />
         );
       case 'quotes':
         return <QuoteManager user={user} />;
       case 'admin':
-        return user.role === 'admin' ? <AdminPanel user={user} /> : <div className="text-white">Access Denied</div>;
+        return user.role === 'ADMIN' ? <AdminPanel user={user} /> : <div className="text-white">Access Denied</div>;
       default:
         return <DashboardOverview user={user} />;
     }

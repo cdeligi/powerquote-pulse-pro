@@ -22,7 +22,7 @@ const Sidebar = ({ user, activeView, onViewChange, onLogout }: SidebarProps) => 
     { id: 'overview', label: 'Dashboard', icon: Home },
     { id: 'bom', label: 'BOM Builder', icon: Wrench },
     { id: 'quotes', label: 'Quotes', icon: FileText },
-    ...(user.role === 'admin' ? [{ id: 'admin' as const, label: 'Admin Panel', icon: Settings }] : [])
+    ...(user.role === 'ADMIN' ? [{ id: 'admin' as const, label: 'Admin Panel', icon: Settings }] : [])
   ];
 
   const getRoleBadge = (role: string) => {
