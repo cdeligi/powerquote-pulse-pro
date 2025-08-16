@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { productDataService } from "@/services/productDataService";
+import { useState } from "react";
+import { productDataService, ProductDataService } from "@/services/productDataService";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,24 +11,14 @@ interface SensorConfigManagementProps {
 }
 
 const SensorConfigManagement = ({ showAnalog = true, showBushing = true }: SensorConfigManagementProps) => {
-  const [analogTypes, setAnalogTypes] = useState<any[]>([]);
-  const [bushingModels, setBushingModels] = useState<any[]>([]);
+  const [analogTypes, setAnalogTypes] = useState(ProductDataService.getAnalogSensorTypes());
+  const [bushingModels, setBushingModels] = useState(ProductDataService.getBushingTapModels());
 
   const [analogForm, setAnalogForm] = useState({ name: "", description: "" });
   const [editingAnalogId, setEditingAnalogId] = useState<string | null>(null);
 
   const [bushingForm, setBushingForm] = useState({ name: "" });
   const [editingBushingId, setEditingBushingId] = useState<string | null>(null);
-
-  useEffect(() => {
-    const loadData = async () => {
-      const analogData = await productDataService.getAnalogSensorTypes();
-      const bushingData = await productDataService.getBushingTapModels();
-      setAnalogTypes(analogData);
-      setBushingModels(bushingData);
-    };
-    loadData();
-  }, []);
 
   const resetForms = () => {
     setAnalogForm({ name: "", description: "" });
@@ -37,11 +27,9 @@ const SensorConfigManagement = ({ showAnalog = true, showBushing = true }: Senso
     setEditingBushingId(null);
   };
 
-  const refresh = async () => {
-    const analogData = await productDataService.getAnalogSensorTypes();
-    const bushingData = await productDataService.getBushingTapModels();
-    setAnalogTypes(analogData);
-    setBushingModels(bushingData);
+  const refresh = () => {
+    setAnalogTypes(ProductDataService.getAnalogSensorTypes());
+    setBushingModels(ProductDataService.getBushingTapModels());
   };
 
   const handleSaveAnalog = async () => {

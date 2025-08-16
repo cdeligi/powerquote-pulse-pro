@@ -119,7 +119,27 @@ const AdminPanel = ({ user }: AdminPanelProps) => {
         </TabsList>
 
         <TabsContent value="products" className="mt-6">
-          <ProductManagement />
+          <div className="space-y-6">
+            <Tabs defaultValue="management" className="w-full">
+              <TabsList>
+                <TabsTrigger value="management">Product Management</TabsTrigger>
+                <TabsTrigger value="chassis">Chassis</TabsTrigger>
+                <TabsTrigger value="part-numbers">Part Numbers</TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="management">
+                <ProductManagement />
+              </TabsContent>
+              
+              <TabsContent value="chassis">
+                <ChassisTypeManager />
+              </TabsContent>
+              
+              <TabsContent value="part-numbers">
+                <PartNumberConfigManager />
+              </TabsContent>
+            </Tabs>
+          </div>
         </TabsContent>
 
         <TabsContent value="quote-fields" className="mt-6">

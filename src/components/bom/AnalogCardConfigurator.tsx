@@ -3,9 +3,9 @@
  * © 2025 Qualitrol Corp. All rights reserved.
  */
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { BOMItem, Level3Customization } from "@/types/product/interfaces";
-import { productDataService } from "@/services/productDataService";
+import { ProductDataService } from "@/services/productDataService";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -21,47 +21,32 @@ interface AnalogCardConfiguratorProps {
 }
 
 const AnalogCardConfigurator = ({ bomItem, onSave, onClose }: AnalogCardConfiguratorProps) => {
-  const [sensorOptions, setSensorOptions] = useState<any[]>([]);
-  const [channelConfigs, setChannelConfigs] = useState<Record<number, string>>({});
-
-  useEffect(() => {
-    const loadData = async () => {
-      try {
-        const sensors = await productDataService.getAnalogSensorTypes();
-        setSensorOptions(sensors);
-        
-        // Initialize with existing configurations or default to first sensor type
-        const configs: Record<number, string> = {};
-        if (bomItem.level3Customizations) {
-          bomItem.level3Customizations.forEach((config, index) => {
-            if (config.name && sensors.some(s => s.name === config.name)) {
-              configs[index + 1] = config.name;
-            }
-          });
-        } else {
-          const stored = localStorage.getItem(`analogDefaults_${bomItem.product.id}`);
-          if (stored) {
-            Object.assign(configs, JSON.parse(stored));
-          }
+  const sensorOptions = ProductDataService.getAnalogSensorTypes();
+  const [channelConfigs, setChannelConfigs] = useState<Record<number, string>>(() => {
+    // Initialize with existing configurations or default to first sensor type
+    const configs: Record<number, string> = {};
+    if (bomItem.level3Customizations) {
+      bomItem.level3Customizations.forEach((config, index) => {
+        if (config.name && sensorOptions.some(s => s.name === config.name)) {
+          configs[index + 1] = config.name;
         }
-
-        // Fill in any missing channels with default
-        for (let i = 1; i <= 8; i++) {
-          if (!configs[i]) {
-            configs[i] = sensors[0]?.name || '';
-          }
-        }
-
-        setChannelConfigs(configs);
-      } catch (error) {
-        console.error('Error loading sensor types:', error);
-        setSensorOptions([]);
-        setChannelConfigs({});
+      });
+    } else {
+      const stored = localStorage.getItem(`analogDefaults_${bomItem.product.id}`);
+      if (stored) {
+        Object.assign(configs, JSON.parse(stored));
       }
-    };
-    
-    loadData();
-  }, [bomItem]);
+    }
+
+  // Fill in any missing channels with default
+    for (let i = 1; i <= 8; i++) {
+      if (!configs[i]) {
+        configs[i] = sensorOptions[0]?.name || '';
+      }
+    }
+
+    return configs;
+  });
 
   const handleChannelChange = (channel: number, sensorType: string) => {
     setChannelConfigs(prev => ({
