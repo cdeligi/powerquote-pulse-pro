@@ -951,12 +951,9 @@ export class ProductDataService {
 
   async upsertPartNumberConfig(config: {
     level2_product_id: string;
-    prefix: string;
+    part_number: string;
     slot_placeholder: string;
     slot_count: number;
-    suffix_separator?: string;
-    remote_off_code?: string;
-    remote_on_code?: string;
   }): Promise<any | null> {
     try {
       const { data, error } = await supabase
