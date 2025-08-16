@@ -2,8 +2,10 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { Loader2 } from 'lucide-react';
+import { toast } from '@/hooks/use-toast';
 
 interface Feature {
   key: string;
@@ -23,6 +25,7 @@ export default function PermissionsOverview() {
   const [features, setFeatures] = useState<Feature[]>([]);
   const [roleDefaults, setRoleDefaults] = useState<RoleDefault[]>([]);
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -58,6 +61,54 @@ export default function PermissionsOverview() {
     );
     return roleDefault?.allowed || false;
   };
+
+  const updateRolePermission = async (featureKey: string, role: string, allowed: boolean) => {
+    try {
+      setSaving(true);
+
+      const { error } = await supabase
+        .from('role_feature_defaults')
+        .upsert({
+          role: role as any,
+          feature_key: featureKey,
+          allowed
+        });
+
+      if (error) throw error;
+
+      // Update local state optimistically
+      setRoleDefaults(prev => {
+        const existing = prev.find(rd => rd.feature_key === featureKey && rd.role === role);
+        if (existing) {
+          return prev.map(rd => 
+            rd.feature_key === featureKey && rd.role === role 
+              ? { ...rd, allowed }
+              : rd
+          );
+        } else {
+          return [...prev, { role, feature_key: featureKey, allowed }];
+        }
+      });
+
+      toast({
+        title: 'Success',
+        description: 'Permission updated successfully.'
+      });
+
+    } catch (error) {
+      console.error('Error updating permission:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to update permission.',
+        variant: 'destructive'
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Filter out BOM Edit Part Number feature as it's controlled by admin panel access
+  const filteredFeatures = features.filter(f => f.key !== 'FEATURE_BOM_EDIT_PART_NUMBER');
 
   if (loading) {
     return (
@@ -104,7 +155,7 @@ export default function PermissionsOverview() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {features.map(feature => (
+              {filteredFeatures.map(feature => (
                 <TableRow key={feature.key}>
                   <TableCell>
                     <div>
@@ -118,12 +169,15 @@ export default function PermissionsOverview() {
                     const allowed = getPermissionForRole(feature.key, role);
                     return (
                       <TableCell key={role} className="text-center">
-                        <Badge 
+                        <Button
                           variant={allowed ? "default" : "secondary"}
-                          className={allowed ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}
+                          size="sm"
+                          disabled={saving}
+                          onClick={() => updateRolePermission(feature.key, role, !allowed)}
+                          className={allowed ? "bg-green-600 hover:bg-green-700 text-white" : "bg-red-600 hover:bg-red-700 text-white"}
                         >
                           {allowed ? 'Allowed' : 'Denied'}
-                        </Badge>
+                        </Button>
                       </TableCell>
                     );
                   })}
@@ -133,7 +187,7 @@ export default function PermissionsOverview() {
           </Table>
         </div>
         
-        {features.length === 0 && (
+        {filteredFeatures.length === 0 && (
           <div className="text-center py-8 text-muted-foreground">
             No features configured yet.
           </div>

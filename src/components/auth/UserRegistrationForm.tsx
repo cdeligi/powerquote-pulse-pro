@@ -26,7 +26,7 @@ const UserRegistrationForm = ({ onSubmit, onBack }: UserRegistrationFormProps) =
     jobTitle: '',
     phoneNumber: '',
     businessJustification: '',
-    requestedRole: 'level1' as 'level1' | 'level2',
+    requestedRole: 'LEVEL_1' as 'LEVEL_1' | 'LEVEL_2' | 'LEVEL_3' | 'ADMIN' | 'FINANCE',
     managerEmail: '',
     companyName: '',
     agreedToTerms: false,
@@ -89,7 +89,7 @@ const UserRegistrationForm = ({ onSubmit, onBack }: UserRegistrationFormProps) =
         jobTitle: '',
         phoneNumber: '',
         businessJustification: '',
-        requestedRole: 'level1',
+        requestedRole: 'LEVEL_1',
         managerEmail: '',
         companyName: '',
         agreedToTerms: false,
@@ -298,21 +298,30 @@ const UserRegistrationForm = ({ onSubmit, onBack }: UserRegistrationFormProps) =
                 <Label htmlFor="requestedRole" className="text-white font-medium mb-2 block">
                   Requested Access Level *
                 </Label>
-                <Select value={formData.requestedRole} onValueChange={(value: 'level1' | 'level2') => handleInputChange('requestedRole', value)}>
+                <Select value={formData.requestedRole} onValueChange={(value: 'LEVEL_1' | 'LEVEL_2' | 'LEVEL_3' | 'ADMIN' | 'FINANCE') => handleInputChange('requestedRole', value)}>
                   <SelectTrigger className="bg-gray-800 border-gray-600 text-white focus:border-red-500 focus:ring-red-500">
                     <SelectValue placeholder="Select access level" />
                   </SelectTrigger>
                   <SelectContent className="bg-gray-800 border-gray-600 z-50">
-                    <SelectItem value="level1" className="text-white hover:bg-gray-700 focus:bg-gray-700">
-                      Level 1 (Basic Access)
+                    <SelectItem value="LEVEL_1" className="text-white hover:bg-gray-700 focus:bg-gray-700">
+                      Level 1 - Channel Partners
                     </SelectItem>
-                    <SelectItem value="level2" className="text-white hover:bg-gray-700 focus:bg-gray-700">
-                      Level 2 (Full Access with Pricing)
+                    <SelectItem value="LEVEL_2" className="text-white hover:bg-gray-700 focus:bg-gray-700">
+                      Level 2 - Qualitrol Sales
+                    </SelectItem>
+                    <SelectItem value="LEVEL_3" className="text-white hover:bg-gray-700 focus:bg-gray-700">
+                      Level 3 - Directors
+                    </SelectItem>
+                    <SelectItem value="ADMIN" className="text-white hover:bg-gray-700 focus:bg-gray-700">
+                      Admin - Administrators
+                    </SelectItem>
+                    <SelectItem value="FINANCE" className="text-white hover:bg-gray-700 focus:bg-gray-700">
+                      Finance - Finance Team
                     </SelectItem>
                   </SelectContent>
                 </Select>
                 <p className="text-gray-400 text-sm mt-1">
-                  Level 1: Can create quotes without seeing prices. Level 2: Full access including pricing information.
+                  Select the appropriate access level based on your role and responsibilities.
                 </p>
               </div>
 
