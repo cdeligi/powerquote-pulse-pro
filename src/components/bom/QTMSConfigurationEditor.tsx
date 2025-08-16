@@ -102,8 +102,7 @@ const QTMSConfigurationEditor = ({
       const defaults = {
         prefix: `QTMS-${(chassis.type || '').toUpperCase()}-`,
         slot_count: chassis.specifications?.slots || 0,
-        slot_placeholder: '0',
-        suffix_separator: '-'
+        slot_placeholder: '0'
       } as const;
 
       const cfg = pnConfig ?? defaults;
@@ -141,9 +140,9 @@ const QTMSConfigurationEditor = ({
       }
 
       const slotsStr = slotsArr.join('');
-      // Accessory count suffix: currently counts selected accessories (Remote Display only for now)
+      // Simple accessory count suffix: currently counts selected accessories (Remote Display only for now)
       const accessoriesCount = editedHasRemoteDisplay ? 1 : 0;
-      const suffix = `${cfg.suffix_separator || '-'}${accessoriesCount}`;
+      const suffix = `-${accessoriesCount}`;
       return `${cfg.prefix}${slotsStr}${suffix}`;
     } catch (e) {
       console.error('Error computing part number:', e);

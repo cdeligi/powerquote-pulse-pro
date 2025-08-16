@@ -1,3 +1,4 @@
+
 import { Level2Product, Level3Product } from '@/types/product';
 
 export interface PartNumberBuildParams {
@@ -35,9 +36,6 @@ export function buildQTMSPartNumber(params: PartNumberBuildParams): string {
       prefix: `QTMS-${((chassis.chassisType || chassis.type) || '').toUpperCase()}-`,
       slot_count: chassis.specifications?.slots || 0,
       slot_placeholder: '0',
-      suffix_separator: '-',
-      remote_off_code: '0',
-      remote_on_code: 'D1',
     } as const;
 
     const cfg = pnConfig ?? defaults;
@@ -77,9 +75,9 @@ export function buildQTMSPartNumber(params: PartNumberBuildParams): string {
 
     const slotsStr = slotsArr.join('');
 
-    // Accessory suffix: optionally include remote display codes
-    const remoteCode = hasRemoteDisplay ? (cfg.remote_on_code ?? 'D1') : (cfg.remote_off_code ?? '0');
-    const suffix = includeSuffix ? `${cfg.suffix_separator || '-'}${remoteCode}` : '';
+    // Simple accessory count suffix: count accessories like remote display
+    const accessoriesCount = hasRemoteDisplay ? 1 : 0;
+    const suffix = includeSuffix ? `-${accessoriesCount}` : '';
 
     return `${cfg.prefix}${slotsStr}${suffix}`;
   } catch (e) {

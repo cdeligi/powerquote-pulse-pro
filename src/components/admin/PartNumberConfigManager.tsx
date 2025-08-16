@@ -1,3 +1,4 @@
+
 import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -33,7 +34,7 @@ const PartNumberConfigManager: React.FC<PartNumberConfigManagerProps> = ({ initi
   const [loading, setLoading] = useState(false);
 
   // Level 2 config state
-  const [partNumber, setPartNumber] = useState("");
+  const [prefix, setPrefix] = useState("");
   const [slotPlaceholder, setSlotPlaceholder] = useState("0");
   const [slotCount, setSlotCount] = useState<number>(0);
 
@@ -64,13 +65,13 @@ const PartNumberConfigManager: React.FC<PartNumberConfigManagerProps> = ({ initi
         ]);
         setLevel3List(l3);
         if (cfg) {
-          setPartNumber(cfg.part_number || "");
+          setPrefix(cfg.prefix || "");
           setSlotPlaceholder(cfg.slot_placeholder || "0");
           setSlotCount(cfg.slot_count || 0);
         } else {
           // Defaults from L2 specs
           const current = level2List.find(p => p.id === selectedL2);
-          setPartNumber(current?.chassisType || "");
+          setPrefix(current?.chassisType || "");
           setSlotCount((current?.specifications as any)?.slots || 0);
         }
         setTemplates(codes);
@@ -89,7 +90,7 @@ const PartNumberConfigManager: React.FC<PartNumberConfigManagerProps> = ({ initi
       if (!selectedL2) return;
       const okCfg = await productDataService.upsertPartNumberConfig({
         level2_product_id: selectedL2,
-        part_number: partNumber,
+        prefix: prefix,
         slot_placeholder: slotPlaceholder,
         slot_count: slotCount
       });
@@ -150,7 +151,7 @@ const PartNumberConfigManager: React.FC<PartNumberConfigManagerProps> = ({ initi
           <div className="md:col-span-2 grid grid-cols-3 gap-4">
             <div>
               <Label>Part Number</Label>
-              <Input value={partNumber} onChange={e => setPartNumber(e.target.value)} className="bg-background border-border text-foreground" />
+              <Input value={prefix} onChange={e => setPrefix(e.target.value)} className="bg-background border-border text-foreground" />
             </div>
             <div>
               <Label>Slot Placeholder</Label>
