@@ -30,6 +30,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/use-toast";
+import UserPermissionsTab from "./UserPermissionsTab";
 
 interface UserProfile {
   id: string;
@@ -700,6 +701,28 @@ const UserManagementEnhanced = ({ user }: UserManagementEnhancedProps) => {
               </Button>
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* User Permissions Dialog */}
+      <Dialog open={!!selectedUserForPermissions} onOpenChange={() => setSelectedUserForPermissions(null)}>
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              Manage Permissions - {selectedUserForPermissions?.first_name} {selectedUserForPermissions?.last_name}
+            </DialogTitle>
+          </DialogHeader>
+          {selectedUserForPermissions && (
+            <UserPermissionsTab
+              userProfile={{
+                id: selectedUserForPermissions.id,
+                email: selectedUserForPermissions.email,
+                first_name: selectedUserForPermissions.first_name,
+                last_name: selectedUserForPermissions.last_name,
+                role: selectedUserForPermissions.role as any
+              }}
+            />
+          )}
         </DialogContent>
       </Dialog>
     </div>

@@ -13,13 +13,17 @@ interface BOMDisplayProps {
   onEditConfiguration?: (item: BOMItem) => void;
   onSubmitQuote?: () => void;
   canSeePrices: boolean;
+  canSeeCosts?: boolean;
+  canEditPartNumber?: boolean;
 }
 
-const BOMDisplay = ({ bomItems, onUpdateBOM, onEditConfiguration, onSubmitQuote, canSeePrices }: BOMDisplayProps) => {
+const BOMDisplay = ({ bomItems, onUpdateBOM, onEditConfiguration, onSubmitQuote, canSeePrices, canSeeCosts = false, canEditPartNumber = false }: BOMDisplayProps) => {
   const [editingItem, setEditingItem] = useState<string | null>(null);
   const [editQuantity, setEditQuantity] = useState<number>(1);
   const [editingPrice, setEditingPrice] = useState<string | null>(null);
   const [editPrice, setEditPrice] = useState<number>(0);
+  const [editingPartNumber, setEditingPartNumber] = useState<string | null>(null);
+  const [editPartNumber, setEditPartNumber] = useState<string>('');
 
   const handleEditStart = (item: BOMItem) => {
     setEditingItem(item.id);
@@ -63,6 +67,26 @@ const BOMDisplay = ({ bomItems, onUpdateBOM, onEditConfiguration, onSubmitQuote,
   const handlePriceEditCancel = () => {
     setEditingPrice(null);
     setEditPrice(0);
+  };
+
+  const handlePartNumberEditStart = (item: BOMItem) => {
+    setEditingPartNumber(item.id);
+    setEditPartNumber(item.partNumber || item.product.partNumber || '');
+  };
+
+  const handlePartNumberEditSave = (itemId: string) => {
+    const updatedItems = bomItems.map(item =>
+      item.id === itemId 
+        ? { ...item, partNumber: editPartNumber.trim() }
+        : item
+    );
+    onUpdateBOM(updatedItems);
+    setEditingPartNumber(null);
+  };
+
+  const handlePartNumberEditCancel = () => {
+    setEditingPartNumber(null);
+    setEditPartNumber('');
   };
 
   const handleRemoveItem = (itemId: string) => {
@@ -147,9 +171,57 @@ const BOMDisplay = ({ bomItems, onUpdateBOM, onEditConfiguration, onSubmitQuote,
                 
                 {/* Part Number Display */}
                 <div className="flex flex-wrap items-center gap-2 mt-1">
-                  <Badge variant="outline" className="text-xs font-mono text-white border-gray-500 break-all">
-                    P/N: {getPartNumber(item)}
-                  </Badge>
+                  {editingPartNumber === item.id ? (
+                    <div className="flex items-center space-x-1">
+                      <span className="text-xs text-gray-400">P/N:</span>
+                      <Input
+                        value={editPartNumber}
+                        onChange={(e) => setEditPartNumber(e.target.value)}
+                        className="w-32 h-6 text-xs bg-gray-700 border-gray-600 text-white font-mono"
+                        placeholder="Part number"
+                      />
+                      <Button
+                        size="sm"
+                        onClick={() => handlePartNumberEditSave(item.id)}
+                        className="h-6 w-6 p-0 bg-green-600 hover:bg-green-700"
+                        title="Save part number"
+                      >
+                        <Save className="h-3 w-3" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={handlePartNumberEditCancel}
+                        className="h-6 w-6 p-0 text-gray-400 hover:text-white"
+                        title="Cancel"
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center space-x-1">
+                      <Badge variant="outline" className="text-xs font-mono text-white border-gray-500 break-all">
+                        P/N: {getPartNumber(item)}
+                      </Badge>
+                      {/* Show "Forced" badge if part number differs from product default */}
+                      {item.partNumber && item.partNumber !== item.product.partNumber && (
+                        <Badge variant="outline" className="text-xs text-yellow-400 border-yellow-400">
+                          Forced
+                        </Badge>
+                      )}
+                      {canEditPartNumber && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handlePartNumberEditStart(item)}
+                          className="h-4 w-4 p-0 text-gray-400 hover:text-white"
+                          title="Edit part number"
+                        >
+                          <Edit3 className="h-3 w-3" />
+                        </Button>
+                      )}
+                    </div>
+                  )}
                   {item.slot && (
                     <Badge variant="outline" className="text-xs text-blue-400 border-blue-400">
                       Slot {item.slot}
@@ -296,8 +368,8 @@ const BOMDisplay = ({ bomItems, onUpdateBOM, onEditConfiguration, onSubmitQuote,
                       Orig: ${item.original_unit_price.toLocaleString()}
                     </div>
                   )}
-                  {/* Display cost information if available */}
-                  {item.product.cost && (
+                  {/* Display cost information if available and user can see costs */}
+                  {canSeeCosts && item.product.cost && (
                     <div className="text-orange-400 text-xs">
                       Cost: ${((item.product.cost || 0) * item.quantity).toLocaleString()}
                     </div>
@@ -316,8 +388,8 @@ const BOMDisplay = ({ bomItems, onUpdateBOM, onEditConfiguration, onSubmitQuote,
                 ${calculateTotal().toLocaleString()}
               </span>
             </div>
-            {/* Display total cost if available */}
-            {bomItems.some(item => item.product.cost) && (
+            {/* Display total cost if available and user can see costs */}
+            {canSeeCosts && bomItems.some(item => item.product.cost) && (
               <div className="flex justify-between items-center mt-1">
                 <span className="text-orange-400 text-sm">Total Cost:</span>
                 <span className="text-orange-400 text-sm font-medium">
