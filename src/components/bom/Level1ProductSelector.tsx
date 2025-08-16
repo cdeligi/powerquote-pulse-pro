@@ -99,8 +99,8 @@ const Level1ProductSelector = ({ onProductSelect, selectedProduct }: Level1Produ
             )}
             onClick={() => onProductSelect(product)}
           >
-            <CardHeader>
-              <CardTitle className="flex items-center justify-between">
+            <CardHeader className="pb-2">
+              <CardTitle className="flex items-center justify-between text-sm leading-tight">
                 {product.name}
                 {product.type && (
                   <Badge variant="outline" className="text-xs">
@@ -109,21 +109,28 @@ const Level1ProductSelector = ({ onProductSelect, selectedProduct }: Level1Produ
                 )}
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <p className="text-muted-foreground text-sm mb-3">{product.description}</p>
+            <CardContent className="space-y-2">
+              {product.description && (
+                <p className="text-muted-foreground text-xs line-clamp-2 leading-tight">
+                  {product.description}
+                </p>
+              )}
               {product.price > 0 && (
-                <div className="flex justify-between items-center">
-                  <span className="text-foreground font-medium">
-                    From ${product.price.toLocaleString()}
-                  </span>
+                <div className="text-foreground font-medium text-xs">
+                  From ${product.price.toLocaleString()}
                 </div>
               )}
-              {product.partNumber && (
-                <div className="mt-2">
-                  <Badge variant="outline" className="text-xs">
-                    {product.partNumber}
-                  </Badge>
-                </div>
+              {/* Product link if available */}
+              {product.productInfoUrl && (
+                <a 
+                  href={product.productInfoUrl} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="text-primary text-xs hover:underline"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  Product Info
+                </a>
               )}
             </CardContent>
           </Card>

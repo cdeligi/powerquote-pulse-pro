@@ -161,218 +161,183 @@ const BOMDisplay = ({ bomItems, onUpdateBOM, onEditConfiguration, onSubmitQuote,
       <CardContent className="space-y-3">
          {bomItems.map((item) => (
            <div key={item.id} className="p-2 bg-gray-800 rounded border border-gray-700">
-             <div className="flex justify-between items-start mb-1">
+             <div className="flex justify-between items-start gap-2">
                <div className="flex-1 min-w-0">
-                 <h4 className="text-white font-medium text-sm leading-tight mb-1">{item.product.name}</h4>
-                 {item.product.description && (
-                   <p className="text-gray-400 text-xs line-clamp-2 leading-tight">{item.product.description}</p>
-                 )}
-                 
-                 {/* Part Number Display - on its own line */}
-                 <div className="mt-1">
-                   {editingPartNumber === item.id ? (
-                     <div className="flex items-center space-x-1">
-                       <Input
-                         value={editPartNumber}
-                         onChange={(e) => setEditPartNumber(e.target.value)}
-                         className="w-32 h-5 text-xs bg-gray-700 border-gray-600 text-white font-mono"
-                         placeholder="Part number"
-                       />
-                       <Button
-                         size="sm"
-                         onClick={() => handlePartNumberEditSave(item.id)}
-                         className="h-5 w-5 p-0 bg-green-600 hover:bg-green-700"
-                         title="Save part number"
-                       >
-                         <Save className="h-2.5 w-2.5" />
-                       </Button>
+                 <div className="flex items-center justify-between mb-1">
+                   <h4 className="text-white font-medium text-sm leading-tight">{item.product.name}</h4>
+                   <div className="flex items-center gap-1">
+                     {isConfigurableItem(item) && onEditConfiguration && (
                        <Button
                          size="sm"
                          variant="ghost"
-                         onClick={handlePartNumberEditCancel}
-                         className="h-5 w-5 p-0 text-gray-400 hover:text-white"
-                         title="Cancel"
+                         onClick={() => handleConfigurationEdit(item)}
+                         className="h-5 w-5 p-0 text-purple-400 hover:text-purple-300"
+                         title="Configure"
                        >
-                         <X className="h-2.5 w-2.5" />
+                         <Settings className="h-3 w-3" />
                        </Button>
-                     </div>
-                   ) : (
-                     <div className="text-xs font-mono bg-gray-700 px-2 py-1 rounded break-all">
-                       {getPartNumber(item)}
-                       {item.partNumber && item.partNumber !== item.product.partNumber && (
-                         <Badge variant="outline" className="ml-1 text-xs text-yellow-400 border-yellow-400">
-                           Custom
-                         </Badge>
-                       )}
-                       {canEditPartNumber && (
+                     )}
+                     <Button
+                       size="sm"
+                       variant="ghost"
+                       onClick={() => handleRemoveItem(item.id)}
+                       className="h-5 w-5 p-0 text-red-400 hover:text-red-300"
+                       title="Remove"
+                     >
+                       <Trash2 className="h-3 w-3" />
+                     </Button>
+                   </div>
+                 </div>
+                 
+                 {item.product.description && (
+                   <p className="text-gray-400 text-xs line-clamp-1 leading-tight mb-1">{item.product.description}</p>
+                 )}
+                 
+                 {/* Compact Part Number and controls */}
+                 <div className="flex items-center justify-between text-xs">
+                   <div className="flex items-center gap-2">
+                     <span className="text-gray-400">PN:</span>
+                     {editingPartNumber === item.id ? (
+                       <div className="flex items-center gap-1">
+                         <Input
+                           value={editPartNumber}
+                           onChange={(e) => setEditPartNumber(e.target.value)}
+                           className="w-24 h-5 text-xs bg-gray-700 border-gray-600 text-white font-mono"
+                           placeholder="Part number"
+                         />
+                         <Button
+                           size="sm"
+                           onClick={() => handlePartNumberEditSave(item.id)}
+                           className="h-5 w-5 p-0 bg-green-600 hover:bg-green-700"
+                           title="Save"
+                         >
+                           <Save className="h-2.5 w-2.5" />
+                         </Button>
                          <Button
                            size="sm"
                            variant="ghost"
-                           onClick={() => handlePartNumberEditStart(item)}
-                           className="ml-1 h-4 w-4 p-0 text-gray-400 hover:text-white"
-                           title="Edit part number"
+                           onClick={handlePartNumberEditCancel}
+                           className="h-5 w-5 p-0 text-gray-400 hover:text-white"
+                           title="Cancel"
                          >
-                           <Edit3 className="h-2.5 w-2.5" />
-                        </Button>
-                      )}
-                    </div>
-                  )}
-                  {item.slot && (
-                    <Badge variant="outline" className="text-xs text-blue-400 border-blue-400">
-                      Slot {item.slot}
-                    </Badge>
-                  )}
-                  {isConfigurableItem(item) && (
-                    <Badge variant="outline" className="text-xs text-purple-400 border-purple-400">
-                      Configurable
-                    </Badge>
-                  )}
-                  {needsConfiguration(item) && (
-                    <Badge variant="outline" className="text-xs text-orange-400 border-orange-400">
-                      Config Required
-                    </Badge>
-                  )}
-                </div>
-              </div>
-              
-              <div className="flex items-center space-x-2 ml-2">
-                {isConfigurableItem(item) && onEditConfiguration && (
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => handleConfigurationEdit(item)}
-                    className="h-6 w-6 p-0 text-purple-400 hover:text-purple-300"
-                    title="Edit configuration"
-                  >
-                    <Settings className="h-3 w-3" />
-                  </Button>
-                )}
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => handleEditStart(item)}
-                  className="h-6 w-6 p-0 text-gray-400 hover:text-white"
-                  title="Edit quantity"
-                >
-                  <Edit3 className="h-3 w-3" />
-                </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => handleRemoveItem(item.id)}
-                  className="h-6 w-6 p-0 text-red-400 hover:text-red-300"
-                  title="Remove item"
-                >
-                  <Trash2 className="h-3 w-3" />
-                </Button>
-              </div>
-            </div>
-            
-            <div className="flex justify-between items-center">
-              <div className="flex items-center space-x-2">
-                <span className="text-gray-400 text-sm">Qty:</span>
-                {editingItem === item.id ? (
-                  <div className="flex items-center space-x-1">
-                    <Input
-                      type="number"
-                      min="1"
-                      value={editQuantity}
-                      onChange={(e) => setEditQuantity(parseInt(e.target.value) || 1)}
-                      className="w-16 h-6 text-xs bg-gray-700 border-gray-600 text-white"
-                    />
-                    <Button
-                      size="sm"
-                      onClick={() => handleEditSave(item.id)}
-                      className="h-6 w-6 p-0 bg-green-600 hover:bg-green-700"
-                      title="Save"
-                    >
-                      <Save className="h-3 w-3" />
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={handleEditCancel}
-                      className="h-6 w-6 p-0 text-gray-400 hover:text-white"
-                      title="Cancel"
-                    >
-                      <X className="h-3 w-3" />
-                    </Button>
-                  </div>
-                ) : (
-                  <span className="text-white font-medium">{item.quantity}</span>
-                )}
-              </div>
-              
-              {canSeePrices && (
-                <div className="text-right">
-                  <div className="flex items-center space-x-2 justify-end">
-                    {editingPrice === item.id ? (
-                      <div className="flex items-center space-x-1">
-                        <span className="text-gray-400 text-xs">$</span>
-                        <Input
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          value={editPrice}
-                          onChange={(e) => setEditPrice(parseFloat(e.target.value) || 0)}
-                          className="w-20 h-6 text-xs bg-gray-700 border-gray-600 text-white"
-                        />
-                        <Button
-                          size="sm"
-                          onClick={() => handlePriceEditSave(item.id)}
-                          className="h-6 w-6 p-0 bg-green-600 hover:bg-green-700"
-                          title="Save price"
-                        >
-                          <Save className="h-3 w-3" />
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={handlePriceEditCancel}
-                          className="h-6 w-6 p-0 text-gray-400 hover:text-white"
-                          title="Cancel"
-                        >
-                          <X className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    ) : (
-                      <div className="flex items-center space-x-1">
-                        <div className="text-white font-medium">
-                          ${((item.product.price || 0) * item.quantity).toLocaleString()}
-                        </div>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => handlePriceEditStart(item)}
-                          className="h-4 w-4 p-0 text-gray-400 hover:text-white"
-                          title="Edit price"
-                        >
-                          <Edit3 className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                  {item.quantity > 1 && !editingPrice && (
-                    <div className="text-gray-400 text-xs">
-                      ${item.product.price?.toLocaleString() || '—'} each
-                    </div>
-                  )}
-                  {/* Show price adjustment indicator */}
-                  {item.original_unit_price && item.original_unit_price !== item.product.price && (
-                    <div className="text-yellow-400 text-xs">
-                      Orig: ${item.original_unit_price.toLocaleString()}
-                    </div>
-                  )}
-                  {/* Display cost information if available and user can see costs */}
-                  {canSeeCosts && item.product.cost && (
-                    <div className="text-orange-400 text-xs">
-                      Cost: ${((item.product.cost || 0) * item.quantity).toLocaleString()}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
+                           <X className="h-2.5 w-2.5" />
+                         </Button>
+                       </div>
+                     ) : (
+                       <div className="flex items-center gap-1">
+                         <code className="text-xs bg-gray-700 px-1 py-0.5 rounded font-mono">
+                           {getPartNumber(item)}
+                         </code>
+                         {canEditPartNumber && (
+                           <Button
+                             size="sm"
+                             variant="ghost"
+                             onClick={() => handlePartNumberEditStart(item)}
+                             className="h-4 w-4 p-0 text-gray-400 hover:text-white"
+                             title="Edit part number"
+                           >
+                             <Edit3 className="h-2.5 w-2.5" />
+                           </Button>
+                         )}
+                       </div>
+                     )}
+                   </div>
+                   
+                   {/* Quantity and Price controls on same line */}
+                   <div className="flex items-center gap-3">
+                     <div className="flex items-center gap-1">
+                       <span className="text-gray-400">Qty:</span>
+                       {editingItem === item.id ? (
+                         <div className="flex items-center gap-1">
+                           <Input
+                             type="number"
+                             min="1"
+                             value={editQuantity}
+                             onChange={(e) => setEditQuantity(parseInt(e.target.value) || 1)}
+                             className="w-12 h-5 text-xs bg-gray-700 border-gray-600 text-white"
+                           />
+                           <Button
+                             size="sm"
+                             onClick={() => handleEditSave(item.id)}
+                             className="h-5 w-5 p-0 bg-green-600 hover:bg-green-700"
+                             title="Save"
+                           >
+                             <Save className="h-2.5 w-2.5" />
+                           </Button>
+                         </div>
+                       ) : (
+                         <span 
+                           className="text-white font-medium cursor-pointer hover:bg-gray-700 rounded px-1 py-0.5"
+                           onClick={() => handleEditStart(item)}
+                           title="Click to edit quantity"
+                         >
+                           {item.quantity}
+                         </span>
+                       )}
+                     </div>
+                     
+                     {canSeePrices && (
+                       <div className="flex items-center gap-1">
+                         <span className="text-gray-400">$</span>
+                         {editingPrice === item.id ? (
+                           <div className="flex items-center gap-1">
+                             <Input
+                               type="number"
+                               min="0"
+                               step="0.01"
+                               value={editPrice}
+                               onChange={(e) => setEditPrice(parseFloat(e.target.value) || 0)}
+                               className="w-16 h-5 text-xs bg-gray-700 border-gray-600 text-white"
+                             />
+                             <Button
+                               size="sm"
+                               onClick={() => handlePriceEditSave(item.id)}
+                               className="h-5 w-5 p-0 bg-green-600 hover:bg-green-700"
+                               title="Save"
+                             >
+                               <Save className="h-2.5 w-2.5" />
+                             </Button>
+                           </div>
+                         ) : (
+                           <span 
+                             className="text-white font-medium cursor-pointer hover:bg-gray-700 rounded px-1 py-0.5"
+                             onClick={() => handlePriceEditStart(item)}
+                             title="Click to edit price"
+                           >
+                             {((item.product.price || 0) * item.quantity).toLocaleString()}
+                           </span>
+                         )}
+                       </div>
+                     )}
+                   </div>
+                 </div>
+                 
+                 {/* Badges and status indicators */}
+                 <div className="flex items-center gap-1 mt-1">
+                   {item.slot && (
+                     <Badge variant="outline" className="text-xs text-blue-400 border-blue-400">
+                       Slot {item.slot}
+                     </Badge>
+                   )}
+                   {isConfigurableItem(item) && (
+                     <Badge variant="outline" className="text-xs text-purple-400 border-purple-400">
+                       Config
+                     </Badge>
+                   )}
+                   {needsConfiguration(item) && (
+                     <Badge variant="outline" className="text-xs text-orange-400 border-orange-400">
+                       Required
+                     </Badge>
+                   )}
+                   {item.partNumber && item.partNumber !== item.product.partNumber && (
+                     <Badge variant="outline" className="text-xs text-yellow-400 border-yellow-400">
+                       Custom PN
+                     </Badge>
+                   )}
+                 </div>
+               </div>
+             </div>
+           </div>
         ))}
         
         {canSeePrices && bomItems.length > 0 && (

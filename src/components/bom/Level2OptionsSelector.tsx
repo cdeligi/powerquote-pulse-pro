@@ -109,48 +109,45 @@ const Level2OptionsSelector = ({
                 )}
                 onClick={() => handleOptionClick(option)}
               >
-                <CardHeader className="pb-1">
-                  <CardTitle className="text-sm leading-tight truncate">
+                <CardHeader className="pb-2">
+                  <CardTitle className="flex items-center justify-between text-sm leading-tight">
                     {option.name}
-                    <div className="flex items-center gap-1 mt-1">
+                    <div className="flex items-center gap-1">
                       {requiresChassisConfig && (
                         <Badge variant="secondary" className="text-xs">
                           Configure
                         </Badge>
                       )}
+                      {/* Add Level 1 tag */}
+                      <Badge variant="outline" className="text-xs">
+                        {level1Product.type || 'Product'}
+                      </Badge>
                     </div>
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="pt-0 flex flex-col h-full space-y-1">
-                  {option.partNumber && (
-                    <div className="text-xs font-mono bg-muted px-1 py-0.5 rounded break-all">
-                      {option.partNumber}
-                    </div>
-                  )}
+                <CardContent className="pt-0 space-y-2">
                   {option.description && (
                     <p className="text-muted-foreground text-xs line-clamp-2 leading-tight">
                       {option.description}
                     </p>
                   )}
-                  <div className="flex items-center justify-between pt-1">
-                    {canSeePrices && option.price && (
-                      <span className="text-foreground font-medium text-xs">
-                        ${option.price.toLocaleString()}
-                      </span>
-                    )}
-                    {onAddToBOM && !requiresChassisConfig && (
-                      <Button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onAddToBOM(option);
-                        }}
-                        size="sm"
-                        className="text-xs h-6 px-2"
-                      >
-                        Add to BOM
-                      </Button>
-                    )}
-                  </div>
+                  {canSeePrices && option.price && (
+                    <div className="text-foreground font-medium text-xs">
+                      ${option.price.toLocaleString()}
+                    </div>
+                  )}
+                  {/* Product link if available */}
+                  {option.productInfoUrl && (
+                    <a 
+                      href={option.productInfoUrl} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="text-primary text-xs hover:underline"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      Product Info
+                    </a>
+                  )}
                 </CardContent>
               </Card>
             );
