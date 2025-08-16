@@ -54,9 +54,17 @@ const RackVisualizer = ({
   };
 
 const getSlotColor = (slot: number) => {
-  // For selected empty slots, show highlight; for assigned slots we will use admin color via inline style
+  // For selected empty slots, show highlight
   if (!slotAssignments[slot] && selectedSlot === slot) return 'bg-yellow-600';
-  if (slotAssignments[slot]) return 'bg-gray-700'; // base for assigned; real color via inline style
+  // For assigned slots, use admin color if available, otherwise fallback to type color
+  if (slotAssignments[slot]) {
+    const card = slotAssignments[slot];
+    const adminColor = colorByProductId?.[card.id];
+    if (adminColor) {
+      return 'bg-gray-700'; // Base class, actual color applied via inline style
+    }
+    return getCardTypeColor(card.type); // Fallback to type-based color
+  }
   return 'bg-gray-700'; // Empty slot
 };
 
@@ -79,7 +87,7 @@ const getSlotColor = (slot: number) => {
   };
 
   const getSlotTitle = (slot: number) => {
-  const slotNumberingStart = chassisType?.metadata?.slotNumberingStart || 0;
+  const slotNumberingStart = chassisType?.metadata?.slotNumberingStart || 1;
   const displayNumber = slot + slotNumberingStart;
   
   if (slotAssignments[slot]) {
@@ -355,7 +363,7 @@ return (
                 {Object.entries(slotAssignments)
                   .filter(([slot, card]) => !isBushingCard(card))
                   .map(([slot, card]) => {
-                    const slotNumberingStart = chassisType?.metadata?.slotNumberingStart || 0;
+                    const slotNumberingStart = chassisType?.metadata?.slotNumberingStart || 1;
                     const displaySlot = parseInt(slot) + slotNumberingStart;
                     return (
                       <div key={slot} className="flex justify-between text-sm">
