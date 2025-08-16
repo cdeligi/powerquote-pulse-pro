@@ -487,5 +487,3 @@ export const productDataService = {
   },
 };
 
-// Export for backwards compatibility
-export { productDataService as ProductDataService };
