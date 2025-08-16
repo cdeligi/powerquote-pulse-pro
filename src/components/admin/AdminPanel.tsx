@@ -73,20 +73,13 @@ const AdminPanel = ({ user }: AdminPanelProps) => {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-7 bg-gray-800">
+        <TabsList className="grid w-full grid-cols-6 bg-gray-800">
           <TabsTrigger 
             value="products" 
             className="text-white data-[state=active]:bg-red-600 data-[state=active]:text-white"
           >
             <Package className="h-4 w-4 mr-2" />
             Products
-          </TabsTrigger>
-          <TabsTrigger 
-            value="chassis" 
-            className="text-white data-[state=active]:bg-red-600 data-[state=active]:text-white"
-          >
-            <Grid3X3 className="h-4 w-4 mr-2" />
-            Chassis
           </TabsTrigger>
           <TabsTrigger 
             value="quote-fields" 
@@ -103,13 +96,6 @@ const AdminPanel = ({ user }: AdminPanelProps) => {
             Users
           </TabsTrigger>
           <TabsTrigger 
-            value="permissions" 
-            className="text-white data-[state=active]:bg-red-600 data-[state=active]:text-white"
-          >
-            <Shield className="h-4 w-4 mr-2" />
-            Permissions
-          </TabsTrigger>
-          <TabsTrigger 
             value="analytics" 
             className="text-white data-[state=active]:bg-red-600 data-[state=active]:text-white"
           >
@@ -123,6 +109,13 @@ const AdminPanel = ({ user }: AdminPanelProps) => {
             <CheckCircle className="h-4 w-4 mr-2" />
             Approval
           </TabsTrigger>
+          <TabsTrigger 
+            value="settings" 
+            className="text-white data-[state=active]:bg-red-600 data-[state=active]:text-white"
+          >
+            <Settings className="h-4 w-4 mr-2" />
+            Settings
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="products" className="mt-6">
@@ -130,11 +123,16 @@ const AdminPanel = ({ user }: AdminPanelProps) => {
             <Tabs defaultValue="management" className="w-full">
               <TabsList>
                 <TabsTrigger value="management">Product Management</TabsTrigger>
+                <TabsTrigger value="chassis">Chassis</TabsTrigger>
                 <TabsTrigger value="part-numbers">Part Numbers</TabsTrigger>
               </TabsList>
               
               <TabsContent value="management">
                 <ProductManagement />
+              </TabsContent>
+              
+              <TabsContent value="chassis">
+                <ChassisTypeManager />
               </TabsContent>
               
               <TabsContent value="part-numbers">
@@ -144,20 +142,12 @@ const AdminPanel = ({ user }: AdminPanelProps) => {
           </div>
         </TabsContent>
 
-        <TabsContent value="chassis" className="mt-6">
-          <ChassisTypeManager />
-        </TabsContent>
-
         <TabsContent value="quote-fields" className="mt-6">
           <QuoteFieldConfiguration user={user} />
         </TabsContent>
 
         <TabsContent value="users" className="mt-6">
           <UserManagementEnhanced user={user} />
-        </TabsContent>
-
-        <TabsContent value="permissions" className="mt-6">
-          <PermissionsOverview />
         </TabsContent>
 
         <TabsContent value="analytics" className="mt-6">
@@ -181,6 +171,10 @@ const AdminPanel = ({ user }: AdminPanelProps) => {
 
         <TabsContent value="approval" className="mt-6">
           <QuoteApprovalDashboard user={user} />
+        </TabsContent>
+
+        <TabsContent value="settings" className="mt-6">
+          <AdminSettings />
         </TabsContent>
       </Tabs>
     </div>

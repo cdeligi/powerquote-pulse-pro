@@ -26,11 +26,14 @@ import {
   Activity,
   Trash2,
   RefreshCw,
-  Shield
+  Shield,
+  Edit
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/use-toast";
 import UserPermissionsTab from "./UserPermissionsTab";
+import UserEditDialog from "./UserEditDialog";
+import PermissionsOverview from "./PermissionsOverview";
 
 interface UserProfile {
   id: string;
@@ -57,6 +60,7 @@ const UserManagementEnhanced = ({ user }: UserManagementEnhancedProps) => {
   const [selectedUserToRemove, setSelectedUserToRemove] = useState<UserProfile | null>(null);
   const [isRemoveDialogOpen, setIsRemoveDialogOpen] = useState(false);
   const [selectedUserForPermissions, setSelectedUserForPermissions] = useState<UserProfile | null>(null);
+  const [selectedUserForEdit, setSelectedUserForEdit] = useState<UserProfile | null>(null);
 
   // Mock data for registration requests - in real app this would come from API
   const [pendingRequests, setPendingRequests] = useState<UserRegistrationRequest[]>([
@@ -151,6 +155,42 @@ const UserManagementEnhanced = ({ user }: UserManagementEnhancedProps) => {
         description: error.message || "Failed to remove user.",
         variant: "destructive",
       });
+    }
+  };
+
+  const handleUpdateUser = async (userData: any) => {
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          first_name: userData.firstName,
+          last_name: userData.lastName,
+          role: userData.role,
+          user_status: userData.userStatus,
+          department: userData.department,
+          job_title: userData.jobTitle,
+          phone_number: userData.phoneNumber,
+          manager_email: userData.managerEmail,
+          company_name: userData.companyName,
+          business_justification: userData.businessJustification,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', userData.id);
+
+      if (error) throw error;
+
+      // Refresh the user list
+      await fetchUserProfiles();
+      setSelectedUserForEdit(null);
+
+      toast({
+        title: "Success",
+        description: "User updated successfully!",
+      });
+
+    } catch (error: any) {
+      console.error('Error updating user:', error);
+      throw new Error(error.message || "Failed to update user.");
     }
   };
 
@@ -326,12 +366,15 @@ const UserManagementEnhanced = ({ user }: UserManagementEnhancedProps) => {
       </div>
 
       <Tabs defaultValue="users" className="w-full">
-        <TabsList className="grid w-full grid-cols-3 bg-gray-800">
+        <TabsList className="grid w-full grid-cols-4 bg-gray-800">
           <TabsTrigger value="users" className="text-white data-[state=active]:bg-red-600">
             User Profiles
           </TabsTrigger>
           <TabsTrigger value="requests" className="text-white data-[state=active]:bg-red-600">
             Registration Requests
+          </TabsTrigger>
+          <TabsTrigger value="permissions" className="text-white data-[state=active]:bg-red-600">
+            Permissions
           </TabsTrigger>
           <TabsTrigger value="audit" className="text-white data-[state=active]:bg-red-600">
             Security Audit Log
@@ -389,8 +432,17 @@ const UserManagementEnhanced = ({ user }: UserManagementEnhancedProps) => {
                         <TableCell className="text-gray-300">
                           {new Date(profile.created_at).toLocaleDateString()}
                         </TableCell>
-                        <TableCell>
+                         <TableCell>
             <div className="flex space-x-2">
+                            <Button
+                              onClick={() => setSelectedUserForEdit(profile)}
+                              size="sm"
+                              variant="outline"
+                              className="text-white border-gray-600 hover:bg-gray-700"
+                              title="Edit User"
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
                             <Button
                               onClick={() => setSelectedUserForPermissions(profile)}
                               size="sm"
@@ -616,6 +668,10 @@ const UserManagementEnhanced = ({ user }: UserManagementEnhancedProps) => {
             </CardContent>
           </Card>
         </TabsContent>
+
+        <TabsContent value="permissions">
+          <PermissionsOverview />
+        </TabsContent>
       </Tabs>
 
       {/* User Removal Confirmation Dialog */}
@@ -725,6 +781,26 @@ const UserManagementEnhanced = ({ user }: UserManagementEnhancedProps) => {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* User Edit Dialog */}
+      <UserEditDialog
+        user={selectedUserForEdit ? {
+          id: selectedUserForEdit.id,
+          email: selectedUserForEdit.email,
+          fullName: `${selectedUserForEdit.first_name} ${selectedUserForEdit.last_name}`,
+          role: selectedUserForEdit.role,
+          department: selectedUserForEdit.department,
+          userStatus: selectedUserForEdit.user_status,
+          jobTitle: null,
+          phoneNumber: null,
+          managerEmail: null,
+          companyName: null,
+          businessJustification: null
+        } : null}
+        isOpen={!!selectedUserForEdit}
+        onClose={() => setSelectedUserForEdit(null)}
+        onSave={handleUpdateUser}
+      />
     </div>
   );
 };

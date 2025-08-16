@@ -159,65 +159,60 @@ const BOMDisplay = ({ bomItems, onUpdateBOM, onEditConfiguration, onSubmitQuote,
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
-        {bomItems.map((item) => (
-          <div key={item.id} className="p-3 bg-gray-800 rounded-lg border border-gray-700">
-            <div className="flex justify-between items-start mb-2">
-              <div className="flex-1 min-w-0">
-                <h4 className="text-white font-medium leading-tight mb-1">{item.product.name}</h4>
-                {/* Enhanced description display from product data */}
-                {item.product.description && (
-                  <p className="text-gray-400 text-xs mt-1 line-clamp-2 leading-tight">{item.product.description}</p>
-                )}
-                
-                {/* Part Number Display */}
-                <div className="flex flex-wrap items-center gap-2 mt-1">
-                  {editingPartNumber === item.id ? (
-                    <div className="flex items-center space-x-1">
-                      <span className="text-xs text-gray-400">P/N:</span>
-                      <Input
-                        value={editPartNumber}
-                        onChange={(e) => setEditPartNumber(e.target.value)}
-                        className="w-32 h-6 text-xs bg-gray-700 border-gray-600 text-white font-mono"
-                        placeholder="Part number"
-                      />
-                      <Button
-                        size="sm"
-                        onClick={() => handlePartNumberEditSave(item.id)}
-                        className="h-6 w-6 p-0 bg-green-600 hover:bg-green-700"
-                        title="Save part number"
-                      >
-                        <Save className="h-3 w-3" />
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={handlePartNumberEditCancel}
-                        className="h-6 w-6 p-0 text-gray-400 hover:text-white"
-                        title="Cancel"
-                      >
-                        <X className="h-3 w-3" />
-                      </Button>
-                    </div>
-                  ) : (
-                    <div className="flex items-center space-x-1">
-                      <div className="font-mono text-xs text-white break-all whitespace-normal max-w-[150px]">
-                        P/N: {getPartNumber(item)}
-                      </div>
-                      {/* Show "Forced" badge if part number differs from product default */}
-                      {item.partNumber && item.partNumber !== item.product.partNumber && (
-                        <Badge variant="outline" className="text-xs text-yellow-400 border-yellow-400">
-                          Forced
-                        </Badge>
-                      )}
-                      {canEditPartNumber && (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => handlePartNumberEditStart(item)}
-                          className="h-4 w-4 p-0 text-gray-400 hover:text-white"
-                          title="Edit part number"
-                        >
-                          <Edit3 className="h-3 w-3" />
+         {bomItems.map((item) => (
+           <div key={item.id} className="p-2 bg-gray-800 rounded border border-gray-700">
+             <div className="flex justify-between items-start mb-1">
+               <div className="flex-1 min-w-0">
+                 <h4 className="text-white font-medium text-sm leading-tight mb-1">{item.product.name}</h4>
+                 {item.product.description && (
+                   <p className="text-gray-400 text-xs line-clamp-2 leading-tight">{item.product.description}</p>
+                 )}
+                 
+                 {/* Part Number Display - on its own line */}
+                 <div className="mt-1">
+                   {editingPartNumber === item.id ? (
+                     <div className="flex items-center space-x-1">
+                       <Input
+                         value={editPartNumber}
+                         onChange={(e) => setEditPartNumber(e.target.value)}
+                         className="w-32 h-5 text-xs bg-gray-700 border-gray-600 text-white font-mono"
+                         placeholder="Part number"
+                       />
+                       <Button
+                         size="sm"
+                         onClick={() => handlePartNumberEditSave(item.id)}
+                         className="h-5 w-5 p-0 bg-green-600 hover:bg-green-700"
+                         title="Save part number"
+                       >
+                         <Save className="h-2.5 w-2.5" />
+                       </Button>
+                       <Button
+                         size="sm"
+                         variant="ghost"
+                         onClick={handlePartNumberEditCancel}
+                         className="h-5 w-5 p-0 text-gray-400 hover:text-white"
+                         title="Cancel"
+                       >
+                         <X className="h-2.5 w-2.5" />
+                       </Button>
+                     </div>
+                   ) : (
+                     <div className="text-xs font-mono bg-gray-700 px-2 py-1 rounded break-all">
+                       {getPartNumber(item)}
+                       {item.partNumber && item.partNumber !== item.product.partNumber && (
+                         <Badge variant="outline" className="ml-1 text-xs text-yellow-400 border-yellow-400">
+                           Custom
+                         </Badge>
+                       )}
+                       {canEditPartNumber && (
+                         <Button
+                           size="sm"
+                           variant="ghost"
+                           onClick={() => handlePartNumberEditStart(item)}
+                           className="ml-1 h-4 w-4 p-0 text-gray-400 hover:text-white"
+                           title="Edit part number"
+                         >
+                           <Edit3 className="h-2.5 w-2.5" />
                         </Button>
                       )}
                     </div>

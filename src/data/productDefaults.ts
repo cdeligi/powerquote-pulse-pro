@@ -156,7 +156,7 @@ export const DEFAULT_LEVEL2_PRODUCTS: Level2Product[] = [
     price: 15000,
     cost: 11000,
     enabled: true,
-    partNumber: 'DGA9+-001',
+    partNumber: 'TM3',
     specifications: {
       gases: ['H2', 'O2', 'N2', 'CO', 'CO2', 'CH4', 'C2H2', 'C2H4', 'C2H6'],
       oilType: 'Mineral',
@@ -172,7 +172,7 @@ export const DEFAULT_LEVEL2_PRODUCTS: Level2Product[] = [
     price: 12000,
     cost: 9000,
     enabled: true,
-    partNumber: 'DGA5-PRO-001',
+    partNumber: 'TM8',
     specifications: {
       gases: ['H2', 'CO', 'CO2', 'CH4', 'C2H2'],
       oilType: 'Mineral',

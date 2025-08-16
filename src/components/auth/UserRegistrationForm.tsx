@@ -318,6 +318,15 @@ const UserRegistrationForm = ({ onSubmit, onBack }: UserRegistrationFormProps) =
                     <SelectItem value="FINANCE" className="text-white hover:bg-gray-700 focus:bg-gray-700">
                       Finance - Finance Team
                     </SelectItem>
+                    <SelectItem value="LEVEL_3" className="text-white hover:bg-gray-700 focus:bg-gray-700">
+                      Level 3 - Directors
+                    </SelectItem>
+                    <SelectItem value="ADMIN" className="text-white hover:bg-gray-700 focus:bg-gray-700">
+                      Admin - Administrators
+                    </SelectItem>
+                    <SelectItem value="FINANCE" className="text-white hover:bg-gray-700 focus:bg-gray-700">
+                      Finance - Finance Team
+                    </SelectItem>
                   </SelectContent>
                 </Select>
                 <p className="text-gray-400 text-sm mt-1">
