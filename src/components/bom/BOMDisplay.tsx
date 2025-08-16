@@ -163,10 +163,10 @@ const BOMDisplay = ({ bomItems, onUpdateBOM, onEditConfiguration, onSubmitQuote,
           <div key={item.id} className="p-3 bg-gray-800 rounded-lg border border-gray-700">
             <div className="flex justify-between items-start mb-2">
               <div className="flex-1 min-w-0">
-                <h4 className="text-white font-medium truncate">{item.product.name}</h4>
+                <h4 className="text-white font-medium leading-tight mb-1">{item.product.name}</h4>
                 {/* Enhanced description display from product data */}
                 {item.product.description && (
-                  <p className="text-gray-400 text-xs mt-1">{item.product.description}</p>
+                  <p className="text-gray-400 text-xs mt-1 line-clamp-2 leading-tight">{item.product.description}</p>
                 )}
                 
                 {/* Part Number Display */}
@@ -200,9 +200,9 @@ const BOMDisplay = ({ bomItems, onUpdateBOM, onEditConfiguration, onSubmitQuote,
                     </div>
                   ) : (
                     <div className="flex items-center space-x-1">
-                      <Badge variant="outline" className="text-xs font-mono text-white border-gray-500 break-all">
+                      <div className="font-mono text-xs text-white break-all whitespace-normal max-w-[150px]">
                         P/N: {getPartNumber(item)}
-                      </Badge>
+                      </div>
                       {/* Show "Forced" badge if part number differs from product default */}
                       {item.partNumber && item.partNumber !== item.product.partNumber && (
                         <Badge variant="outline" className="text-xs text-yellow-400 border-yellow-400">

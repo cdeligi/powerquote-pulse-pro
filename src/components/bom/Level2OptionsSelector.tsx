@@ -95,7 +95,7 @@ const Level2OptionsSelector = ({
       <h3 className="text-xl font-medium text-foreground">Select {level1Product.name} Options</h3>
       
       {availableOptions.length > 0 ? (
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid gap-3 md:grid-cols-3 lg:grid-cols-4">
           {availableOptions.map((option) => {
             const isCurrentlySelected = isSelected(option);
             const requiresChassisConfig = option.chassisType && option.chassisType !== 'N/A';
@@ -109,32 +109,38 @@ const Level2OptionsSelector = ({
                 )}
                 onClick={() => handleOptionClick(option)}
               >
-                <CardHeader>
-                  <CardTitle className="flex items-center justify-between">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm leading-tight">
                     {option.name}
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1 mt-1">
                       {requiresChassisConfig && (
                         <Badge variant="secondary" className="text-xs">
                           Configure
                         </Badge>
                       )}
-                      <Badge variant="outline" className="text-xs">
-                        {level1Product.name}
-                      </Badge>
                     </div>
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="flex flex-col h-full">
+                <CardContent className="pt-0 flex flex-col h-full">
                   <div className="flex flex-col flex-1">
-                    <p className="text-muted-foreground text-sm mb-3">{option.description}</p>
+                    {option.partNumber && (
+                      <div className="mb-2">
+                        <code className="text-xs bg-muted px-1 py-0.5 rounded font-mono break-all">
+                          {option.partNumber}
+                        </code>
+                      </div>
+                    )}
+                    <p className="text-muted-foreground text-xs mb-2 line-clamp-2">
+                      {option.description}
+                    </p>
                     {requiresChassisConfig && (
                       <p className="text-xs text-muted-foreground mb-2">
                         Requires chassis configuration
                       </p>
                     )}
-                    <div className="flex justify-between items-center mb-3">
+                    <div className="flex justify-between items-center mb-2">
                       {canSeePrices && option.price && (
-                        <span className="text-foreground font-medium">
+                        <span className="text-foreground font-medium text-sm">
                           ${option.price.toLocaleString()}
                         </span>
                       )}
@@ -151,9 +157,9 @@ const Level2OptionsSelector = ({
                           onAddToBOM(option);
                         }}
                         size="sm"
-                        className="w-full mt-3"
+                        className="w-full mt-2 text-xs"
                       >
-                        Add to Bill of Material
+                        Add to BOM
                       </Button>
                     )}
                   </div>

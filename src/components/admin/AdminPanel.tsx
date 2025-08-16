@@ -73,7 +73,7 @@ const AdminPanel = ({ user }: AdminPanelProps) => {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-6 bg-gray-800">
+        <TabsList className="grid w-full grid-cols-7 bg-gray-800">
           <TabsTrigger 
             value="products" 
             className="text-white data-[state=active]:bg-red-600 data-[state=active]:text-white"
@@ -89,11 +89,11 @@ const AdminPanel = ({ user }: AdminPanelProps) => {
             Chassis
           </TabsTrigger>
           <TabsTrigger 
-            value="bom" 
+            value="quote-fields" 
             className="text-white data-[state=active]:bg-red-600 data-[state=active]:text-white"
           >
-            <Wrench className="h-4 w-4 mr-2" />
-            BOM
+            <FileText className="h-4 w-4 mr-2" />
+            Quote Fields
           </TabsTrigger>
           <TabsTrigger 
             value="users" 
@@ -110,37 +110,46 @@ const AdminPanel = ({ user }: AdminPanelProps) => {
             Permissions
           </TabsTrigger>
           <TabsTrigger 
-            value="settings" 
+            value="analytics" 
             className="text-white data-[state=active]:bg-red-600 data-[state=active]:text-white"
           >
-            <Settings className="h-4 w-4 mr-2" />
-            Settings
+            <BarChart3 className="h-4 w-4 mr-2" />
+            Analytics
+          </TabsTrigger>
+          <TabsTrigger 
+            value="approval" 
+            className="text-white data-[state=active]:bg-red-600 data-[state=active]:text-white"
+          >
+            <CheckCircle className="h-4 w-4 mr-2" />
+            Approval
           </TabsTrigger>
         </TabsList>
 
         <TabsContent value="products" className="mt-6">
-          <ProductManagement />
+          <div className="space-y-6">
+            <Tabs defaultValue="management" className="w-full">
+              <TabsList>
+                <TabsTrigger value="management">Product Management</TabsTrigger>
+                <TabsTrigger value="part-numbers">Part Numbers</TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="management">
+                <ProductManagement />
+              </TabsContent>
+              
+              <TabsContent value="part-numbers">
+                <PartNumberConfigManager />
+              </TabsContent>
+            </Tabs>
+          </div>
         </TabsContent>
 
         <TabsContent value="chassis" className="mt-6">
           <ChassisTypeManager />
         </TabsContent>
 
-        <TabsContent value="bom" className="mt-6">
-          <div className="space-y-6">
-            <Tabs defaultValue="part-numbers" className="w-full">
-              <TabsList>
-                <TabsTrigger value="part-numbers">Part Numbers</TabsTrigger>
-                <TabsTrigger value="quote-fields">Quote Fields</TabsTrigger>
-              </TabsList>
-              <TabsContent value="part-numbers" className="mt-6">
-                <PartNumberConfigManager />
-              </TabsContent>
-              <TabsContent value="quote-fields" className="mt-6">
-                <QuoteFieldConfiguration user={user} />
-              </TabsContent>
-            </Tabs>
-          </div>
+        <TabsContent value="quote-fields" className="mt-6">
+          <QuoteFieldConfiguration user={user} />
         </TabsContent>
 
         <TabsContent value="users" className="mt-6">
@@ -151,29 +160,27 @@ const AdminPanel = ({ user }: AdminPanelProps) => {
           <PermissionsOverview />
         </TabsContent>
 
-        <TabsContent value="settings" className="mt-6">
+        <TabsContent value="analytics" className="mt-6">
           <div className="space-y-6">
-            <Tabs defaultValue="general" className="w-full">
+            <Tabs defaultValue="overview" className="w-full">
               <TabsList>
-                <TabsTrigger value="general">General</TabsTrigger>
-                <TabsTrigger value="analytics">Analytics</TabsTrigger>
+                <TabsTrigger value="overview">Overview</TabsTrigger>
                 <TabsTrigger value="margins">Margins</TabsTrigger>
-                <TabsTrigger value="approval">Approval</TabsTrigger>
               </TabsList>
-              <TabsContent value="general" className="mt-6">
-                <AdminSettings />
-              </TabsContent>
-              <TabsContent value="analytics" className="mt-6">
+              
+              <TabsContent value="overview">
                 <QuoteAnalyticsDashboard analytics={mockAnalytics} isAdmin={true} />
               </TabsContent>
-              <TabsContent value="margins" className="mt-6">
+              
+              <TabsContent value="margins">
                 <MarginDashboard bomItems={getMockBomItems()} user={user} />
-              </TabsContent>
-              <TabsContent value="approval" className="mt-6">
-                <QuoteApprovalDashboard user={user} />
               </TabsContent>
             </Tabs>
           </div>
+        </TabsContent>
+
+        <TabsContent value="approval" className="mt-6">
+          <QuoteApprovalDashboard user={user} />
         </TabsContent>
       </Tabs>
     </div>

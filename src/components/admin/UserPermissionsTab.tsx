@@ -61,11 +61,12 @@ const UserPermissionsTab = ({ userProfile }: UserPermissionsTabProps) => {
 
       if (overrideError) throw overrideError;
 
-      // Build feature permissions
+      // Build feature permissions - filter out BOM Edit Part Number
+      const filteredFeatures = features?.filter(f => f.key !== 'FEATURE_BOM_EDIT_PART_NUMBER') || [];
       const roleDefaultsMap = new Map(roleDefaults?.map(rd => [rd.feature_key, rd.allowed]) || []);
       const userOverridesMap = new Map(userOverrides?.map(uo => [uo.feature_key, uo.allowed]) || []);
 
-      const permissions: FeaturePermission[] = features?.map(feature => {
+      const permissions: FeaturePermission[] = filteredFeatures.map(feature => {
         const roleDefault = roleDefaultsMap.get(feature.key) || false;
         const userOverride = userOverridesMap.get(feature.key) || null;
         const effectivePermission = userOverride !== null ? userOverride : roleDefault;
@@ -76,7 +77,7 @@ const UserPermissionsTab = ({ userProfile }: UserPermissionsTabProps) => {
           userOverride,
           effectivePermission
         };
-      }) || [];
+      });
 
       setFeaturePermissions(permissions);
     } catch (error) {
