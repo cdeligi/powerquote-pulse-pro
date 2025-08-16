@@ -7,10 +7,12 @@ import { BOMItem, Level1Product, Level2Product, Level3Product, Level3Customizati
 import Level2OptionsSelector from './Level2OptionsSelector';
 import ChassisSelector from './ChassisSelector';
 import RackVisualizer from './RackVisualizer';
+import AccessoryList from './AccessoryList';
 import SlotCardSelector from './SlotCardSelector';
 import BOMDisplay from './BOMDisplay';
 import AnalogCardConfigurator from './AnalogCardConfigurator';
 import BushingCardConfigurator from './BushingCardConfigurator';
+import NonChassisConfigurator from './NonChassisConfigurator';
 
 import { productDataService } from '@/services/productDataService';
 import QuoteFieldsSection from './QuoteFieldsSection';
@@ -50,6 +52,7 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
 const [editingQTMS, setEditingQTMS] = useState<ConsolidatedQTMS | null>(null);
 const [configuringChassis, setConfiguringChassis] = useState<Level2Product | null>(null);
 const [editingOriginalItem, setEditingOriginalItem] = useState<BOMItem | null>(null);
+const [configuringNonChassis, setConfiguringNonChassis] = useState<Level2Product | null>(null);
 
 // Admin-driven part number config and codes for the selected chassis
 const [pnConfig, setPnConfig] = useState<any | null>(null);
@@ -234,17 +237,33 @@ const toggleAccessory = (id: string) => {
       return;
     }
 
-    // For N/A chassis type or no chassis type, add directly to BOM
-    console.log('Adding N/A chassis product directly to BOM:', option.name);
-    // Fetch prefix config for N/A chassis type products
+    // For N/A chassis type or no chassis type, show non-chassis configurator
+    console.log('Showing non-chassis configuration for:', option.name);
+    setConfiguringNonChassis(option);
+    
+    // Load admin config and codes for this product
     (async () => {
       try {
-        const cfg = await productDataService.getPartNumberConfig(option.id);
-        const partNumber = cfg?.prefix || option.partNumber || `${option.name}-001`;
-        handleAddToBOM(option, partNumber);
+        const [cfg, codes, l3] = await Promise.all([
+          productDataService.getPartNumberConfig(option.id),
+          productDataService.getPartNumberCodesForLevel2(option.id),
+          productDataService.getLevel3ProductsForLevel2(option.id)
+        ]);
+        setPnConfig(cfg);
+        setCodeMap(codes);
+        setLevel3Products(l3);
+        
+        // Auto-select standard accessories for N/A chassis products
+        const standardAccessories = l3
+          .filter(p => codes[p.id]?.outside_chassis && codes[p.id]?.is_standard)
+          .map(p => p.id);
+        
+        if (standardAccessories.length > 0) {
+          setSelectedAccessories(new Set(standardAccessories));
+        }
+        
       } catch (e) {
-        console.error('Failed to fetch prefix config:', e);
-        handleAddToBOM(option);
+        console.error('Failed to load PN config/codes for non-chassis product:', e);
       }
     })();
   };
@@ -311,6 +330,53 @@ const handleChassisSelect = (chassis: Level2Product) => {
     handleAddToBOM(chassis);
   }
 };
+
+  const handleAddNonChassisToBOM = (customPartNumber?: string) => {
+    if (!configuringNonChassis) return;
+    
+    console.log('Adding non-chassis configuration to BOM:', configuringNonChassis.name);
+    
+    const partNumber = customPartNumber || pnConfig?.prefix || configuringNonChassis.partNumber || `${configuringNonChassis.name}-001`;
+    
+    // Add main product to BOM
+    const mainItem: BOMItem = {
+      id: `${configuringNonChassis.id}-${Date.now()}`,
+      product: configuringNonChassis,
+      quantity: 1,
+      enabled: true,
+      partNumber: partNumber
+    };
+    
+    // Add selected accessories as separate BOM items
+    const accessoryItems: BOMItem[] = Array.from(selectedAccessories)
+      .map(id => {
+        const product = level3Products.find(p => p.id === id);
+        if (!product) return null as any;
+        const template = codeMap[id]?.template as string | undefined;
+        const accPN = template ? String(template).replace(/\{[^}]+\}/g, '') : (product.partNumber || '');
+        return {
+          id: `${id}-${Date.now()}`,
+          product,
+          quantity: 1,
+          enabled: true,
+          partNumber: accPN
+        } as BOMItem;
+      })
+      .filter(Boolean) as BOMItem[];
+
+    const updated = [...bomItems, mainItem, ...accessoryItems];
+    setBomItems(updated);
+    onBOMUpdate(updated);
+    
+    toast({
+      title: 'Product Configuration Added',
+      description: `${configuringNonChassis.name} configuration has been added to your bill of materials.`,
+    });
+    
+    // Reset non-chassis configuration state
+    setConfiguringNonChassis(null);
+    setSelectedAccessories(new Set());
+  };
 
   const handleAddChassisToBOM = () => {
     if (!selectedChassis) return;
@@ -858,10 +924,13 @@ const handleAddChassisAndCardsToBOM = () => {
   onRemoteDisplayToggle={handleRemoteDisplayToggle}
   standardSlotHints={standardSlotHints}
   colorByProductId={colorByProductId}
-  accessories={accessories}
-  onAccessoryToggle={toggleAccessory}
-  partNumber={buildQTMSPartNumber({ chassis: configuringChassis, slotAssignments, hasRemoteDisplay, pnConfig, codeMap, includeSuffix: false })}
-/>
+              level3Products={level3Products}
+              codeMap={codeMap}
+              selectedAccessories={selectedAccessories}
+              onAccessoryToggle={toggleAccessory}
+              partNumber={buildQTMSPartNumber({ chassis: configuringChassis, slotAssignments, hasRemoteDisplay, pnConfig, codeMap, includeSuffix: false })}
+              onAddChassis={handleAddChassisToBOM}
+            />
           
 {selectedSlot !== null && (
   <SlotCardSelector
@@ -941,7 +1010,9 @@ const handleAddChassisAndCardsToBOM = () => {
   onRemoteDisplayToggle={handleRemoteDisplayToggle}
   standardSlotHints={standardSlotHints}
   colorByProductId={colorByProductId}
-  accessories={accessories}
+  level3Products={level3Products}
+  codeMap={codeMap}
+  selectedAccessories={selectedAccessories}
   onAccessoryToggle={toggleAccessory}
   partNumber={buildQTMSPartNumber({ chassis: selectedChassis, slotAssignments, hasRemoteDisplay, pnConfig, codeMap, includeSuffix: false })}
 />
@@ -993,6 +1064,41 @@ const handleAddChassisAndCardsToBOM = () => {
             selectedChassis={selectedChassis}
             onAddToBOM={handleAddToBOM}
             canSeePrices={canSeePrices}
+          />
+        </div>
+      );
+    }
+
+    // If we're configuring a non-chassis product, show the non-chassis configurator
+    if (configuringNonChassis) {
+      console.log('Rendering non-chassis configuration for:', configuringNonChassis.name);
+      return (
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <h3 className="text-xl font-semibold">
+              Configure {configuringNonChassis.name}
+            </h3>
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => {
+                setConfiguringNonChassis(null);
+                setSelectedAccessories(new Set());
+              }}
+            >
+              Back to Products
+            </Button>
+          </div>
+          
+          <NonChassisConfigurator
+            level2Product={configuringNonChassis}
+            level3Products={level3Products}
+            codeMap={codeMap}
+            partNumberPrefix={pnConfig?.prefix || configuringNonChassis.partNumber || `${configuringNonChassis.name}-001`}
+            selectedAccessories={selectedAccessories}
+            onToggleAccessory={toggleAccessory}
+            onAddToBOM={handleAddNonChassisToBOM}
+            canOverridePartNumber={user?.role === 'level2'}
           />
         </div>
       );
