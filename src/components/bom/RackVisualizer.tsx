@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { X } from "lucide-react";
 import { getBushingOccupiedSlots, isBushingCard } from "@/utils/bushingValidation";
+import AccessoryList from "./AccessoryList";
 
 interface RackVisualizerProps {
   chassis: Chassis;
@@ -16,10 +17,24 @@ interface RackVisualizerProps {
   onRemoteDisplayToggle?: (enabled: boolean) => void;
   standardSlotHints?: Record<number, string[]>;
   colorByProductId?: Record<string, string>;
-  accessories?: { product: Level3Product; selected: boolean; color?: string | null; pn?: string | null }[];
+  level3Products?: Level3Product[];
+  codeMap?: Record<string, {
+    template: string;
+    slot_span: number;
+    is_standard?: boolean;
+    standard_position?: number | null;
+    designated_only?: boolean;
+    designated_positions?: number[];
+    outside_chassis?: boolean;
+    notes?: string | null;
+    exclusive_in_slots?: boolean;
+    color?: string | null;
+  }>;
+  selectedAccessories?: Set<string>;
   onAccessoryToggle?: (id: string) => void;
   partNumber?: string;
   chassisType?: ChassisType; // Optional chassis type for custom layouts
+  onAddChassis?: () => void; // Add the missing prop
 }
 
 const RackVisualizer = ({ 
@@ -32,10 +47,13 @@ const RackVisualizer = ({
   onRemoteDisplayToggle,
   standardSlotHints,
   colorByProductId,
-  accessories,
+  level3Products = [],
+  codeMap = {},
+  selectedAccessories = new Set(),
   onAccessoryToggle,
   partNumber,
   chassisType,
+  onAddChassis,
 }: RackVisualizerProps) => {
   
   const bushingSlots = getBushingOccupiedSlots(slotAssignments);
@@ -297,41 +315,15 @@ return (
           )}
           
           
-          {/* Accessories Section */}
-          {accessories && accessories.length > 0 && (
+          {/* Accessories Section using AccessoryList component */}
+          {level3Products.length > 0 && Object.keys(codeMap).length > 0 && onAccessoryToggle && (
             <div className="pt-4 border-t border-gray-700">
-              <h4 className="text-white font-medium mb-2">Accessories</h4>
-              <div className="space-y-2">
-                {accessories.map((acc) => (
-                  <div key={acc.product.id} className="flex items-center justify-between p-3 bg-gray-800 rounded border border-gray-700">
-                    <div className="flex items-center space-x-2">
-                      <span className="inline-block h-3 w-3 rounded-full" style={acc.color ? { backgroundColor: acc.color } : undefined} />
-                      <span className="text-white">{acc.product.name}</span>
-                      {acc.pn && (
-                        <>
-                          <span className="mx-2 text-gray-400">•</span>
-                          <span className="font-mono text-white text-sm break-all">{acc.pn}</span>
-                        </>
-                      )}
-                    </div>
-                    {onAccessoryToggle && (
-                      <Button
-                        variant={acc.selected ? 'default' : 'outline'}
-                        size="sm"
-                        onClick={() => {
-                          onAccessoryToggle(acc.product.id);
-                          if (onRemoteDisplayToggle && acc.product.name?.toLowerCase().includes('remote') && acc.product.name?.toLowerCase().includes('display')) {
-                            onRemoteDisplayToggle(!acc.selected);
-                          }
-                        }}
-                        className={acc.selected ? 'bg-green-600 hover:bg-green-700' : ''}
-                      >
-                        {acc.selected ? 'Added' : 'Add'}
-                      </Button>
-                    )}
-                  </div>
-                ))}
-              </div>
+              <AccessoryList
+                level3Products={level3Products}
+                codeMap={codeMap}
+                selectedAccessories={selectedAccessories}
+                onToggleAccessory={onAccessoryToggle}
+              />
             </div>
           )}
           
