@@ -601,36 +601,27 @@ export type Database = {
           created_at: string
           id: string
           level2_product_id: string
-          prefix: string
-          remote_off_code: string
-          remote_on_code: string
+          part_number: string
           slot_count: number
           slot_placeholder: string
-          suffix_separator: string
           updated_at: string
         }
         Insert: {
           created_at?: string
           id?: string
           level2_product_id: string
-          prefix: string
-          remote_off_code?: string
-          remote_on_code?: string
+          part_number: string
           slot_count: number
           slot_placeholder?: string
-          suffix_separator?: string
           updated_at?: string
         }
         Update: {
           created_at?: string
           id?: string
           level2_product_id?: string
-          prefix?: string
-          remote_off_code?: string
-          remote_on_code?: string
+          part_number?: string
           slot_count?: number
           slot_placeholder?: string
-          suffix_separator?: string
           updated_at?: string
         }
         Relationships: []

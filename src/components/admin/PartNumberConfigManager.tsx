@@ -33,12 +33,9 @@ const PartNumberConfigManager: React.FC<PartNumberConfigManagerProps> = ({ initi
   const [loading, setLoading] = useState(false);
 
   // Level 2 config state
-  const [prefix, setPrefix] = useState("");
+  const [partNumber, setPartNumber] = useState("");
   const [slotPlaceholder, setSlotPlaceholder] = useState("0");
   const [slotCount, setSlotCount] = useState<number>(0);
-  const [suffixSeparator, setSuffixSeparator] = useState("-");
-  const [remoteOffCode, setRemoteOffCode] = useState("0");
-  const [remoteOnCode, setRemoteOnCode] = useState("D1");
 
   // Level 3 code templates
   const [templates, setTemplates] = useState<Record<string, CodeTemplate>>({});
@@ -67,16 +64,13 @@ const PartNumberConfigManager: React.FC<PartNumberConfigManagerProps> = ({ initi
         ]);
         setLevel3List(l3);
         if (cfg) {
-          setPrefix(cfg.prefix || "");
+          setPartNumber(cfg.part_number || "");
           setSlotPlaceholder(cfg.slot_placeholder || "0");
           setSlotCount(cfg.slot_count || 0);
-          setSuffixSeparator(cfg.suffix_separator || "-");
-          setRemoteOffCode(cfg.remote_off_code || "0");
-          setRemoteOnCode(cfg.remote_on_code || "D1");
         } else {
           // Defaults from L2 specs
           const current = level2List.find(p => p.id === selectedL2);
-          setPrefix(current?.chassisType || "");
+          setPartNumber(current?.chassisType || "");
           setSlotCount((current?.specifications as any)?.slots || 0);
         }
         setTemplates(codes);
@@ -95,12 +89,9 @@ const PartNumberConfigManager: React.FC<PartNumberConfigManagerProps> = ({ initi
       if (!selectedL2) return;
       const okCfg = await productDataService.upsertPartNumberConfig({
         level2_product_id: selectedL2,
-        prefix,
+        part_number: partNumber,
         slot_placeholder: slotPlaceholder,
-        slot_count: slotCount,
-        suffix_separator: suffixSeparator,
-        remote_off_code: remoteOffCode,
-        remote_on_code: remoteOnCode
+        slot_count: slotCount
       });
       const codesPayload = level3List.map(l3 => {
         const t = templates[l3.id] || {};
@@ -156,10 +147,10 @@ const PartNumberConfigManager: React.FC<PartNumberConfigManagerProps> = ({ initi
             </Select>
           </div>
 
-          <div className="md:col-span-2 grid grid-cols-2 gap-4">
+          <div className="md:col-span-2 grid grid-cols-3 gap-4">
             <div>
-              <Label>Prefix</Label>
-              <Input value={prefix} onChange={e => setPrefix(e.target.value)} className="bg-background border-border text-foreground" />
+              <Label>Part Number</Label>
+              <Input value={partNumber} onChange={e => setPartNumber(e.target.value)} className="bg-background border-border text-foreground" />
             </div>
             <div>
               <Label>Slot Placeholder</Label>
@@ -168,18 +159,6 @@ const PartNumberConfigManager: React.FC<PartNumberConfigManagerProps> = ({ initi
             <div>
               <Label>Slot Count</Label>
               <Input type="number" value={slotCount} onChange={e => setSlotCount(parseInt(e.target.value) || 0)} className="bg-background border-border text-foreground" />
-            </div>
-            <div>
-              <Label>Suffix Separator</Label>
-              <Input value={suffixSeparator} onChange={e => setSuffixSeparator(e.target.value)} className="bg-background border-border text-foreground" />
-            </div>
-            <div>
-              <Label>Remote Off Code</Label>
-              <Input value={remoteOffCode} onChange={e => setRemoteOffCode(e.target.value)} className="bg-background border-border text-foreground" />
-            </div>
-            <div>
-              <Label>Remote On Code</Label>
-              <Input value={remoteOnCode} onChange={e => setRemoteOnCode(e.target.value)} className="bg-background border-border text-foreground" />
             </div>
           </div>
         </div>

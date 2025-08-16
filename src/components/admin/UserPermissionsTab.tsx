@@ -117,6 +117,8 @@ const UserPermissionsTab = ({ userProfile }: UserPermissionsTabProps) => {
             user_id: userProfile.id,
             feature_key: featureKey,
             allowed
+          }, {
+            onConflict: 'user_id,feature_key'
           });
 
         if (error) throw error;
