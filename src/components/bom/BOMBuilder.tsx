@@ -25,15 +25,22 @@ import { buildQTMSPartNumber } from '@/utils/qtmsPartNumberBuilder';
 import { findOptimalBushingPlacement, findExistingBushingSlots, isBushingCard } from '@/utils/bushingValidation';
 import { useAuth } from '@/hooks/useAuth';
 import { useQuoteValidation } from './QuoteFieldValidation';
+import { usePermissions, FEATURES } from '@/hooks/usePermissions';
 
 interface BOMBuilderProps {
   onBOMUpdate: (items: BOMItem[]) => void;
   canSeePrices: boolean;
+  canSeeCosts?: boolean;
 }
 
-const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
+const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuilderProps) => {
   // ALL HOOKS MUST BE AT THE TOP - NO CONDITIONAL RETURNS BEFORE HOOKS
   const { user, loading } = useAuth();
+  const { has } = usePermissions();
+
+  // Compute permissions
+  const canEditPN = has(FEATURES.BOM_EDIT_PART_NUMBER);
+  const canForcePN = has(FEATURES.BOM_FORCE_PART_NUMBER);
 
   const [selectedLevel1Product, setSelectedLevel1Product] = useState<Level1Product | null>(null);
   const [selectedLevel2Options, setSelectedLevel2Options] = useState<Level2Product[]>([]);
@@ -1098,7 +1105,7 @@ const handleAddChassisAndCardsToBOM = () => {
             selectedAccessories={selectedAccessories}
             onToggleAccessory={toggleAccessory}
             onAddToBOM={handleAddNonChassisToBOM}
-            canOverridePartNumber={user?.role === 'LEVEL_2' || user?.role === 'LEVEL_3' || user?.role === 'ADMIN' || user?.role === 'FINANCE'}
+            canOverridePartNumber={canForcePN}
           />
         </div>
       );
@@ -1223,6 +1230,8 @@ const handleAddChassisAndCardsToBOM = () => {
               onEditConfiguration={handleBOMConfigurationEdit}
               onSubmitQuote={submitQuoteRequest}
               canSeePrices={canSeePrices}
+              canSeeCosts={canSeeCosts}
+              canEditPartNumber={canEditPN}
             />
           </div>
         </div>

@@ -7,6 +7,7 @@ import BOMBuilder from "../bom/BOMBuilder";
 import QuoteManager from "../quotes/QuoteManager";
 import AdminPanel from "../admin/AdminPanel";
 import { BOMItem } from "@/types/product";
+import { usePermissions, FEATURES } from "@/hooks/usePermissions";
 
 interface DashboardProps {
   user: User;
@@ -18,10 +19,14 @@ type ActiveView = 'overview' | 'bom' | 'quotes' | 'admin';
 const Dashboard = ({ user, onLogout }: DashboardProps) => {
   const [activeView, setActiveView] = useState<ActiveView>('overview');
   const [bomItems, setBomItems] = useState<BOMItem[]>([]);
+  const { has } = usePermissions();
 
   const handleBOMUpdate = (items: BOMItem[]) => {
     setBomItems(items);
   };
+
+  // Compute permissions for BOM
+  const canSeeCosts = has(FEATURES.BOM_SHOW_PRODUCT_COST);
 
   const renderContent = () => {
     switch (activeView) {
@@ -32,6 +37,7 @@ const Dashboard = ({ user, onLogout }: DashboardProps) => {
           <BOMBuilder 
             onBOMUpdate={handleBOMUpdate}
             canSeePrices={user.role === 'ADMIN' || user.role === 'FINANCE' || user.role === 'LEVEL_3'}
+            canSeeCosts={canSeeCosts}
           />
         );
       case 'quotes':
