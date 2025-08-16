@@ -54,17 +54,9 @@ const RackVisualizer = ({
   };
 
 const getSlotColor = (slot: number) => {
-  // For selected empty slots, show highlight
+  // For selected empty slots, show highlight; for assigned slots we will use admin color via inline style
   if (!slotAssignments[slot] && selectedSlot === slot) return 'bg-yellow-600';
-  // For assigned slots, use admin color if available, otherwise fallback to type color
-  if (slotAssignments[slot]) {
-    const card = slotAssignments[slot];
-    const adminColor = colorByProductId?.[card.id];
-    if (adminColor) {
-      return 'bg-gray-700'; // Base class, actual color applied via inline style
-    }
-    return getCardTypeColor(card.type); // Fallback to type-based color
-  }
+  if (slotAssignments[slot]) return 'bg-gray-700'; // base for assigned; real color via inline style
   return 'bg-gray-700'; // Empty slot
 };
 
@@ -80,16 +72,11 @@ const getSlotColor = (slot: number) => {
       }
       return card.type.charAt(0).toUpperCase() + card.type.slice(1);
     }
-    // For empty slots, show the display label based on chassis numbering
-    const slotNumberingStart = chassisType?.metadata?.slotNumberingStart || 1;
-    const displayNumber = slot + slotNumberingStart;
-    return `${displayNumber}`;
+    // For empty slots, just show the slot number
+    return `${slot}`;
   };
 
-  const getSlotTitle = (slot: number) => {
-  const slotNumberingStart = chassisType?.metadata?.slotNumberingStart || 1;
-  const displayNumber = slot + slotNumberingStart;
-  
+const getSlotTitle = (slot: number) => {
   if (slotAssignments[slot]) {
     const card = slotAssignments[slot];
     const display = card?.type ? card.type.charAt(0).toUpperCase() + card.type.slice(1) : card?.name;
@@ -104,9 +91,9 @@ const getSlotColor = (slot: number) => {
   // Empty slots - show standard hints when available
   const hints = standardSlotHints?.[slot];
   if (hints && hints.length) {
-    return `Slot ${displayNumber} - Standard: ${hints.join(', ')}`;
+    return `Slot ${slot} - Standard: ${hints.join(', ')}`;
   }
-  return `Slot ${displayNumber} - Click to add card`;
+  return `Slot ${slot} - Click to add card`;
 };
 
   const isSlotClickable = (slot: number) => {
@@ -362,16 +349,12 @@ return (
                 ))}
                 {Object.entries(slotAssignments)
                   .filter(([slot, card]) => !isBushingCard(card))
-                  .map(([slot, card]) => {
-                    const slotNumberingStart = chassisType?.metadata?.slotNumberingStart || 1;
-                    const displaySlot = parseInt(slot) + slotNumberingStart;
-                    return (
-                      <div key={slot} className="flex justify-between text-sm">
-                        <span className="text-gray-400">Slot {displaySlot}:</span>
-                        <span className="text-white">{card.type ? card.type.charAt(0).toUpperCase() + card.type.slice(1) : card.name}</span>
-                      </div>
-                    );
-                  })}
+                  .map(([slot, card]) => (
+                    <div key={slot} className="flex justify-between text-sm">
+                      <span className="text-gray-400">Slot {slot}:</span>
+                      <span className="text-white">{card.type ? card.type.charAt(0).toUpperCase() + card.type.slice(1) : card.name}</span>
+                    </div>
+                  ))}
               </div>
             </div>
           )}

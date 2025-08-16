@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { BOMItem, Level1Product, Level2Product, Level3Product, Level3Customization, ChassisType } from '@/types/product';
+import { BOMItem, Level1Product, Level2Product, Level3Product, Level3Customization } from '@/types/product';
 import Level2OptionsSelector from './Level2OptionsSelector';
 import ChassisSelector from './ChassisSelector';
 import RackVisualizer from './RackVisualizer';
@@ -41,9 +41,6 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices }: BOMBuilderProps) => {
   const [bomItems, setBomItems] = useState<BOMItem[]>([]);
   const [activeTab, setActiveTab] = useState<string>('');
   const [hasRemoteDisplay, setHasRemoteDisplay] = useState<boolean>(false);
-  const [chassisTypes, setChassisTypes] = useState<ChassisType[]>([]);
-  const [selectedChassisType, setSelectedChassisType] = useState<ChassisType | null>(null);
-  const [currentChassisType, setCurrentChassisType] = useState<ChassisType | null>(null);
   const [configuringCard, setConfiguringCard] = useState<BOMItem | null>(null);
   const [configuringBOMItem, setConfiguringBOMItem] = useState<BOMItem | null>(null);
   const [quoteFields, setQuoteFields] = useState<Record<string, any>>({});
@@ -61,6 +58,22 @@ const [level3Products, setLevel3Products] = useState<Level3Product[]>([]);
 const [autoPlaced, setAutoPlaced] = useState(false);
 const [selectedAccessories, setSelectedAccessories] = useState<Set<string>>(new Set());
 
+// Hints for standard slot positions not yet filled (top-level to avoid conditional hooks)
+const standardSlotHints = useMemo(() => {
+  const hints: Record<number, string[]> = {};
+  const nameById = Object.fromEntries(level3Products.map(p => [p.id, p.name] as const));
+  Object.entries(codeMap).forEach(([l3Id, def]) => {
+    if (!def?.is_standard || def?.outside_chassis) return;
+    const pos = def.standard_position;
+    // Skip CPU std position (0) and ignore outside-chassis items
+    if (pos === 0 || pos === null || pos === undefined) return;
+    if (!slotAssignments[pos]) {
+      const name = nameById[l3Id] || 'Standard Item';
+      hints[pos] = hints[pos] ? [...hints[pos], name] : [name];
+    }
+  });
+  return hints;
+}, [codeMap, level3Products, slotAssignments]);
 
 // Map configured colors by Level3 id from admin codeMap
 const colorByProductId = useMemo(() => {
@@ -131,17 +144,12 @@ const toggleAccessory = (id: string) => {
   const [level1Products, setLevel1Products] = useState<Level1Product[]>([]);
   const [level1Loading, setLevel1Loading] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
-  const [standardSlotHints, setStandardSlotHints] = useState<Record<number, string[]>>({});
 
   useEffect(() => {
     const loadLevel1Products = async () => {
       try {
-        const [products, chassisTypesData] = await Promise.all([
-          productDataService.getLevel1Products(),
-          productDataService.getChassisTypes()
-        ]);
+        const products = await productDataService.getLevel1Products();
         setLevel1Products(products.filter(p => p.enabled));
-        setChassisTypes(chassisTypesData);
       } catch (error) {
         console.error('Error loading Level 1 products:', error);
         setLevel1Products([]);
@@ -210,7 +218,7 @@ const toggleAccessory = (id: string) => {
     });
   };
 
-const handleLevel2OptionToggle = (option: Level2Product) => {
+  const handleLevel2OptionToggle = (option: Level2Product) => {
     console.log('Level2OptionToggle called with option:', option.name, 'chassisType:', option.chassisType);
     
     // Check if this is a single-selection context (clear other selections first)
@@ -223,11 +231,6 @@ const handleLevel2OptionToggle = (option: Level2Product) => {
       setSelectedChassis(option);
       setSlotAssignments({});
       setSelectedSlot(null);
-      
-      // Find and set the matching chassis type for layout and numbering
-      const matchingChassisType = chassisTypes.find(ct => ct.code.toLowerCase() === option.chassisType.toLowerCase());
-      setCurrentChassisType(matchingChassisType);
-      
       return;
     }
 
@@ -247,96 +250,67 @@ const handleLevel2OptionToggle = (option: Level2Product) => {
   };
 
 const handleChassisSelect = (chassis: Level2Product) => {
-    console.log('Chassis selected:', chassis);
-    setSelectedChassis(chassis);
-    setConfiguringChassis(chassis); // This was missing - needed to show the rack visualizer!
+  console.log('Chassis selected:', chassis.name, 'chassisType:', chassis.chassisType);
+  setSelectedChassis(chassis);
+
+  if (chassis.chassisType && chassis.chassisType !== 'N/A') {
+    console.log('Setting up chassis configuration for:', chassis.name);
+    setConfiguringChassis(chassis);
     setSlotAssignments({});
-    setAutoPlaced(false);
-    setSelectedAccessories(new Set());
+    setSelectedSlot(null);
 
-    // Find and store the matching chassis type for layout and numbering
-    const matchingChassisType = chassisTypes.find(ct => ct.code.toLowerCase() === chassis.chassisType.toLowerCase());
-    setCurrentChassisType(matchingChassisType);
-
-    // Load Level 2 part number configuration and Level 3 products
+    // Load admin config and codes for this chassis
     (async () => {
       try {
-        // Fetch part number config for this chassis
-        const { data: pnData, error: pnError } = await supabase
-          .from('level2_products')
-          .select('part_number_config')
-          .eq('id', chassis.id)
-          .single();
-
-        if (pnError) throw pnError;
-        setPnConfig(pnData?.part_number_config || null);
-
-        // Fetch Level 3 products and their admin configuration
-        const [l3Products, { data: codeData }] = await Promise.all([
-          productDataService.getLevel3ProductsForLevel2(chassis.id),
-          supabase.from('level3_products').select('id, admin_config').neq('admin_config', null)
+        const [cfg, codes, l3] = await Promise.all([
+          productDataService.getPartNumberConfig(chassis.id),
+          productDataService.getPartNumberCodesForLevel2(chassis.id),
+          productDataService.getLevel3ProductsForLevel2(chassis.id)
         ]);
-
-        setLevel3Products(l3Products);
-
-        // Build code map from admin_config
-        const newCodeMap: Record<string, any> = {};
-        if (codeData) {
-          codeData.forEach(item => {
-            if (item.admin_config) {
-              newCodeMap[item.id] = item.admin_config;
-            }
-          });
-        }
-        setCodeMap(newCodeMap);
-
-        // Auto-place standard items and build hints
+        setPnConfig(cfg);
+        setCodeMap(codes);
+        setLevel3Products(l3);
+        setAutoPlaced(false);
+        
+        // Auto-include standard items based on admin configuration
         const autoIncludeAssignments: Record<number, Level3Product> = {};
-        const standardHints: Record<number, string[]> = {};
-        const autoAccessories = new Set<string>();
-
-        l3Products.forEach(product => {
-          const config = newCodeMap[product.id];
-          if (config?.is_standard) {
-            if (config.outside_chassis) {
-              // Auto-select standard accessories
-              autoAccessories.add(product.id);
-            } else if (config.standard_position && config.standard_position > 0) {
-              // Auto-place standard items in their designated slots
-              autoIncludeAssignments[config.standard_position] = product;
+        
+        // Check for standard items to auto-include
+        Object.entries(codes).forEach(([l3Id, def]) => {
+          if (def?.is_standard && !def?.outside_chassis) {
+            const standardProduct = l3.find(p => p.id === l3Id);
+            if (standardProduct && def.standard_position !== null && def.standard_position !== undefined) {
+              // Use the exact position from admin config - no remapping needed
+              const position = def.standard_position;
+              autoIncludeAssignments[position] = standardProduct;
+              console.log(`Auto-including standard item "${standardProduct.name}" at position ${position}`);
             }
-          }
-
-          // Build standard slot hints for empty slots
-          if (config?.designated_only && config.designated_positions) {
-            config.designated_positions.forEach((slot: number) => {
-              if (!standardHints[slot]) standardHints[slot] = [];
-              standardHints[slot].push(product.name);
-            });
           }
         });
-
-        console.log('Auto-included items:', autoIncludeAssignments);
-        console.log('Standard hints:', standardHints);
-        console.log('Auto accessories:', autoAccessories);
         
-        setSlotAssignments(autoIncludeAssignments);
-        setStandardSlotHints(standardHints);
-        setSelectedAccessories(autoAccessories);
-        setAutoPlaced(true);
+        if (Object.keys(autoIncludeAssignments).length > 0) {
+          setSlotAssignments(autoIncludeAssignments);
+          toast({
+            title: 'Standard Items Added',
+            description: `${Object.keys(autoIncludeAssignments).length} standard items have been automatically included.`,
+          });
+        }
+        
       } catch (e) {
-        console.error('Failed to load chassis configuration:', e);
-        // Reset states on error
-        setPnConfig(null);
-        setCodeMap({});
-        setLevel3Products([]);
-        setStandardSlotHints({});
+        console.error('Failed to load PN config/codes for chassis:', e);
       }
     })();
 
-    // Set selected chassis type for rack visualization
-    setSelectedChassisType(matchingChassisType);
-  };
+    setTimeout(() => {
+      const configSection = document.getElementById('chassis-configuration');
+      if (configSection) {
+        configSection.scrollIntoView({ behavior: 'smooth' });
+      }
+    }, 100);
+  } else {
+    handleAddToBOM(chassis);
+  }
+};
 
   const handleAddChassisToBOM = () => {
     if (!selectedChassis) return;
@@ -881,20 +855,12 @@ const handleAddChassisAndCardsToBOM = () => {
   onSlotClick={handleSlotClick}
   onSlotClear={handleSlotClear}
   hasRemoteDisplay={hasRemoteDisplay}
-  onRemoteDisplayToggle={setHasRemoteDisplay}
+  onRemoteDisplayToggle={handleRemoteDisplayToggle}
   standardSlotHints={standardSlotHints}
   colorByProductId={colorByProductId}
   accessories={accessories}
   onAccessoryToggle={toggleAccessory}
-  partNumber={configuringChassis ? buildQTMSPartNumber({
-    chassis: configuringChassis,
-    slotAssignments,
-    hasRemoteDisplay,
-    pnConfig,
-    codeMap,
-    includeSuffix: true
-  }) : ''}
-  chassisType={currentChassisType}
+  partNumber={buildQTMSPartNumber({ chassis: configuringChassis, slotAssignments, hasRemoteDisplay, pnConfig, codeMap, includeSuffix: false })}
 />
           
 {selectedSlot !== null && (
@@ -935,10 +901,9 @@ const handleAddChassisAndCardsToBOM = () => {
       );
     }
 
-    // Rack configurable products - show chassis selector or configuration
-    if (product.rackConfigurable || product.name?.toLowerCase().includes('qtms')) {
-      console.log('Rendering rack configurable product content, configuringChassis:', configuringChassis);
-      console.log('Product for chassis:', product);
+    // QTMS tab - show chassis selector or configuration
+    if (productId.toLowerCase() === 'qtms') {
+      console.log('Rendering QTMS tab content, configuringChassis:', configuringChassis);
       
       // If configuring a chassis, show rack visualizer
       if (configuringChassis && selectedChassis) {
@@ -973,20 +938,12 @@ const handleAddChassisAndCardsToBOM = () => {
   onSlotClear={handleSlotClear}
   selectedSlot={selectedSlot}
   hasRemoteDisplay={hasRemoteDisplay}
-  onRemoteDisplayToggle={setHasRemoteDisplay}
+  onRemoteDisplayToggle={handleRemoteDisplayToggle}
   standardSlotHints={standardSlotHints}
   colorByProductId={colorByProductId}
   accessories={accessories}
   onAccessoryToggle={toggleAccessory}
-  partNumber={selectedChassis ? buildQTMSPartNumber({
-    chassis: selectedChassis,
-    slotAssignments,
-    hasRemoteDisplay,
-    pnConfig,
-    codeMap,
-    includeSuffix: true
-  }) : ''}
-  chassisType={currentChassisType}
+  partNumber={buildQTMSPartNumber({ chassis: selectedChassis, slotAssignments, hasRemoteDisplay, pnConfig, codeMap, includeSuffix: false })}
 />
              </div>
 
@@ -1036,7 +993,6 @@ const handleAddChassisAndCardsToBOM = () => {
             selectedChassis={selectedChassis}
             onAddToBOM={handleAddToBOM}
             canSeePrices={canSeePrices}
-            level1ProductId={product.id}
           />
         </div>
       );
