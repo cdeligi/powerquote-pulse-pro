@@ -147,9 +147,8 @@ export default function UserEditDialog({ user, isOpen, onClose, onSave }: UserEd
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent className="bg-gray-800 border-gray-700">
-                  <SelectItem value="level1">Level 1 (Channel partners)</SelectItem>
-                  <SelectItem value="level2">Level 2 (Qualitrol Sales)</SelectItem>
-                  <SelectItem value="level3">Level 3 (Directors)</SelectItem>
+                  <SelectItem value="level1">Level 1</SelectItem>
+                  <SelectItem value="level2">Level 2</SelectItem>
                   <SelectItem value="admin">Admin</SelectItem>
                   <SelectItem value="finance">Finance</SelectItem>
                 </SelectContent>
@@ -241,17 +240,13 @@ export default function UserEditDialog({ user, isOpen, onClose, onSave }: UserEd
           </div>
 
           <div className="flex justify-end space-x-2 pt-4">
-            <Button 
-              variant="outline" 
-              onClick={onClose}
-              className="border-gray-600 text-white hover:bg-gray-700"
-            >
+            <Button variant="outline" onClick={onClose}>
               Cancel
             </Button>
             <Button 
               onClick={handleSave} 
               disabled={isLoading}
-              className="bg-primary hover:bg-primary/90 text-white"
+              className="bg-blue-600 hover:bg-blue-700"
             >
               {isLoading ? 'Saving...' : 'Save Changes'}
             </Button>

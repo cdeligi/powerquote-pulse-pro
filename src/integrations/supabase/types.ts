@@ -602,8 +602,11 @@ export type Database = {
           id: string
           level2_product_id: string
           prefix: string
+          remote_off_code: string
+          remote_on_code: string
           slot_count: number
           slot_placeholder: string
+          suffix_separator: string
           updated_at: string
         }
         Insert: {
@@ -611,8 +614,11 @@ export type Database = {
           id?: string
           level2_product_id: string
           prefix: string
+          remote_off_code?: string
+          remote_on_code?: string
           slot_count: number
           slot_placeholder?: string
+          suffix_separator?: string
           updated_at?: string
         }
         Update: {
@@ -620,8 +626,11 @@ export type Database = {
           id?: string
           level2_product_id?: string
           prefix?: string
+          remote_off_code?: string
+          remote_on_code?: string
           slot_count?: number
           slot_placeholder?: string
+          suffix_separator?: string
           updated_at?: string
         }
         Relationships: []
