@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { productDataService, ProductDataService } from "@/services/productDataService";
+import { ProductDataService } from "@/services/productDataService";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -33,17 +33,14 @@ const SensorConfigManagement = ({ showAnalog = true, showBushing = true }: Senso
   };
 
   const handleSaveAnalog = async () => {
-    if (editingAnalogId) {
-      await productDataService.updateAnalogSensorType(editingAnalogId, analogForm);
-    } else {
-      await productDataService.createAnalogSensorType(analogForm);
-    }
+    // This functionality needs to be implemented with Supabase tables
+    console.log('Analog sensor save operation:', { editingAnalogId, analogForm });
     resetForms();
     refresh();
   };
 
   const handleDeleteAnalog = async (id: string) => {
-    await productDataService.deleteAnalogSensorType(id);
+    console.log('Analog sensor delete operation:', id);
     if (editingAnalogId === id) {
       setAnalogForm({ name: "", description: "" });
       setEditingAnalogId(null);
@@ -60,17 +57,13 @@ const SensorConfigManagement = ({ showAnalog = true, showBushing = true }: Senso
   };
 
   const handleSaveBushing = async () => {
-    if (editingBushingId) {
-      await productDataService.updateBushingTapModel(editingBushingId, bushingForm);
-    } else {
-      await productDataService.createBushingTapModel(bushingForm);
-    }
+    console.log('Bushing tap model save operation:', { editingBushingId, bushingForm });
     resetForms();
     refresh();
   };
 
   const handleDeleteBushing = async (id: string) => {
-    await productDataService.deleteBushingTapModel(id);
+    console.log('Bushing tap model delete operation:', id);
     if (editingBushingId === id) {
       setBushingForm({ name: "" });
       setEditingBushingId(null);

@@ -23,6 +23,7 @@ const CardForm = ({ onSubmit, level2Products, initialData }: CardFormProps) => {
     price: initialData?.price || 0,
     cost: initialData?.cost || 0,
     enabled: initialData?.enabled ?? true,
+    requires_level4_config: initialData?.requires_level4_config || false,
     specifications: initialData?.specifications || {},
     product_level: 3,
     image: initialData?.image || ''
@@ -211,6 +212,15 @@ const CardForm = ({ onSubmit, level2Products, initialData }: CardFormProps) => {
           onCheckedChange={(enabled) => setFormData({ ...formData, enabled })}
         />
         <Label htmlFor="enabled" className="text-foreground">Enabled</Label>
+      </div>
+
+      <div className="flex items-center space-x-2">
+        <Switch
+          id="requires-level4"
+          checked={formData.requires_level4_config}
+          onCheckedChange={(requires_level4_config) => setFormData({ ...formData, requires_level4_config })}
+        />
+        <Label htmlFor="requires-level4" className="text-foreground">Requires Level 4 Configuration</Label>
       </div>
 
       <div className="flex justify-end space-x-3 pt-4">

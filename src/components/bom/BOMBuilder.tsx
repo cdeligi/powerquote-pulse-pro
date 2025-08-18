@@ -524,7 +524,7 @@ const handleChassisSelect = (chassis: Level2Product) => {
         return updated;
       });
 
-      if (card.name.toLowerCase().includes('bushing')) {
+      if ((card as any).requires_level4_config && card.name.toLowerCase().includes('bushing')) {
         const newItem: BOMItem = {
           id: `${Date.now()}-${Math.random()}`,
           product: card,
@@ -540,7 +540,7 @@ const handleChassisSelect = (chassis: Level2Product) => {
       return;
     }
 
-    if (card.name.toLowerCase().includes('analog')) {
+    if ((card as any).requires_level4_config && card.name.toLowerCase().includes('analog')) {
       const newItem: BOMItem = {
         id: `${Date.now()}-${Math.random()}`,
         product: card,
@@ -1258,20 +1258,20 @@ const handleAddChassisAndCardsToBOM = () => {
       </div>
 
       {/* Configuration Dialogs */}
-      {configuringCard && configuringCard.product.name.toLowerCase().includes('analog') && (
-        <AnalogCardConfigurator
-          bomItem={configuringCard}
-          onSave={handleCardConfiguration}
-          onClose={() => setConfiguringCard(null)}
-        />
-      )}
-
-      {configuringCard && configuringCard.product.name.toLowerCase().includes('bushing') && (
-        <BushingCardConfigurator
-          bomItem={configuringCard}
-          onSave={handleCardConfiguration}
-          onClose={() => setConfiguringCard(null)}
-        />
+      {configuringCard && (configuringCard.product as any).requires_level4_config && (
+        configuringCard.product.name.toLowerCase().includes('analog') ? (
+          <AnalogCardConfigurator
+            bomItem={configuringCard}
+            onSave={handleCardConfiguration}
+            onClose={() => setConfiguringCard(null)}
+          />
+        ) : configuringCard.product.name.toLowerCase().includes('bushing') ? (
+          <BushingCardConfigurator
+            bomItem={configuringCard}
+            onSave={handleCardConfiguration}
+            onClose={() => setConfiguringCard(null)}
+          />
+        ) : null
       )}
 
       {editingQTMS && (
