@@ -293,14 +293,21 @@ export const Level4ConfigurationManager: React.FC = () => {
     try {
       console.log('=== DEBUGGING LEVEL 4 CONFIGURATION ===');
       
-      // 1. Check Level 3 products that should have Level 4 config
-      const { data: level3Products, error: l3Error } = await supabase
+      // 1. Check Level 3 products that should have Level 4 config - check specifications JSON
+      const { data: allLevel3Products, error: l3Error } = await supabase
         .from('products')
-        .select('id, name, requires_level4_config, product_level')
-        .eq('requires_level4_config', true);
+        .select('id, name, specifications, product_level')
+        .eq('product_level', 3);
       
       if (l3Error) throw l3Error;
-      console.log('Level 3 products requiring Level 4 config:', level3Products);
+      
+      // Filter client-side for requires_level4_config in specifications
+      const level3ProductsWithL4Config = allLevel3Products?.filter(product => {
+        const specs = product.specifications || {};
+        return specs.requires_level4_config === true;
+      }) || [];
+      
+      console.log('Level 3 products requiring Level 4 config:', level3ProductsWithL4Config);
       
       // 2. Check all Level 4 products
       const { data: allLevel4Products, error: l4Error } = await supabase
@@ -328,7 +335,7 @@ export const Level4ConfigurationManager: React.FC = () => {
       
       const { data: requiredProductsData, error: reqError } = await supabase
         .from('products')
-        .select('id, name, requires_level4_config')
+        .select('id, name, specifications')
         .in('id', requiredProducts);
       
       if (reqError) throw reqError;
