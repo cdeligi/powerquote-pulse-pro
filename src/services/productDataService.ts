@@ -1100,8 +1100,7 @@ export class ProductDataService {
             updated_at: new Date().toISOString()
           },
           { 
-            onConflict: 'product_id',
-            returning: 'representation' // Ensure we get the updated/inserted record
+            onConflict: 'product_id'
           }
         )
         .select()

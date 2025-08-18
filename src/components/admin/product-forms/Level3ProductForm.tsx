@@ -53,8 +53,8 @@ export const Level3ProductForm: React.FC<Level3ProductFormProps> = ({
               id="name"
               {...register('name')}
               placeholder="Enter product name"
-              error={errors.name?.message}
             />
+            {errors.name && <p className="text-sm text-destructive">{errors.name.message}</p>}
           </div>
           <div className="space-y-2">
             <Label htmlFor="sku">SKU</Label>
@@ -62,8 +62,8 @@ export const Level3ProductForm: React.FC<Level3ProductFormProps> = ({
               id="sku"
               {...register('sku')}
               placeholder="Enter SKU"
-              error={errors.sku?.message}
             />
+            {errors.sku && <p className="text-sm text-destructive">{errors.sku.message}</p>}
           </div>
         </div>
 
@@ -76,8 +76,8 @@ export const Level3ProductForm: React.FC<Level3ProductFormProps> = ({
               step="0.01"
               {...register('price', { valueAsNumber: true })}
               placeholder="Enter price"
-              error={errors.price?.message}
             />
+            {errors.price && <p className="text-sm text-destructive">{errors.price.message}</p>}
           </div>
           <div className="space-y-2">
             {/* Additional fields can go here */}
