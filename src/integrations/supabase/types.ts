@@ -472,6 +472,13 @@ export type Database = {
             referencedRelation: "level4_products"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "level4_configuration_options_level4_product_id_fkey"
+            columns: ["level4_product_id"]
+            isOneToOne: false
+            referencedRelation: "level4_products"
+            referencedColumns: ["id"]
+          },
         ]
       }
       level4_product_configs: {
@@ -496,7 +503,15 @@ export type Database = {
           level4_product_id?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "level4_product_configs_level4_product_id_fkey"
+            columns: ["level4_product_id"]
+            isOneToOne: true
+            referencedRelation: "level4_products"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       level4_products: {
         Row: {
