@@ -63,6 +63,8 @@ export interface Level3Product {
   enabled?: boolean; // Made optional since many static card objects omit it
   product_level?: number; // Product level indicator
   requires_level4_config?: boolean; // Whether this requires Level 4 configuration
+  requiresChassis?: boolean; // For backward compatibility
+  requiresLevel4Config?: boolean; // For backward compatibility
   sku?: string; // Optional SKU field
   specifications?: {
     slotRequirement?: number;
@@ -103,6 +105,16 @@ export interface Level4ConfigurationOption {
   optionValue: string; // For dropdown: display name; For multiline: the description
   displayOrder: number;
   enabled: boolean;
+}
+
+// Chassis Configuration interface
+export interface ChassisConfiguration {
+  id: string;
+  name: string;
+  layout: any;
+  enabled: boolean;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 // Type unions for backward compatibility

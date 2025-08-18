@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
-import { Trash2, Edit, Plus, Save, X } from 'lucide-react';
+import { Trash2, Edit, Plus } from 'lucide-react';
 import { Level3Product, Level4Product, Level2Product } from '@/types/product';
 import { productDataService } from '@/services/productDataService';
 import { Level4ConfigEditor } from './level4/Level4ConfigEditor';
@@ -45,6 +45,7 @@ const Level4ConfigurationManager = () => {
       setLevel3Products(level3Data);
       setLevel4Products(level4Data);
       setLevel2Products(level2Data);
+      console.log('Level 4 products loaded:', level4Data);
     } catch (error) {
       console.error('Error loading data:', error);
       toast.error('Failed to load configuration data');
@@ -70,7 +71,7 @@ const Level4ConfigurationManager = () => {
     try {
       setLoading(true);
 
-      // Create the Level 4 product with minimal required fields
+      // Create the Level 4 product with required fields matching the interface
       const level4ProductData = {
         name: `${newConfiguration.name} Configuration`,
         description: newConfiguration.description,
@@ -79,10 +80,7 @@ const Level4ConfigurationManager = () => {
         price: 0,
         cost: 0,
         enabled: true,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        configuration: null,
-        configurationOptions: []
+        options: [] // Required by Level4Product interface
       };
 
       const savedProduct = await productDataService.saveLevel4Product(level4ProductData);
@@ -92,7 +90,7 @@ const Level4ConfigurationManager = () => {
       if (level3Product) {
         await productDataService.saveLevel3Product({
           ...level3Product,
-          requiresLevel4Config: true
+          requires_level4_config: true // Use correct property name
         });
       }
 
@@ -120,11 +118,7 @@ const Level4ConfigurationManager = () => {
 
   const handleSaveConfiguration = async (productData: Level4Product | Omit<Level4Product, 'id'>) => {
     try {
-      if ('id' in productData) {
-        await productDataService.saveLevel4Product(productData);
-      } else {
-        await productDataService.saveLevel4Product(productData);
-      }
+      await productDataService.saveLevel4Product(productData);
       await loadData();
       setSelectedProduct(null);
       toast.success('Configuration saved successfully');
