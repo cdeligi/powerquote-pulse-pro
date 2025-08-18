@@ -70,7 +70,7 @@ const Level4ConfigurationManager = () => {
     try {
       setLoading(true);
 
-      // Create the Level 4 product
+      // Create the Level 4 product with minimal required fields
       const level4ProductData = {
         name: `${newConfiguration.name} Configuration`,
         description: newConfiguration.description,
@@ -78,7 +78,11 @@ const Level4ConfigurationManager = () => {
         configurationType: newConfiguration.configurationType,
         price: 0,
         cost: 0,
-        enabled: true
+        enabled: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        configuration: null,
+        configurationOptions: []
       };
 
       const savedProduct = await productDataService.saveLevel4Product(level4ProductData);

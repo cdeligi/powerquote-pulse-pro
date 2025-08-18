@@ -8,7 +8,7 @@ import Level1ProductForm from "./product-forms/Level1ProductForm";
 import ChassisForm from "./product-forms/ChassisForm";
 import CardForm from "./product-forms/CardForm";
 import Level2OptionForm from "./product-forms/Level2OptionForm";
-import { Level4ConfigurationManager } from "./Level4ConfigurationManager";
+import Level4ConfigurationManager from "./Level4ConfigurationManager";
 import PartNumberConfigManager from "./PartNumberConfigManager";
 import { ChassisTypeManager } from "./ChassisTypeManager";
 import { Level1ProductList } from "./product-lists/Level1ProductList";
@@ -36,6 +36,7 @@ export const ProductManagement = () => {
   // Tab state persistence
   const [activeTab, setActiveTab] = useState('level1');
   const [selectedL2ForPN, setSelectedL2ForPN] = useState<string | undefined>(undefined);
+  
   useEffect(() => {
     initializeData();
   }, [refreshTrigger]);
@@ -46,9 +47,6 @@ export const ProductManagement = () => {
       setError(null);
       
       console.log('ProductManagement: Starting data initialization...');
-      
-      // Initialize the service and load data
-      await productDataService.initialize();
       
       // Load all product data
       const [l1Products, l2Products, l3Products] = await Promise.all([
@@ -88,7 +86,6 @@ export const ProductManagement = () => {
     }
   };
 
-
   const refreshProductData = async () => {
     console.log('ProductManagement: Manual refresh triggered');
     setRefreshTrigger(prev => prev + 1);
@@ -127,6 +124,7 @@ export const ProductManagement = () => {
       console.log('ProductManagement: Saving Level 2 product:', productData);
       
       if ('id' in productData) {
+        await productDataService.updateLevel2Product(productData.id, productData);
         toast({ title: "Success", description: "Level 2 product updated successfully" });
       } else {
         await productDataService.createLevel2Product(productData);

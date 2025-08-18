@@ -1,7 +1,9 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { Level1Product, Level2Product, Level3Product, Level4Product, ChassisConfiguration } from '@/types/product';
 
 export class ProductDataService {
+  // Level 1 Product methods
   async getLevel1Products(): Promise<Level1Product[]> {
     try {
       const { data, error } = await supabase
@@ -31,6 +33,83 @@ export class ProductDataService {
     }
   }
 
+  async createLevel1Product(productData: Omit<Level1Product, 'id' | 'createdAt' | 'updatedAt'>): Promise<Level1Product> {
+    try {
+      const { data, error } = await supabase
+        .from('level1_products')
+        .insert([productData])
+        .select('*')
+        .single();
+
+      if (error) {
+        console.error('Error creating Level 1 product:', error);
+        throw error;
+      }
+
+      return {
+        id: data.id,
+        name: data.name,
+        description: data.description || '',
+        price: Number(data.price) || 0,
+        cost: Number(data.cost) || 0,
+        enabled: data.enabled,
+        createdAt: data.created_at,
+        updatedAt: data.updated_at
+      };
+    } catch (error) {
+      console.error('Error in createLevel1Product:', error);
+      throw error;
+    }
+  }
+
+  async updateLevel1Product(id: string, productData: Partial<Level1Product>): Promise<Level1Product> {
+    try {
+      const { data, error } = await supabase
+        .from('level1_products')
+        .update(productData)
+        .eq('id', id)
+        .select('*')
+        .single();
+
+      if (error) {
+        console.error('Error updating Level 1 product:', error);
+        throw error;
+      }
+
+      return {
+        id: data.id,
+        name: data.name,
+        description: data.description || '',
+        price: Number(data.price) || 0,
+        cost: Number(data.cost) || 0,
+        enabled: data.enabled,
+        createdAt: data.created_at,
+        updatedAt: data.updated_at
+      };
+    } catch (error) {
+      console.error('Error in updateLevel1Product:', error);
+      throw error;
+    }
+  }
+
+  async deleteLevel1Product(id: string): Promise<void> {
+    try {
+      const { error } = await supabase
+        .from('level1_products')
+        .delete()
+        .eq('id', id);
+
+      if (error) {
+        console.error('Error deleting Level 1 product:', error);
+        throw error;
+      }
+    } catch (error) {
+      console.error('Error in deleteLevel1Product:', error);
+      throw error;
+    }
+  }
+
+  // Level 2 Product methods
   async getLevel2Products(): Promise<Level2Product[]> {
     try {
       const { data, error } = await supabase
@@ -61,6 +140,133 @@ export class ProductDataService {
     }
   }
 
+  async createLevel2Product(productData: Omit<Level2Product, 'id' | 'createdAt' | 'updatedAt'>): Promise<Level2Product> {
+    try {
+      const { data, error } = await supabase
+        .from('level2_products')
+        .insert([{
+          name: productData.name,
+          description: productData.description,
+          price: productData.price,
+          cost: productData.cost,
+          enabled: productData.enabled,
+          parent_product_id: productData.parentProductId
+        }])
+        .select('*')
+        .single();
+
+      if (error) {
+        console.error('Error creating Level 2 product:', error);
+        throw error;
+      }
+
+      return {
+        id: data.id,
+        name: data.name,
+        description: data.description || '',
+        price: Number(data.price) || 0,
+        cost: Number(data.cost) || 0,
+        enabled: data.enabled,
+        parentProductId: data.parent_product_id,
+        createdAt: data.created_at,
+        updatedAt: data.updated_at
+      };
+    } catch (error) {
+      console.error('Error in createLevel2Product:', error);
+      throw error;
+    }
+  }
+
+  async updateLevel2Product(id: string, productData: Partial<Level2Product>): Promise<Level2Product> {
+    try {
+      const updateData: any = {};
+      if (productData.name !== undefined) updateData.name = productData.name;
+      if (productData.description !== undefined) updateData.description = productData.description;
+      if (productData.price !== undefined) updateData.price = productData.price;
+      if (productData.cost !== undefined) updateData.cost = productData.cost;
+      if (productData.enabled !== undefined) updateData.enabled = productData.enabled;
+      if (productData.parentProductId !== undefined) updateData.parent_product_id = productData.parentProductId;
+
+      const { data, error } = await supabase
+        .from('level2_products')
+        .update(updateData)
+        .eq('id', id)
+        .select('*')
+        .single();
+
+      if (error) {
+        console.error('Error updating Level 2 product:', error);
+        throw error;
+      }
+
+      return {
+        id: data.id,
+        name: data.name,
+        description: data.description || '',
+        price: Number(data.price) || 0,
+        cost: Number(data.cost) || 0,
+        enabled: data.enabled,
+        parentProductId: data.parent_product_id,
+        createdAt: data.created_at,
+        updatedAt: data.updated_at
+      };
+    } catch (error) {
+      console.error('Error in updateLevel2Product:', error);
+      throw error;
+    }
+  }
+
+  async deleteLevel2Product(id: string): Promise<void> {
+    try {
+      const { error } = await supabase
+        .from('level2_products')
+        .delete()
+        .eq('id', id);
+
+      if (error) {
+        console.error('Error deleting Level 2 product:', error);
+        throw error;
+      }
+    } catch (error) {
+      console.error('Error in deleteLevel2Product:', error);
+      throw error;
+    }
+  }
+
+  async getLevel2ProductById(id: string): Promise<Level2Product | null> {
+    try {
+      const { data, error } = await supabase
+        .from('level2_products')
+        .select('*')
+        .eq('id', id)
+        .single();
+
+      if (error) {
+        if (error.code === 'PGRST116') {
+          return null; // No product found
+        }
+        console.error('Error fetching Level 2 product by ID:', error);
+        throw error;
+      }
+
+      return {
+        id: data.id,
+        name: data.name,
+        description: data.description || '',
+        price: Number(data.price) || 0,
+        cost: Number(data.cost) || 0,
+        enabled: data.enabled,
+        parentProductId: data.parent_product_id,
+        createdAt: data.created_at,
+        updatedAt: data.updated_at
+      };
+    } catch (error) {
+      console.error('Error in getLevel2ProductById:', error);
+      return null;
+    }
+  }
+
+  // Level 3 Product methods
   async getLevel3Products(): Promise<Level3Product[]> {
     try {
       const { data, error } = await supabase
@@ -90,6 +296,107 @@ export class ProductDataService {
     } catch (error) {
       console.error('Error in getLevel3Products:', error);
       return [];
+    }
+  }
+
+  async createLevel3Product(productData: Omit<Level3Product, 'id' | 'createdAt' | 'updatedAt'>): Promise<Level3Product> {
+    try {
+      const { data, error } = await supabase
+        .from('level3_products')
+        .insert([{
+          name: productData.name,
+          description: productData.description,
+          price: productData.price,
+          cost: productData.cost,
+          enabled: productData.enabled,
+          parent_product_id: productData.parentProductId,
+          requires_chassis: productData.requiresChassis,
+          requires_level4_config: productData.requiresLevel4Config
+        }])
+        .select('*')
+        .single();
+
+      if (error) {
+        console.error('Error creating Level 3 product:', error);
+        throw error;
+      }
+
+      return {
+        id: data.id,
+        name: data.name,
+        description: data.description || '',
+        price: Number(data.price) || 0,
+        cost: Number(data.cost) || 0,
+        enabled: data.enabled,
+        parentProductId: data.parent_product_id,
+        requiresChassis: data.requires_chassis || false,
+        requiresLevel4Config: data.requires_level4_config || false,
+        createdAt: data.created_at,
+        updatedAt: data.updated_at
+      };
+    } catch (error) {
+      console.error('Error in createLevel3Product:', error);
+      throw error;
+    }
+  }
+
+  async updateLevel3Product(id: string, productData: Partial<Level3Product>): Promise<Level3Product> {
+    try {
+      const updateData: any = {};
+      if (productData.name !== undefined) updateData.name = productData.name;
+      if (productData.description !== undefined) updateData.description = productData.description;
+      if (productData.price !== undefined) updateData.price = productData.price;
+      if (productData.cost !== undefined) updateData.cost = productData.cost;
+      if (productData.enabled !== undefined) updateData.enabled = productData.enabled;
+      if (productData.parentProductId !== undefined) updateData.parent_product_id = productData.parentProductId;
+      if (productData.requiresChassis !== undefined) updateData.requires_chassis = productData.requiresChassis;
+      if (productData.requiresLevel4Config !== undefined) updateData.requires_level4_config = productData.requiresLevel4Config;
+
+      const { data, error } = await supabase
+        .from('level3_products')
+        .update(updateData)
+        .eq('id', id)
+        .select('*')
+        .single();
+
+      if (error) {
+        console.error('Error updating Level 3 product:', error);
+        throw error;
+      }
+
+      return {
+        id: data.id,
+        name: data.name,
+        description: data.description || '',
+        price: Number(data.price) || 0,
+        cost: Number(data.cost) || 0,
+        enabled: data.enabled,
+        parentProductId: data.parent_product_id,
+        requiresChassis: data.requires_chassis || false,
+        requiresLevel4Config: data.requires_level4_config || false,
+        createdAt: data.created_at,
+        updatedAt: data.updated_at
+      };
+    } catch (error) {
+      console.error('Error in updateLevel3Product:', error);
+      throw error;
+    }
+  }
+
+  async deleteLevel3Product(id: string): Promise<void> {
+    try {
+      const { error } = await supabase
+        .from('level3_products')
+        .delete()
+        .eq('id', id);
+
+      if (error) {
+        console.error('Error deleting Level 3 product:', error);
+        throw error;
+      }
+    } catch (error) {
+      console.error('Error in deleteLevel3Product:', error);
+      throw error;
     }
   }
 
@@ -124,6 +431,7 @@ export class ProductDataService {
     }
   }
 
+  // Level 4 Product methods  
   async getLevel4ProductsByParent(parentProductId: string): Promise<Level4Product[]> {
     try {
       const { data, error } = await supabase
@@ -353,24 +661,6 @@ export class ProductDataService {
     }
   }
 
-  async getChassisConfigurations(): Promise<ChassisConfiguration[]> {
-    try {
-      const { data, error } = await supabase
-        .from('chassis_configurations')
-        .select('*');
-
-      if (error) {
-        console.error('Error fetching chassis configurations:', error);
-        throw error;
-      }
-
-      return data || [];
-    } catch (error) {
-      console.error('Error in getChassisConfigurations:', error);
-      return [];
-    }
-  }
-
   async saveLevel1Product(productData: Level1Product): Promise<Level1Product> {
     try {
       const { data, error } = await supabase
@@ -476,7 +766,7 @@ export class ProductDataService {
 
   async saveLevel4Product(productData: Level4Product | Omit<Level4Product, 'id'>): Promise<{ id: string }> {
     try {
-      const { id, ...rest } = productData as Level4Product;
+      const { id, configurationOptions, configuration, ...rest } = productData as Level4Product;
       const isUpdate = !!id;
 
       const query = supabase
@@ -527,6 +817,25 @@ export class ProductDataService {
     }
   }
 
+  // Chassis Configuration methods
+  async getChassisConfigurations(): Promise<ChassisConfiguration[]> {
+    try {
+      const { data, error } = await supabase
+        .from('chassis_configurations')
+        .select('*');
+
+      if (error) {
+        console.error('Error fetching chassis configurations:', error);
+        throw error;
+      }
+
+      return data || [];
+    } catch (error) {
+      console.error('Error in getChassisConfigurations:', error);
+      return [];
+    }
+  }
+
   async saveChassisConfiguration(config: ChassisConfiguration): Promise<ChassisConfiguration> {
     try {
       const { data, error } = await supabase
@@ -547,6 +856,287 @@ export class ProductDataService {
     }
   }
 
+  // Chassis Type methods
+  async getChassisTypes(): Promise<any[]> {
+    try {
+      const { data, error } = await supabase
+        .from('chassis_types')
+        .select('*')
+        .order('name');
+
+      if (error) {
+        console.error('Error fetching chassis types:', error);
+        throw error;
+      }
+
+      return data || [];
+    } catch (error) {
+      console.error('Error in getChassisTypes:', error);
+      return [];
+    }
+  }
+
+  async createChassisType(chassisTypeData: any): Promise<any> {
+    try {
+      const { data, error } = await supabase
+        .from('chassis_types')
+        .insert([chassisTypeData])
+        .select('*')
+        .single();
+
+      if (error) {
+        console.error('Error creating chassis type:', error);
+        throw error;
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Error in createChassisType:', error);
+      throw error;
+    }
+  }
+
+  async updateChassisType(id: string, chassisTypeData: any): Promise<any> {
+    try {
+      const { data, error } = await supabase
+        .from('chassis_types')
+        .update(chassisTypeData)
+        .eq('id', id)
+        .select('*')
+        .single();
+
+      if (error) {
+        console.error('Error updating chassis type:', error);
+        throw error;
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Error in updateChassisType:', error);
+      throw error;
+    }
+  }
+
+  async deleteChassisType(id: string): Promise<void> {
+    try {
+      const { error } = await supabase
+        .from('chassis_types')
+        .delete()
+        .eq('id', id);
+
+      if (error) {
+        console.error('Error deleting chassis type:', error);
+        throw error;
+      }
+    } catch (error) {
+      console.error('Error in deleteChassisType:', error);
+      throw error;
+    }
+  }
+
+  // Asset Type methods
+  async getAssetTypes(): Promise<any[]> {
+    try {
+      const { data, error } = await supabase
+        .from('asset_types')
+        .select('*')
+        .order('name');
+
+      if (error) {
+        console.error('Error fetching asset types:', error);
+        throw error;
+      }
+
+      return data || [];
+    } catch (error) {
+      console.error('Error in getAssetTypes:', error);
+      return [];
+    }
+  }
+
+  getAssetTypesSync(): any[] {
+    // Return empty array as fallback for sync method
+    return [];
+  }
+
+  // Part Number methods
+  async getPartNumberConfig(level2Id: string): Promise<any> {
+    try {
+      const { data, error } = await supabase
+        .from('part_number_configs')
+        .select('*')
+        .eq('level2_product_id', level2Id)
+        .single();
+
+      if (error) {
+        if (error.code === 'PGRST116') {
+          return null; // No config exists
+        }
+        console.error('Error fetching part number config:', error);
+        throw error;
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Error in getPartNumberConfig:', error);
+      return null;
+    }
+  }
+
+  async getLevel3ProductsForLevel2(level2Id: string): Promise<Level3Product[]> {
+    try {
+      const { data, error } = await supabase
+        .from('level3_products')
+        .select('*')
+        .eq('parent_product_id', level2Id)
+        .eq('enabled', true)
+        .order('name');
+
+      if (error) {
+        console.error('Error fetching Level 3 products for Level 2:', error);
+        throw error;
+      }
+
+      return (data || []).map(item => ({
+        id: item.id,
+        name: item.name,
+        description: item.description || '',
+        price: Number(item.price) || 0,
+        cost: Number(item.cost) || 0,
+        enabled: item.enabled,
+        parentProductId: item.parent_product_id,
+        requiresChassis: item.requires_chassis || false,
+        requiresLevel4Config: item.requires_level4_config || false,
+        createdAt: item.created_at,
+        updatedAt: item.updated_at
+      }));
+    } catch (error) {
+      console.error('Error in getLevel3ProductsForLevel2:', error);
+      return [];
+    }
+  }
+
+  async getPartNumberCodesForLevel2(level2Id: string): Promise<any[]> {
+    try {
+      const { data, error } = await supabase
+        .from('part_number_codes')
+        .select('*')
+        .eq('level2_product_id', level2Id)
+        .order('position');
+
+      if (error) {
+        console.error('Error fetching part number codes for Level 2:', error);
+        throw error;
+      }
+
+      return data || [];
+    } catch (error) {
+      console.error('Error in getPartNumberCodesForLevel2:', error);
+      return [];
+    }
+  }
+
+  async upsertPartNumberConfig(config: any): Promise<any> {
+    try {
+      const { data, error } = await supabase
+        .from('part_number_configs')
+        .upsert([config], { onConflict: 'level2_product_id' })
+        .select('*')
+        .single();
+
+      if (error) {
+        console.error('Error upserting part number config:', error);
+        throw error;
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Error in upsertPartNumberConfig:', error);
+      throw error;
+    }
+  }
+
+  async upsertPartNumberCodes(codes: any[]): Promise<any[]> {
+    try {
+      const { data, error } = await supabase
+        .from('part_number_codes')
+        .upsert(codes, { onConflict: 'id' })
+        .select('*');
+
+      if (error) {
+        console.error('Error upserting part number codes:', error);
+        throw error;
+      }
+
+      return data || [];
+    } catch (error) {
+      console.error('Error in upsertPartNumberCodes:', error);
+      throw error;
+    }
+  }
+
+  // Sensor Configuration methods
+  static async getAnalogSensorTypes(): Promise<any[]> {
+    try {
+      const { data, error } = await supabase
+        .from('analog_sensor_types')
+        .select('*')
+        .order('name');
+
+      if (error) {
+        console.error('Error fetching analog sensor types:', error);
+        throw error;
+      }
+
+      return data || [];
+    } catch (error) {
+      console.error('Error in getAnalogSensorTypes:', error);
+      return [];
+    }
+  }
+
+  static async getBushingTapModels(): Promise<any[]> {
+    try {
+      const { data, error } = await supabase
+        .from('bushing_tap_models')
+        .select('*')
+        .order('name');
+
+      if (error) {
+        console.error('Error fetching bushing tap models:', error);
+        throw error;
+      }
+
+      return data || [];
+    } catch (error) {
+      console.error('Error in getBushingTapModels:', error);
+      return [];
+    }
+  }
+
+  // Sync methods for backward compatibility
+  getLevel1ProductsSync(): Level1Product[] {
+    return [];
+  }
+
+  getLevel2ProductsSync(): Level2Product[] {
+    return [];
+  }
+
+  getLevel3ProductsSync(): Level3Product[] {
+    return [];
+  }
+
+  getLevel3ProductsSync(): Level3Product[] {
+    return [];
+  }
+
+  // Initialize method for backward compatibility
+  async initialize(): Promise<void> {
+    console.log('ProductDataService initialized');
+  }
+
+  // Transform methods for backward compatibility
   async transformDbLevel1(dbProduct: any): Promise<Level1Product> {
     return {
       id: dbProduct.id,
