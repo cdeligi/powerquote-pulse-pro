@@ -44,8 +44,12 @@ export const Level4ConfigurationManager: React.FC = () => {
         
         // Load Level 3 products that require Level 4 configuration
         const products = await productDataService.getLevel3Products();
-        const filteredProducts = products.filter(p => Boolean(p.requires_level4_config));
-        console.log('Filtered Level 3 products:', filteredProducts);
+        console.log('All Level 3 products:', products);
+        const filteredProducts = products.filter(p => {
+          console.log(`Product ${p.name} requires_level4_config:`, p.requires_level4_config);
+          return Boolean(p.requires_level4_config);
+        });
+        console.log('Filtered Level 3 products requiring L4 config:', filteredProducts);
         
         setLevel3Products(filteredProducts);
         
@@ -183,17 +187,34 @@ export const Level4ConfigurationManager: React.FC = () => {
       
       let savedProduct;
       
-      // Save the product first
+      // Save the Level 4 product first
       if (isNewProduct) {
-        savedProduct = await productDataService.createProduct(productData);
+        const level4ProductData = {
+          name: selectedProduct.name,
+          parentProductId: selectedLevel3,
+          description: `Configuration for ${selectedProduct.name}`,
+          configurationType: (selectedProduct.type === 'bushing' ? 'bushing' : 'analog') as any,
+          enabled: true,
+          price: selectedProduct.price || 0,
+          cost: 0,
+          options: []
+        };
+        savedProduct = await productDataService.createLevel4Product(level4ProductData);
+        
+        // Create relationship between Level 3 and Level 4 products
+        await productDataService.createLevel3Level4Relationship(selectedLevel3, savedProduct.id);
       } else {
-        savedProduct = await productDataService.updateProduct(selectedProduct.id, productData);
+        const updateData = {
+          name: selectedProduct.name,
+          parentProductId: selectedLevel3,
+          configurationType: (selectedProduct.type === 'bushing' ? 'bushing' : 'analog') as any,
+          enabled: true,
+          price: selectedProduct.price || 0,
+        };
+        savedProduct = await productDataService.updateLevel4Product(selectedProduct.id, updateData);
       }
       
-      // Save the configuration data if we have it
-      if (configData && savedProduct) {
-        await productDataService.saveLevel4Config(savedProduct.id, configData);
-      }
+      console.log('Saved Level 4 product:', savedProduct);
       
       // Close the editor
       setIsEditorOpen(false);

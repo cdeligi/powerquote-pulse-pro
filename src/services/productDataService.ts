@@ -664,34 +664,70 @@ export class ProductDataService {
 
   async updateLevel3Product(id: string, updates: Partial<Level3Product>): Promise<Level3Product | null> {
     try {
-      // Merge requires_level4_config into specifications if provided
-      const specifications = updates.specifications ? {
-        ...updates.specifications,
-        requires_level4_config: updates.requires_level4_config !== undefined ? updates.requires_level4_config : updates.specifications.requires_level4_config
-      } : undefined;
+      console.log('updateLevel3Product called with:', { id, updates });
       
+      // First get the current product to merge specifications properly
+      const { data: currentData, error: fetchError } = await supabase
+        .from('products')
+        .select('specifications')
+        .eq('id', id)
+        .single();
+      
+      if (fetchError) {
+        console.error('Error fetching current product data:', fetchError);
+        throw fetchError;
+      }
+      
+      // Merge specifications properly
+      const currentSpecs = (currentData?.specifications && typeof currentData.specifications === 'object') 
+        ? currentData.specifications 
+        : {};
+      
+      const newSpecs = updates.specifications || {};
+      
+      // Always include requires_level4_config in specifications
+      const specifications = {
+        ...currentSpecs,
+        ...newSpecs,
+        requires_level4_config: updates.requires_level4_config !== undefined 
+          ? updates.requires_level4_config 
+          : (newSpecs.requires_level4_config !== undefined 
+            ? newSpecs.requires_level4_config 
+            : currentSpecs.requires_level4_config || false)
+      };
+      
+      console.log('Final specifications for update:', specifications);
+      
+      // Build update object with only non-undefined values
+      const updateData: any = {};
+      if (updates.partNumber !== undefined) updateData.code = updates.partNumber;
+      if (updates.name !== undefined) updateData.name = updates.name;
+      if (updates.description !== undefined) updateData.description = updates.description;
+      if (updates.price !== undefined) updateData.price = updates.price;
+      if (updates.cost !== undefined) updateData.cost = updates.cost;
+      if (updates.type !== undefined) updateData.subcategory = updates.type;
+      if (updates.enabled !== undefined) updateData.enabled = updates.enabled;
+      if (updates.parentProductId !== undefined) updateData.parent_product_id = updates.parentProductId;
+      if (updates.partNumber !== undefined) updateData.part_number = updates.partNumber;
+      if (specifications.slotRequirement !== undefined) updateData.slot_requirement = specifications.slotRequirement;
+      if (updates.image !== undefined) updateData.image_url = updates.image;
+      if (updates.productInfoUrl !== undefined) updateData.product_info_url = updates.productInfoUrl;
+      
+      // Always update specifications since we computed it above
+      updateData.specifications = specifications;
+      
+      console.log('Updating product with data:', updateData);
+
       const { data, error } = await supabase
         .from('products')
-        .update({
-          code: updates.partNumber,
-          name: updates.name,
-          description: updates.description,
-          price: updates.price,
-          cost: updates.cost,
-          subcategory: updates.type,
-          enabled: updates.enabled,
-          parent_product_id: updates.parentProductId,
-          part_number: updates.partNumber,
-          slot_requirement: updates.specifications?.slotRequirement,
-          specifications: specifications,
-          image_url: updates.image,
-          product_info_url: updates.productInfoUrl
-        })
+        .update(updateData)
         .eq('id', id)
         .select()
         .single();
 
       if (error) throw error;
+      
+      console.log('Product updated successfully:', data);
       return this.transformDbToLevel3(data);
     } catch (error) {
       console.error('Error updating Level 3 product:', error);
@@ -780,6 +816,25 @@ export class ProductDataService {
       throw error;
     }
   }
+
+  // Create relationship between Level 3 and Level 4 products
+  async createLevel3Level4Relationship(level3ProductId: string, level4ProductId: string): Promise<void> {
+    try {
+      const { error } = await supabase
+        .from('level3_level4_relationships')
+        .insert({
+          level3_product_id: level3ProductId,
+          level4_product_id: level4ProductId
+        });
+
+      if (error) throw error;
+      console.log(`Created relationship: ${level3ProductId} -> ${level4ProductId}`);
+    } catch (error) {
+      console.error('Error creating Level 3-4 relationship:', error);
+      throw error;
+    }
+  }
+
 
   // Chassis Types CRUD operations
   async getChassisTypes(): Promise<ChassisType[]> {
