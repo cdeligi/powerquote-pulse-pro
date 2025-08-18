@@ -118,6 +118,9 @@ export class ProductDataService {
   private transformDbToLevel3(row: any): Level3Product {
     const rawSpecs = (row.specifications && typeof row.specifications === 'object') ? row.specifications : {};
     const subcategory = typeof row.subcategory === 'string' ? row.subcategory : '';
+    // Get requires_level4_config from specifications JSON field
+    const requires_level4_config = rawSpecs.requires_level4_config === true || Boolean(row.requires_level4_config);
+    
     return {
       id: row.id,
       name: row.name,
@@ -127,7 +130,7 @@ export class ProductDataService {
       price: parseFloat(row.price) || 0,
       cost: parseFloat(row.cost) || 0,
       enabled: row.enabled !== false,
-      requires_level4_config: Boolean(row.requires_level4_config),
+      requires_level4_config: requires_level4_config,
       specifications: {
         ...rawSpecs,
         slotRequirement: row.slot_requirement || rawSpecs.slotRequirement || 1
@@ -195,16 +198,19 @@ export class ProductDataService {
         .eq('product_level', 3)
         .eq('enabled', true);
 
-      // Only filter by requires_level4_config if explicitly requested
-      if (requireLevel4Config) {
-        query = query.eq('requires_level4_config', true);
-      }
-
       query = query.order('name');
 
       const { data, error } = await query;
       if (error) throw error;
-      return (data || []).map(row => this.transformDbToLevel3(row));
+      
+      const transformedProducts = (data || []).map(row => this.transformDbToLevel3(row));
+      
+      // Filter client-side for requires_level4_config if needed
+      if (requireLevel4Config) {
+        return transformedProducts.filter(product => product.requires_level4_config);
+      }
+      
+      return transformedProducts;
     } catch (error) {
       console.error('Error fetching Level 3 products:', error);
       return [];
@@ -618,6 +624,13 @@ export class ProductDataService {
   async createLevel3Product(product: Omit<Level3Product, 'id'>): Promise<Level3Product> {
     try {
       const id = `level3-${Date.now()}`;
+      
+      // Merge requires_level4_config into specifications
+      const specifications = {
+        ...product.specifications,
+        requires_level4_config: product.requires_level4_config || false
+      };
+      
       const { data, error } = await supabase
         .from('products')
         .insert({
@@ -634,7 +647,7 @@ export class ProductDataService {
           product_level: 3,
           part_number: product.partNumber,
           slot_requirement: product.specifications?.slotRequirement || 1,
-          specifications: product.specifications,
+          specifications: specifications,
           image_url: product.image,
           product_info_url: product.productInfoUrl
         })
@@ -651,6 +664,12 @@ export class ProductDataService {
 
   async updateLevel3Product(id: string, updates: Partial<Level3Product>): Promise<Level3Product | null> {
     try {
+      // Merge requires_level4_config into specifications if provided
+      const specifications = updates.specifications ? {
+        ...updates.specifications,
+        requires_level4_config: updates.requires_level4_config !== undefined ? updates.requires_level4_config : updates.specifications.requires_level4_config
+      } : undefined;
+      
       const { data, error } = await supabase
         .from('products')
         .update({
@@ -664,7 +683,7 @@ export class ProductDataService {
           parent_product_id: updates.parentProductId,
           part_number: updates.partNumber,
           slot_requirement: updates.specifications?.slotRequirement,
-          specifications: updates.specifications,
+          specifications: specifications,
           image_url: updates.image,
           product_info_url: updates.productInfoUrl
         })

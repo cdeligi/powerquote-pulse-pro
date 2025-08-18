@@ -151,6 +151,7 @@ export const ProductManagement = () => {
       console.log('ProductManagement: Saving Level 3 product:', productData);
       
       if ('id' in productData) {
+        await productDataService.updateLevel3Product(productData.id, productData);
         toast({ title: "Success", description: "Level 3 product updated successfully" });
       } else {
         await productDataService.createLevel3Product(productData);
