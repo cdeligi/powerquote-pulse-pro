@@ -11,6 +11,7 @@ interface Feature {
   key: string;
   label: string;
   description: string;
+  category?: string;
 }
 
 interface RoleDefault {
@@ -20,6 +21,30 @@ interface RoleDefault {
 }
 
 const ROLES = ['ADMIN', 'FINANCE', 'LEVEL_3', 'LEVEL_2', 'LEVEL_1'] as const;
+
+const DEFAULT_FEATURES: Feature[] = [
+  {
+    key: 'FEATURE_BOM_SHOW_PRODUCT_COST',
+    label: 'View Product Costs',
+    description: 'Allows users to view product costs in BOM',
+  },
+  {
+    key: 'FEATURE_BOM_SHOW_MARGIN',
+    label: 'View Product Margins',
+    description: 'Allows users to view margin percentages in BOM items',
+  },
+  {
+    key: 'FEATURE_BOM_EDIT_PART_NUMBER',
+    label: 'Edit Part Numbers',
+    description: 'Allows users to edit part numbers in BOM',
+  },
+  {
+    key: 'FEATURE_BOM_EDIT_PRICE',
+    label: 'Edit Prices',
+    description: 'Allows users to edit product prices in BOM',
+  }
+  // ... other features
+];
 
 export default function PermissionsOverview() {
   const [features, setFeatures] = useState<Feature[]>([]);
@@ -33,16 +58,20 @@ export default function PermissionsOverview() {
       try {
         setLoading(true);
         
-        // Fetch features and role defaults
-        const [featuresResult, roleDefaultsResult] = await Promise.all([
-          supabase.from('features').select('*').order('label'),
-          supabase.from('role_feature_defaults').select('*')
-        ]);
+        // Try to fetch features from database
+        const featuresResult = await supabase.from('features').select('*').order('label');
+        
+        // If no features in DB, use defaults
+        const features = featuresResult.data?.length ? featuresResult.data : DEFAULT_FEATURES;
+        
+        // Ensure all default features exist in the database
+        if (!featuresResult.data?.length) {
+          await supabase.from('features').upsert(DEFAULT_FEATURES);
+        }
 
-        if (featuresResult.error) throw featuresResult.error;
-        if (roleDefaultsResult.error) throw roleDefaultsResult.error;
-
-        setFeatures(featuresResult.data || []);
+        const roleDefaultsResult = await supabase.from('role_feature_defaults').select('*');
+        
+        setFeatures(features);
         setRoleDefaults(roleDefaultsResult.data || []);
       } catch (err) {
         console.error('Error fetching permissions data:', err);
@@ -65,43 +94,49 @@ export default function PermissionsOverview() {
   const updateRolePermission = async (featureKey: string, role: string, allowed: boolean) => {
     try {
       setSaving(true);
-
-      const { error } = await supabase
-        .from('role_feature_defaults')
-        .upsert({
-          role: role as any,
-          feature_key: featureKey,
-          allowed
-        });
-
-      if (error) throw error;
-
-      // Update local state optimistically
+      
+      // Update local state first for immediate UI feedback
       setRoleDefaults(prev => {
-        const existing = prev.find(rd => rd.feature_key === featureKey && rd.role === role);
+        const existing = prev.find(rd => rd.role === role && rd.feature_key === featureKey);
         if (existing) {
           return prev.map(rd => 
-            rd.feature_key === featureKey && rd.role === role 
-              ? { ...rd, allowed }
+            rd.role === role && rd.feature_key === featureKey 
+              ? { ...rd, allowed } 
               : rd
           );
-        } else {
-          return [...prev, { role, feature_key: featureKey, allowed }];
         }
+        return [...prev, { role, feature_key: featureKey, allowed }];
       });
 
+      // Update in database
+      const { error } = await supabase
+        .from('role_feature_defaults')
+        .upsert(
+          { role, feature_key: featureKey, allowed },
+          { onConflict: 'role,feature_key' }
+        );
+
+      if (error) throw error;
+      
       toast({
-        title: 'Success',
-        description: 'Permission updated successfully.'
+        title: "Success",
+        description: `Updated permission for ${role}`,
       });
-
     } catch (error) {
       console.error('Error updating permission:', error);
       toast({
-        title: 'Error',
-        description: 'Failed to update permission.',
-        variant: 'destructive'
+        title: "Error",
+        description: "Failed to update permission. Please try again.",
+        variant: "destructive",
       });
+      // Revert local state on error
+      setRoleDefaults(prev => 
+        prev.map(rd => 
+          rd.role === role && rd.feature_key === featureKey 
+            ? { ...rd, allowed: !allowed } 
+            : rd
+        )
+      );
     } finally {
       setSaving(false);
     }

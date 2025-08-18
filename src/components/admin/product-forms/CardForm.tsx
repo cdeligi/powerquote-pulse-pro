@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -47,20 +46,20 @@ const CardForm = ({ onSubmit, level2Products, initialData }: CardFormProps) => {
   const selectedParent = level2Products.find(p => p.id === formData.parentProductId);
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-4 dark:text-white">
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <Label htmlFor="name" className="text-white">Component Name</Label>
+          <Label htmlFor="name" className="text-foreground">Component Name</Label>
           <Input
             id="name"
             value={formData.name}
             onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-            className="bg-gray-800 border-gray-700 text-white"
+            className="bg-background border-input text-foreground"
             required
           />
         </div>
         <div>
-          <Label htmlFor="parentProductId" className="text-white">Parent Product (Level 2)</Label>
+          <Label htmlFor="parentProductId" className="text-foreground">Parent Product (Level 2)</Label>
           <Select 
             value={formData.parentProductId} 
             onValueChange={(value) => {
@@ -72,12 +71,16 @@ const CardForm = ({ onSubmit, level2Products, initialData }: CardFormProps) => {
               });
             }}
           >
-            <SelectTrigger className="bg-gray-800 border-gray-700 text-white">
-              <SelectValue placeholder="Select parent product" />
+            <SelectTrigger className="bg-background border-input text-foreground">
+              <SelectValue placeholder="Select parent product" className="text-foreground" />
             </SelectTrigger>
-            <SelectContent className="bg-gray-800 border-gray-700">
+            <SelectContent className="bg-background border-input">
               {level2Products.map((product) => (
-                <SelectItem key={product.id} value={product.id} className="text-white">
+                <SelectItem 
+                  key={product.id} 
+                  value={product.id} 
+                  className="text-foreground hover:bg-accent focus:bg-accent"
+                >
                   {product.name} ({product.type})
                 </SelectItem>
               ))}
@@ -87,53 +90,53 @@ const CardForm = ({ onSubmit, level2Products, initialData }: CardFormProps) => {
       </div>
 
       <div>
-        <Label htmlFor="type" className="text-white">Display Name (Auto-filled from Parent)</Label>
+        <Label htmlFor="type" className="text-foreground">Display Name (Auto-filled from Parent)</Label>
         <Input
           id="type"
           value={selectedParent?.name || formData.type}
           readOnly
-          className="bg-gray-700 border-gray-600 text-gray-300"
+          className="bg-muted text-foreground"
           placeholder="Select parent product first"
         />
       </div>
 
       <div>
-        <Label htmlFor="description" className="text-white">Description</Label>
+        <Label htmlFor="description" className="text-foreground">Description</Label>
         <Textarea
           id="description"
           value={formData.description}
           onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-          className="bg-gray-800 border-gray-700 text-white"
+          className="bg-background border-input text-foreground"
           required
         />
       </div>
 
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <Label htmlFor="price" className="text-white">Price ($)</Label>
+          <Label htmlFor="price" className="text-foreground">Price ($)</Label>
           <Input
             id="price"
             type="number"
             value={formData.price}
             onChange={(e) => setFormData({ ...formData, price: parseFloat(e.target.value) })}
-            className="bg-gray-800 border-gray-700 text-white"
+            className="bg-background border-input text-foreground"
             required
           />
         </div>
         <div>
-          <Label htmlFor="cost" className="text-white">Cost ($)</Label>
+          <Label htmlFor="cost" className="text-foreground">Cost ($)</Label>
           <Input
             id="cost"
             type="number"
             value={formData.cost}
             onChange={(e) => setFormData({ ...formData, cost: parseFloat(e.target.value) })}
-            className="bg-gray-800 border-gray-700 text-white"
+            className="bg-background border-input text-foreground"
           />
         </div>
       </div>
 
       <div>
-        <Label className="text-white">Part Number</Label>
+        <Label className="text-foreground">Part Number</Label>
         <div className="text-sm text-gray-400">
           Part numbers are configured under Products → Part Numbers.
         </div>
@@ -141,53 +144,60 @@ const CardForm = ({ onSubmit, level2Products, initialData }: CardFormProps) => {
 
       {/* Specifications Section */}
       <div className="space-y-2">
-        <Label className="text-white">Specifications (Optional)</Label>
+        <Label className="text-foreground">Specifications (Optional)</Label>
+        <div className="text-gray-300 text-sm mb-2">
+          Configure the technical specifications for this component
+        </div>
         <div className="grid grid-cols-2 gap-4">
-          <div>
-            <Label htmlFor="slotRequirement" className="text-white text-sm">Slot Requirement</Label>
+          <div className="space-y-1">
+            <Label htmlFor="slotRequirement" className="text-foreground text-sm">Slot Requirement</Label>
             <Input
               id="slotRequirement"
               type="number"
               value={formData.specifications?.slotRequirement || ''}
               onChange={(e) => handleSpecificationChange('slotRequirement', parseInt(e.target.value) || 0)}
-              className="bg-gray-800 border-gray-700 text-white"
+              className="bg-background border-input text-foreground placeholder-gray-500"
               placeholder="e.g., 1, 2"
             />
+            <p className="text-xs text-gray-400">Number of slots this card requires</p>
           </div>
-          <div>
-            <Label htmlFor="inputs" className="text-white text-sm">Inputs</Label>
+          <div className="space-y-1">
+            <Label htmlFor="inputs" className="text-foreground text-sm">Inputs</Label>
             <Input
               id="inputs"
               type="number"
               value={formData.specifications?.inputs || ''}
               onChange={(e) => handleSpecificationChange('inputs', parseInt(e.target.value) || 0)}
-              className="bg-gray-800 border-gray-700 text-white"
+              className="bg-background border-input text-foreground placeholder-gray-500"
               placeholder="e.g., 8, 16"
             />
+            <p className="text-xs text-gray-400">Number of input channels</p>
           </div>
         </div>
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <Label htmlFor="outputs" className="text-white text-sm">Outputs</Label>
+        <div className="grid grid-cols-2 gap-4 mt-2">
+          <div className="space-y-1">
+            <Label htmlFor="outputs" className="text-foreground text-sm">Outputs</Label>
             <Input
               id="outputs"
               type="number"
               value={formData.specifications?.outputs || ''}
               onChange={(e) => handleSpecificationChange('outputs', parseInt(e.target.value) || 0)}
-              className="bg-gray-800 border-gray-700 text-white"
+              className="bg-background border-input text-foreground placeholder-gray-500"
               placeholder="e.g., 2, 4"
             />
+            <p className="text-xs text-gray-400">Number of output channels</p>
           </div>
-          <div>
-            <Label htmlFor="channels" className="text-white text-sm">Channels</Label>
+          <div className="space-y-1">
+            <Label htmlFor="channels" className="text-foreground text-sm">Channels</Label>
             <Input
               id="channels"
               type="number"
               value={formData.specifications?.channels || ''}
               onChange={(e) => handleSpecificationChange('channels', parseInt(e.target.value) || 0)}
-              className="bg-gray-800 border-gray-700 text-white"
+              className="bg-background border-input text-foreground placeholder-gray-500"
               placeholder="e.g., 1, 3, 8"
             />
+            <p className="text-xs text-gray-400">Total number of channels</p>
           </div>
         </div>
       </div>
@@ -198,7 +208,7 @@ const CardForm = ({ onSubmit, level2Products, initialData }: CardFormProps) => {
           checked={formData.enabled}
           onCheckedChange={(enabled) => setFormData({ ...formData, enabled })}
         />
-        <Label htmlFor="enabled" className="text-white">Enabled</Label>
+        <Label htmlFor="enabled" className="text-foreground">Enabled</Label>
       </div>
 
       <div className="flex justify-end space-x-3 pt-4">

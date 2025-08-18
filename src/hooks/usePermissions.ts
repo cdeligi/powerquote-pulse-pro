@@ -90,8 +90,10 @@ export function usePermissions(): PermissionData & { has: (featureKey: string) =
 // Feature constants
 export const FEATURES = {
   BOM_SHOW_PRODUCT_COST: 'FEATURE_BOM_SHOW_PRODUCT_COST',
+  BOM_SHOW_MARGIN: 'FEATURE_BOM_SHOW_MARGIN',
   BOM_FORCE_PART_NUMBER: 'FEATURE_BOM_FORCE_PART_NUMBER',
-  BOM_EDIT_PART_NUMBER: 'FEATURE_BOM_EDIT_PART_NUMBER'
+  BOM_EDIT_PART_NUMBER: 'FEATURE_BOM_EDIT_PART_NUMBER',
+  BOM_EDIT_PRICE: 'FEATURE_BOM_EDIT_PRICE'
 } as const;
 
 // Role labels for UI display

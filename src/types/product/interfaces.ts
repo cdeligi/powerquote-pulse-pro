@@ -1,6 +1,6 @@
 
 /**
- * © 2025 Qualitrol Corp. All rights reserved.
+ * 2025 Qualitrol Corp. All rights reserved.
  */
 
 // Level 0: Asset Types (Power Transformer, GIS, Breaker, etc.)
@@ -79,14 +79,17 @@ export interface Level4Product {
   id: string;
   name: string;
   parentProductId: string; // Links to Level3Product
-  type?: string;
+  type?: 'bushing' | 'analog' | 'dropdown';
   description: string;
-  configurationType: 'dropdown' | 'multiline';
+  configurationType: 'dropdown' | 'multiline' | 'bushing' | 'analog';
   price: number;
   cost?: number;
   enabled: boolean;
   options: Level4ConfigurationOption[];
   partNumber?: string;
+  configuration?: any; // For storing configuration data
+  product_level?: number; // Should be 4 for Level 4 products
+  requires_level4_config?: boolean; // Indicates if this product requires configuration
 }
 
 export interface Level4ConfigurationOption {

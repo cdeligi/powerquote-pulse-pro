@@ -257,9 +257,9 @@ export const ProductManagement = () => {
           <TabsTrigger value="level1">Level 1 Products</TabsTrigger>
           <TabsTrigger value="level2">Level 2 Products</TabsTrigger>
           <TabsTrigger value="level3">Level 3 Products</TabsTrigger>
+          <TabsTrigger value="level4">Level 4 Configuration</TabsTrigger>
           <TabsTrigger value="partnumbers">Part Numbers</TabsTrigger>
           <TabsTrigger value="chassis-types">Chassis Types</TabsTrigger>
-          <TabsTrigger value="level4">Level 4 Configuration</TabsTrigger>
         </TabsList>
 
         <TabsContent value="level1" className="space-y-4">
@@ -392,14 +392,6 @@ export const ProductManagement = () => {
           </div>
         </TabsContent>
 
-        <TabsContent value="partnumbers" className="space-y-4">
-          <PartNumberConfigManager initialSelectedL2={selectedL2ForPN} />
-        </TabsContent>
-
-        <TabsContent value="chassis-types" className="space-y-4">
-          <ChassisTypeManager />
-        </TabsContent>
-
         <TabsContent value="level4" className="space-y-4">
           <Card>
             <CardHeader>
@@ -412,6 +404,14 @@ export const ProductManagement = () => {
               <Level4ConfigurationManager key={refreshTrigger} />
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="partnumbers" className="space-y-4">
+          <PartNumberConfigManager initialSelectedL2={selectedL2ForPN} />
+        </TabsContent>
+
+        <TabsContent value="chassis-types" className="space-y-4">
+          <ChassisTypeManager />
         </TabsContent>
       </Tabs>
     </div>

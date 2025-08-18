@@ -1,388 +1,514 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Trash2, Edit, Plus, Settings, List, AlertCircle } from "lucide-react";
-import { Level4Product, Level3Product } from "@/types/product";
-import { productDataService } from "@/services/productDataService";
-import { Level4ProductForm } from "./product-forms/Level4ProductForm";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Plus, Search, Loader2 } from 'lucide-react';
+import { DataTable } from "@/components/ui/data-table";
+import { ColumnDef } from "@tanstack/react-table";
+import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { useToast } from "@/hooks/use-toast";
+import { useToast } from "@/components/ui/use-toast";
+import { productDataService } from "@/services/productDataService";
+import { Level4ConfigEditor } from "./level4/Level4ConfigEditor";
+import { supabase } from "@/utils/supabase";
+
+interface Product {
+  id: string;
+  name: string;
+  sku: string;
+  product_level: number;
+  requires_level4_config: boolean;
+  type?: 'bushing' | 'analog';
+}
 
 export const Level4ConfigurationManager: React.FC = () => {
-  const [level4Products, setLevel4Products] = useState<Level4Product[]>([]);
-  const [level3Products, setLevel3Products] = useState<Level3Product[]>([]);
-  const [selectedLevel3, setSelectedLevel3] = useState<string>('all');
-  const [searchTerm, setSearchTerm] = useState('');
-  const [isFormOpen, setIsFormOpen] = useState(false);
-  const [editingProduct, setEditingProduct] = useState<Level4Product | undefined>();
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
+  const [level3Products, setLevel3Products] = useState<Product[]>([]);
+  const [level4Products, setLevel4Products] = useState<Product[]>([]);
+  const [selectedLevel3, setSelectedLevel3] = useState<string>('');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
+  const [isEditorOpen, setIsEditorOpen] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
+  // Update the initialization effect to ensure schema is set up first
   useEffect(() => {
-    loadData();
-  }, []);
+    const initialize = async () => {
+      try {
+        setIsLoading(true);
+        
+        // 1. Ensure the schema is set up correctly
+        const { success: schemaSuccess, error: schemaError } = 
+          await productDataService.ensureLevel4Schema();
+          
+        if (!schemaSuccess) {
+          throw new Error(schemaError || 'Failed to set up Level 4 schema');
+        }
+        
+        console.log('Verified Level 4 schema');
+        
+        // 2. Ensure required Level 4 products exist
+        await productDataService.ensureRequiredLevel4Products();
+        console.log('Verified required Level 4 products');
+        
+        // 3. Update Level 3 products to have the correct requires_level4_config flag
+        const { success: updateSuccess, error: updateError } = 
+          await productDataService.updateLevel3ProductsForLevel4();
+          
+        if (!updateSuccess) {
+          throw new Error(updateError || 'Failed to update Level 3 products');
+        }
+        
+        console.log('Updated requires_level4_config for Level 3 products');
+        
+        // 4. Load Level 3 products that require Level 4 configuration
+        const products = await productDataService.getLevel3Products();
+        const filteredProducts = products.filter(p => Boolean(p.requires_level4_config));
+        console.log('Filtered Level 3 products:', filteredProducts);
+        
+        setLevel3Products(filteredProducts);
+        
+        if (filteredProducts.length === 1) {
+          setSelectedLevel3(filteredProducts[0].id);
+        }
+        
+      } catch (error) {
+        console.error('Initialization error:', error);
+        toast({
+          title: "Error",
+          description: error instanceof Error ? error.message : 'Failed to initialize Level 4 configuration',
+          variant: "destructive",
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
 
-  const loadData = async () => {
+    initialize();
+  }, [toast]);
+
+  // Load level 4 products when a level 3 product is selected
+  useEffect(() => {
+    const loadLevel4Products = async () => {
+      if (!selectedLevel3) {
+        console.log('No level 3 product selected');
+        setLevel4Products([]);
+        return;
+      }
+      
+      try {
+        console.log('Loading level 4 products for parent ID:', selectedLevel3);
+        setIsLoading(true);
+        
+        // Get the parent product details
+        const parentProduct = level3Products.find(p => p.id === selectedLevel3);
+        if (!parentProduct) {
+          console.error('Parent product not found:', selectedLevel3);
+          toast({
+            title: "Error",
+            description: "Parent product not found. Please try selecting again.",
+            variant: "destructive",
+          });
+          return;
+        }
+        
+        console.log('Fetching level 4 products for:', parentProduct.name);
+        
+        // Fetch level 4 products with their configurations
+        const products = await productDataService.getChildProducts(selectedLevel3);
+        
+        if (!Array.isArray(products)) {
+          throw new Error('Invalid response format: expected an array of products');
+        }
+        
+        console.log('Loaded level 4 products:', products);
+        
+        // Set the level 4 products
+        setLevel4Products(products);
+        
+      } catch (error) {
+        console.error('Error loading level 4 products:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load level 4 products. Please try again.",
+          variant: "destructive",
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadLevel4Products();
+  }, [selectedLevel3, level3Products, toast]);
+
+  // Add debug effect to log state changes
+  useEffect(() => {
+    console.log('Selected Level 3:', selectedLevel3);
+    console.log('Level 3 Products:', level3Products);
+    console.log('Level 4 Products:', level4Products);
+    console.log('Filtered Level 4 Products:', filteredLevel4Products);
+  }, [selectedLevel3, level3Products, level4Products, filteredLevel4Products]);
+
+  // Filter level 4 products based on search term
+  const filteredLevel4Products = level4Products.filter(product => {
+    const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                       product.sku.toLowerCase().includes(searchTerm.toLowerCase());
+    return matchesSearch;
+  });
+
+  // Handle opening the editor for a product
+  const handleConfigureProduct = (product: Product) => {
+    setSelectedProduct(product);
+    setIsEditorOpen(true);
+  };
+
+  // Handle creating a new configuration
+  const handleAddConfiguration = () => {
+    // Determine the type based on the selected level 3 product name or other criteria
+    const level3Product = level3Products.find(p => p.id === selectedLevel3);
+    const productType = level3Product?.name.toLowerCase().includes('bushing') ? 'bushing' : 'analog';
+    
+    setSelectedProduct({
+      id: 'new',
+      name: `New ${level3Product?.name || 'Configuration'}`,
+      sku: '',
+      product_level: 4,
+      requires_level4_config: false,
+      type: productType
+    });
+    setIsEditorOpen(true);
+  };
+
+  // Handle saving the configuration
+  const handleSaveConfiguration = async (configData: any) => {
+    if (!selectedProduct) return;
+    
     try {
-      setIsLoading(true);
-      setError(null);
-      console.log('Level4ConfigurationManager: Loading data...');
+      setIsSaving(true);
       
-      // Ensure service is initialized
-      await productDataService.initialize();
+      // Determine if this is a new product or an update
+      const isNewProduct = selectedProduct.id === 'new';
       
-      // Load data asynchronously
-      const [l4Products, l3Products] = await Promise.all([
-        productDataService.getLevel4Products(),
-        productDataService.getLevel3Products()
-      ]);
+      // Prepare the product data
+      const productData = {
+        name: selectedProduct.name,
+        sku: selectedProduct.sku || `L4-${Date.now()}`,
+        product_level: 4,
+        parent_product_id: selectedLevel3,
+        type: selectedProduct.type || 'analog',
+        requires_level4_config: true,
+        // Add other product fields as needed
+      };
       
-      console.log('Level4ConfigurationManager: Data loaded:', { 
-        l4Count: l4Products.length, 
-        l3Count: l3Products.length 
+      let savedProduct;
+      
+      // Save the product first
+      if (isNewProduct) {
+        savedProduct = await productDataService.createProduct(productData);
+      } else {
+        savedProduct = await productDataService.updateProduct(selectedProduct.id, productData);
+      }
+      
+      // Save the configuration data if we have it
+      if (configData && savedProduct) {
+        await productDataService.saveLevel4Config(savedProduct.id, configData);
+      }
+      
+      // Close the editor
+      setIsEditorOpen(false);
+      
+      // Refresh the products list
+      if (selectedLevel3) {
+        const products = await productDataService.getChildProducts(selectedLevel3);
+        setLevel4Products(products);
+      }
+      
+      // Show success message
+      toast({
+        title: "Success",
+        description: `Configuration ${isNewProduct ? 'created' : 'updated'} successfully.`,
       });
       
-      setLevel4Products(l4Products);
-      setLevel3Products(l3Products);
+    } catch (error) {
+      console.error('Error saving configuration:', error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : `Failed to ${selectedProduct.id === 'new' ? 'create' : 'update'} configuration. Please try again.`,
+        variant: "destructive",
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Define columns for the data table
+  const columns: ColumnDef<Product>[] = [
+    {
+      accessorKey: "name",
+      header: "Name",
+      cell: ({ row }) => {
+        const product = row.original;
+        return (
+          <div className="font-medium flex items-center gap-2">
+            <span>{product.name}</span>
+            {product.type && (
+              <Badge variant={product.type === 'bushing' ? 'default' : 'secondary'} className="text-xs">
+                {product.type.charAt(0).toUpperCase() + product.type.slice(1)}
+              </Badge>
+            )}
+          </div>
+        );
+      },
+    },
+    {
+      accessorKey: "partNumber",
+      header: "Part Number",
+      cell: ({ row }) => (
+        <div className="text-muted-foreground">
+          {row.original.partNumber || 'N/A'}
+        </div>
+      ),
+    },
+    {
+      accessorKey: "price",
+      header: "Price",
+      cell: ({ row }) => {
+        const price = parseFloat(row.getValue("price")) || 0;
+        const formatted = new Intl.NumberFormat('en-US', {
+          style: 'currency',
+          currency: 'USD',
+        }).format(price);
+        
+        return <div className="font-medium">{formatted}</div>;
+      },
+    },
+    {
+      accessorKey: "configurationType",
+      header: "Type",
+      cell: ({ row }) => (
+        <Badge variant="outline" className="capitalize">
+          {row.original.configurationType || 'dropdown'}
+        </Badge>
+      ),
+    },
+    {
+      id: "actions",
+      cell: ({ row }) => (
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            setSelectedProduct(row.original);
+            setIsEditorOpen(true);
+          }}
+        >
+          Configure
+        </Button>
+      ),
+    },
+  ];
+
+  const debugDatabaseState = async () => {
+    try {
+      console.log('=== DEBUGGING LEVEL 4 CONFIGURATION ===');
+      
+      // 1. Check Level 3 products that should have Level 4 config
+      const { data: level3Products, error: l3Error } = await supabase
+        .from('products')
+        .select('id, name, requires_level4_config, product_level')
+        .eq('requires_level4_config', true);
+      
+      if (l3Error) throw l3Error;
+      console.log('Level 3 products requiring Level 4 config:', level3Products);
+      
+      // 2. Check all Level 4 products
+      const { data: allLevel4Products, error: l4Error } = await supabase
+        .from('level4_products')
+        .select('*');
+      
+      if (l4Error) throw l4Error;
+      console.log('All Level 4 products:', allLevel4Products);
+      
+      // 3. Check relationships between Level 3 and Level 4
+      const { data: relationships, error: relError } = await supabase
+        .from('level3_level4_relationships')
+        .select(`
+          *,
+          level3_product:level3_product_id (id, name),
+          level4_product:level4_product_id (id, name)
+        `);
+      
+      if (relError) throw relError;
+      console.log('Level 3 to Level 4 relationships:', relationships);
+      
+      // 4. Check if the required Level 4 products exist
+      const requiredProducts = ['bushing-card', 'bushing-card-mtx', 'bushing-card-stx', 
+                              'analog-card-multi', 'analog-card-multi-mtx', 'analog-card-multi-stx'];
+      
+      const { data: requiredProductsData, error: reqError } = await supabase
+        .from('products')
+        .select('id, name, requires_level4_config')
+        .in('id', requiredProducts);
+      
+      if (reqError) throw reqError;
+      console.log('Required Level 4 products status:', requiredProductsData);
       
     } catch (error) {
-      console.error('Level4ConfigurationManager: Error loading data:', error);
-      setError('Failed to load configuration data');
+      console.error('Debug error:', error);
+    }
+  };
+
+  useEffect(() => {
+    debugDatabaseState();
+  }, []);
+
+  const handleDebugLevel4 = async () => {
+    try {
+      setIsLoading(true);
+      const result = await productDataService.debugLevel4Products();
       
-      // Fallback to sync data
-      try {
-        const l4Sync = productDataService.getLevel4ProductsSync();
-        const l3Sync = productDataService.getLevel3ProductsSync();
-        setLevel4Products(l4Sync);
-        setLevel3Products(l3Sync);
-        console.log('Level4ConfigurationManager: Fallback to sync data successful');
-      } catch (syncError) {
-        console.error('Level4ConfigurationManager: Fallback also failed:', syncError);
+      if (result.success) {
+        toast({
+          title: "Debug Information",
+          description: "Check the browser console for detailed debug information about Level 4 products.",
+        });
+      } else {
+        throw new Error(result.error || 'Unknown error occurred during debug');
       }
+    } catch (error) {
+      console.error('Debug error:', error);
+      toast({
+        title: "Debug Error",
+        description: error instanceof Error ? error.message : 'Failed to get debug information',
+        variant: "destructive",
+      });
     } finally {
       setIsLoading(false);
     }
   };
 
-  const filteredLevel4Products = level4Products.filter(product => {
-    const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         product.description?.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesLevel3 = selectedLevel3 === 'all' || product.parentProductId === selectedLevel3;
-    return matchesSearch && matchesLevel3;
-  });
-
-  const handleCreateProduct = async (productData: Omit<Level4Product, 'id'>) => {
-    try {
-      await productDataService.createLevel4Product(productData);
-      await loadData(); // Reload data after creation
-      setIsFormOpen(false);
-      toast({
-        title: "Success",
-        description: "Level 4 configuration created successfully"
-      });
-    } catch (error) {
-      console.error('Error creating Level 4 configuration:', error);
-      toast({
-        title: "Error",
-        description: "Failed to create Level 4 configuration",
-        variant: "destructive"
-      });
-    }
-  };
-
-  const handleUpdateProduct = async (productData: Level4Product) => {
-    try {
-      // Update method needs to be implemented in service
-      await loadData(); // Reload data after update
-      setIsFormOpen(false);
-      setEditingProduct(undefined);
-      toast({
-        title: "Success",
-        description: "Level 4 configuration updated successfully"
-      });
-    } catch (error) {
-      console.error('Error updating Level 4 configuration:', error);
-      toast({
-        title: "Error",
-        description: "Failed to update Level 4 configuration",
-        variant: "destructive"
-      });
-    }
-  };
-
-  const handleDeleteProduct = async (productId: string) => {
-    if (confirm('Are you sure you want to delete this Level 4 configuration?')) {
-      try {
-        // Delete method needs to be implemented in service
-        await loadData(); // Reload data after deletion
-        toast({
-          title: "Success",
-          description: "Level 4 configuration deleted successfully"
-        });
-      } catch (error) {
-        console.error('Error deleting Level 4 configuration:', error);
-        toast({
-          title: "Error",
-          description: "Failed to delete Level 4 configuration",
-          variant: "destructive"
-        });
-      }
-    }
-  };
-
-  const getLevel3ProductName = (level3Id: string) => {
-    const level3 = level3Products.find(p => p.id === level3Id);
-    return level3?.name || 'Unknown Product';
-  };
-
-  if (isLoading) {
-    return (
-      <div className="space-y-6">
-        <div className="flex justify-between items-center">
-          <div>
-            <h2 className="text-2xl font-bold">Level 4 Configuration</h2>
-            <p className="text-gray-600">Loading configuration data...</p>
-          </div>
-        </div>
-        <div className="flex items-center justify-center py-12">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-            <p className="text-gray-600">Loading Level 4 configurations...</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="space-y-6">
-        <div className="text-center py-8">
-          <AlertCircle className="h-12 w-12 mx-auto text-red-500 mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">Failed to Load Configuration Data</h3>
-          <p className="text-gray-600 mb-4">{error}</p>
-          <Button onClick={loadData} variant="default">
-            Retry Loading
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
-  if (level3Products.length === 0) {
-    return (
-      <div className="space-y-6">
-        <div className="flex justify-between items-center">
-          <div>
-            <h2 className="text-2xl font-bold">Level 4 Configuration</h2>
-            <p className="text-gray-600">Manage product-specific configurations for Level 3 products</p>
-          </div>
-        </div>
-        <Card>
-          <CardContent className="text-center py-8">
-            <Settings className="h-12 w-12 mx-auto text-gray-400 mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No Level 3 Products Available</h3>
-            <p className="text-gray-600 mb-4">
-              You need to create Level 3 products before you can add Level 4 configurations.
-            </p>
-            <p className="text-sm text-gray-500">
-              Go to the Level 3 Products tab to create cards, components, or options first.
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h2 className="text-2xl font-bold">Level 4 Configuration</h2>
-          <p className="text-gray-600">Manage product-specific configurations for Level 3 products</p>
-        </div>
-        <Button onClick={() => setIsFormOpen(true)}>
-          <Plus className="h-4 w-4 mr-2" />
-          Add Configuration
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-bold tracking-tight">Level 4 Product Configurations</h2>
+        <Button 
+          variant="outline" 
+          onClick={handleDebugLevel4}
+          disabled={isLoading}
+        >
+          {isLoading ? 'Debugging...' : 'Debug Level 4'}
         </Button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div>
-          <Label htmlFor="search">Search Configurations</Label>
-          <Input
-            id="search"
-            placeholder="Search by name or description..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-        </div>
-        
-        <div>
-          <Label htmlFor="level3Filter">Filter by Level 3 Product</Label>
-          <Select value={selectedLevel3} onValueChange={setSelectedLevel3}>
-            <SelectTrigger>
-              <SelectValue placeholder="All Level 3 Products" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Level 3 Products</SelectItem>
-              {level3Products.map((product) => (
-                <SelectItem key={product.id} value={product.id}>
-                  {product.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="flex items-end">
-          <div className="text-sm text-gray-600">
-            Showing {filteredLevel4Products.length} of {level4Products.length} configurations
-          </div>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {filteredLevel4Products.map((product) => (
-          <Card key={product.id} className="hover:shadow-md transition-shadow">
-            <CardHeader className="pb-3">
-              <div className="flex justify-between items-start">
-                <div>
-                  <CardTitle className="text-lg">{product.name}</CardTitle>
-                  <p className="text-sm text-gray-600 mt-1">
-                    Parent: {getLevel3ProductName(product.parentProductId)}
-                  </p>
-                </div>
-                <div className="flex items-center space-x-1">
-                  <Badge variant={product.enabled ? "default" : "secondary"}>
-                    {product.enabled ? "Active" : "Inactive"}
-                  </Badge>
-                </div>
-              </div>
-            </CardHeader>
+      <Card>
+        <CardHeader>
+          <CardTitle>Manage Configurations</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="level3">Level 3 Product</Label>
+              <select
+                id="level3"
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                value={selectedLevel3}
+                onChange={(e) => setSelectedLevel3(e.target.value)}
+                disabled={isLoading}
+              >
+                <option value="">Select a product</option>
+                {level3Products.map((product) => (
+                  <option key={product.id} value={product.id}>
+                    {product.name}
+                  </option>
+                ))}
+              </select>
+            </div>
             
-            <CardContent className="space-y-3">
-              <div>
-                <div className="flex items-center space-x-2 mb-2">
-                  {product.configurationType === 'dropdown' ? 
-                    <List className="h-4 w-4" /> : 
-                    <Settings className="h-4 w-4" />
-                  }
-                  <Badge variant="outline">
-                    {product.configurationType === 'dropdown' ? 'Dropdown' : 'Multi-line'}
-                  </Badge>
-                </div>
-                
-                {product.description && (
-                  <p className="text-sm text-gray-600 mb-3">{product.description}</p>
-                )}
-                
-                <div className="text-sm">
-                  <p><strong>Options:</strong> {product.options?.length || 0}</p>
-                  <p><strong>Price:</strong> ${product.price}</p>
-                  {product.cost && product.cost > 0 && (
-                    <p><strong>Cost:</strong> ${product.cost}</p>
-                  )}
-                </div>
-
-                {product.options && product.options.length > 0 && (
-                  <div className="mt-3">
-                    <p className="text-xs text-gray-500 mb-1">Sample Options:</p>
-                    <div className="flex flex-wrap gap-1">
-                      {product.options.slice(0, 3).map((option) => (
-                        <Badge key={option.id} variant="secondary" className="text-xs">
-                          {option.optionValue}
-                        </Badge>
-                      ))}
-                      {product.options.length > 3 && (
-                        <Badge variant="secondary" className="text-xs">
-                          +{product.options.length - 3} more
-                        </Badge>
-                      )}
-                    </div>
-                  </div>
-                )}
+            <div className="space-y-2">
+              <Label htmlFor="search">Search Configurations</Label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  id="search"
+                  placeholder="Search by name or SKU..."
+                  className="pl-10"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  disabled={isLoading || !selectedLevel3}
+                />
               </div>
-              
-              <div className="flex justify-end space-x-2 pt-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    setEditingProduct(product);
-                    setIsFormOpen(true);
-                  }}
-                >
-                  <Edit className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleDeleteProduct(product.id)}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
+            </div>
+          </div>
+
+          <div className="mt-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-medium">
+                Configurations
+                {selectedLevel3 && (
+                  <span className="text-sm text-muted-foreground ml-2">
+                    ({filteredLevel4Products.length} found)
+                  </span>
+                )}
+              </h3>
+              <Button 
+                onClick={handleAddConfiguration}
+                disabled={!selectedLevel3 || isLoading}
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Add Configuration
+              </Button>
+            </div>
+
+            {isLoading ? (
+              <div className="flex items-center justify-center h-64">
+                <Loader2 className="h-8 w-8 animate-spin" />
+                <span className="ml-2">Loading configurations...</span>
               </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+            ) : selectedLevel3 ? (
+              <div className="rounded-md border">
+                <DataTable
+                  columns={columns}
+                  data={filteredLevel4Products}
+                  emptyMessage="No configurations found. Click 'Add Configuration' to create one."
+                />
+              </div>
+            ) : (
+              <div className="text-center py-12 bg-muted/50 rounded-md">
+                <p className="text-muted-foreground">
+                  Please select a Level 3 product to view or create configurations.
+                </p>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
 
-      {filteredLevel4Products.length === 0 && level4Products.length === 0 && (
-        <Card>
-          <CardContent className="text-center py-8">
-            <Settings className="h-12 w-12 mx-auto text-gray-400 mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No Level 4 Configurations</h3>
-            <p className="text-gray-600 mb-4">
-              Create your first Level 4 configuration to get started.
-            </p>
-            <Button onClick={() => setIsFormOpen(true)}>
-              <Plus className="h-4 w-4 mr-2" />
-              Add First Configuration
-            </Button>
-          </CardContent>
-        </Card>
-      )}
-
-      {filteredLevel4Products.length === 0 && level4Products.length > 0 && (
-        <Card>
-          <CardContent className="text-center py-8">
-            <Settings className="h-12 w-12 mx-auto text-gray-400 mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No Matching Configurations</h3>
-            <p className="text-gray-600">
-              No configurations match your current search or filter criteria.
-            </p>
-          </CardContent>
-        </Card>
-      )}
-
-      <Dialog open={isFormOpen} onOpenChange={(open) => {
-        setIsFormOpen(open);
-        if (!open) {
-          setEditingProduct(undefined);
-        }
-      }}>
+      {/* Configuration Editor Dialog */}
+      <Dialog open={isEditorOpen} onOpenChange={setIsEditorOpen}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>
-              {editingProduct ? 'Edit' : 'Create'} Level 4 Configuration
-            </DialogTitle>
-          </DialogHeader>
-          <Level4ProductForm
-            product={editingProduct}
-            onSave={editingProduct ? handleUpdateProduct : handleCreateProduct}
-            onCancel={() => {
-              setIsFormOpen(false);
-              setEditingProduct(undefined);
-            }}
-          />
+          {selectedProduct && (
+            <>
+              <DialogHeader>
+                <DialogTitle>
+                  {selectedProduct.id === 'new' ? 'Add New Configuration' : `Configure ${selectedProduct.name}`}
+                </DialogTitle>
+              </DialogHeader>
+              <div className="py-4">
+                <Level4ConfigEditor
+                  productId={selectedProduct.id}
+                  productType={selectedProduct.type || 'analog'}
+                  onSave={(configData) => handleSaveConfiguration(configData)}
+                  onCancel={() => setIsEditorOpen(false)}
+                />
+              </div>
+            </>
+          )}
         </DialogContent>
       </Dialog>
     </div>
   );
 };
+
+export default Level4ConfigurationManager;
