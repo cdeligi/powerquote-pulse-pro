@@ -17,13 +17,14 @@ const CardForm = ({ onSubmit, level2Products, initialData }: CardFormProps) => {
   const [formData, setFormData] = useState({
     name: initialData?.name || '',
     parentProductId: initialData?.parentProductId || '',
+    parent_product_id: initialData?.parent_product_id || initialData?.parentProductId || '',
     type: initialData?.type || '',
     description: initialData?.description || '',
     price: initialData?.price || 0,
     cost: initialData?.cost || 0,
     enabled: initialData?.enabled ?? true,
     specifications: initialData?.specifications || {},
-    
+    product_level: 3,
     image: initialData?.image || ''
   });
 
@@ -43,7 +44,7 @@ const CardForm = ({ onSubmit, level2Products, initialData }: CardFormProps) => {
   };
 
   // Get the parent product name for the type field
-  const selectedParent = level2Products.find(p => p.id === formData.parentProductId);
+  const selectedParent = level2Products.find(p => p.id === formData.parent_product_id);
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4 dark:text-white">
@@ -60,13 +61,14 @@ const CardForm = ({ onSubmit, level2Products, initialData }: CardFormProps) => {
         </div>
         <div>
           <Label htmlFor="parentProductId" className="text-foreground">Parent Product (Level 2)</Label>
-          <Select 
-            value={formData.parentProductId} 
+            <Select 
+            value={formData.parent_product_id} 
             onValueChange={(value) => {
               const parentProduct = level2Products.find(p => p.id === value);
               setFormData({ 
                 ...formData, 
                 parentProductId: value,
+                parent_product_id: value,
                 type: parentProduct?.name || ''
               });
             }}

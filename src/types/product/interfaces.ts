@@ -55,11 +55,15 @@ export interface Level3Product {
   id: string;
   name: string;
   parentProductId: string; // Links to Level2Product
+  parent_product_id?: string; // Alternative naming for database compatibility
   type: string; // Dynamic type instead of hardcoded union
   description: string;
   price: number;
   cost?: number;
   enabled?: boolean; // Made optional since many static card objects omit it
+  product_level?: number; // Product level indicator
+  requires_level4_config?: boolean; // Whether this requires Level 4 configuration
+  sku?: string; // Optional SKU field
   specifications?: {
     slotRequirement?: number;
     inputs?: number;

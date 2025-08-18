@@ -11,21 +11,24 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { useToast } from "@/components/ui/use-toast";
 import { productDataService } from "@/services/productDataService";
 import { Level4ConfigEditor } from "./level4/Level4ConfigEditor";
-import { supabase } from "@/utils/supabase";
+import { supabase } from "@/integrations/supabase/client";
 
 interface Product {
   id: string;
   name: string;
-  sku: string;
+  sku?: string;
   product_level: number;
-  requires_level4_config: boolean;
+  requires_level4_config?: boolean;
   type?: 'bushing' | 'analog';
+  partNumber?: string;
+  configurationType?: 'dropdown' | 'multiline' | 'bushing' | 'analog';
+  price?: number;
 }
 
 export const Level4ConfigurationManager: React.FC = () => {
   const { toast } = useToast();
-  const [level3Products, setLevel3Products] = useState<Product[]>([]);
-  const [level4Products, setLevel4Products] = useState<Product[]>([]);
+  const [level3Products, setLevel3Products] = useState<any[]>([]);
+  const [level4Products, setLevel4Products] = useState<any[]>([]);
   const [selectedLevel3, setSelectedLevel3] = useState<string>('');
   const [searchTerm, setSearchTerm] = useState('');
   const [isLoading, setIsLoading] = useState(true);
@@ -33,37 +36,13 @@ export const Level4ConfigurationManager: React.FC = () => {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Update the initialization effect to ensure schema is set up first
+  // Load Level 3 products on initialization
   useEffect(() => {
     const initialize = async () => {
       try {
         setIsLoading(true);
         
-        // 1. Ensure the schema is set up correctly
-        const { success: schemaSuccess, error: schemaError } = 
-          await productDataService.ensureLevel4Schema();
-          
-        if (!schemaSuccess) {
-          throw new Error(schemaError || 'Failed to set up Level 4 schema');
-        }
-        
-        console.log('Verified Level 4 schema');
-        
-        // 2. Ensure required Level 4 products exist
-        await productDataService.ensureRequiredLevel4Products();
-        console.log('Verified required Level 4 products');
-        
-        // 3. Update Level 3 products to have the correct requires_level4_config flag
-        const { success: updateSuccess, error: updateError } = 
-          await productDataService.updateLevel3ProductsForLevel4();
-          
-        if (!updateSuccess) {
-          throw new Error(updateError || 'Failed to update Level 3 products');
-        }
-        
-        console.log('Updated requires_level4_config for Level 3 products');
-        
-        // 4. Load Level 3 products that require Level 4 configuration
+        // Load Level 3 products that require Level 4 configuration
         const products = await productDataService.getLevel3Products();
         const filteredProducts = products.filter(p => Boolean(p.requires_level4_config));
         console.log('Filtered Level 3 products:', filteredProducts);
@@ -78,7 +57,7 @@ export const Level4ConfigurationManager: React.FC = () => {
         console.error('Initialization error:', error);
         toast({
           title: "Error",
-          description: error instanceof Error ? error.message : 'Failed to initialize Level 4 configuration',
+          description: error instanceof Error ? error.message : 'Failed to load Level 3 products',
           variant: "destructive",
         });
       } finally {
@@ -143,6 +122,13 @@ export const Level4ConfigurationManager: React.FC = () => {
     loadLevel4Products();
   }, [selectedLevel3, level3Products, toast]);
 
+  // Filter level 4 products based on search term
+  const filteredLevel4Products = level4Products.filter(product => {
+    const matchesSearch = product.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                       product.sku?.toLowerCase().includes(searchTerm.toLowerCase());
+    return matchesSearch;
+  });
+
   // Add debug effect to log state changes
   useEffect(() => {
     console.log('Selected Level 3:', selectedLevel3);
@@ -150,13 +136,6 @@ export const Level4ConfigurationManager: React.FC = () => {
     console.log('Level 4 Products:', level4Products);
     console.log('Filtered Level 4 Products:', filteredLevel4Products);
   }, [selectedLevel3, level3Products, level4Products, filteredLevel4Products]);
-
-  // Filter level 4 products based on search term
-  const filteredLevel4Products = level4Products.filter(product => {
-    const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                       product.sku.toLowerCase().includes(searchTerm.toLowerCase());
-    return matchesSearch;
-  });
 
   // Handle opening the editor for a product
   const handleConfigureProduct = (product: Product) => {

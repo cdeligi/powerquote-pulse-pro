@@ -24,10 +24,3 @@ export {
   DEFAULT_ANALOG_SENSORS,
   DEFAULT_BUSHING_TAP_MODELS
 } from './product/sensor-config';
-
-export interface Level3Product extends BaseProduct {
-  product_level: 3;
-  parent_product_id: string;
-  requires_level4_config?: boolean;
-  // Other level 3 specific fields
-}
