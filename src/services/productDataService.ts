@@ -393,6 +393,30 @@ export class ProductDataService {
     }
   }
 
+  async getLevel2ProductById(id: string): Promise<Level2Product | null> {
+    try {
+      const { data, error } = await supabase
+        .from('products')
+        .select('*')
+        .eq('id', id)
+        .eq('product_level', 2)
+        .single();
+
+      if (error) {
+        if (error.code === 'PGRST116') {
+          return null; // No matching record
+        }
+        console.error('Error fetching Level 2 product:', error);
+        throw error;
+      }
+
+      return this.transformDbToLevel2(data);
+    } catch (error) {
+      console.error('Error in getLevel2ProductById:', error);
+      return null;
+    }
+  }
+
   // Get Level 2 products by category using the new database function
   async getLevel2ProductsByCategory(category: 'dga' | 'pd' | 'qtms'): Promise<Level2Product[]> {
     try {

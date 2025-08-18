@@ -346,7 +346,8 @@ export const Level4ConfigurationManager: React.FC = () => {
           </DialogHeader>
           
           <Level4ConfigEditor
-            productId={selectedProduct?.id}
+            productId={selectedProduct?.id || ''}
+            productType={selectedProduct?.configurationType === 'analog' ? 'analog' : 'bushing'}
             onSave={handleSaveConfiguration}
             onCancel={handleCancelConfiguration}
           />
