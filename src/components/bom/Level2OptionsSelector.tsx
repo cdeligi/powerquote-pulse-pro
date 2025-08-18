@@ -132,8 +132,13 @@ const Level2OptionsSelector = ({
                     </p>
                   )}
                   {canSeePrices && option.price && (
-                    <div className="text-foreground font-medium text-xs">
-                      ${option.price.toLocaleString()}
+                    <div className="text-foreground font-medium text-xs space-y-1">
+                      <div>Price: ${option.price.toLocaleString()}</div>
+                      {option.cost > 0 && (
+                        <div className="text-muted-foreground">
+                          Cost: ${option.cost.toLocaleString()}
+                        </div>
+                      )}
                     </div>
                   )}
                   {/* Product link if available */}

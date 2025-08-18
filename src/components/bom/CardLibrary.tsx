@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Level2Product, Level3Product } from "@/types/product";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -96,31 +95,33 @@ const CardLibrary = ({ chassis, onCardSelect, canSeePrices }: CardLibraryProps) 
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {cards.map((card) => (
-          <Card key={card.id} className="bg-gray-800 border-gray-700 hover:border-red-600 transition-all">
-            <CardHeader>
-              <CardTitle className="text-white text-lg flex items-center justify-between">
-                {card.name}
+          <Card key={card.id} className="bg-gray-800 border-gray-700 hover:border-red-600 transition-all group">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-white text-lg flex items-center justify-between group-hover:text-white">
+                <span className="text-white group-hover:text-red-400 transition-colors">
+                  {card.name}
+                </span>
                 {needsConfiguration(card) && (
                   <Settings className="h-4 w-4 text-blue-400" />
                 )}
               </CardTitle>
-              <CardDescription className="text-gray-400">
+              <CardDescription className="text-gray-300 group-hover:text-gray-100 transition-colors">
                 {card.description}
               </CardDescription>
               <div className="flex gap-2 flex-wrap">
-                <Badge variant="outline" className="text-white border-gray-500">
+                <Badge variant="outline" className="text-gray-200 border-gray-500 bg-gray-800/80">
                   {card.specifications?.slotRequirement || 1} slot{(card.specifications?.slotRequirement || 1) > 1 ? 's' : ''}
                 </Badge>
-                <Badge variant="outline" className="text-white border-gray-500">
+                <Badge variant="outline" className="text-gray-200 border-gray-500 bg-gray-800/80">
                   {card.type}
                 </Badge>
                 {card.specifications?.inputs && (
-                  <Badge variant="outline" className="text-white border-gray-500">
+                  <Badge variant="outline" className="text-gray-200 border-gray-500 bg-gray-800/80">
                     {card.specifications.inputs} inputs
                   </Badge>
                 )}
                 {card.specifications?.channels && (
-                  <Badge variant="outline" className="text-white border-gray-500">
+                  <Badge variant="outline" className="text-gray-200 border-gray-500 bg-gray-800/80">
                     {card.specifications.channels} channels
                   </Badge>
                 )}
@@ -141,14 +142,18 @@ const CardLibrary = ({ chassis, onCardSelect, canSeePrices }: CardLibraryProps) 
                 )}
               </div>
             </CardHeader>
-            <CardContent>
+            <CardContent className="pt-0">
               <div className="space-y-2 mb-4">
                 {card.specifications && Object.entries(card.specifications).map(([key, value]) => {
                   if (key === 'slotRequirement' || key === 'compatibleChassis') return null;
                   return (
                     <div key={key} className="flex justify-between text-sm">
-                      <span className="text-gray-400 capitalize">{key.replace(/([A-Z])/g, ' $1')}:</span>
-                      <span className="text-white">{Array.isArray(value) ? value.join(', ') : String(value)}</span>
+                      <span className="text-gray-300 group-hover:text-gray-100 transition-colors capitalize">
+                        {key.replace(/([A-Z])/g, ' $1').trim()}:
+                      </span>
+                      <span className="text-white font-medium">
+                        {Array.isArray(value) ? value.join(', ') : String(value)}
+                      </span>
                     </div>
                   );
                 })}

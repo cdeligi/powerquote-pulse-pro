@@ -127,6 +127,7 @@ export class ProductDataService {
       price: parseFloat(row.price) || 0,
       cost: parseFloat(row.cost) || 0,
       enabled: row.enabled !== false,
+      requires_level4_config: Boolean(row.requires_level4_config),
       specifications: {
         ...rawSpecs,
         slotRequirement: row.slot_requirement || rawSpecs.slotRequirement || 1
@@ -186,15 +187,22 @@ export class ProductDataService {
   }
 
   // Level 3 Products (Real-time Supabase fetch)
-  async getLevel3Products(): Promise<Level3Product[]> {
+  async getLevel3Products(requireLevel4Config: boolean = false): Promise<Level3Product[]> {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('products')
         .select('*')
         .eq('product_level', 3)
-        .eq('enabled', true)
-        .order('name');
+        .eq('enabled', true);
 
+      // Only filter by requires_level4_config if explicitly requested
+      if (requireLevel4Config) {
+        query = query.eq('requires_level4_config', true);
+      }
+
+      query = query.order('name');
+
+      const { data, error } = await query;
       if (error) throw error;
       return (data || []).map(row => this.transformDbToLevel3(row));
     } catch (error) {
@@ -204,21 +212,65 @@ export class ProductDataService {
   }
 
   // Level 4 Products (Real-time Supabase fetch)
-  async getLevel4Products(): Promise<Level4Product[]> {
+  async getLevel4Products(level3ProductId?: string): Promise<Level4Product[]> {
     try {
-      const { data, error } = await supabase
+      console.log('getLevel4Products called with level3ProductId:', level3ProductId);
+      
+      let query = supabase
         .from('level4_products')
         .select(`
           *,
           options:level4_configuration_options(*)
         `)
-        .eq('enabled', true)
-        .order('name');
+        .eq('enabled', true);
 
-      if (error) throw error;
+      // If a specific Level 3 product ID is provided, filter for its configurations
+      if (level3ProductId) {
+        console.log('Fetching relationships for level3ProductId:', level3ProductId);
+        
+        // First, get the Level 4 product IDs that are related to this Level 3 product
+        const { data: relationships, error: relError, count } = await supabase
+          .from('level3_level4_relationships')
+          .select('level4_product_id', { count: 'exact' })
+          .eq('level3_product_id', level3ProductId);
+
+        if (relError) {
+          console.error('Error fetching relationships:', relError);
+          throw relError;
+        }
+        
+        console.log(`Found ${relationships?.length || 0} relationships for level3ProductId ${level3ProductId}`);
+        
+        // Extract just the level4_product_id values
+        const level4ProductIds = relationships?.map(r => r.level4_product_id) || [];
+        
+        if (level4ProductIds.length > 0) {
+          console.log('Filtering Level 4 products with IDs:', level4ProductIds);
+          // Filter to only include these Level 4 products
+          query = query.in('id', level4ProductIds);
+        } else {
+          console.log('No Level 4 products found for this Level 3 product');
+          return [];
+        }
+      } else {
+        console.log('No level3ProductId provided, fetching all Level 4 products');
+      }
+
+      const { data, error, count } = await query.order('name');
+
+      if (error) {
+        console.error('Error fetching Level 4 products:', error);
+        throw error;
+      }
+
+      console.log(`Fetched ${data?.length || 0} Level 4 products`);
+      if (data && data.length > 0) {
+        console.log('First Level 4 product sample:', JSON.stringify(data[0], null, 2));
+      }
+
       return data || [];
     } catch (error) {
-      console.error('Error fetching Level 4 products:', error);
+      console.error('Error in getLevel4Products:', error);
       return [];
     }
   }
@@ -1036,6 +1088,218 @@ export class ProductDataService {
     }
   }
 
+  // Save Level 4 configuration
+  async saveLevel4Config(productId: string, config: any): Promise<any> {
+    try {
+      const { data, error } = await supabase
+        .from('level4_product_configs')
+        .upsert(
+          {
+            product_id: productId,
+            config_data: config,
+            updated_at: new Date().toISOString()
+          },
+          { 
+            onConflict: 'product_id',
+            returning: 'representation' // Ensure we get the updated/inserted record
+          }
+        )
+        .select()
+        .single();
+
+      if (error) throw error;
+      
+      // Return the saved configuration
+      return data?.config_data || null;
+    } catch (error) {
+      console.error('Error saving Level 4 config:', error);
+      throw error;
+    }
+  }
+
+  // Get Level 4 configuration
+  async getLevel4Config(productId: string): Promise<any> {
+    try {
+      const { data, error } = await supabase
+        .from('level4_product_configs')
+        .select('*')
+        .eq('product_id', productId)
+        .single();
+
+      if (error && error.code !== 'PGRST116') { // PGRST116 is "No rows returned"
+        throw error;
+      }
+
+      return data?.config_data || null;
+    } catch (error) {
+      console.error('Error fetching Level 4 config:', error);
+      throw error;
+    }
+  }
+
+  // Get all Level 4 configurations for a product type
+  async getLevel4ConfigsByType(productType: 'analog' | 'bushing'): Promise<any[]> {
+    try {
+      const { data, error } = await supabase
+        .from('level4_product_configs')
+        .select('*, products!inner(*)')
+        .eq('products.type', productType);
+
+      if (error) throw error;
+      return data.map(item => ({
+        ...item.config_data,
+        productId: item.product_id,
+        product: item.products
+      }));
+    } catch (error) {
+      console.error(`Error fetching ${productType} configs:`, error);
+      throw error;
+    }
+  }
+
+  async getChildProducts(parentId: string): Promise<Level4Product[]> {
+    try {
+      console.log(`Fetching Level 4 products for parent ID: ${parentId}`);
+      
+      // 1. Get all Level 4 products that are children of this parent
+      const { data: level4Products, error: productsError } = await supabase
+        .from('level4_products')
+        .select(`
+          *,
+          options:level4_configuration_options(*)
+        `)
+        .eq('parent_product_id', parentId)
+        .eq('enabled', true)
+        .order('name');
+
+      if (productsError) {
+        console.error('Error fetching Level 4 products:', productsError);
+        throw productsError;
+      }
+
+      console.log(`Found ${level4Products?.length || 0} Level 4 products`);
+
+      // 2. Get any existing configurations for these products
+      const productIds = level4Products?.map(p => p.id) || [];
+      let configurations = {};
+      
+      if (productIds.length > 0) {
+        const { data: configs, error: configError } = await supabase
+          .from('level4_product_configs')
+          .select('*')
+          .in('product_id', productIds);
+          
+        if (configError) {
+          console.error('Error fetching Level 4 configs:', configError);
+        } else {
+          // Create a map of product_id -> config
+          configurations = configs?.reduce((acc, curr) => ({
+            ...acc,
+            [curr.product_id]: curr.config_data
+          }), {}) || {};
+        }
+      }
+
+      // 3. Map to Level4Product format
+      return (level4Products || []).map(product => ({
+        id: product.id,
+        name: product.name,
+        description: product.description || '',
+        type: product.type || 'dropdown',
+        configurationType: product.configuration_type || 'dropdown',
+        price: parseFloat(product.price) || 0,
+        cost: parseFloat(product.cost) || 0,
+        enabled: product.enabled !== false,
+        options: product.options || [],
+        configuration: configurations[product.id] || null,
+        parentProductId: parentId,
+        product_level: 4,
+        requires_level4_config: true
+      }));
+      
+    } catch (error) {
+      console.error('Error in getChildProducts:', error);
+      throw error;
+    }
+  }
+
+  // Create a new product
+  async createProduct(productData: any): Promise<any> {
+    try {
+      // First, create the product in the products table
+      const { data: product, error: productError } = await supabase
+        .from('products')
+        .insert([
+          {
+            name: productData.name,
+            sku: productData.sku,
+            product_level: productData.product_level,
+            parent_product_id: productData.parent_product_id,
+            type: productData.type,
+            requires_level4_config: productData.requires_level4_config,
+            enabled: true,
+            description: productData.description || '',
+            price: productData.price || 0,
+            cost: productData.cost || 0,
+            part_number: productData.partNumber || ''
+          }
+        ])
+        .select()
+        .single();
+
+      if (productError) throw productError;
+
+      // If this is a Level 4 product, create a relationship with its parent
+      if (productData.product_level === 4 && productData.parent_product_id) {
+        const { error: relError } = await supabase
+          .from('level3_level4_relationships')
+          .insert([
+            {
+              level3_product_id: productData.parent_product_id,
+              level4_product_id: product.id
+            }
+          ]);
+
+        if (relError) {
+          console.error('Error creating relationship:', relError);
+          // Don't throw here, as the product was created successfully
+        }
+      }
+
+      return product;
+    } catch (error) {
+      console.error('Error in createProduct:', error);
+      throw error;
+    }
+  }
+
+  // Update an existing product
+  async updateProduct(id: string, updates: any): Promise<any> {
+    try {
+      const { data: product, error } = await supabase
+        .from('products')
+        .update({
+          name: updates.name,
+          sku: updates.sku,
+          type: updates.type,
+          description: updates.description,
+          price: updates.price,
+          cost: updates.cost,
+          part_number: updates.partNumber,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return product;
+    } catch (error) {
+      console.error('Error in updateProduct:', error);
+      throw error;
+    }
+  }
+
   // Debug and utility methods
   async resetAndReload(): Promise<void> {
     console.log('Reset not needed - always fetching fresh data from Supabase');
@@ -1051,6 +1315,186 @@ export class ProductDataService {
       initialized: this.initialized,
       note: 'All data fetched real-time from Supabase'
     };
+  }
+
+  // Get relationships between Level 3 and Level 4 products
+  async getLevel3Level4Relationships(level3ProductId: string) {
+    try {
+      const { data, error } = await supabase
+        .from('level3_level4_relationships')
+        .select('*')
+        .eq('level3_product_id', level3ProductId);
+
+      if (error) throw error;
+      return { data, error: null };
+    } catch (error) {
+      console.error('Error getting Level 3-4 relationships:', error);
+      return { data: null, error };
+    }
+  }
+
+  // Get Level 4 products by IDs
+  async getLevel4ProductsByIds(ids: string[]) {
+    try {
+      if (!ids || ids.length === 0) {
+        return { data: [], error: null };
+      }
+
+      const { data, error } = await supabase
+        .from('level4_products')
+        .select('*')
+        .in('id', ids);
+
+      if (error) throw error;
+      return { data, error: null };
+    } catch (error) {
+      console.error('Error getting Level 4 products by IDs:', error);
+      return { data: null, error };
+    }
+  }
+
+  async debugLevel4Products() {
+    try {
+      console.log('=== DEBUGGING LEVEL 4 PRODUCTS ===');
+      
+      // 1. Get all Level 4 products
+      const { data: level4Products, error: l4Error } = await supabase
+        .from('level4_products')
+        .select('*');
+      
+      if (l4Error) throw l4Error;
+      console.log('All Level 4 products:', level4Products);
+      
+      // 2. Get all relationships
+      const { data: relationships, error: relError } = await supabase
+        .from('level3_level4_relationships')
+        .select('*');
+      
+      if (relError) throw relError;
+      console.log('All Level 3 to Level 4 relationships:', relationships);
+      
+      // 3. Get Level 3 products that should have Level 4 config
+      const { data: level3Products, error: l3Error } = await supabase
+        .from('products')
+        .select('id, name, requires_level4_config, product_level')
+        .eq('requires_level4_config', true);
+      
+      if (l3Error) throw l3Error;
+      console.log('Level 3 products requiring Level 4 config:', level3Products);
+      
+      // 4. Get Level 4 options
+      const { data: options, error: optError } = await supabase
+        .from('level4_configuration_options')
+        .select('*');
+      
+      if (optError) throw optError;
+      console.log('All Level 4 configuration options:', options);
+      
+      return {
+        success: true,
+        level4Products,
+        relationships,
+        level3Products,
+        options
+      };
+      
+    } catch (error) {
+      console.error('Error debugging Level 4 products:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      };
+    }
+  }
+
+  // Ensure required Level 4 products
+  async ensureRequiredLevel4Products() {
+    try {
+      const requiredProducts = [
+        {
+          id: 'bushing-card',
+          name: 'Bushing Monitoring Card',
+          description: 'Bushing monitoring and diagnostics card',
+          configuration_type: 'dropdown',
+          type: 'bushing',
+          price: 0,
+          cost: 0,
+          enabled: true
+        },
+        {
+          id: 'bushing-card-mtx',
+          name: 'Bushing Card (MTX)',
+          description: 'Bushing monitoring card for MTX',
+          configuration_type: 'dropdown',
+          type: 'bushing',
+          price: 0,
+          cost: 0,
+          enabled: true
+        },
+        {
+          id: 'bushing-card-stx',
+          name: 'Bushing Card (STX)',
+          description: 'Bushing monitoring card for STX',
+          configuration_type: 'dropdown',
+          type: 'bushing',
+          price: 0,
+          cost: 0,
+          enabled: true
+        },
+        {
+          id: 'analog-card-multi',
+          name: 'Multi-Input Analog Card',
+          description: 'Multi-input analog monitoring card',
+          configuration_type: 'multiline',
+          type: 'analog',
+          price: 0,
+          cost: 0,
+          enabled: true
+        },
+        {
+          id: 'analog-card-multi-mtx',
+          name: 'Multi-Input Analog Card (MTX)',
+          description: 'Multi-input analog card for MTX',
+          configuration_type: 'multiline',
+          type: 'analog',
+          price: 0,
+          cost: 0,
+          enabled: true
+        },
+        {
+          id: 'analog-card-multi-stx',
+          name: 'Multi-Input Analog Card (STX)',
+          description: 'Multi-input analog card for STX',
+          configuration_type: 'multiline',
+          type: 'analog',
+          price: 0,
+          cost: 0,
+          enabled: true
+        }
+      ];
+
+      for (const product of requiredProducts) {
+        const { error } = await supabase
+          .from('level4_products')
+          .upsert(
+            {
+              ...product,
+              updated_at: new Date().toISOString()
+            },
+            { onConflict: 'id' }
+          );
+        
+        if (error) {
+          console.error(`Error ensuring Level 4 product ${product.id}:`, error);
+        }
+      }
+      
+      console.log('Verified required Level 4 products');
+      
+    } catch (error) {
+      console.error('Error in ensureRequiredLevel4Products:', error);
+      throw error;
+    }
   }
 }
 
