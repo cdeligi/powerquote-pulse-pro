@@ -499,7 +499,128 @@ const handleChassisSelect = (chassis: Level2Product) => {
     });
   };
 
-  const handleCardSelect = (card: Level3Product, slot?: number) => {
+  const handleCardSelect = async (card: Level3Product, slot?: number) => {
+    // Check if the card requires Level 4 configuration
+    const requiresConfig = (card as any).requires_level4_config || card.specifications?.requires_level4_config;
+    
+    if (requiresConfig) {
+      try {
+        // Fetch Level 4 configurations for this card
+        const level4Products = await productDataService.getLevel4Products(card.id);
+        
+        if (level4Products.length > 0) {
+          // Use the first available configuration type
+          const level4Config = level4Products[0];
+          const configurationType = level4Config.configurationType;
+          
+          console.log('Level 4 configuration found:', configurationType, level4Config);
+          
+          if (configurationType === 'analog') {
+            const newItem: BOMItem = {
+              id: `${Date.now()}-${Math.random()}`,
+              product: card,
+              quantity: 1,
+              slot: slot || selectedSlot,
+              enabled: true
+            };
+            setConfiguringCard(newItem);
+            return;
+          } else if (configurationType === 'bushing') {
+            if (isBushingCard(card)) {
+              if (!selectedChassis) return;
+              
+              const placement = findOptimalBushingPlacement(selectedChassis, slotAssignments);
+              if (!placement) {
+                console.error('Cannot place bushing card - no valid placement found');
+                return;
+              }
+
+              setSlotAssignments(prev => {
+                const updated = { ...prev };
+                
+                if (placement.shouldClearExisting) {
+                  placement.existingSlotsToClear.forEach(slotToClear => {
+                    delete updated[slotToClear];
+                  });
+                }
+                
+                updated[placement.primarySlot] = card;
+                updated[placement.secondarySlot] = card;
+                
+                return updated;
+              });
+
+              const newItem: BOMItem = {
+                id: `${Date.now()}-${Math.random()}`,
+                product: card,
+                quantity: 1,
+                slot: placement.primarySlot,
+                enabled: true
+              };
+              setConfiguringCard(newItem);
+              return;
+            }
+          }
+        }
+        
+        // Fallback to name-based detection if no Level 4 config found
+        if (card.name.toLowerCase().includes('analog')) {
+          const newItem: BOMItem = {
+            id: `${Date.now()}-${Math.random()}`,
+            product: card,
+            quantity: 1,
+            slot: slot || selectedSlot,
+            enabled: true
+          };
+          setConfiguringCard(newItem);
+          return;
+        } else if (card.name.toLowerCase().includes('bushing')) {
+          if (isBushingCard(card)) {
+            if (!selectedChassis) return;
+            
+            const placement = findOptimalBushingPlacement(selectedChassis, slotAssignments);
+            if (!placement) {
+              console.error('Cannot place bushing card - no valid placement found');
+              return;
+            }
+
+            setSlotAssignments(prev => {
+              const updated = { ...prev };
+              
+              if (placement.shouldClearExisting) {
+                placement.existingSlotsToClear.forEach(slotToClear => {
+                  delete updated[slotToClear];
+                });
+              }
+              
+              updated[placement.primarySlot] = card;
+              updated[placement.secondarySlot] = card;
+              
+              return updated;
+            });
+
+            const newItem: BOMItem = {
+              id: `${Date.now()}-${Math.random()}`,
+              product: card,
+              quantity: 1,
+              slot: placement.primarySlot,
+              enabled: true
+            };
+            setConfiguringCard(newItem);
+            return;
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching Level 4 configurations:', error);
+        toast({
+          title: 'Error',
+          description: 'Failed to load configuration options',
+          variant: 'destructive',
+        });
+      }
+    }
+
+    // Handle bushing cards without Level 4 config
     if (isBushingCard(card)) {
       if (!selectedChassis) return;
       
@@ -524,31 +645,7 @@ const handleChassisSelect = (chassis: Level2Product) => {
         return updated;
       });
 
-      if ((card as any).requires_level4_config && card.name.toLowerCase().includes('bushing')) {
-        const newItem: BOMItem = {
-          id: `${Date.now()}-${Math.random()}`,
-          product: card,
-          quantity: 1,
-          slot: placement.primarySlot,
-          enabled: true
-        };
-        setConfiguringCard(newItem);
-        return;
-      }
-
       setSelectedSlot(null);
-      return;
-    }
-
-    if ((card as any).requires_level4_config && card.name.toLowerCase().includes('analog')) {
-      const newItem: BOMItem = {
-        id: `${Date.now()}-${Math.random()}`,
-        product: card,
-        quantity: 1,
-        slot: slot || selectedSlot,
-        enabled: true
-      };
-      setConfiguringCard(newItem);
       return;
     }
 

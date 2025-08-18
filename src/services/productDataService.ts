@@ -226,7 +226,8 @@ export class ProductDataService {
         .from('level4_products')
         .select(`
           *,
-          options:level4_configuration_options(*)
+          options:level4_configuration_options(*),
+          configs:level4_product_configs(*)
         `)
         .eq('enabled', true);
 
@@ -763,14 +764,16 @@ export class ProductDataService {
           configuration_type: product.configurationType,
           price: product.price,
           cost: product.cost,
-          enabled: product.enabled,
-          part_number: (product as any).partNumber
+          enabled: product.enabled
         })
         .select()
         .single();
 
       if (error) throw error;
-      return { ...data, options: [] };
+
+      // Configuration handling will be added separately
+
+      return { ...data, options: product.options || [] };
     } catch (error) {
       console.error('Error creating Level 4 product:', error);
       throw error;
@@ -788,15 +791,17 @@ export class ProductDataService {
           configuration_type: updates.configurationType,
           price: updates.price,
           cost: updates.cost,
-          enabled: updates.enabled,
-          part_number: (updates as any).partNumber
+          enabled: updates.enabled
         })
         .eq('id', id)
         .select()
         .single();
 
       if (error) throw error;
-      return { ...data, options: [] };
+
+      // Configuration handling will be added separately
+
+      return { ...data, options: updates.options || [] };
     } catch (error) {
       console.error('Error updating Level 4 product:', error);
       return null;
