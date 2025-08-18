@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Edit3, Trash2, Save, X, Filter } from "lucide-react";
+import { Edit3, Trash2, Save, X, Filter, Settings } from "lucide-react";
 import { Level2Product, Level3Product } from "@/types/product";
 import { productDataService } from "@/services/productDataService";
 import { useToast } from "@/hooks/use-toast";
@@ -40,7 +40,8 @@ export const Level3ProductList: React.FC<Level3ProductListProps> = ({
       description: product.description,
       price: product.price,
       cost: product.cost || 0,
-      enabled: product.enabled !== false
+      enabled: product.enabled !== false,
+      requires_level4_config: product.requires_level4_config || false
     });
   };
 
@@ -191,14 +192,22 @@ export const Level3ProductList: React.FC<Level3ProductListProps> = ({
                         className="bg-white border-gray-300 text-gray-900"
                       />
                     </div>
-                    <div className="flex items-center space-x-2">
-                      <Switch
-                        id={`enabled-${product.id}`}
-                        checked={editFormData.enabled !== false}
-                        onCheckedChange={(checked) => setEditFormData(prev => ({ ...prev, enabled: checked }))}
-                      />
-                      <Label htmlFor={`enabled-${product.id}`} className="text-gray-700">Enabled</Label>
-                    </div>
+                      <div className="flex items-center space-x-2">
+                        <Switch
+                          id={`enabled-${product.id}`}
+                          checked={editFormData.enabled !== false}
+                          onCheckedChange={(checked) => setEditFormData(prev => ({ ...prev, enabled: checked }))}
+                        />
+                        <Label htmlFor={`enabled-${product.id}`} className="text-gray-700">Enabled</Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Switch
+                          id={`requires-level4-${product.id}`}
+                          checked={editFormData.requires_level4_config || false}
+                          onCheckedChange={(checked) => setEditFormData(prev => ({ ...prev, requires_level4_config: checked }))}
+                        />
+                        <Label htmlFor={`requires-level4-${product.id}`} className="text-gray-700">Level 4 Configuration</Label>
+                      </div>
                     <div>
                       <Label htmlFor={`price-${product.id}`} className="text-gray-700">Price ($)</Label>
                       <Input
@@ -270,6 +279,11 @@ export const Level3ProductList: React.FC<Level3ProductListProps> = ({
                                className={product.enabled !== false ? "bg-green-100 text-green-800 border-green-200" : "bg-gray-100 text-gray-600 border-gray-200"}>
                           {product.enabled !== false ? 'Enabled' : 'Disabled'}
                         </Badge>
+                        {product.requires_level4_config && (
+                          <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-200">
+                            L4 Enabled
+                          </Badge>
+                        )}
                       </div>
                     </div>
                     <div className="flex space-x-2 ml-4">
@@ -289,6 +303,16 @@ export const Level3ProductList: React.FC<Level3ProductListProps> = ({
                       >
                         Part Numbers
                       </Button>
+                      {product.requires_level4_config && (
+                        <Button
+                          onClick={() => window.open(`/admin/level4?product=${product.id}`, '_blank')}
+                          variant="outline"
+                          size="sm"
+                          className="border-green-300 text-green-700 hover:bg-green-50"
+                        >
+                          <Settings className="h-4 w-4" />
+                        </Button>
+                      )}
                       <Button
                         onClick={() => handleDelete(product.id, product.name)}
                         variant="outline"

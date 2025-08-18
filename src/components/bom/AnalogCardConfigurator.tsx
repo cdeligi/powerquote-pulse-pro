@@ -3,7 +3,8 @@
  * © 2025 Qualitrol Corp. All rights reserved.
  */
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import { BOMItem, Level3Customization } from "@/types/product/interfaces";
 import { ProductDataService } from "@/services/productDataService";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { X, Save, Info } from "lucide-react";
 
@@ -21,7 +23,8 @@ interface AnalogCardConfiguratorProps {
 }
 
 const AnalogCardConfigurator = ({ bomItem, onSave, onClose }: AnalogCardConfiguratorProps) => {
-  const sensorOptions = ProductDataService.getAnalogSensorTypes();
+  const [sensorOptions, setSensorOptions] = useState(ProductDataService.getAnalogSensorTypes());
+  const [numberOfChannels, setNumberOfChannels] = useState(8);
   const [channelConfigs, setChannelConfigs] = useState<Record<number, string>>(() => {
     // Initialize with existing configurations or default to first sensor type
     const configs: Record<number, string> = {};
@@ -34,12 +37,14 @@ const AnalogCardConfigurator = ({ bomItem, onSave, onClose }: AnalogCardConfigur
     } else {
       const stored = localStorage.getItem(`analogDefaults_${bomItem.product.id}`);
       if (stored) {
-        Object.assign(configs, JSON.parse(stored));
+        const parsed = JSON.parse(stored);
+        if (parsed.numberOfChannels) setNumberOfChannels(parsed.numberOfChannels);
+        if (parsed.configs) Object.assign(configs, parsed.configs);
       }
     }
 
   // Fill in any missing channels with default
-    for (let i = 1; i <= 8; i++) {
+    for (let i = 1; i <= numberOfChannels; i++) {
       if (!configs[i]) {
         configs[i] = sensorOptions[0]?.name || '';
       }
@@ -48,6 +53,38 @@ const AnalogCardConfigurator = ({ bomItem, onSave, onClose }: AnalogCardConfigur
     return configs;
   });
 
+  // Load saved Level 4 configurations for this product
+  useEffect(() => {
+    const loadLevel4Config = async () => {
+      try {
+        const { data: level4Config, error } = await supabase
+          .from('level4_products')
+          .select('*')
+          .eq('parent_level3_id', bomItem.product.id)
+          .single();
+
+        if (error || !level4Config) {
+          console.log('No Level 4 config found for product:', bomItem.product.id);
+          return;
+        }
+
+        const config = level4Config.configuration_data;
+        if (config?.numberOfChannels) {
+          setNumberOfChannels(config.numberOfChannels);
+        }
+        if (config?.sensorOptions) {
+          setSensorOptions(config.sensorOptions);
+        }
+      } catch (error) {
+        console.error('Error loading Level 4 config:', error);
+      }
+    };
+
+    if ((bomItem.product as any).requires_level4_config) {
+      loadLevel4Config();
+    }
+  }, [bomItem.product.id]);
+
   const handleChannelChange = (channel: number, sensorType: string) => {
     setChannelConfigs(prev => ({
       ...prev,
@@ -55,10 +92,30 @@ const AnalogCardConfigurator = ({ bomItem, onSave, onClose }: AnalogCardConfigur
     }));
   };
 
+  const handleNumberOfChannelsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = parseInt(e.target.value, 10);
+    if (isNaN(value) || value < 1 || value > 32) return;
+    
+    setNumberOfChannels(value);
+    
+    // Ensure configurations exist for each channel
+    setChannelConfigs(prev => {
+      const updatedConfigs = { ...prev };
+      const defaultSensor = sensorOptions[0]?.name || '';
+      
+      for (let i = 1; i <= value; i++) {
+        if (!updatedConfigs[i]) {
+          updatedConfigs[i] = defaultSensor;
+        }
+      }
+      return updatedConfigs;
+    });
+  };
+
   const handleSave = () => {
     const customizations: Level3Customization[] = [];
     
-    for (let channel = 1; channel <= 8; channel++) {
+    for (let channel = 1; channel <= numberOfChannels; channel++) {
       const sensorType = channelConfigs[channel];
       customizations.push({
         id: `analog-ch${channel}-${bomItem.id}`,
@@ -98,12 +155,29 @@ const AnalogCardConfigurator = ({ bomItem, onSave, onClose }: AnalogCardConfigur
               <CardHeader>
                 <CardTitle className="text-white text-lg">Channel Configuration</CardTitle>
                 <CardDescription className="text-gray-400">
-                  Configure each of the 8 analog input channels with the appropriate sensor type
+                  Configure the analog input channels with the appropriate sensor types
                 </CardDescription>
               </CardHeader>
               <CardContent>
+                <div className="space-y-4 mb-6">
+                  <div className="space-y-2">
+                    <Label htmlFor="num-channels" className="text-white font-medium">
+                      Number of Channels
+                    </Label>
+                    <Input
+                      id="num-channels"
+                      type="number"
+                      min="1"
+                      max="32"
+                      value={numberOfChannels}
+                      onChange={handleNumberOfChannelsChange}
+                      className="bg-gray-700 border-gray-600 text-white w-32"
+                    />
+                  </div>
+                </div>
+                
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {[1, 2, 3, 4, 5, 6, 7, 8].map((channel) => (
+                  {Array.from({ length: numberOfChannels }, (_, i) => i + 1).map((channel) => (
                     <div key={channel} className="space-y-2">
                       <div className="flex items-center space-x-2">
                         <Label htmlFor={`channel-${channel}`} className="text-white font-medium">
