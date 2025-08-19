@@ -79,7 +79,15 @@ const PartNumberConfigManager: React.FC<PartNumberConfigManagerProps> = ({ initi
           setPrefix(current?.chassisType || "");
           setSlotCount((current?.specifications as any)?.slots || 0);
         }
-        setTemplates(codes);
+        // Convert array to Record format expected by state
+        const codesRecord: Record<string, CodeTemplate> = {};
+        codes.forEach((code: any) => {
+          codesRecord[code.id || code.code] = {
+            template: code.template,
+            slot_span: code.slot_span || 1
+          };
+        });
+        setTemplates(codesRecord);
       } catch (e) {
         console.error(e);
       } finally {

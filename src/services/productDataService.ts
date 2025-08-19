@@ -838,6 +838,44 @@ export class ProductDataService {
     }
   }
 
+  async getAnalogSensorTypes(): Promise<any[]> {
+    try {
+      const { data, error } = await supabase
+        .from('analog_sensor_types')
+        .select('*')
+        .order('name');
+
+      if (error) {
+        console.error('Error fetching analog sensor types:', error);
+        throw error;
+      }
+
+      return data || [];
+    } catch (error) {
+      console.error('Error in getAnalogSensorTypes:', error);
+      return [];
+    }
+  }
+
+  async getBushingTapModels(): Promise<any[]> {
+    try {
+      const { data, error } = await supabase
+        .from('bushing_tap_models')
+        .select('*')
+        .order('name');
+
+      if (error) {
+        console.error('Error fetching bushing tap models:', error);
+        throw error;
+      }
+
+      return data || [];
+    } catch (error) {
+      console.error('Error in getBushingTapModels:', error);
+      return [];
+    }
+  }
+
   static async getAnalogSensorTypes(): Promise<any[]> {
     try {
       const { data, error } = await supabase
@@ -874,6 +912,146 @@ export class ProductDataService {
       console.error('Error in getBushingTapModels:', error);
       return [];
     }
+  }
+
+  // Product category methods
+  async getDGAProducts(): Promise<Level1Product[]> {
+    const { data, error } = await supabase
+      .from('products')
+      .select('*')
+      .eq('product_level', 1)
+      .eq('enabled', true)
+      .ilike('category', '%DGA%');
+    
+    if (error) throw error;
+    return (data || []).map(item => ({
+      id: item.id,
+      name: item.name,
+      type: item.type || 'DGA',
+      description: item.description || '',
+      price: Number(item.price) || 0,
+      cost: Number(item.cost) || 0,
+      enabled: item.enabled
+    }));
+  }
+
+  async getPDProducts(): Promise<Level1Product[]> {
+    const { data, error } = await supabase
+      .from('products')
+      .select('*')
+      .eq('product_level', 1)
+      .eq('enabled', true)
+      .ilike('category', '%PD%');
+    
+    if (error) throw error;
+    return (data || []).map(item => ({
+      id: item.id,
+      name: item.name,
+      type: item.type || 'PD',
+      description: item.description || '',
+      price: Number(item.price) || 0,
+      cost: Number(item.cost) || 0,
+      enabled: item.enabled
+    }));
+  }
+
+  async getLevel2ProductsByCategory(category: string): Promise<Level2Product[]> {
+    const { data, error } = await supabase
+      .from('products')
+      .select('*')
+      .eq('product_level', 2)
+      .eq('enabled', true)
+      .eq('category', category);
+    
+    if (error) throw error;
+    return (data || []).map(item => ({
+      id: item.id,
+      name: item.name,
+      description: item.description || '',
+      price: Number(item.price) || 0,
+      cost: Number(item.cost) || 0,
+      enabled: item.enabled,
+      parentProductId: item.parent_product_id
+    }));
+  }
+
+  async getLevel2ProductsForLevel1(parentId: string): Promise<Level2Product[]> {
+    const { data, error } = await supabase
+      .from('products')
+      .select('*')
+      .eq('product_level', 2)
+      .eq('enabled', true)
+      .eq('parent_product_id', parentId);
+    
+    if (error) throw error;
+    return (data || []).map(item => ({
+      id: item.id,
+      name: item.name,
+      description: item.description || '',
+      price: Number(item.price) || 0,
+      cost: Number(item.cost) || 0,
+      enabled: item.enabled,
+      parentProductId: item.parent_product_id
+    }));
+  }
+
+  async deleteLevel3Product(id: string): Promise<void> {
+    const { error } = await supabase
+      .from('products')
+      .delete()
+      .eq('id', id);
+    
+    if (error) throw error;
+  }
+
+  async getLevel4ProductsByIds(ids: string[]): Promise<Level4Product[]> {
+    if (!ids.length) return [];
+    
+    const { data, error } = await supabase
+      .from('products')
+      .select('*')
+      .eq('product_level', 4)
+      .in('id', ids);
+    
+    if (error) throw error;
+    return (data || []).map(item => ({
+      id: item.id,
+      name: item.name,
+      description: item.description || '',
+      price: Number(item.price) || 0,
+      cost: Number(item.cost) || 0,
+      enabled: item.enabled,
+      parentProductId: item.parent_product_id,
+      configurationType: item.configuration_type || 'dropdown',
+      options: []
+    }));
+  }
+
+  async getChassisOptions(): Promise<Level2Product[]> {
+    return this.getLevel2ProductsByCategory('QTMS');
+  }
+
+  async saveChassis(chassis: Partial<Level2Product>): Promise<Level2Product> {
+    const { data, error } = await supabase
+      .from('products')
+      .upsert({
+        ...chassis,
+        product_level: 2,
+        category: 'QTMS'
+      })
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return {
+      id: data.id,
+      name: data.name,
+      description: data.description || '',
+      price: Number(data.price) || 0,
+      cost: Number(data.cost) || 0,
+      enabled: data.enabled,
+      parentProductId: data.parent_product_id
+    };
   }
 
   getLevel1ProductsSync(): Level1Product[] {
