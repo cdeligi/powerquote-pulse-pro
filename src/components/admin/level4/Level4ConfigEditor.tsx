@@ -1,23 +1,18 @@
-
 import React, { useState, useEffect } from 'react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plus, Trash2, Save } from 'lucide-react';
-import { Level4Product } from '@/types/product';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Loader2, Save } from 'lucide-react';
+import { toast } from "@/components/ui/use-toast";
+import { BushingCardConfig, BushingInputConfig, BushingTapModel } from './BushingCardConfig';
+import { AnalogCardConfig, AnalogInputConfig, AnalogInputType } from './AnalogCardConfig';
 import { productDataService } from '@/services/productDataService';
-import { toast } from 'sonner';
 
-interface Level4ConfigEditorProps {
+export interface Level4ConfigEditorProps {
   productId: string;
-  productType: 'analog' | 'bushing';
-  onSave: (productData: Level4Product | Omit<Level4Product, 'id'>) => Promise<void>;
-  onCancel: () => void;
+  productType: 'bushing' | 'analog';
+  onSave?: (configData: any) => void;
+  onCancel?: () => void;
 }
 
 export const Level4ConfigEditor: React.FC<Level4ConfigEditorProps> = ({
@@ -26,276 +21,170 @@ export const Level4ConfigEditor: React.FC<Level4ConfigEditorProps> = ({
   onSave,
   onCancel
 }) => {
-  const [product, setProduct] = useState<Level4Product | null>(null);
-  const [configJson, setConfigJson] = useState<string>('');
-  const [basicInfo, setBasicInfo] = useState({
-    name: '',
-    description: '',
-    price: 0,
-    cost: 0
-  });
-  const [loading, setLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [activeTab, setActiveTab] = useState<'bushing' | 'analog'>(productType);
 
+  // Bushing card state
+  const [bushingConfig, setBushingConfig] = useState({
+    maxInputs: 6,
+    bushingTapModels: [] as BushingTapModel[],
+    inputs: [] as BushingInputConfig[]
+  });
+
+  // Analog card state
+  const [analogConfig, setAnalogConfig] = useState({
+    inputTypes: [] as AnalogInputType[],
+    inputs: [] as AnalogInputConfig[]
+  });
+
+  // Load configuration when component mounts or productId changes
   useEffect(() => {
-    loadProductData();
-  }, [productId]);
-
-  const loadProductData = async () => {
-    try {
-      setLoading(true);
-      const products = await productDataService.getLevel4ProductsByIds([productId]);
-      const productData = products[0];
-      
-      if (productData) {
-        setProduct(productData);
-        setBasicInfo({
-          name: productData.name,
-          description: productData.description || '',
-          price: productData.price,
-          cost: productData.cost
-        });
+    const loadConfig = async () => {
+      try {
+        setIsLoading(true);
         
-        // Load configuration JSON
-        if (productData.configuration) {
-          setConfigJson(JSON.stringify(productData.configuration, null, 2));
+        // Load the product configuration
+        const config = await productDataService.getLevel4Config(productId);
+        
+        if (productType === 'bushing') {
+          setBushingConfig({
+            maxInputs: config?.maxInputs || 6,
+            bushingTapModels: config?.bushingTapModels || [
+              { id: 'model-1', name: 'Standard Bushing', partNumber: 'BUSH-001' },
+              { id: 'model-2', name: 'High-Voltage Bushing', partNumber: 'BUSH-002' },
+            ],
+            inputs: config?.inputs || Array(6).fill(0).map((_, i) => ({
+              id: `input-${i}`,
+              enabled: i < 4, // Enable first 4 by default
+              selectedModelId: i < 4 ? 'model-1' : undefined
+            }))
+          });
         } else {
-          // Set default configuration based on product type
-          const defaultConfig = productType === 'analog' 
-            ? getDefaultAnalogConfig()
-            : getDefaultBushingConfig();
-          setConfigJson(JSON.stringify(defaultConfig, null, 2));
+          setAnalogConfig({
+            inputTypes: config?.inputTypes || [
+              { id: 'type-1', name: '4-20mA', unit: 'mA', minValue: 4, maxValue: 20 },
+              { id: 'type-2', name: '0-10V', unit: 'V', minValue: 0, maxValue: 10 },
+              { id: 'type-3', name: 'Temperature', unit: '°C', minValue: -20, maxValue: 120 },
+            ],
+            inputs: config?.inputs || Array(8).fill(0).map((_, i) => ({
+              id: `input-${i}`,
+              enabled: i < 4, // Enable first 4 by default
+              customName: `Input ${i + 1}`,
+              selectedTypeId: i < 4 ? 'type-1' : undefined
+            }))
+          });
         }
+      } catch (error) {
+        console.error('Error loading configuration:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load configuration. Using default values.",
+          variant: "destructive",
+        });
+      } finally {
+        setIsLoading(false);
       }
-    } catch (error) {
-      console.error('Error loading product data:', error);
-      toast.error('Failed to load product data');
-    } finally {
-      setLoading(false);
-    }
-  };
+    };
 
-  const getDefaultAnalogConfig = () => ({
-    channels: [
-      {
-        number: 1,
-        name: "Channel 1",
-        type: "4-20mA",
-        enabled: true,
-        scalingFactor: 1.0,
-        offset: 0.0,
-        units: "mA"
-      }
-    ],
-    samplingRate: 1000,
-    resolution: 16,
-    calibration: {
-      zeroOffset: 0,
-      fullScaleGain: 1
-    }
-  });
-
-  const getDefaultBushingConfig = () => ({
-    bushings: [
-      {
-        id: "tap1",
-        name: "H1",
-        tapModel: "",
-        partNumber: "",
-        position: { x: 100, y: 100 },
-        isSelected: false
-      }
-    ],
-    connectionType: "wye",
-    voltageLevel: "15kV",
-    insulationType: "oil"
-  });
+    loadConfig();
+  }, [productId, productType]);
 
   const handleSave = async () => {
     try {
-      setLoading(true);
+      setIsSaving(true);
       
-      // Parse and validate JSON
-      let configData;
-      try {
-        configData = JSON.parse(configJson);
-      } catch (error) {
-        toast.error('Invalid JSON configuration');
-        return;
+      // Prepare the configuration data based on the active tab
+      const configData = activeTab === 'bushing' 
+        ? { 
+            type: 'bushing',
+            maxInputs: bushingConfig.maxInputs,
+            bushingTapModels: bushingConfig.bushingTapModels,
+            inputs: bushingConfig.inputs
+          }
+        : { 
+            type: 'analog',
+            inputTypes: analogConfig.inputTypes,
+            inputs: analogConfig.inputs
+          };
+      
+      // Call the onSave callback with the configuration data
+      if (onSave) {
+        await onSave(configData);
       }
-
-      // Save configuration data
-      await productDataService.saveLevel4Config(productId, configData);
       
-      // Update basic product info
-      const updatedProduct: Level4Product = {
-        ...product!,
-        ...basicInfo,
-        configuration: configData
-      };
-
-      await onSave(updatedProduct);
-      toast.success('Configuration saved successfully');
     } catch (error) {
-      console.error('Error saving configuration:', error);
-      toast.error('Failed to save configuration');
+      console.error('Error in handleSave:', error);
+      // The error will be handled by the parent component
+      throw error;
     } finally {
-      setLoading(false);
+      setIsSaving(false);
     }
   };
 
-  const addBushingTap = () => {
-    try {
-      const config = JSON.parse(configJson);
-      if (config.bushings) {
-        const newTap = {
-          id: `tap${config.bushings.length + 1}`,
-          name: `Tap ${config.bushings.length + 1}`,
-          tapModel: "",
-          partNumber: "",
-          position: { x: 100 + (config.bushings.length * 50), y: 100 },
-          isSelected: false
-        };
-        config.bushings.push(newTap);
-        setConfigJson(JSON.stringify(config, null, 2));
-      }
-    } catch (error) {
-      toast.error('Invalid JSON configuration');
-    }
-  };
-
-  const addAnalogChannel = () => {
-    try {
-      const config = JSON.parse(configJson);
-      if (config.channels) {
-        const newChannel = {
-          number: config.channels.length + 1,
-          name: `Channel ${config.channels.length + 1}`,
-          type: "4-20mA",
-          enabled: true,
-          scalingFactor: 1.0,
-          offset: 0.0,
-          units: "mA"
-        };
-        config.channels.push(newChannel);
-        setConfigJson(JSON.stringify(config, null, 2));
-      }
-    } catch (error) {
-      toast.error('Invalid JSON configuration');
-    }
-  };
-
-  if (loading) {
-    return <div className="flex justify-center p-8">Loading...</div>;
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin" />
+        <span className="ml-2">Loading configuration...</span>
+      </div>
+    );
   }
 
   return (
     <div className="space-y-6">
-      <Tabs defaultValue="basic" className="w-full">
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="basic">Basic Information</TabsTrigger>
-          <TabsTrigger value="config">Configuration</TabsTrigger>
+      <Tabs 
+        value={activeTab} 
+        onValueChange={(value) => setActiveTab(value as 'bushing' | 'analog')}
+        className="w-full"
+      >
+        <TabsList className="grid w-full grid-cols-2 max-w-md">
+          <TabsTrigger value="bushing">Bushing Card</TabsTrigger>
+          <TabsTrigger value="analog">Analog Card</TabsTrigger>
         </TabsList>
         
-        <TabsContent value="basic" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Product Information</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <Label htmlFor="name">Name</Label>
-                <Input
-                  id="name"
-                  value={basicInfo.name}
-                  onChange={(e) => setBasicInfo(prev => ({ ...prev, name: e.target.value }))}
-                />
-              </div>
-              
-              <div>
-                <Label htmlFor="description">Description</Label>
-                <Textarea
-                  id="description"
-                  value={basicInfo.description}
-                  onChange={(e) => setBasicInfo(prev => ({ ...prev, description: e.target.value }))}
-                  rows={3}
-                />
-              </div>
-              
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="price">Price ($)</Label>
-                  <Input
-                    id="price"
-                    type="number"
-                    step="0.01"
-                    value={basicInfo.price}
-                    onChange={(e) => setBasicInfo(prev => ({ ...prev, price: parseFloat(e.target.value) || 0 }))}
-                  />
-                </div>
-                
-                <div>
-                  <Label htmlFor="cost">Cost ($)</Label>
-                  <Input
-                    id="cost"
-                    type="number"
-                    step="0.01"
-                    value={basicInfo.cost}
-                    onChange={(e) => setBasicInfo(prev => ({ ...prev, cost: parseFloat(e.target.value) || 0 }))}
-                  />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+        <TabsContent value="bushing" className="mt-6">
+          <BushingCardConfig 
+            value={bushingConfig}
+            onChange={setBushingConfig}
+          />
         </TabsContent>
         
-        <TabsContent value="config" className="space-y-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle>
-                {productType === 'analog' ? 'Analog Card' : 'Bushing Card'} Configuration
-              </CardTitle>
-              <div className="flex gap-2">
-                {productType === 'bushing' && (
-                  <Button size="sm" onClick={addBushingTap}>
-                    <Plus className="h-4 w-4 mr-1" />
-                    Add Tap
-                  </Button>
-                )}
-                {productType === 'analog' && (
-                  <Button size="sm" onClick={addAnalogChannel}>
-                    <Plus className="h-4 w-4 mr-1" />
-                    Add Channel
-                  </Button>
-                )}
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div>
-                <Label htmlFor="configJson">Configuration JSON</Label>
-                <ScrollArea className="h-[400px] w-full border rounded">
-                  <Textarea
-                    id="configJson"
-                    value={configJson}
-                    onChange={(e) => setConfigJson(e.target.value)}
-                    className="min-h-[380px] font-mono text-sm resize-none border-0"
-                    placeholder="Enter configuration JSON..."
-                  />
-                </ScrollArea>
-              </div>
-            </CardContent>
-          </Card>
+        <TabsContent value="analog" className="mt-6">
+          <AnalogCardConfig 
+            value={analogConfig}
+            onChange={setAnalogConfig}
+          />
         </TabsContent>
       </Tabs>
 
-      <div className="flex justify-end gap-2">
-        <Button variant="outline" onClick={onCancel}>
+      <div className="flex justify-end space-x-4 pt-6">
+        <Button 
+          variant="outline" 
+          onClick={onCancel}
+          disabled={isSaving}
+        >
           Cancel
         </Button>
-        <Button onClick={handleSave} disabled={loading}>
-          <Save className="h-4 w-4 mr-1" />
-          {loading ? 'Saving...' : 'Save Configuration'}
+        <Button 
+          onClick={handleSave}
+          disabled={isSaving}
+        >
+          {isSaving ? (
+            <>
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              Saving...
+            </>
+          ) : (
+            <>
+              <Save className="h-4 w-4 mr-2" />
+              Save Configuration
+            </>
+          )}
         </Button>
       </div>
     </div>
   );
 };
+
+export default Level4ConfigEditor;

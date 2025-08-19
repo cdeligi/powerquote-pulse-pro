@@ -52,15 +52,7 @@ export const Level3ProductList: React.FC<Level3ProductListProps> = ({
     (async () => {
       if (parentFilter === 'all') { setParentCodes({}); return; }
       const codes = await productDataService.getPartNumberCodesForLevel2(parentFilter);
-      // Convert array to Record format expected by state
-      const codesRecord: Record<string, { template: string; slot_span: number }> = {};
-      codes.forEach((code: any) => {
-        codesRecord[code.id || code.code] = {
-          template: code.template,
-          slot_span: code.slot_span || 1
-        };
-      });
-      if (mounted) setParentCodes(codesRecord);
+      if (mounted) setParentCodes(codes);
     })();
     return () => { mounted = false; };
   }, [parentFilter]);

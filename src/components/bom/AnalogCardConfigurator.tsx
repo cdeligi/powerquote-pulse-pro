@@ -23,14 +23,14 @@ interface AnalogCardConfiguratorProps {
 }
 
 const AnalogCardConfigurator = ({ bomItem, onSave, onClose }: AnalogCardConfiguratorProps) => {
-  const [sensorOptions, setSensorOptions] = useState<any[]>([]);
+  const [sensorOptions, setSensorOptions] = useState(ProductDataService.getAnalogSensorTypes());
   const [numberOfChannels, setNumberOfChannels] = useState(8);
   const [channelConfigs, setChannelConfigs] = useState<Record<number, string>>(() => {
     // Initialize with existing configurations or default to first sensor type
     const configs: Record<number, string> = {};
     if (bomItem.level3Customizations) {
       bomItem.level3Customizations.forEach((config, index) => {
-        if (config.name) {
+        if (config.name && sensorOptions.some(s => s.name === config.name)) {
           configs[index + 1] = config.name;
         }
       });
@@ -53,18 +53,8 @@ const AnalogCardConfigurator = ({ bomItem, onSave, onClose }: AnalogCardConfigur
     return configs;
   });
 
-  // Load sensor options and Level 4 configurations for this product
+  // Load saved Level 4 configurations for this product
   useEffect(() => {
-    const loadSensorOptions = async () => {
-      try {
-        const options = await ProductDataService.getAnalogSensorTypes();
-        setSensorOptions(options);
-      } catch (error) {
-        console.error('Error loading sensor options:', error);
-      }
-    };
-    
-    loadSensorOptions();
     const loadLevel4Config = async () => {
       try {
         const { data: level4Config, error } = await supabase
