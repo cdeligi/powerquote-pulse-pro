@@ -13,6 +13,7 @@ import BOMDisplay from './BOMDisplay';
 import AnalogCardConfigurator from './AnalogCardConfigurator';
 import BushingCardConfigurator from './BushingCardConfigurator';
 import NonChassisConfigurator from './NonChassisConfigurator';
+import { Level4Configurator } from './Level4Configurator';
 
 import { productDataService } from '@/services/productDataService';
 import QuoteFieldsSection from './QuoteFieldsSection';
@@ -50,75 +51,75 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
   const [bomItems, setBomItems] = useState<BOMItem[]>([]);
   const [activeTab, setActiveTab] = useState<string>('');
   const [hasRemoteDisplay, setHasRemoteDisplay] = useState<boolean>(false);
-  const [configuringCard, setConfiguringCard] = useState<BOMItem | null>(null);
+  const [configuringCard, setConfiguringCard] = useState<BOMItem | null>(null); // Legacy, to be removed
+  const [configuringLevel4Item, setConfiguringLevel4Item] = useState<BOMItem | null>(null);
   const [configuringBOMItem, setConfiguringBOMItem] = useState<BOMItem | null>(null);
   const [quoteFields, setQuoteFields] = useState<Record<string, any>>({});
   const [discountPercentage, setDiscountPercentage] = useState<number>(0);
   const [discountJustification, setDiscountJustification] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-const [editingQTMS, setEditingQTMS] = useState<ConsolidatedQTMS | null>(null);
-const [configuringChassis, setConfiguringChassis] = useState<Level2Product | null>(null);
-const [editingOriginalItem, setEditingOriginalItem] = useState<BOMItem | null>(null);
-const [configuringNonChassis, setConfiguringNonChassis] = useState<Level2Product | null>(null);
+  const [editingQTMS, setEditingQTMS] = useState<ConsolidatedQTMS | null>(null);
+  const [configuringChassis, setConfiguringChassis] = useState<Level2Product | null>(null);
+  const [editingOriginalItem, setEditingOriginalItem] = useState<BOMItem | null>(null);
+  const [configuringNonChassis, setConfiguringNonChassis] = useState<Level2Product | null>(null);
 
-// Admin-driven part number config and codes for the selected chassis
-const [pnConfig, setPnConfig] = useState<any | null>(null);
-const [codeMap, setCodeMap] = useState<Record<string, { template: string; slot_span: number; is_standard?: boolean; standard_position?: number | null; designated_only?: boolean; designated_positions?: number[]; outside_chassis?: boolean; notes?: string | null; exclusive_in_slots?: boolean; color?: string | null }>>({});
-const [level3Products, setLevel3Products] = useState<Level3Product[]>([]);
-const [autoPlaced, setAutoPlaced] = useState(false);
-const [selectedAccessories, setSelectedAccessories] = useState<Set<string>>(new Set());
+  // Admin-driven part number config and codes for the selected chassis
+  const [pnConfig, setPnConfig] = useState<any | null>(null);
+  const [codeMap, setCodeMap] = useState<Record<string, { template: string; slot_span: number; is_standard?: boolean; standard_position?: number | null; designated_only?: boolean; designated_positions?: number[]; outside_chassis?: boolean; notes?: string | null; exclusive_in_slots?: boolean; color?: string | null }>>({});
+  const [level3Products, setLevel3Products] = useState<Level3Product[]>([]);
+  const [autoPlaced, setAutoPlaced] = useState(false);
+  const [selectedAccessories, setSelectedAccessories] = useState<Set<string>>(new Set());
 
-// Hints for standard slot positions not yet filled (top-level to avoid conditional hooks)
-const standardSlotHints = useMemo(() => {
-  const hints: Record<number, string[]> = {};
-  const nameById = Object.fromEntries(level3Products.map(p => [p.id, p.name] as const));
-  Object.entries(codeMap).forEach(([l3Id, def]) => {
-    if (!def?.is_standard || def?.outside_chassis) return;
-    const pos = def.standard_position;
-    // Skip CPU std position (0) and ignore outside-chassis items
-    if (pos === 0 || pos === null || pos === undefined) return;
-    if (!slotAssignments[pos]) {
-      const name = nameById[l3Id] || 'Standard Item';
-      hints[pos] = hints[pos] ? [...hints[pos], name] : [name];
-    }
-  });
-  return hints;
-}, [codeMap, level3Products, slotAssignments]);
-
-// Map configured colors by Level3 id from admin codeMap
-const colorByProductId = useMemo(() => {
-  const map: Record<string, string> = {};
-  Object.entries(codeMap).forEach(([id, def]) => {
-    if (def && def.color) map[id] = def.color as string;
-  });
-  return map;
-}, [codeMap]);
-
-
-// Accessories list from admin config (outside_chassis)
-const accessories = useMemo(() => {
-  return level3Products
-    .filter(p => codeMap[p.id]?.outside_chassis)
-    .map(p => {
-      const template = codeMap[p.id]?.template as string | undefined;
-      const pn = template ? String(template).replace(/\{[^}]+\}/g, '') : (p.partNumber || undefined);
-      return {
-        product: p,
-        selected: selectedAccessories.has(p.id),
-        color: (codeMap[p.id]?.color as string | null) || null,
-        pn,
-      };
+  // Hints for standard slot positions not yet filled (top-level to avoid conditional hooks)
+  const standardSlotHints = useMemo(() => {
+    const hints: Record<number, string[]> = {};
+    const nameById = Object.fromEntries(level3Products.map(p => [p.id, p.name] as const));
+    Object.entries(codeMap).forEach(([l3Id, def]) => {
+      if (!def?.is_standard || def?.outside_chassis) return;
+      const pos = def.standard_position;
+      // Skip CPU std position (0) and ignore outside-chassis items
+      if (pos === 0 || pos === null || pos === undefined) return;
+      if (!slotAssignments[pos]) {
+        const name = nameById[l3Id] || 'Standard Item';
+        hints[pos] = hints[pos] ? [...hints[pos], name] : [name];
+      }
     });
-}, [level3Products, codeMap, selectedAccessories]);
+    return hints;
+  }, [codeMap, level3Products, slotAssignments]);
 
-const toggleAccessory = (id: string) => {
-  setSelectedAccessories(prev => {
-    const next = new Set(prev);
-    if (next.has(id)) next.delete(id);
-    else next.add(id);
-    return next;
-  });
-};
+  // Map configured colors by Level3 id from admin codeMap
+  const colorByProductId = useMemo(() => {
+    const map: Record<string, string> = {};
+    Object.entries(codeMap).forEach(([id, def]) => {
+      if (def && def.color) map[id] = def.color as string;
+    });
+    return map;
+  }, [codeMap]);
+
+  // Accessories list from admin config (outside_chassis)
+  const accessories = useMemo(() => {
+    return level3Products
+      .filter(p => codeMap[p.id]?.outside_chassis)
+      .map(p => {
+        const template = codeMap[p.id]?.template as string | undefined;
+        const pn = template ? String(template).replace(/\{[^}]+\}/g, '') : (p.partNumber || undefined);
+        return {
+          product: p,
+          selected: selectedAccessories.has(p.id),
+          color: (codeMap[p.id]?.color as string | null) || null,
+          pn,
+        };
+      });
+  }, [level3Products, codeMap, selectedAccessories]);
+
+  const toggleAccessory = (id: string) => {
+    setSelectedAccessories(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
 
   // Get available quote fields for validation
   const [availableQuoteFields, setAvailableQuoteFields] = useState<any[]>([]);
@@ -275,68 +276,68 @@ const toggleAccessory = (id: string) => {
     })();
   };
 
-const handleChassisSelect = (chassis: Level2Product) => {
-  console.log('Chassis selected:', chassis.name, 'chassisType:', chassis.chassisType);
-  setSelectedChassis(chassis);
+  const handleChassisSelect = (chassis: Level2Product) => {
+    console.log('Chassis selected:', chassis.name, 'chassisType:', chassis.chassisType);
+    setSelectedChassis(chassis);
 
-  if (chassis.chassisType && chassis.chassisType !== 'N/A') {
-    console.log('Setting up chassis configuration for:', chassis.name);
-    setConfiguringChassis(chassis);
-    setSlotAssignments({});
-    setSelectedSlot(null);
+    if (chassis.chassisType && chassis.chassisType !== 'N/A') {
+      console.log('Setting up chassis configuration for:', chassis.name);
+      setConfiguringChassis(chassis);
+      setSlotAssignments({});
+      setSelectedSlot(null);
 
-    // Load admin config and codes for this chassis
-    (async () => {
-      try {
-        const [cfg, codes, l3] = await Promise.all([
-          productDataService.getPartNumberConfig(chassis.id),
-          productDataService.getPartNumberCodesForLevel2(chassis.id),
-          productDataService.getLevel3ProductsForLevel2(chassis.id)
-        ]);
-        setPnConfig(cfg);
-        setCodeMap(codes);
-        setLevel3Products(l3);
-        setAutoPlaced(false);
-        
-        // Auto-include standard items based on admin configuration
-        const autoIncludeAssignments: Record<number, Level3Product> = {};
-        
-        // Check for standard items to auto-include
-        Object.entries(codes).forEach(([l3Id, def]) => {
-          if (def?.is_standard && !def?.outside_chassis) {
-            const standardProduct = l3.find(p => p.id === l3Id);
-            if (standardProduct && def.standard_position !== null && def.standard_position !== undefined) {
-              // Use the exact position from admin config - no remapping needed
-              const position = def.standard_position;
-              autoIncludeAssignments[position] = standardProduct;
-              console.log(`Auto-including standard item "${standardProduct.name}" at position ${position}`);
+      // Load admin config and codes for this chassis
+      (async () => {
+        try {
+          const [cfg, codes, l3] = await Promise.all([
+            productDataService.getPartNumberConfig(chassis.id),
+            productDataService.getPartNumberCodesForLevel2(chassis.id),
+            productDataService.getLevel3ProductsForLevel2(chassis.id)
+          ]);
+          setPnConfig(cfg);
+          setCodeMap(codes);
+          setLevel3Products(l3);
+          setAutoPlaced(false);
+          
+          // Auto-include standard items based on admin configuration
+          const autoIncludeAssignments: Record<number, Level3Product> = {};
+          
+          // Check for standard items to auto-include
+          Object.entries(codes).forEach(([l3Id, def]) => {
+            if (def?.is_standard && !def?.outside_chassis) {
+              const standardProduct = l3.find(p => p.id === l3Id);
+              if (standardProduct && def.standard_position !== null && def.standard_position !== undefined) {
+                // Use the exact position from admin config - no remapping needed
+                const position = def.standard_position;
+                autoIncludeAssignments[position] = standardProduct;
+                console.log(`Auto-including standard item "${standardProduct.name}" at position ${position}`);
+              }
             }
-          }
-        });
-        
-        if (Object.keys(autoIncludeAssignments).length > 0) {
-          setSlotAssignments(autoIncludeAssignments);
-          toast({
-            title: 'Standard Items Added',
-            description: `${Object.keys(autoIncludeAssignments).length} standard items have been automatically included.`,
           });
+          
+          if (Object.keys(autoIncludeAssignments).length > 0) {
+            setSlotAssignments(autoIncludeAssignments);
+            toast({
+              title: 'Standard Items Added',
+              description: `${Object.keys(autoIncludeAssignments).length} standard items have been automatically included.`,
+            });
+          }
+          
+        } catch (e) {
+          console.error('Failed to load PN config/codes for chassis:', e);
         }
-        
-      } catch (e) {
-        console.error('Failed to load PN config/codes for chassis:', e);
-      }
-    })();
+      })();
 
-    setTimeout(() => {
-      const configSection = document.getElementById('chassis-configuration');
-      if (configSection) {
-        configSection.scrollIntoView({ behavior: 'smooth' });
-      }
-    }, 100);
-  } else {
-    handleAddToBOM(chassis);
-  }
-};
+      setTimeout(() => {
+        const configSection = document.getElementById('chassis-configuration');
+        if (configSection) {
+          configSection.scrollIntoView({ behavior: 'smooth' });
+        }
+      }, 100);
+    } else {
+      handleAddToBOM(chassis);
+    }
+  };
 
   const handleAddNonChassisToBOM = (customPartNumber?: string) => {
     if (!configuringNonChassis) return;
@@ -500,55 +501,16 @@ const handleChassisSelect = (chassis: Level2Product) => {
   };
 
   const handleCardSelect = (card: Level3Product, slot?: number) => {
-    if (isBushingCard(card)) {
-      if (!selectedChassis) return;
-      
-      const placement = findOptimalBushingPlacement(selectedChassis, slotAssignments);
-      if (!placement) {
-        console.error('Cannot place bushing card - no valid placement found');
-        return;
-      }
-
-      setSlotAssignments(prev => {
-        const updated = { ...prev };
-        
-        if (placement.shouldClearExisting) {
-          placement.existingSlotsToClear.forEach(slotToClear => {
-            delete updated[slotToClear];
-          });
-        }
-        
-        updated[placement.primarySlot] = card;
-        updated[placement.secondarySlot] = card;
-        
-        return updated;
-      });
-
-      if ((card as any).requires_level4_config && card.name.toLowerCase().includes('bushing')) {
-        const newItem: BOMItem = {
-          id: `${Date.now()}-${Math.random()}`,
-          product: card,
-          quantity: 1,
-          slot: placement.primarySlot,
-          enabled: true
-        };
-        setConfiguringCard(newItem);
-        return;
-      }
-
-      setSelectedSlot(null);
-      return;
-    }
-
-    if ((card as any).requires_level4_config && card.name.toLowerCase().includes('analog')) {
+    // NEW GENERIC LEVEL 4 CONFIGURATION HANDLING
+    if ((card as any).requires_level4_config) {
       const newItem: BOMItem = {
-        id: `${Date.now()}-${Math.random()}`,
+        id: `${card.id}-${Date.now()}`,
         product: card,
         quantity: 1,
         slot: slot || selectedSlot,
-        enabled: true
+        enabled: true,
       };
-      setConfiguringCard(newItem);
+      setConfiguringLevel4Item(newItem);
       return;
     }
 
@@ -574,6 +536,28 @@ const handleChassisSelect = (chassis: Level2Product) => {
     }
   };
 
+  const handleLevel4Save = (configuredItem: BOMItem) => {
+    if (configuredItem.slot !== undefined && configuredItem.slot !== null) {
+      // If the item is meant for a slot, add it to the slot assignments
+      setSlotAssignments(prev => ({
+        ...prev,
+        [configuredItem.slot!]: configuredItem.product as Level3Product,
+      }));
+    } else {
+      // Otherwise, add it directly to the BOM as a standalone item
+      const updatedItems = [...bomItems, configuredItem];
+      setBomItems(updatedItems);
+      onBOMUpdate(updatedItems);
+    }
+    setConfiguringLevel4Item(null);
+    setSelectedSlot(null);
+  };
+
+  const handleLevel4Cancel = () => {
+    setConfiguringLevel4Item(null);
+    setSelectedSlot(null);
+  };
+
   const handleCardConfiguration = (customizations: Level3Customization[]) => {
     if (!configuringCard) return;
 
@@ -597,54 +581,53 @@ const handleChassisSelect = (chassis: Level2Product) => {
     setSelectedSlot(null);
   };
 
-
   const handleRemoteDisplayToggle = (enabled: boolean) => {
     setHasRemoteDisplay(enabled);
   };
 
-const handleAddChassisAndCardsToBOM = () => {
-  if (!selectedChassis) return;
+  const handleAddChassisAndCardsToBOM = () => {
+    if (!selectedChassis) return;
 
-  const consolidated = consolidateQTMSConfiguration(
-    selectedChassis,
-    slotAssignments,
-    hasRemoteDisplay,
-    {},
-    {}
-  );
+    const consolidated = consolidateQTMSConfiguration(
+      selectedChassis,
+      slotAssignments,
+      hasRemoteDisplay,
+      {},
+      {}
+    );
 
-  // Include outside-chassis standard items from admin config
-  if (codeMap && level3Products.length) {
-    Object.entries(codeMap).forEach(([l3Id, def]) => {
-      if (def?.outside_chassis && def?.is_standard) {
-        const product = level3Products.find(p => p.id === l3Id);
-        if (product && !consolidated.components.some(c => c.product.id === product.id)) {
-          consolidated.components.push({
-            id: `${Date.now()}-outside-${l3Id}`,
-            product: product as any,
-            quantity: 1,
-            enabled: true,
-            partNumber: product.partNumber
-          });
+    // Include outside-chassis standard items from admin config
+    if (codeMap && level3Products.length) {
+      Object.entries(codeMap).forEach(([l3Id, def]) => {
+        if (def?.outside_chassis && def?.is_standard) {
+          const product = level3Products.find(p => p.id === l3Id);
+          if (product && !consolidated.components.some(c => c.product.id === product.id)) {
+            consolidated.components.push({
+              id: `${Date.now()}-outside-${l3Id}`,
+              product: product as any,
+              quantity: 1,
+              enabled: true,
+              partNumber: product.partNumber
+            });
+          }
         }
-      }
-    });
-  }
+      });
+    }
 
-  // Recalculate total price to include outside-chassis items
-  consolidated.price = consolidated.components.reduce((sum, item) => sum + (item.product.price || 0), 0);
+    // Recalculate total price to include outside-chassis items
+    consolidated.price = consolidated.components.reduce((sum, item) => sum + (item.product.price || 0), 0);
 
-  const bomItem = createQTMSBOMItem(consolidated);
+    const bomItem = createQTMSBOMItem(consolidated);
 
-  const updatedItems = [...bomItems, bomItem];
-  setBomItems(updatedItems);
-  onBOMUpdate(updatedItems);
+    const updatedItems = [...bomItems, bomItem];
+    setBomItems(updatedItems);
+    onBOMUpdate(updatedItems);
 
-  setSelectedChassis(null);
-  setSlotAssignments({});
-  setSelectedSlot(null);
-  setHasRemoteDisplay(false);
-};
+    setSelectedChassis(null);
+    setSlotAssignments({});
+    setSelectedSlot(null);
+    setHasRemoteDisplay(false);
+  };
 
   const handleBOMConfigurationEdit = (item: BOMItem) => {
     console.log('Editing BOM item configuration:', item);
@@ -773,32 +756,33 @@ const handleAddChassisAndCardsToBOM = () => {
       const discountedMargin =
         discountedValue > 0 ? (grossProfit / discountedValue) * 100 : 0;
 
-      const { error: quoteError } = await supabase.from('quotes').insert({
-        id: quoteId,
-        customer_name: quoteFields.customerName,
-        oracle_customer_id: quoteFields.oracleCustomerId,
-        sfdc_opportunity: quoteFields.sfdcOpportunity,
-        status: 'pending_approval',
-        user_id: user!.id,
-        submitted_by_name: user!.name,
-        submitted_by_email: user!.email,
-        original_quote_value: originalQuoteValue,
-        requested_discount: discountPercentage,
-        discount_justification: discountJustification,
-        discounted_value: discountedValue,
-        total_cost: totalCost,
-        gross_profit: grossProfit,
-        original_margin:
-          originalQuoteValue > 0
-            ? ((originalQuoteValue - totalCost) / originalQuoteValue) * 100
-            : 0,
-        discounted_margin: discountedMargin,
-        quote_fields: quoteFields,
-        priority: 'Medium',
-        currency: 'USD',
-        payment_terms: 'Net 30',
-        shipping_terms: 'FOB Origin',
-      });
+      const { error: quoteError } = await supabase
+        .from('quotes').insert({
+          id: quoteId,
+          customer_name: quoteFields.customerName,
+          oracle_customer_id: quoteFields.oracleCustomerId,
+          sfdc_opportunity: quoteFields.sfdcOpportunity,
+          status: 'pending_approval',
+          user_id: user!.id,
+          submitted_by_name: user!.name,
+          submitted_by_email: user!.email,
+          original_quote_value: originalQuoteValue,
+          requested_discount: discountPercentage,
+          discount_justification: discountJustification,
+          discounted_value: discountedValue,
+          total_cost: totalCost,
+          gross_profit: grossProfit,
+          original_margin:
+            originalQuoteValue > 0
+              ? ((originalQuoteValue - totalCost) / originalQuoteValue) * 100
+              : 0,
+          discounted_margin: discountedMargin,
+          quote_fields: quoteFields,
+          priority: 'Medium',
+          currency: 'USD',
+          payment_terms: 'Net 30',
+          shipping_terms: 'FOB Origin',
+        });
 
       if (quoteError) {
         console.error('SUPABASE ERROR:', quoteError);
@@ -916,41 +900,41 @@ const handleAddChassisAndCardsToBOM = () => {
             </Button>
           </div>
           
-<RackVisualizer
-  chassis={{
-    ...configuringChassis,
-    type: configuringChassis.chassisType || configuringChassis.type || 'chassis',
-    height: configuringChassis.specifications?.height || '6U',
-    slots: configuringChassis.specifications?.slots || 0
-  }}
-  slotAssignments={slotAssignments}
-  selectedSlot={selectedSlot}
-  onSlotClick={handleSlotClick}
-  onSlotClear={handleSlotClear}
-  hasRemoteDisplay={hasRemoteDisplay}
-  onRemoteDisplayToggle={handleRemoteDisplayToggle}
-  standardSlotHints={standardSlotHints}
-  colorByProductId={colorByProductId}
-              level3Products={level3Products}
-              codeMap={codeMap}
-              selectedAccessories={selectedAccessories}
-              onAccessoryToggle={toggleAccessory}
-              partNumber={buildQTMSPartNumber({ chassis: configuringChassis, slotAssignments, hasRemoteDisplay, pnConfig, codeMap, includeSuffix: false })}
-              onAddChassis={handleAddChassisToBOM}
-            />
+          <RackVisualizer
+            chassis={{
+              ...configuringChassis,
+              type: configuringChassis.chassisType || configuringChassis.type || 'chassis',
+              height: configuringChassis.specifications?.height || '6U',
+              slots: configuringChassis.specifications?.slots || 0
+            }}
+            slotAssignments={slotAssignments}
+            selectedSlot={selectedSlot}
+            onSlotClick={handleSlotClick}
+            onSlotClear={handleSlotClear}
+            hasRemoteDisplay={hasRemoteDisplay}
+            onRemoteDisplayToggle={handleRemoteDisplayToggle}
+            standardSlotHints={standardSlotHints}
+            colorByProductId={colorByProductId}
+            level3Products={level3Products}
+            codeMap={codeMap}
+            selectedAccessories={selectedAccessories}
+            onAccessoryToggle={toggleAccessory}
+            partNumber={buildQTMSPartNumber({ chassis: configuringChassis, slotAssignments, hasRemoteDisplay, pnConfig, codeMap, includeSuffix: false })}
+            onAddChassis={handleAddChassisToBOM}
+          />
           
-{selectedSlot !== null && (
-  <SlotCardSelector
-    chassis={configuringChassis}
-    slot={selectedSlot}
-    onCardSelect={handleCardSelect}
-    onClose={() => setSelectedSlot(null)}
-    canSeePrices={canSeePrices}
-    currentSlotAssignments={slotAssignments}
-    codeMap={codeMap}
-    pnConfig={pnConfig}
-  />
-)}
+          {selectedSlot !== null && (
+            <SlotCardSelector
+              chassis={configuringChassis}
+              slot={selectedSlot}
+              onCardSelect={handleCardSelect}
+              onClose={() => setSelectedSlot(null)}
+              canSeePrices={canSeePrices}
+              currentSlotAssignments={slotAssignments}
+              codeMap={codeMap}
+              pnConfig={pnConfig}
+            />
+          )}
           
           <div className="flex justify-end space-x-4">
             <Button 
@@ -988,76 +972,76 @@ const handleAddChassisAndCardsToBOM = () => {
             <div className="bg-gray-800 p-6 rounded-lg border border-gray-700">
               <div className="flex items-center justify-between mb-6">
                 <h3 className="text-xl font-semibold text-white">Configure {selectedChassis.name}</h3>
-                 <Button
-                   variant="outline"
-                   onClick={() => {
-                     setConfiguringChassis(null);
-                     setSelectedChassis(null);
-                     setSlotAssignments({});
-                     setSelectedSlot(null);
-                   }}
-                   className="text-gray-300 border-gray-600 hover:text-white hover:border-gray-400"
-                 >
-                   Back to Products
-                 </Button>
-               </div>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setConfiguringChassis(null);
+                    setSelectedChassis(null);
+                    setSlotAssignments({});
+                    setSelectedSlot(null);
+                  }}
+                  className="text-gray-300 border-gray-600 hover:text-white hover:border-gray-400"
+                >
+                  Back to Products
+                </Button>
+              </div>
 
-<RackVisualizer
-  chassis={{
-    ...selectedChassis,
-    type: selectedChassis.chassisType || selectedChassis.type || 'chassis',
-    height: selectedChassis.specifications?.height || '6U',
-    slots: selectedChassis.specifications?.slots || 0
-  }}
-  slotAssignments={slotAssignments}
-  onSlotClick={handleSlotClick}
-  onSlotClear={handleSlotClear}
-  selectedSlot={selectedSlot}
-  hasRemoteDisplay={hasRemoteDisplay}
-  onRemoteDisplayToggle={handleRemoteDisplayToggle}
-  standardSlotHints={standardSlotHints}
-  colorByProductId={colorByProductId}
-  level3Products={level3Products}
-  codeMap={codeMap}
-  selectedAccessories={selectedAccessories}
-  onAccessoryToggle={toggleAccessory}
-  partNumber={buildQTMSPartNumber({ chassis: selectedChassis, slotAssignments, hasRemoteDisplay, pnConfig, codeMap, includeSuffix: false })}
-/>
-             </div>
+              <RackVisualizer
+                chassis={{
+                  ...selectedChassis,
+                  type: selectedChassis.chassisType || selectedChassis.type || 'chassis',
+                  height: selectedChassis.specifications?.height || '6U',
+                  slots: selectedChassis.specifications?.slots || 0
+                }}
+                slotAssignments={slotAssignments}
+                onSlotClick={handleSlotClick}
+                onSlotClear={handleSlotClear}
+                selectedSlot={selectedSlot}
+                hasRemoteDisplay={hasRemoteDisplay}
+                onRemoteDisplayToggle={handleRemoteDisplayToggle}
+                standardSlotHints={standardSlotHints}
+                colorByProductId={colorByProductId}
+                level3Products={level3Products}
+                codeMap={codeMap}
+                selectedAccessories={selectedAccessories}
+                onAccessoryToggle={toggleAccessory}
+                partNumber={buildQTMSPartNumber({ chassis: selectedChassis, slotAssignments, hasRemoteDisplay, pnConfig, codeMap, includeSuffix: false })}
+              />
+            
+              {selectedSlot !== null && (
+                <SlotCardSelector
+                  chassis={selectedChassis}
+                  slot={selectedSlot}
+                  onCardSelect={handleCardSelect}
+                  onClose={() => setSelectedSlot(null)}
+                  canSeePrices={canSeePrices}
+                  currentSlotAssignments={slotAssignments}
+                  codeMap={codeMap}
+                  pnConfig={pnConfig}
+                />
+              )}
 
-{selectedSlot !== null && (
-  <SlotCardSelector
-    chassis={selectedChassis}
-    slot={selectedSlot}
-    onCardSelect={handleCardSelect}
-    onClose={() => setSelectedSlot(null)}
-    canSeePrices={canSeePrices}
-    currentSlotAssignments={slotAssignments}
-    codeMap={codeMap}
-    pnConfig={pnConfig}
-  />
-)}
-
-             <div className="flex gap-4 justify-end">
-               <Button
-                 variant="outline"
-                 onClick={() => {
-                   setConfiguringChassis(null);
-                   setSelectedChassis(null);
-                   setSlotAssignments({});
-                   setSelectedSlot(null);
-                 }}
-                 className="text-gray-300 border-gray-600 hover:text-white hover:border-gray-400"
-               >
-                 Cancel
-               </Button>
-              <Button 
-                onClick={handleAddChassisToBOM}
-                disabled={Object.keys(slotAssignments).length === 0}
-                className="bg-green-600 hover:bg-green-700 text-white disabled:opacity-50"
-              >
-                Add to BOM
-              </Button>
+              <div className="flex gap-4 justify-end">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setConfiguringChassis(null);
+                    setSelectedChassis(null);
+                    setSlotAssignments({});
+                    setSelectedSlot(null);
+                  }}
+                  className="text-gray-300 border-gray-600 hover:text-white hover:border-gray-400"
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  onClick={handleAddChassisToBOM}
+                  disabled={Object.keys(slotAssignments).length === 0}
+                  className="bg-green-600 hover:bg-green-700 text-white disabled:opacity-50"
+                >
+                  Add to BOM
+                </Button>
+              </div>
             </div>
           </div>
         );
@@ -1272,6 +1256,14 @@ const handleAddChassisAndCardsToBOM = () => {
             onClose={() => setConfiguringCard(null)}
           />
         ) : null
+      )}
+
+      {configuringLevel4Item && (
+        <Level4Configurator
+          bomItem={configuringLevel4Item}
+          onSave={handleLevel4Save}
+          onCancel={handleLevel4Cancel}
+        />
       )}
 
       {editingQTMS && (

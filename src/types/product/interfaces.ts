@@ -1,4 +1,3 @@
-
 /**
  * 2025 Qualitrol Corp. All rights reserved.
  */
@@ -54,55 +53,42 @@ export interface Level2Product {
 export interface Level3Product {
   id: string;
   name: string;
-  parentProductId: string; // Links to Level2Product
-  parent_product_id?: string; // Alternative naming for database compatibility
-  type: string; // Dynamic type instead of hardcoded union
+  parent_product_id: string; // Links to Level2Product
   description: string;
   price: number;
   cost?: number;
-  enabled?: boolean; // Made optional since many static card objects omit it
-  product_level?: number; // Product level indicator
-  requires_level4_config?: boolean; // Whether this requires Level 4 configuration
-  sku?: string; // Optional SKU field
-  specifications?: {
-    slotRequirement?: number;
-    inputs?: number;
-    outputs?: string[];
-    protocols?: string[];
-    channels?: number;
-    inputTypes?: string[];
-    [key: string]: any;
-  };
-  partNumber?: string;
-  image?: string;
+  enabled: boolean;
+  product_level: 3;
+  part_number_format?: string;
+  requires_level4_config?: boolean; // Flag to enable Level 4 config
   productInfoUrl?: string;
 }
 
-// Level 4: Product Configurations (Sensor configs, specific customizations)
-export interface Level4Product {
+// Level 4: Dynamic Product Configuration
+export interface Level4Configuration {
   id: string;
+  level3_product_id: string;
   name: string;
-  parentProductId: string; // Links to Level3Product
-  type?: 'bushing' | 'analog' | 'dropdown';
-  description: string;
-  configurationType: 'dropdown' | 'multiline' | 'bushing' | 'analog';
-  price: number;
-  cost?: number;
-  enabled: boolean;
-  options: Level4ConfigurationOption[];
-  partNumber?: string;
-  configuration?: any; // For storing configuration data
-  product_level?: number; // Should be 4 for Level 4 products
-  requires_level4_config?: boolean; // Indicates if this product requires configuration
+  fields: Level4ConfigurationField[];
 }
 
-export interface Level4ConfigurationOption {
+export interface Level4ConfigurationField {
   id: string;
-  level4ProductId: string;
-  optionKey: string; // For dropdown: the value; For multiline: the field name
-  optionValue: string; // For dropdown: display name; For multiline: the description
-  displayOrder: number;
-  enabled: boolean;
+  level4_configuration_id: string;
+  label: string;
+  info_url?: string;
+  field_type: 'dropdown'; // Initially just dropdown
+  display_order: number;
+  dropdown_options?: Level4DropdownOption[];
+  default_option_id?: string;
+}
+
+export interface Level4DropdownOption {
+  id: string;
+  field_id: string;
+  value: string; // The value to be stored
+  label: string; // The value to be displayed
+  is_default: boolean;
 }
 
 // Type unions for backward compatibility
@@ -158,8 +144,8 @@ export interface BOMItem {
   configuration?: Record<string, any>;
   level2Options?: Level2Product[];
   level3Customizations?: Level3Customization[];
-  level4Configurations?: Level4Product[];
   slotAssignments?: Record<number, Level3Product>; // For chassis configurations
+  level4Selections?: { [fieldId: string]: string }; // fieldId: optionValue
   
   // Additional properties for admin quote management
   name?: string;
@@ -174,4 +160,4 @@ export interface BOMItem {
   price_adjustment_history?: any[];
 }
 
-export type Product = Level1Product | Level2Product | Level3Product | Level4Product;
+export type Product = Level1Product | Level2Product | Level3Product;

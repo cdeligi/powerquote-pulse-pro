@@ -8,13 +8,13 @@ import Level1ProductForm from "./product-forms/Level1ProductForm";
 import ChassisForm from "./product-forms/ChassisForm";
 import CardForm from "./product-forms/CardForm";
 import Level2OptionForm from "./product-forms/Level2OptionForm";
-import { Level4ConfigurationManager } from "./Level4ConfigurationManager";
+import { Level4AdminManager } from "./Level4AdminManager";
 import PartNumberConfigManager from "./PartNumberConfigManager";
 import { ChassisTypeManager } from "./ChassisTypeManager";
 import { Level1ProductList } from "./product-lists/Level1ProductList";
 import { Level2ProductList } from "./product-lists/Level2ProductList";
 import { Level3ProductList } from "./product-lists/Level3ProductList";
-import { Level1Product, Level2Product, Level3Product, Level4Product } from "@/types/product";
+import { Level1Product, Level2Product, Level3Product } from "@/types/product";
 import { productDataService } from "@/services/productDataService";
 import { useToast } from "@/hooks/use-toast";
 
@@ -394,17 +394,7 @@ export const ProductManagement = () => {
         </TabsContent>
 
         <TabsContent value="level4" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Level 4 Configuration</CardTitle>
-              <CardDescription>
-                Product-specific configurations tied to Level 3 products. Create dropdown selections or multi-line configurations for your products.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Level4ConfigurationManager key={refreshTrigger} />
-            </CardContent>
-          </Card>
+          <Level4AdminManager />
         </TabsContent>
 
         <TabsContent value="partnumbers" className="space-y-4">
