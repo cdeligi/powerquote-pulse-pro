@@ -57,7 +57,7 @@ const AnalogCardConfigurator = ({ bomItem, onSave, onClose }: AnalogCardConfigur
   useEffect(() => {
     const loadSensorOptions = async () => {
       try {
-        const options = await productDataService.getAnalogSensorTypes();
+        const options = await ProductDataService.getAnalogSensorTypes();
         setSensorOptions(options);
       } catch (error) {
         console.error('Error loading sensor options:', error);
