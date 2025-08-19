@@ -83,34 +83,7 @@ const QTMSConfigurationEditor = ({
         ]);
         if (!isMounted) return;
         setPnConfig(cfg);
-        // Convert array to Record format expected by state
-        const codesRecord: Record<string, { 
-          template: string; 
-          slot_span: number; 
-          is_standard?: boolean; 
-          standard_position?: number; 
-          designated_only?: boolean; 
-          designated_positions?: number[]; 
-          outside_chassis?: boolean; 
-          notes?: string; 
-          exclusive_in_slots?: boolean; 
-          color?: string; 
-        }> = {};
-        codes.forEach((code: any) => {
-          codesRecord[code.id || code.code] = {
-            template: code.template,
-            slot_span: code.slot_span || 1,
-            is_standard: code.is_standard,
-            standard_position: code.standard_position,
-            designated_only: code.designated_only,
-            designated_positions: code.designated_positions,
-            outside_chassis: code.outside_chassis,
-            notes: code.notes,
-            exclusive_in_slots: code.exclusive_in_slots,
-            color: code.color
-          };
-        });
-        setCodeMap(codesRecord);
+        setCodeMap(codes);
         setLevel3Products(l3);
         setAutoPlaced(false);
       } catch (e) {

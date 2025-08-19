@@ -1,299 +1,1289 @@
-import React, { useState, useEffect, useCallback } from "react";
-import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Input } from "@/components/ui/input";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
-import { Separator } from "@/components/ui/separator";
-import { toast } from "sonner";
-import { Trash2, GripVertical } from "lucide-react";
-import { productDataService } from "@/services/productDataService";
-import { Level1Product, Level2Product, Level3Product, BOMItem } from "@/types/product/interfaces";
+import { useState, useEffect, useMemo } from 'react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { BOMItem, Level1Product, Level2Product, Level3Product, Level3Customization } from '@/types/product';
+import Level2OptionsSelector from './Level2OptionsSelector';
+import ChassisSelector from './ChassisSelector';
+import RackVisualizer from './RackVisualizer';
+import AccessoryList from './AccessoryList';
+import SlotCardSelector from './SlotCardSelector';
+import BOMDisplay from './BOMDisplay';
+import AnalogCardConfigurator from './AnalogCardConfigurator';
+import BushingCardConfigurator from './BushingCardConfigurator';
+import NonChassisConfigurator from './NonChassisConfigurator';
+
+import { productDataService } from '@/services/productDataService';
+import QuoteFieldsSection from './QuoteFieldsSection';
+import DiscountSection from './DiscountSection';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from '@/components/ui/use-toast';
+import QTMSConfigurationEditor from './QTMSConfigurationEditor';
+import { consolidateQTMSConfiguration, createQTMSBOMItem, ConsolidatedQTMS, QTMSConfiguration } from '@/utils/qtmsConsolidation';
+import { buildQTMSPartNumber } from '@/utils/qtmsPartNumberBuilder';
+import { findOptimalBushingPlacement, findExistingBushingSlots, isBushingCard } from '@/utils/bushingValidation';
+import { useAuth } from '@/hooks/useAuth';
+import { useQuoteValidation } from './QuoteFieldValidation';
+import { usePermissions, FEATURES } from '@/hooks/usePermissions';
 
 interface BOMBuilderProps {
   onBOMUpdate: (items: BOMItem[]) => void;
   canSeePrices: boolean;
-  canSeeCosts: boolean;
+  canSeeCosts?: boolean;
 }
 
-export default function BOMBuilder({ onBOMUpdate, canSeePrices, canSeeCosts }: BOMBuilderProps) {
-  const [level1Products, setLevel1Products] = useState<Level1Product[]>([]);
-  const [level2Products, setLevel2Products] = useState<Level2Product[]>([]);
-  const [level3Products, setLevel3Products] = useState<Level3Product[]>([]);
-  const [chassisOptions, setChassisOptions] = useState<Level2Product[]>([]);
-  
-  const [selectedLevel1, setSelectedLevel1] = useState<string>("");
-  const [selectedLevel2, setSelectedLevel2] = useState<string>("");
-  const [selectedLevel3, setSelectedLevel3] = useState<string>("");
-  const [selectedChassis, setSelectedChassis] = useState<string>("");
-  const [quantity, setQuantity] = useState<number>(1);
-  
+const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuilderProps) => {
+  // ALL HOOKS MUST BE AT THE TOP - NO CONDITIONAL RETURNS BEFORE HOOKS
+  const { user, loading } = useAuth();
+  const { has } = usePermissions();
+
+  // Compute permissions
+  const canEditPN = has(FEATURES.BOM_EDIT_PART_NUMBER);
+  const canForcePN = has(FEATURES.BOM_FORCE_PART_NUMBER);
+
+  const [selectedLevel1Product, setSelectedLevel1Product] = useState<Level1Product | null>(null);
+  const [selectedLevel2Options, setSelectedLevel2Options] = useState<Level2Product[]>([]);
+  const [selectedChassis, setSelectedChassis] = useState<Level2Product | null>(null);
+  const [slotAssignments, setSlotAssignments] = useState<Record<number, Level3Product>>({});
+  const [selectedSlot, setSelectedSlot] = useState<number | null>(null);
   const [bomItems, setBomItems] = useState<BOMItem[]>([]);
-  const [isBOMDirty, setIsBOMDirty] = useState(false);
+  const [activeTab, setActiveTab] = useState<string>('');
+  const [hasRemoteDisplay, setHasRemoteDisplay] = useState<boolean>(false);
+  const [configuringCard, setConfiguringCard] = useState<BOMItem | null>(null);
+  const [configuringBOMItem, setConfiguringBOMItem] = useState<BOMItem | null>(null);
+  const [quoteFields, setQuoteFields] = useState<Record<string, any>>({});
+  const [discountPercentage, setDiscountPercentage] = useState<number>(0);
+  const [discountJustification, setDiscountJustification] = useState<string>('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+const [editingQTMS, setEditingQTMS] = useState<ConsolidatedQTMS | null>(null);
+const [configuringChassis, setConfiguringChassis] = useState<Level2Product | null>(null);
+const [editingOriginalItem, setEditingOriginalItem] = useState<BOMItem | null>(null);
+const [configuringNonChassis, setConfiguringNonChassis] = useState<Level2Product | null>(null);
 
-  const loadData = async () => {
-    try {
-      const [l1Products, chassis] = await Promise.all([
-        productDataService.getLevel1Products(),
-        productDataService.getChassisOptions()
-      ]);
-      setLevel1Products(l1Products);
-      setChassisOptions(chassis);
-    } catch (error) {
-      console.error("Error loading data:", error);
-      toast.error("Failed to load product data");
+// Admin-driven part number config and codes for the selected chassis
+const [pnConfig, setPnConfig] = useState<any | null>(null);
+const [codeMap, setCodeMap] = useState<Record<string, { template: string; slot_span: number; is_standard?: boolean; standard_position?: number | null; designated_only?: boolean; designated_positions?: number[]; outside_chassis?: boolean; notes?: string | null; exclusive_in_slots?: boolean; color?: string | null }>>({});
+const [level3Products, setLevel3Products] = useState<Level3Product[]>([]);
+const [autoPlaced, setAutoPlaced] = useState(false);
+const [selectedAccessories, setSelectedAccessories] = useState<Set<string>>(new Set());
+
+// Hints for standard slot positions not yet filled (top-level to avoid conditional hooks)
+const standardSlotHints = useMemo(() => {
+  const hints: Record<number, string[]> = {};
+  const nameById = Object.fromEntries(level3Products.map(p => [p.id, p.name] as const));
+  Object.entries(codeMap).forEach(([l3Id, def]) => {
+    if (!def?.is_standard || def?.outside_chassis) return;
+    const pos = def.standard_position;
+    // Skip CPU std position (0) and ignore outside-chassis items
+    if (pos === 0 || pos === null || pos === undefined) return;
+    if (!slotAssignments[pos]) {
+      const name = nameById[l3Id] || 'Standard Item';
+      hints[pos] = hints[pos] ? [...hints[pos], name] : [name];
     }
-  };
+  });
+  return hints;
+}, [codeMap, level3Products, slotAssignments]);
 
+// Map configured colors by Level3 id from admin codeMap
+const colorByProductId = useMemo(() => {
+  const map: Record<string, string> = {};
+  Object.entries(codeMap).forEach(([id, def]) => {
+    if (def && def.color) map[id] = def.color as string;
+  });
+  return map;
+}, [codeMap]);
+
+
+// Accessories list from admin config (outside_chassis)
+const accessories = useMemo(() => {
+  return level3Products
+    .filter(p => codeMap[p.id]?.outside_chassis)
+    .map(p => {
+      const template = codeMap[p.id]?.template as string | undefined;
+      const pn = template ? String(template).replace(/\{[^}]+\}/g, '') : (p.partNumber || undefined);
+      return {
+        product: p,
+        selected: selectedAccessories.has(p.id),
+        color: (codeMap[p.id]?.color as string | null) || null,
+        pn,
+      };
+    });
+}, [level3Products, codeMap, selectedAccessories]);
+
+const toggleAccessory = (id: string) => {
+  setSelectedAccessories(prev => {
+    const next = new Set(prev);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    return next;
+  });
+};
+
+  // Get available quote fields for validation
+  const [availableQuoteFields, setAvailableQuoteFields] = useState<any[]>([]);
+  
   useEffect(() => {
-    loadData();
+    const fetchQuoteFields = async () => {
+      try {
+        const { data: fields, error } = await supabase
+          .from('quote_fields')
+          .select('*')
+          .eq('enabled', true)
+          .order('display_order');
+        
+        if (error) throw error;
+        setAvailableQuoteFields(fields || []);
+      } catch (error) {
+        console.error('Error fetching quote fields:', error);
+      }
+    };
+
+    fetchQuoteFields();
   }, []);
 
-  const filteredLevel2Products = level2Products.filter(
-    product => product.parentProductId === selectedLevel1
-  );
+  // Use quote validation hook
+  const { validation, validateFields } = useQuoteValidation(quoteFields, availableQuoteFields);
 
-  const filteredLevel3Products = level3Products.filter(
-    product => product.parentProductId === selectedLevel2
-  );
-
-  const handleLevel1Change = async (value: string) => {
-    setSelectedLevel1(value);
-    setSelectedLevel2("");
-    setSelectedLevel3("");
-    
-    try {
-      const l2Products = await productDataService.getLevel2ProductsForLevel1(value);
-      setLevel2Products(l2Products);
-      setLevel3Products([]);
-    } catch (error) {
-      console.error("Error loading Level 2 products:", error);
-      toast.error("Failed to load Level 2 products");
-    }
+  // Fixed field change handler to match expected signature
+  const handleQuoteFieldChange = (fieldId: string, value: any) => {
+    setQuoteFields(prev => ({ ...prev, [fieldId]: value }));
   };
 
-  const handleLevel2Change = async (value: string) => {
-    setSelectedLevel2(value);
-    setSelectedLevel3("");
-    
-    try {
-      const l3Products = await productDataService.getLevel3ProductsForLevel2(value);
-      setLevel3Products(l3Products);
-    } catch (error) {
-      console.error("Error loading Level 3 products:", error);
-      toast.error("Failed to load Level 3 products");
+  // Load Level 1 products for dynamic tabs - use real Supabase data
+  const [level1Products, setLevel1Products] = useState<Level1Product[]>([]);
+  const [level1Loading, setLevel1Loading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    const loadLevel1Products = async () => {
+      try {
+        const products = await productDataService.getLevel1Products();
+        setLevel1Products(products.filter(p => p.enabled));
+      } catch (error) {
+        console.error('Error loading Level 1 products:', error);
+        setLevel1Products([]);
+      } finally {
+        setLevel1Loading(false);
+      }
+    };
+
+    loadLevel1Products();
+  }, []);
+
+  // Set default active tab when products are loaded
+  useEffect(() => {
+    if (level1Products.length > 0 && !activeTab) {
+      console.log('Setting default active tab. Available products:', level1Products.map(p => ({ id: p.id, name: p.name })));
+      setActiveTab(level1Products[0].id);
     }
+  }, [level1Products.length, activeTab]);
+
+  // Update selected product when tab changes
+  useEffect(() => {
+    if (activeTab && activeTab !== 'additional-config') {
+      console.log('Active tab changed to:', activeTab);
+      const product = level1Products.find(p => p.id === activeTab);
+      console.log('Found product for tab:', product);
+      
+      if (product && selectedLevel1Product?.id !== activeTab) {
+        console.log('Setting selectedLevel1Product to:', product);
+        setSelectedLevel1Product(product);
+        setSelectedLevel2Options([]);
+        setSelectedChassis(null);
+        setSlotAssignments({});
+        setSelectedSlot(null);
+      }
+    }
+  }, [activeTab, level1Products, selectedLevel1Product?.id]);
+
+  const handleAddToBOM = (product: Level1Product | Level2Product | Level3Product, customPartNumber?: string) => {
+    console.log('Adding product to BOM:', product.name);
+    
+    let partNumber = customPartNumber || product.partNumber;
+    
+    // For Level 2 products with "Not Applicable" chassis type, use the Admin-configured prefix as part number
+    if (!partNumber && 'chassisType' in product && product.chassisType === 'N/A' && 'partNumberPrefix' in product && product.partNumberPrefix) {
+      partNumber = String(product.partNumberPrefix);
+    } else if (!partNumber && 'partNumberPrefix' in product && product.partNumberPrefix) {
+      partNumber = String(product.partNumberPrefix);
+    }
+    
+    const newItem: BOMItem = {
+      id: `${product.id}-${Date.now()}`,
+      product: product,
+      quantity: 1,
+      enabled: true,
+      partNumber: partNumber
+    };
+    
+    // Add to BOM
+    setBomItems(prev => [...prev, newItem]);
+    onBOMUpdate([...bomItems, newItem]);
+    
+    // Show success message
+    toast({
+      title: 'Added to BOM',
+      description: `${product.name} has been added to your bill of materials.`,
+    });
   };
 
-  const addCardToSlot = (card: Level3Product, slot?: number) => {
-    const existingItem = bomItems.find(
-      item => item.product.id === card.id && item.slot === slot
-    );
+  const handleLevel2OptionToggle = (option: Level2Product) => {
+    console.log('Level2OptionToggle called with option:', option.name, 'chassisType:', option.chassisType);
+    
+    // Check if this is a single-selection context (clear other selections first)
+    setSelectedLevel2Options([]);
+    
+    // If the option has a chassis type and it's not 'N/A', show chassis config
+    if (option.chassisType && option.chassisType !== 'N/A') {
+      console.log('Showing chassis configuration for:', option.name);
+      setConfiguringChassis(option);
+      setSelectedChassis(option);
+      setSlotAssignments({});
+      setSelectedSlot(null);
+      return;
+    }
 
-    if (existingItem) {
-      setBomItems(items =>
-        items.map(item =>
-          item.product.id === card.id && item.slot === slot
-            ? { ...item, quantity: item.quantity + quantity }
-            : item
-        )
+    // For N/A chassis type or no chassis type, show non-chassis configurator
+    console.log('Showing non-chassis configuration for:', option.name);
+    setConfiguringNonChassis(option);
+    
+    // Load admin config and codes for this product
+    (async () => {
+      try {
+        const [cfg, codes, l3] = await Promise.all([
+          productDataService.getPartNumberConfig(option.id),
+          productDataService.getPartNumberCodesForLevel2(option.id),
+          productDataService.getLevel3ProductsForLevel2(option.id)
+        ]);
+        setPnConfig(cfg);
+        setCodeMap(codes);
+        setLevel3Products(l3);
+        
+        // Auto-select standard accessories for N/A chassis products
+        const standardAccessories = l3
+          .filter(p => codes[p.id]?.outside_chassis && codes[p.id]?.is_standard)
+          .map(p => p.id);
+        
+        if (standardAccessories.length > 0) {
+          setSelectedAccessories(new Set(standardAccessories));
+        }
+        
+      } catch (e) {
+        console.error('Failed to load PN config/codes for non-chassis product:', e);
+      }
+    })();
+  };
+
+const handleChassisSelect = (chassis: Level2Product) => {
+  console.log('Chassis selected:', chassis.name, 'chassisType:', chassis.chassisType);
+  setSelectedChassis(chassis);
+
+  if (chassis.chassisType && chassis.chassisType !== 'N/A') {
+    console.log('Setting up chassis configuration for:', chassis.name);
+    setConfiguringChassis(chassis);
+    setSlotAssignments({});
+    setSelectedSlot(null);
+
+    // Load admin config and codes for this chassis
+    (async () => {
+      try {
+        const [cfg, codes, l3] = await Promise.all([
+          productDataService.getPartNumberConfig(chassis.id),
+          productDataService.getPartNumberCodesForLevel2(chassis.id),
+          productDataService.getLevel3ProductsForLevel2(chassis.id)
+        ]);
+        setPnConfig(cfg);
+        setCodeMap(codes);
+        setLevel3Products(l3);
+        setAutoPlaced(false);
+        
+        // Auto-include standard items based on admin configuration
+        const autoIncludeAssignments: Record<number, Level3Product> = {};
+        
+        // Check for standard items to auto-include
+        Object.entries(codes).forEach(([l3Id, def]) => {
+          if (def?.is_standard && !def?.outside_chassis) {
+            const standardProduct = l3.find(p => p.id === l3Id);
+            if (standardProduct && def.standard_position !== null && def.standard_position !== undefined) {
+              // Use the exact position from admin config - no remapping needed
+              const position = def.standard_position;
+              autoIncludeAssignments[position] = standardProduct;
+              console.log(`Auto-including standard item "${standardProduct.name}" at position ${position}`);
+            }
+          }
+        });
+        
+        if (Object.keys(autoIncludeAssignments).length > 0) {
+          setSlotAssignments(autoIncludeAssignments);
+          toast({
+            title: 'Standard Items Added',
+            description: `${Object.keys(autoIncludeAssignments).length} standard items have been automatically included.`,
+          });
+        }
+        
+      } catch (e) {
+        console.error('Failed to load PN config/codes for chassis:', e);
+      }
+    })();
+
+    setTimeout(() => {
+      const configSection = document.getElementById('chassis-configuration');
+      if (configSection) {
+        configSection.scrollIntoView({ behavior: 'smooth' });
+      }
+    }, 100);
+  } else {
+    handleAddToBOM(chassis);
+  }
+};
+
+  const handleAddNonChassisToBOM = (customPartNumber?: string) => {
+    if (!configuringNonChassis) return;
+    
+    console.log('Adding non-chassis configuration to BOM:', configuringNonChassis.name);
+    
+    const partNumber = customPartNumber || pnConfig?.prefix || configuringNonChassis.partNumber || `${configuringNonChassis.name}-001`;
+    
+    // Add main product to BOM
+    const mainItem: BOMItem = {
+      id: `${configuringNonChassis.id}-${Date.now()}`,
+      product: configuringNonChassis,
+      quantity: 1,
+      enabled: true,
+      partNumber: partNumber
+    };
+    
+    // Add selected accessories as separate BOM items
+    const accessoryItems: BOMItem[] = Array.from(selectedAccessories)
+      .map(id => {
+        const product = level3Products.find(p => p.id === id);
+        if (!product) return null as any;
+        const template = codeMap[id]?.template as string | undefined;
+        const accPN = template ? String(template).replace(/\{[^}]+\}/g, '') : (product.partNumber || '');
+        return {
+          id: `${id}-${Date.now()}`,
+          product,
+          quantity: 1,
+          enabled: true,
+          partNumber: accPN
+        } as BOMItem;
+      })
+      .filter(Boolean) as BOMItem[];
+
+    const updated = [...bomItems, mainItem, ...accessoryItems];
+    setBomItems(updated);
+    onBOMUpdate(updated);
+    
+    toast({
+      title: 'Product Configuration Added',
+      description: `${configuringNonChassis.name} configuration has been added to your bill of materials.`,
+    });
+    
+    // Reset non-chassis configuration state
+    setConfiguringNonChassis(null);
+    setSelectedAccessories(new Set());
+  };
+
+  const handleAddChassisToBOM = () => {
+    if (!selectedChassis) return;
+    
+    console.log('Adding chassis configuration to BOM:', selectedChassis.name);
+    
+    // Check if we're editing an existing item
+    if (editingOriginalItem) {
+      // Update the existing item with new configuration
+      const updatedItem: BOMItem = {
+        ...editingOriginalItem,
+        slotAssignments: { ...slotAssignments },
+        partNumber: buildQTMSPartNumber({ chassis: selectedChassis!, slotAssignments, hasRemoteDisplay, pnConfig, codeMap, includeSuffix: false })
+      };
+      
+      // Find and update the existing item in BOM
+      let updatedItems = bomItems.map(item => 
+        item.id === editingOriginalItem.id ? updatedItem : item
       );
+
+      // Append selected accessories as separate BOM items
+      if (selectedAccessories.size) {
+        const accessoryItems: BOMItem[] = Array.from(selectedAccessories)
+          .map(id => {
+            const product = level3Products.find(p => p.id === id);
+            if (!product) return null as any;
+            const template = codeMap[id]?.template as string | undefined;
+            const accPN = template ? String(template).replace(/\{[^}]+\}/g, '') : (product.partNumber || '');
+            return {
+              id: `${id}-${Date.now()}`,
+              product,
+              quantity: 1,
+              enabled: true,
+              partNumber: accPN
+            } as BOMItem;
+          })
+          .filter(Boolean) as BOMItem[];
+        updatedItems = [...updatedItems, ...accessoryItems];
+      }
+      
+      setBomItems(updatedItems);
+      onBOMUpdate(updatedItems);
+      setEditingOriginalItem(null);
+      
+      toast({
+        title: 'Configuration Updated',
+        description: `${selectedChassis.name} configuration has been updated.`,
+      });
+    } else {
+      const chassisItem: BOMItem = {
+        id: `${selectedChassis.id}-${Date.now()}`,
+        product: selectedChassis,
+        quantity: 1,
+        enabled: true,
+        slotAssignments: { ...slotAssignments },
+        partNumber: buildQTMSPartNumber({ chassis: selectedChassis, slotAssignments, hasRemoteDisplay, pnConfig, codeMap, includeSuffix: false })
+      };
+      
+      // Add to BOM with selected accessories
+      const accessoryItems: BOMItem[] = Array.from(selectedAccessories)
+        .map(id => {
+          const product = level3Products.find(p => p.id === id);
+          if (!product) return null as any;
+          const template = codeMap[id]?.template as string | undefined;
+          const accPN = template ? String(template).replace(/\{[^}]+\}/g, '') : (product.partNumber || '');
+          return {
+            id: `${id}-${Date.now()}`,
+            product,
+            quantity: 1,
+            enabled: true,
+            partNumber: accPN
+          } as BOMItem;
+        })
+        .filter(Boolean) as BOMItem[];
+
+      const updated = [...bomItems, chassisItem, ...accessoryItems];
+      setBomItems(updated);
+      onBOMUpdate(updated);
+      
+      toast({
+        title: 'Chassis Configuration Added',
+        description: `${selectedChassis.name} configuration has been added to your bill of materials.`,
+      });
+    }
+    
+    // Reset chassis configuration state
+    setConfiguringChassis(null);
+    setSelectedChassis(null);
+    setSlotAssignments({});
+    setSelectedSlot(null);
+    setSelectedAccessories(new Set());
+  };
+
+  const handleSlotClick = (slot: number) => {
+    setSelectedSlot(slot);
+  };
+
+  const handleSlotClear = (slot: number) => {
+    setSlotAssignments(prev => {
+      const updated = { ...prev };
+      const card = updated[slot];
+      
+      if (card && isBushingCard(card)) {
+        const bushingSlots = findExistingBushingSlots(updated);
+        bushingSlots.forEach(bushingSlot => {
+          delete updated[bushingSlot];
+        });
+      } else {
+        delete updated[slot];
+      }
+      
+      return updated;
+    });
+  };
+
+  const handleCardSelect = (card: Level3Product, slot?: number) => {
+    if (isBushingCard(card)) {
+      if (!selectedChassis) return;
+      
+      const placement = findOptimalBushingPlacement(selectedChassis, slotAssignments);
+      if (!placement) {
+        console.error('Cannot place bushing card - no valid placement found');
+        return;
+      }
+
+      setSlotAssignments(prev => {
+        const updated = { ...prev };
+        
+        if (placement.shouldClearExisting) {
+          placement.existingSlotsToClear.forEach(slotToClear => {
+            delete updated[slotToClear];
+          });
+        }
+        
+        updated[placement.primarySlot] = card;
+        updated[placement.secondarySlot] = card;
+        
+        return updated;
+      });
+
+      if ((card as any).requires_level4_config && card.name.toLowerCase().includes('bushing')) {
+        const newItem: BOMItem = {
+          id: `${Date.now()}-${Math.random()}`,
+          product: card,
+          quantity: 1,
+          slot: placement.primarySlot,
+          enabled: true
+        };
+        setConfiguringCard(newItem);
+        return;
+      }
+
+      setSelectedSlot(null);
+      return;
+    }
+
+    if ((card as any).requires_level4_config && card.name.toLowerCase().includes('analog')) {
+      const newItem: BOMItem = {
+        id: `${Date.now()}-${Math.random()}`,
+        product: card,
+        quantity: 1,
+        slot: slot || selectedSlot,
+        enabled: true
+      };
+      setConfiguringCard(newItem);
+      return;
+    }
+
+    if (selectedSlot !== null || slot !== undefined) {
+      const targetSlot = slot !== undefined ? slot : selectedSlot!;
+      setSlotAssignments(prev => ({
+        ...prev,
+        [targetSlot]: card
+      }));
+      setSelectedSlot(null);
     } else {
       const newItem: BOMItem = {
-        id: `item_${Date.now()}_${Math.random()}`,
+        id: `${Date.now()}-${Math.random()}`,
         product: card,
-        quantity,
-        enabled: true,
+        quantity: 1,
         slot,
-        partNumber: card.partNumber,
-        configuration: {}
+        enabled: true
       };
-      setBomItems(items => [...items, newItem]);
+      
+      const updatedItems = [...bomItems, newItem];
+      setBomItems(updatedItems);
+      onBOMUpdate(updatedItems);
     }
-    setIsBOMDirty(true);
   };
 
-  const handleCardSelect = (cardId: string) => {
-    const card = level3Products.find(p => p.id === cardId);
-    if (!card) return;
+  const handleCardConfiguration = (customizations: Level3Customization[]) => {
+    if (!configuringCard) return;
 
-    addCardToSlot(card);
-    toast.success("Card added to BOM");
+    const configuredItem: BOMItem = {
+      ...configuringCard,
+      level3Customizations: customizations
+    };
+
+    if (configuringCard.slot !== undefined) {
+      setSlotAssignments(prev => ({
+        ...prev,
+        [configuringCard.slot!]: configuringCard.product as Level3Product
+      }));
+    } else {
+      const updatedItems = [...bomItems, configuredItem];
+      setBomItems(updatedItems);
+      onBOMUpdate(updatedItems);
+    }
+
+    setConfiguringCard(null);
+    setSelectedSlot(null);
   };
 
-  const handleSaveBOM = () => {
-    onBOMUpdate(bomItems);
-    setIsBOMDirty(false);
-    toast.success("BOM saved successfully");
+
+  const handleRemoteDisplayToggle = (enabled: boolean) => {
+    setHasRemoteDisplay(enabled);
   };
 
-  const handleRemoveItem = (id: string) => {
-    setBomItems(items => items.filter(item => item.id !== id));
-    setIsBOMDirty(true);
+const handleAddChassisAndCardsToBOM = () => {
+  if (!selectedChassis) return;
+
+  const consolidated = consolidateQTMSConfiguration(
+    selectedChassis,
+    slotAssignments,
+    hasRemoteDisplay,
+    {},
+    {}
+  );
+
+  // Include outside-chassis standard items from admin config
+  if (codeMap && level3Products.length) {
+    Object.entries(codeMap).forEach(([l3Id, def]) => {
+      if (def?.outside_chassis && def?.is_standard) {
+        const product = level3Products.find(p => p.id === l3Id);
+        if (product && !consolidated.components.some(c => c.product.id === product.id)) {
+          consolidated.components.push({
+            id: `${Date.now()}-outside-${l3Id}`,
+            product: product as any,
+            quantity: 1,
+            enabled: true,
+            partNumber: product.partNumber
+          });
+        }
+      }
+    });
+  }
+
+  // Recalculate total price to include outside-chassis items
+  consolidated.price = consolidated.components.reduce((sum, item) => sum + (item.product.price || 0), 0);
+
+  const bomItem = createQTMSBOMItem(consolidated);
+
+  const updatedItems = [...bomItems, bomItem];
+  setBomItems(updatedItems);
+  onBOMUpdate(updatedItems);
+
+  setSelectedChassis(null);
+  setSlotAssignments({});
+  setSelectedSlot(null);
+  setHasRemoteDisplay(false);
+};
+
+  const handleBOMConfigurationEdit = (item: BOMItem) => {
+    console.log('Editing BOM item configuration:', item);
+    
+    // Check if this is a chassis-configured item (has slot assignments)
+    if (item.slotAssignments || (item.product as any).chassisType && (item.product as any).chassisType !== 'N/A') {
+      console.log('Editing chassis configuration for:', item.product.name);
+      
+      // Set up the chassis for editing
+      setSelectedChassis(item.product as Level2Product);
+      setSlotAssignments(item.slotAssignments || {});
+      setConfiguringChassis(item.product as Level2Product);
+      
+      // Store the original item for restoration if edit is cancelled
+      setEditingOriginalItem(item);
+      
+      // Scroll to configuration section
+      setTimeout(() => {
+        const configSection = document.getElementById('chassis-configuration');
+        if (configSection) {
+          configSection.scrollIntoView({ behavior: 'smooth' });
+        }
+      }, 100);
+      
+    } else if (item.product.name?.includes('QTMS') && item.configuration) {
+      // Handle QTMS-specific configuration
+      const consolidatedQTMS: ConsolidatedQTMS = {
+        id: item.id || `qtms-${Date.now()}`,
+        name: item.product.name,
+        description: item.product.description || '',
+        partNumber: item.partNumber || item.product.partNumber || '',
+        price: item.product.price || 0,
+        configuration: item.configuration as QTMSConfiguration,
+        components: []
+      };
+      setEditingQTMS(consolidatedQTMS);
+    } else {
+      // For other configurable items (Level 4, analog cards, etc.)
+      setConfiguringBOMItem(item);
+    }
   };
 
-  const handleQuantityChange = (id: string, newQuantity: number) => {
-    setBomItems(items =>
-      items.map(item =>
-        item.id === id ? { ...item, quantity: newQuantity } : item
-      )
-    );
-    setIsBOMDirty(true);
+  const handleQTMSConfigurationSave = (updatedQTMS: ConsolidatedQTMS) => {
+    console.log('Saving QTMS configuration:', updatedQTMS);
+    
+    const updatedBOMItem = createQTMSBOMItem(updatedQTMS);
+    
+    const existingItemIndex = bomItems.findIndex(item => item.id === updatedQTMS.id);
+    
+    let updatedItems;
+    if (existingItemIndex >= 0) {
+      console.log('Updating existing QTMS item at index:', existingItemIndex);
+      updatedItems = bomItems.map((item, index) => 
+        index === existingItemIndex ? updatedBOMItem : item
+      );
+    } else {
+      console.log('Adding new QTMS item to BOM');
+      updatedItems = [...bomItems, updatedBOMItem];
+    }
+    
+    console.log('Updated BOM items:', updatedItems);
+    setBomItems(updatedItems);
+    onBOMUpdate(updatedItems);
+    setEditingQTMS(null);
   };
 
-  return (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>Product Selection</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div>
-              <Label htmlFor="level1">Level 1 Product</Label>
-              <Select value={selectedLevel1} onValueChange={handleLevel1Change}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select Level 1 Product" />
-                </SelectTrigger>
-                <SelectContent>
-                  {level1Products.map(product => (
-                    <SelectItem key={product.id} value={product.id}>
-                      {product.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+  const handleSubmitQuote = (quoteId: string) => {
+    console.log('Quote submitted with ID:', quoteId);
+    setBomItems([]);
+    setQuoteFields({});
+    setDiscountPercentage(0);
+    setDiscountJustification('');
+    onBOMUpdate([]);
+  };
 
-            <div>
-              <Label htmlFor="level2">Level 2 Product</Label>
-              <Select 
-                value={selectedLevel2} 
-                onValueChange={handleLevel2Change}
-                disabled={!selectedLevel1}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select Level 2 Product" />
-                </SelectTrigger>
-                <SelectContent>
-                  {filteredLevel2Products.map(product => (
-                    <SelectItem key={product.id} value={product.id}>
-                      {product.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+  const handleBOMUpdate = (updatedItems: BOMItem[]) => {
+    setBomItems(updatedItems);
+    onBOMUpdate(updatedItems);
+  };
 
-            <div>
-              <Label htmlFor="level3">Level 3 Product</Label>
-              <Select 
-                value={selectedLevel3} 
-                onValueChange={setSelectedLevel3}
-                disabled={!selectedLevel2}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select Level 3 Product" />
-                </SelectTrigger>
-                <SelectContent>
-                  {filteredLevel3Products.map(product => (
-                    <SelectItem key={product.id} value={product.id}>
-                      {product.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+  const handleDiscountChange = (discount: number, justification: string) => {
+    setDiscountPercentage(discount);
+    setDiscountJustification(justification);
+  };
 
-            <div>
-              <Label htmlFor="quantity">Quantity</Label>
-              <Input
-                type="number"
-                min="1"
-                value={quantity}
-                onChange={(e) => setQuantity(parseInt(e.target.value) || 1)}
-              />
-            </div>
-          </div>
+  const submitQuoteRequest = async () => {
+    if (isSubmitting) return;
 
-          <div className="flex gap-2">
+    // Validate required fields before submission
+    const { isValid, missingFields } = validateFields();
+    
+    if (!isValid) {
+      toast({
+        title: 'Missing Required Fields',
+        description: `Please fill in the following required fields: ${missingFields.join(', ')}`,
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (bomItems.length === 0) {
+      toast({
+        title: 'No Items in BOM',
+        description: 'Please add at least one item to the Bill of Materials before submitting.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      const quoteId = `Q-${Date.now()}`;
+
+      const originalQuoteValue = bomItems.reduce(
+        (sum, item) => sum + item.product.price * item.quantity,
+        0
+      );
+      const discountedValue =
+        originalQuoteValue * (1 - discountPercentage / 100);
+      const totalCost = bomItems.reduce(
+        (sum, item) => sum + (item.product.cost || 0) * item.quantity,
+        0
+      );
+      const grossProfit = discountedValue - totalCost;
+      const discountedMargin =
+        discountedValue > 0 ? (grossProfit / discountedValue) * 100 : 0;
+
+      const { error: quoteError } = await supabase.from('quotes').insert({
+        id: quoteId,
+        customer_name: quoteFields.customerName,
+        oracle_customer_id: quoteFields.oracleCustomerId,
+        sfdc_opportunity: quoteFields.sfdcOpportunity,
+        status: 'pending_approval',
+        user_id: user!.id,
+        submitted_by_name: user!.name,
+        submitted_by_email: user!.email,
+        original_quote_value: originalQuoteValue,
+        requested_discount: discountPercentage,
+        discount_justification: discountJustification,
+        discounted_value: discountedValue,
+        total_cost: totalCost,
+        gross_profit: grossProfit,
+        original_margin:
+          originalQuoteValue > 0
+            ? ((originalQuoteValue - totalCost) / originalQuoteValue) * 100
+            : 0,
+        discounted_margin: discountedMargin,
+        quote_fields: quoteFields,
+        priority: 'Medium',
+        currency: 'USD',
+        payment_terms: 'Net 30',
+        shipping_terms: 'FOB Origin',
+      });
+
+      if (quoteError) {
+        console.error('SUPABASE ERROR:', quoteError);
+        toast({
+          title: 'Submission Failed',
+          description:
+            quoteError.message || 'Unknown error. Check console for more info.',
+          variant: 'destructive',
+        });
+        setIsSubmitting(false);
+        return;
+      }
+
+      for (const item of bomItems) {
+        const { error: bomError } = await supabase.from('bom_items').insert({
+          quote_id: quoteId,
+          product_id: item.product.id,
+          name: item.product.name,
+          description: item.product.description || '',
+          part_number: item.product.partNumber || item.partNumber || '',
+          quantity: item.quantity,
+          unit_price: item.product.price,
+          unit_cost: item.product.cost || 0,
+          total_price: item.product.price * item.quantity,
+          total_cost: (item.product.cost || 0) * item.quantity,
+          margin:
+            item.product.price > 0
+              ? ((item.product.price - (item.product.cost || 0)) /
+                  item.product.price) *
+                100
+              : 0,
+          original_unit_price: item.product.price,
+          approved_unit_price: item.product.price,
+          configuration_data: item.configuration || {},
+          product_type: 'standard',
+        });
+
+        if (bomError) {
+          console.error('SUPABASE BOM ERROR:', bomError);
+          toast({
+            title: 'BOM Item Error',
+            description: bomError.message || 'Failed to create BOM item',
+            variant: 'destructive',
+          });
+          throw bomError;
+        }
+      }
+
+      try {
+        const { data: adminIds } = await supabase.rpc('get_admin_user_ids');
+        if (adminIds && adminIds.length > 0) {
+          await supabase.from('admin_notifications').insert({
+            quote_id: quoteId,
+            notification_type: 'quote_pending_approval',
+            sent_to: adminIds,
+            message_content: {
+              title: 'New Quote Pending Approval',
+              message: `Quote ${quoteId} from ${user!.name} is pending approval`,
+              quote_value: originalQuoteValue,
+              requested_discount: discountPercentage
+            }
+          });
+        }
+      } catch (notificationError) {
+        console.warn('Failed to send admin notifications:', notificationError);
+      }
+
+      toast({
+        title: 'Quote Submitted Successfully',
+        description: `Your quote ${quoteId} has been submitted for approval.`,
+      });
+
+      handleSubmitQuote(quoteId);
+    } catch (error) {
+      console.error('Error submitting quote:', error);
+      toast({
+        title: 'Submission Failed',
+        description: 'Failed to submit quote. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const renderProductContent = (productId: string) => {
+    console.group(`[BOMBuilder] Rendering product content for: ${productId}`);
+    const product = level1Products.find(p => p.id === productId);
+    if (!product) {
+      console.error(`Product not found for ID: ${productId}`);
+      console.groupEnd();
+      return null;
+    }
+
+    // If we're configuring a chassis, show the chassis configuration UI
+    if (configuringChassis) {
+      console.log('Rendering chassis configuration for:', configuringChassis.name);
+      return (
+        <div id="chassis-configuration" className="space-y-6">
+          <div className="flex items-center justify-between">
+            <h3 className="text-xl font-semibold text-white">
+              Configure {configuringChassis.name}
+            </h3>
             <Button 
-              onClick={() => selectedLevel3 && handleCardSelect(selectedLevel3)}
-              disabled={!selectedLevel3}
+              variant="outline" 
+              size="sm"
+              onClick={() => {
+                setConfiguringChassis(null);
+                setSelectedChassis(null);
+                setSlotAssignments({});
+                setSelectedSlot(null);
+              }}
+            >
+              Back to Products
+            </Button>
+          </div>
+          
+<RackVisualizer
+  chassis={{
+    ...configuringChassis,
+    type: configuringChassis.chassisType || configuringChassis.type || 'chassis',
+    height: configuringChassis.specifications?.height || '6U',
+    slots: configuringChassis.specifications?.slots || 0
+  }}
+  slotAssignments={slotAssignments}
+  selectedSlot={selectedSlot}
+  onSlotClick={handleSlotClick}
+  onSlotClear={handleSlotClear}
+  hasRemoteDisplay={hasRemoteDisplay}
+  onRemoteDisplayToggle={handleRemoteDisplayToggle}
+  standardSlotHints={standardSlotHints}
+  colorByProductId={colorByProductId}
+              level3Products={level3Products}
+              codeMap={codeMap}
+              selectedAccessories={selectedAccessories}
+              onAccessoryToggle={toggleAccessory}
+              partNumber={buildQTMSPartNumber({ chassis: configuringChassis, slotAssignments, hasRemoteDisplay, pnConfig, codeMap, includeSuffix: false })}
+              onAddChassis={handleAddChassisToBOM}
+            />
+          
+{selectedSlot !== null && (
+  <SlotCardSelector
+    chassis={configuringChassis}
+    slot={selectedSlot}
+    onCardSelect={handleCardSelect}
+    onClose={() => setSelectedSlot(null)}
+    canSeePrices={canSeePrices}
+    currentSlotAssignments={slotAssignments}
+    codeMap={codeMap}
+    pnConfig={pnConfig}
+  />
+)}
+          
+          <div className="flex justify-end space-x-4">
+            <Button 
+              variant="outline"
+              onClick={() => {
+                setConfiguringChassis(null);
+                setSelectedChassis(null);
+                setSlotAssignments({});
+                setSelectedSlot(null);
+              }}
+              className="text-gray-300 border-gray-600 hover:text-white hover:border-gray-400"
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleAddChassisToBOM}
+              disabled={Object.keys(slotAssignments).length === 0}
+              className="bg-green-600 hover:bg-green-700 text-white disabled:opacity-50"
             >
               Add to BOM
             </Button>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      );
+    }
 
-      <Card>
-        <CardHeader>
-          <CardTitle>BOM Items</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ScrollArea className="h-96">
-            {bomItems.length === 0 ? (
-              <p className="text-muted-foreground text-center py-8">
-                No items in BOM. Add products to get started.
-              </p>
-            ) : (
-              <div className="space-y-2">
-                {bomItems.map(item => (
-                  <div
-                    key={item.id}
-                    className="flex items-center justify-between p-3 border rounded-lg"
-                  >
-                    <div className="flex items-center gap-3">
-                      <GripVertical className="h-4 w-4 text-muted-foreground" />
-                      <div>
-                        <p className="font-medium">{item.product.name}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {item.product.description}
-                        </p>
-                      </div>
-                    </div>
-                    
-                    <div className="flex items-center gap-2">
-                      <Input
-                        type="number"
-                        min="1"
-                        value={item.quantity}
-                        onChange={(e) =>
-                          handleQuantityChange(item.id!, parseInt(e.target.value) || 1)
-                        }
-                        className="w-20"
-                      />
-                      {canSeePrices && (
-                        <span className="text-sm font-medium">
-                          ${(item.product.price * item.quantity).toFixed(2)}
-                        </span>
-                      )}
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleRemoveItem(item.id!)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </ScrollArea>
-          
-          {isBOMDirty && bomItems.length > 0 && (
-            <div className="mt-4">
-              <Separator className="mb-4" />
-              <Button onClick={handleSaveBOM} className="w-full">
-                Save BOM
+    // QTMS tab - show chassis selector or configuration
+    if (productId.toLowerCase() === 'qtms') {
+      console.log('Rendering QTMS tab content, configuringChassis:', configuringChassis);
+      
+      // If configuring a chassis, show rack visualizer
+      if (configuringChassis && selectedChassis) {
+        return (
+          <div className="space-y-6">
+            <div className="bg-gray-800 p-6 rounded-lg border border-gray-700">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-xl font-semibold text-white">Configure {selectedChassis.name}</h3>
+                 <Button
+                   variant="outline"
+                   onClick={() => {
+                     setConfiguringChassis(null);
+                     setSelectedChassis(null);
+                     setSlotAssignments({});
+                     setSelectedSlot(null);
+                   }}
+                   className="text-gray-300 border-gray-600 hover:text-white hover:border-gray-400"
+                 >
+                   Back to Products
+                 </Button>
+               </div>
+
+<RackVisualizer
+  chassis={{
+    ...selectedChassis,
+    type: selectedChassis.chassisType || selectedChassis.type || 'chassis',
+    height: selectedChassis.specifications?.height || '6U',
+    slots: selectedChassis.specifications?.slots || 0
+  }}
+  slotAssignments={slotAssignments}
+  onSlotClick={handleSlotClick}
+  onSlotClear={handleSlotClear}
+  selectedSlot={selectedSlot}
+  hasRemoteDisplay={hasRemoteDisplay}
+  onRemoteDisplayToggle={handleRemoteDisplayToggle}
+  standardSlotHints={standardSlotHints}
+  colorByProductId={colorByProductId}
+  level3Products={level3Products}
+  codeMap={codeMap}
+  selectedAccessories={selectedAccessories}
+  onAccessoryToggle={toggleAccessory}
+  partNumber={buildQTMSPartNumber({ chassis: selectedChassis, slotAssignments, hasRemoteDisplay, pnConfig, codeMap, includeSuffix: false })}
+/>
+             </div>
+
+{selectedSlot !== null && (
+  <SlotCardSelector
+    chassis={selectedChassis}
+    slot={selectedSlot}
+    onCardSelect={handleCardSelect}
+    onClose={() => setSelectedSlot(null)}
+    canSeePrices={canSeePrices}
+    currentSlotAssignments={slotAssignments}
+    codeMap={codeMap}
+    pnConfig={pnConfig}
+  />
+)}
+
+             <div className="flex gap-4 justify-end">
+               <Button
+                 variant="outline"
+                 onClick={() => {
+                   setConfiguringChassis(null);
+                   setSelectedChassis(null);
+                   setSlotAssignments({});
+                   setSelectedSlot(null);
+                 }}
+                 className="text-gray-300 border-gray-600 hover:text-white hover:border-gray-400"
+               >
+                 Cancel
+               </Button>
+              <Button 
+                onClick={handleAddChassisToBOM}
+                disabled={Object.keys(slotAssignments).length === 0}
+                className="bg-green-600 hover:bg-green-700 text-white disabled:opacity-50"
+              >
+                Add to BOM
               </Button>
             </div>
-          )}
+          </div>
+        );
+      }
+
+      // Otherwise, show chassis selector
+      return (
+        <div className="space-y-6">
+          <ChassisSelector
+            onChassisSelect={handleChassisSelect}
+            selectedChassis={selectedChassis}
+            onAddToBOM={handleAddToBOM}
+            canSeePrices={canSeePrices}
+          />
+        </div>
+      );
+    }
+
+    // If we're configuring a non-chassis product, show the non-chassis configurator
+    if (configuringNonChassis) {
+      console.log('Rendering non-chassis configuration for:', configuringNonChassis.name);
+      return (
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <h3 className="text-xl font-semibold">
+              Configure {configuringNonChassis.name}
+            </h3>
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => {
+                setConfiguringNonChassis(null);
+                setSelectedAccessories(new Set());
+              }}
+            >
+              Back to Products
+            </Button>
+          </div>
+          
+          <NonChassisConfigurator
+            level2Product={configuringNonChassis}
+            level3Products={level3Products}
+            codeMap={codeMap}
+            partNumberPrefix={pnConfig?.prefix || configuringNonChassis.partNumber || `${configuringNonChassis.name}-001`}
+            selectedAccessories={selectedAccessories}
+            onToggleAccessory={toggleAccessory}
+            onAddToBOM={handleAddNonChassisToBOM}
+            canOverridePartNumber={canForcePN}
+          />
+        </div>
+      );
+    }
+
+    // For other Level 1 products, only show Level 2 options selector
+    // Level 1 products should not have direct "Add to BOM" buttons
+    return (
+      <div className="space-y-6">
+        <Level2OptionsSelector
+          level1Product={product}
+          selectedOptions={selectedLevel2Options}
+          onOptionToggle={handleLevel2OptionToggle}
+          onChassisSelect={handleChassisSelect}
+          onAddToBOM={handleAddToBOM}
+          canSeePrices={canSeePrices}
+        />
+      </div>
+    );
+  };
+
+  // Show loading state while data is being fetched
+  if (level1Loading) {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <p>Loading product catalog...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Check authentication
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <p>Checking authentication...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <Card>
+        <CardContent className="p-6">
+          <div className="text-center">
+            <h3 className="text-lg font-medium text-gray-900 mb-2">Authentication Required</h3>
+            <p className="text-gray-600">Please log in to access the BOM Builder.</p>
+          </div>
         </CardContent>
       </Card>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Quote Fields Section */}
+      <QuoteFieldsSection
+        quoteFields={quoteFields}
+        onFieldChange={handleQuoteFieldChange}
+      />
+
+      {/* Main Layout: Product Selection (Left) and BOM Display (Right) */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Product Selection - Left Side (2/3 width) */}
+        <div className="lg:col-span-2">
+          <Card>
+            <CardHeader>
+              <CardTitle>Product Selection</CardTitle>
+              <CardDescription>
+                Select products to add to your Bill of Materials
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Tabs value={activeTab} onValueChange={(value) => {
+                // Add loading state to prevent UI lag
+                setIsLoading(true);
+                
+                setActiveTab(value);
+                const selectedProduct = level1Products.find(p => p.id === value);
+                setSelectedLevel1Product(selectedProduct || null);
+                
+                // Clear relevant state when switching tabs
+                setSelectedChassis(null);
+                setSlotAssignments({});
+                setSelectedSlot(null);
+                setHasRemoteDisplay(false);
+                
+                console.log('Tab switching to:', value, 'Product:', selectedProduct);
+                
+                // Remove loading state after brief delay for smooth transition
+                setTimeout(() => setIsLoading(false), 100);
+              }}>
+                <TabsList className="grid w-full grid-cols-3">
+                  {level1Products.map(product => (
+                    <TabsTrigger key={product.id} value={product.id}>
+                      {product.name}
+                    </TabsTrigger>
+                  ))}
+                </TabsList>
+
+                {level1Products.map(product => (
+                  <TabsContent key={product.id} value={product.id}>
+                    {renderProductContent(product.id)}
+                  </TabsContent>
+                ))}
+              </Tabs>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* BOM Display - Right Side (1/3 width, sticky) */}
+        <div className="lg:col-span-1">
+          <div className="sticky top-4">
+            <BOMDisplay
+              bomItems={bomItems}
+              onUpdateBOM={handleBOMUpdate}
+              onEditConfiguration={handleBOMConfigurationEdit}
+              onSubmitQuote={submitQuoteRequest}
+              canSeePrices={canSeePrices}
+              canSeeCosts={canSeeCosts}
+              canEditPartNumber={canEditPN}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Discount Section */}
+      <DiscountSection
+        bomItems={bomItems}
+        onDiscountChange={handleDiscountChange}
+        canSeePrices={canSeePrices}
+        initialDiscount={discountPercentage}
+        initialJustification={discountJustification}
+      />
+
+      {/* Submit Button */}
+      <div className="flex justify-end">
+        <Button
+          onClick={submitQuoteRequest}
+          disabled={isSubmitting || bomItems.length === 0}
+          size="lg"
+        >
+          {isSubmitting ? 'Submitting...' : 'Submit Quote Request'}
+        </Button>
+      </div>
+
+      {/* Configuration Dialogs */}
+      {configuringCard && (configuringCard.product as any).requires_level4_config && (
+        configuringCard.product.name.toLowerCase().includes('analog') ? (
+          <AnalogCardConfigurator
+            bomItem={configuringCard}
+            onSave={handleCardConfiguration}
+            onClose={() => setConfiguringCard(null)}
+          />
+        ) : configuringCard.product.name.toLowerCase().includes('bushing') ? (
+          <BushingCardConfigurator
+            bomItem={configuringCard}
+            onSave={handleCardConfiguration}
+            onClose={() => setConfiguringCard(null)}
+          />
+        ) : null
+      )}
+
+      {editingQTMS && (
+        <QTMSConfigurationEditor
+          consolidatedQTMS={editingQTMS}
+          onSave={handleQTMSConfigurationSave}
+          onClose={() => setEditingQTMS(null)}
+          canSeePrices={canSeePrices}
+        />
+      )}
     </div>
   );
-}
+};
+
+export default BOMBuilder;
