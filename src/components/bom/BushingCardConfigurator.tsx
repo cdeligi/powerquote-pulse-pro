@@ -29,8 +29,9 @@ const BushingCardConfigurator = ({ bomItem, onSave, onClose }: BushingCardConfig
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    try {
-      const models = ProductDataService.getBushingTapModels();
+    const loadModels = async () => {
+      try {
+      const models = await productDataService.getBushingTapModels();
       console.log('Loaded bushing tap models:', models);
       setTapModels(models || []);
       
@@ -52,6 +53,9 @@ const BushingCardConfigurator = ({ bomItem, onSave, onClose }: BushingCardConfig
       setBushingConfigurations({ 1: 'Standard' });
       setLoading(false);
     }
+    };
+    
+    loadModels();
   }, [bomItem.product.id]);
 
   const handleNumberOfBushingsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
