@@ -31,7 +31,7 @@ const BushingCardConfigurator = ({ bomItem, onSave, onClose }: BushingCardConfig
   useEffect(() => {
     const loadModels = async () => {
       try {
-      const models = await productDataService.getBushingTapModels();
+      const models = await ProductDataService.getBushingTapModels();
       console.log('Loaded bushing tap models:', models);
       setTapModels(models || []);
       
