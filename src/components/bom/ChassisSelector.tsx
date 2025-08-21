@@ -17,6 +17,29 @@ const ChassisSelector = ({ onChassisSelect, selectedChassis, onAddToBOM, canSeeP
   const [chassisOptions, setChassisOptions] = useState<Level2Product[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const handleConfigureChassisClick = async (chassis: Level2Product) => {
+    console.log('Configure Chassis clicked for:', chassis.name, 'chassisType:', chassis.chassisType);
+    onChassisSelect(chassis);
+  };
+
+  const handleAddToBOMClick = async (e: React.MouseEvent, product: Level2Product) => {
+    e.stopPropagation();
+    if (!onAddToBOM) return;
+
+    // Check if this product requires Level 4 configuration
+    const requiresLevel4 = (product as any).requires_level4_config === true;
+    
+    console.log(`Adding ${product.name} to BOM, requires Level 4: ${requiresLevel4}`);
+    
+    if (requiresLevel4) {
+      // For Level 2 products that require Level 4 config, we'll let the parent component handle it
+      // The BOMBuilder should detect this and show the Level4Configurator
+      console.log('Product requires Level 4 configuration, deferring to parent component');
+    }
+    
+    onAddToBOM(product);
+  };
+
   useEffect(() => {
     const loadChassis = async () => {
       try {
@@ -150,18 +173,26 @@ const ChassisSelector = ({ onChassisSelect, selectedChassis, onAddToBOM, canSeeP
                 </div>
               )}
               
-              {/* Configure Chassis button only */}
-              <Button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  console.log('Configure Chassis clicked for:', chassis.name, 'chassisType:', chassis.chassisType);
-                  onChassisSelect(chassis);
-                }}
-                size="sm"
-                className="w-full text-xs"
-              >
-                Configure Chassis
-              </Button>
+              <div className="flex flex-col gap-2">
+                <Button
+                  onClick={() => handleConfigureChassisClick(chassis)}
+                  size="sm"
+                  className="w-full text-xs"
+                >
+                  Configure Chassis
+                </Button>
+                
+                {onAddToBOM && (
+                  <Button
+                    onClick={(e) => handleAddToBOMClick(e, chassis)}
+                    size="sm"
+                    variant="outline"
+                    className="w-full text-xs"
+                  >
+                    Add to BOM
+                  </Button>
+                )}
+              </div>
               
               {chassis.specifications && (
                 <div className="mt-2 flex flex-wrap gap-1">
