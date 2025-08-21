@@ -18,6 +18,13 @@ export type {
   Level4ConfigurationOption
 } from './product/interfaces';
 
+export type {
+  Level4Configuration,
+  Level4ConfigurationField,
+  Level4DropdownOption,
+  Level4SharedOption
+} from './level4';
+
 export { 
   ANALOG_SENSOR_TYPES, 
   ANALOG_SENSOR_DESCRIPTIONS,

@@ -88,7 +88,7 @@ export const Level4ConfigEditor: React.FC<Level4ConfigEditorProps> = ({ product,
     }
   };
 
-  const handleUpdateField = async (fieldId: string, updates: Partial<Level4ConfigurationField>) => {
+  const handleUpdateField = async (fieldId: string, updates: Partial<{ label: string; info_url?: string; display_order: number; default_option_id?: string }>) => {
     if (!configuration) return;
 
     try {

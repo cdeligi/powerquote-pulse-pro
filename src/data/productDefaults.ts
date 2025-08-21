@@ -1,221 +1,150 @@
-import { Level1Product, Level2Product, Level3Product, AssetType } from "@/types/product";
+/**
+ * 2025 Qualitrol Corp. All rights reserved.
+ * 
+ * This file contains default product configurations for the QTMS system.
+ * It includes Level 1 (main products), Level 2 (chassis/variants), 
+ * Level 3 (cards/components), and asset types.
+ */
+
+import { AssetType, Level1Product, Level2Product, Level3Product } from "@/types/product";
 
 export const DEFAULT_ASSET_TYPES: AssetType[] = [
   { id: 'power-transformer', name: 'Power Transformer', enabled: true },
-  { id: 'gas-insulated-switchgear', name: 'Gas Insulated Switchgear', enabled: true },
-  { id: 'breaker', name: 'Breaker', enabled: true }
+  { id: 'gis', name: 'GIS (Gas Insulated Switchgear)', enabled: true },
+  { id: 'circuit-breaker', name: 'Circuit Breaker', enabled: true },
+  { id: 'reactor', name: 'Reactor', enabled: true },
+  { id: 'capacitor-bank', name: 'Capacitor Bank', enabled: true }
 ];
+
+// Helper function to ensure Level3Product compliance
+const createLevel3Product = (base: any): Level3Product => ({
+  ...base,
+  parent_product_id: base.parentProductId,
+  product_level: 3 as const,
+});
 
 export const DEFAULT_LEVEL1_PRODUCTS: Level1Product[] = [
   {
     id: 'qtms',
-    name: 'QTMS',
-    type: 'Monitoring Systems',
-    category: 'Monitoring Systems',
-    description: 'The Qualitrol Transformer Monitoring System (QTMS) is a modular, multi-function system used to monitor critical parameters on power transformers.',
-    price: 10000,
-    cost: 7000,
-    productInfoUrl: 'https://qualitrolcorp.com/products/qualitrol-qtms-transformer-monitoring-system/',
+    name: 'QTMS - Qualitrol Transformer Monitoring System',
+    type: 'power-transformer',
+    asset_type_id: 'power-transformer',
+    description: 'Comprehensive monitoring system for power transformers',
+    price: 15000,
+    cost: 10500,
     enabled: true,
-    partNumber: 'QTMS-1000',
-    image: 'https://qualitrolcorp.com/wp-content/uploads/2024/01/QTMS_Main_Image.png'
+    partNumber: 'QTMS-BASE',
+    rackConfigurable: true,
+    hasQuantitySelection: false,
+    productInfoUrl: '/products/qtms'
   },
   {
-    id: 'dga',
-    name: 'DGA',
-    type: 'Monitoring Systems',
-    category: 'DGA Monitors',
-    description: 'Dissolved Gas Analysis (DGA) monitors provide continuous, online monitoring of key gases dissolved in transformer oil, enabling early detection of developing faults.',
-    price: 8000,
-    cost: 5000,
-    productInfoUrl: 'https://qualitrolcorp.com/products/dga-dissolved-gas-analysis/',
+    id: 'tm8',
+    name: 'TM8 Transformer Monitor',
+    type: 'power-transformer', 
+    asset_type_id: 'power-transformer',
+    description: '8-channel transformer monitoring system',
+    price: 8500,
+    cost: 6000,
     enabled: true,
-    partNumber: 'DGA-1000',
-    image: 'https://qualitrolcorp.com/wp-content/uploads/2024/01/DGA_Monitor.png'
+    partNumber: 'TM8-001',
+    rackConfigurable: false,
+    hasQuantitySelection: false
   },
   {
-    id: 'partial-discharge',
-    name: 'Partial Discharge',
-    type: 'Monitoring Systems',
-    category: 'PD Monitors',
-    description: 'Partial Discharge (PD) monitors detect and measure the presence of PD activity within transformers, providing valuable insights into insulation condition and potential defects.',
-    price: 12000,
-    cost: 9000,
-    productInfoUrl: 'https://qualitrolcorp.com/products/partial-discharge-monitoring/',
+    id: 'tm3',
+    name: 'TM3 Transformer Monitor',
+    type: 'power-transformer',
+    asset_type_id: 'power-transformer', 
+    description: '3-channel compact transformer monitor',
+    price: 5200,
+    cost: 3640,
     enabled: true,
-    partNumber: 'PD-1000',
-    image: 'https://qualitrolcorp.com/wp-content/uploads/2024/01/Partial_Discharge_Monitor.png'
+    partNumber: 'TM3-001',
+    rackConfigurable: false,
+    hasQuantitySelection: false
+  },
+  {
+    id: 'tm1',
+    name: 'TM1 Transformer Monitor',
+    type: 'power-transformer',
+    asset_type_id: 'power-transformer',
+    description: 'Single-channel transformer monitor',
+    price: 2800,
+    cost: 1960,
+    enabled: true,
+    partNumber: 'TM1-001',
+    rackConfigurable: false,
+    hasQuantitySelection: false
   }
 ];
 
 export const DEFAULT_LEVEL2_PRODUCTS: Level2Product[] = [
-  // QTMS Chassis
   {
     id: 'ltx-chassis',
     name: 'LTX Chassis',
     parentProductId: 'qtms',
+    chassisType: 'LTX',
     type: 'LTX',
-    description: 'Large capacity transformer monitoring system',
-    price: 4200,
-    cost: 3000,
+    description: '14-slot expandable chassis for comprehensive monitoring',
+    price: 3200,
+    cost: 2240,
     enabled: true,
     specifications: {
-      height: '6U',
-      slots: 14
+      slots: 14,
+      capacity: 'High Capacity',
+      dimensions: '19" rack mountable',
+      powerSupply: 'Redundant',
+      cooling: 'Active'
     },
-    partNumber: 'LTX-6U-14S',
-    productInfoUrl: 'https://www.qualitrolcorp.com/products/ltx-chassis'
+    partNumber: 'LTX-CHASSIS-14',
+    productInfoUrl: '/products/qtms/ltx'
   },
   {
     id: 'mtx-chassis',
-    name: 'MTX Chassis',
+    name: 'MTX Chassis', 
     parentProductId: 'qtms',
+    chassisType: 'MTX',
     type: 'MTX',
-    description: 'Medium capacity transformer monitoring system',
-    price: 2800,
-    cost: 2000,
+    description: '7-slot modular chassis for medium applications',
+    price: 2400,
+    cost: 1680,
     enabled: true,
     specifications: {
-      height: '3U',
-      slots: 7
+      slots: 7,
+      capacity: 'Medium Capacity',
+      dimensions: '19" rack mountable',
+      powerSupply: 'Standard',
+      cooling: 'Passive'
     },
-    partNumber: 'MTX-3U-7S',
-    productInfoUrl: 'https://www.qualitrolcorp.com/products/mtx-chassis'
+    partNumber: 'MTX-CHASSIS-7',
+    productInfoUrl: '/products/qtms/mtx'
   },
   {
     id: 'stx-chassis',
     name: 'STX Chassis',
     parentProductId: 'qtms',
+    chassisType: 'STX', 
     type: 'STX',
-    description: 'Compact transformer monitoring system',
-    price: 1900,
-    cost: 1400,
+    description: '4-slot compact chassis for small installations',
+    price: 1600,
+    cost: 1120,
     enabled: true,
     specifications: {
-      height: '1.5U',
-      slots: 4
+      slots: 4,
+      capacity: 'Compact',
+      dimensions: 'Compact 19" rack',
+      powerSupply: 'External',
+      cooling: 'Passive'
     },
-    partNumber: 'STX-1.5U-4S',
-    productInfoUrl: 'https://www.qualitrolcorp.com/products/stx-chassis'
-  },
-  // Other existing Level 2 products
-  {
-    id: 'chassis-6-slot',
-    name: '6-Slot Chassis',
-    parentProductId: 'qtms',
-    type: 'Chassis',
-    description: '6-slot expansion chassis for QTMS',
-    price: 2000,
-    cost: 1500,
-    enabled: true,
-    partNumber: 'CHASSIS-006',
-    specifications: {
-      slots: 6,
-      powerSupply: 'Redundant',
-      mounting: 'Rackmount'
-    }
-  },
-  {
-    id: 'chassis-12-slot',
-    name: '12-Slot Chassis',
-    parentProductId: 'qtms',
-    type: 'Chassis',
-    description: '12-slot expansion chassis for QTMS',
-    price: 3500,
-    cost: 2500,
-    enabled: true,
-    partNumber: 'CHASSIS-012',
-    specifications: {
-      slots: 12,
-      powerSupply: 'Redundant',
-      mounting: 'Rackmount'
-    }
-  },
-  {
-    id: 'core-sensor-unit',
-    name: 'Core Sensor Unit',
-    parentProductId: 'qtms',
-    type: 'Sensor',
-    description: 'The Core Sensor Unit is the central processing unit for the QTMS system.',
-    price: 5000,
-    cost: 3500,
-    enabled: true,
-    partNumber: 'CSU-100',
-    specifications: {
-      inputs: 8,
-      outputs: 4,
-      communication: ['Ethernet', 'RS-485']
-    }
-  },
-  {
-    id: 'dga-9-plus',
-    name: 'DGA 9 Plus',
-    parentProductId: 'dga',
-    type: 'Monitor',
-    description: '9-gas online DGA monitor with advanced features',
-    price: 15000,
-    cost: 11000,
-    enabled: true,
-    partNumber: 'TM3',
-    specifications: {
-      gases: ['H2', 'O2', 'N2', 'CO', 'CO2', 'CH4', 'C2H2', 'C2H4', 'C2H6'],
-      oilType: 'Mineral',
-      communication: ['Ethernet', 'Modbus']
-    }
-  },
-  {
-    id: 'dga-5-pro',
-    name: 'DGA 5 Pro',
-    parentProductId: 'dga',
-    type: 'Monitor',
-    description: '5-gas online DGA monitor for essential monitoring',
-    price: 12000,
-    cost: 9000,
-    enabled: true,
-    partNumber: 'TM8',
-    specifications: {
-      gases: ['H2', 'CO', 'CO2', 'CH4', 'C2H2'],
-      oilType: 'Mineral',
-      communication: ['Ethernet']
-    }
-  },
-  {
-    id: 'pd-guard-pro',
-    name: 'PD-Guard Pro',
-    parentProductId: 'partial-discharge',
-    type: 'Monitor',
-    description: 'Advanced online partial discharge monitoring system',
-    price: 18000,
-    cost: 14000,
-    enabled: true,
-    partNumber: 'PD-G-PRO-001',
-    specifications: {
-      sensors: 6,
-      frequencyRange: '300 kHz - 3 MHz',
-      communication: ['Fiber Optic', 'Ethernet']
-    }
-  },
-  {
-    id: 'pd-sense-basic',
-    name: 'PD-Sense Basic',
-    parentProductId: 'partial-discharge',
-    type: 'Monitor',
-    description: 'Basic online partial discharge detection system',
-    price: 15000,
-    cost: 11000,
-    enabled: true,
-    partNumber: 'PD-S-BASIC-001',
-    specifications: {
-      sensors: 3,
-      frequencyRange: '500 kHz - 2 MHz',
-      communication: ['Ethernet']
-    }
+    partNumber: 'STX-CHASSIS-4',
+    productInfoUrl: '/products/qtms/stx'
   }
 ];
 
 export const DEFAULT_LEVEL3_PRODUCTS: Level3Product[] = [
   // Basic Cards for all chassis types
-  {
+  createLevel3Product({
     id: 'relay-card-basic',
     name: 'Basic Relay Card',
     parentProductId: 'ltx-chassis',
@@ -228,12 +157,12 @@ export const DEFAULT_LEVEL3_PRODUCTS: Level3Product[] = [
     specifications: {
       channels: 8,
       voltage: '24VDC',
-      current: '2A per channel',
+      current: '10A per channel',
       slotRequirement: 1,
       compatibleChassis: ['LTX', 'MTX', 'STX']
     }
-  },
-  {
+  }),
+  createLevel3Product({
     id: 'relay-card-basic-mtx',
     name: 'Basic Relay Card',
     parentProductId: 'mtx-chassis',
@@ -250,8 +179,8 @@ export const DEFAULT_LEVEL3_PRODUCTS: Level3Product[] = [
       slotRequirement: 1,
       compatibleChassis: ['LTX', 'MTX', 'STX']
     }
-  },
-  {
+  }),
+  createLevel3Product({
     id: 'relay-card-basic-stx',
     name: 'Basic Relay Card',
     parentProductId: 'stx-chassis',
@@ -268,335 +197,195 @@ export const DEFAULT_LEVEL3_PRODUCTS: Level3Product[] = [
       slotRequirement: 1,
       compatibleChassis: ['LTX', 'MTX', 'STX']
     }
-  },
-  // Analog Cards
-  {
-    id: 'analog-card-multi-ltx',
+  }),
+  // Analog input cards with Level 4 configuration capability
+  createLevel3Product({
+    id: 'analog-card-multi',
     name: 'Multi-Input Analog Card',
     parentProductId: 'ltx-chassis',
     type: 'analog',
-    description: 'High-precision analog input card',
-    price: 1250,
-    cost: 900,
+    description: 'Multi-channel analog input card with configurable inputs',
+    price: 1200,
+    cost: 840,
     enabled: true,
-    partNumber: 'ANA-16CH-001',
+    requires_level4_config: true,
+    partNumber: 'ANA-MULTI-001',
     specifications: {
-      channels: 16,
+      channels: 8,
       resolution: '16-bit',
-      inputRange: '±10V, 4-20mA',
-      inputs: 16,
+      inputRange: '±10V, ±5V, 0-10V',
+      inputs: 8,
       slotRequirement: 1,
       compatibleChassis: ['LTX', 'MTX', 'STX']
     }
-  },
-  {
+  }),
+  createLevel3Product({
     id: 'analog-card-multi-mtx',
     name: 'Multi-Input Analog Card',
     parentProductId: 'mtx-chassis',
     type: 'analog',
-    description: 'High-precision analog input card',
-    price: 1250,
-    cost: 900,
+    description: 'Multi-channel analog input card with configurable inputs',
+    price: 1200,
+    cost: 840,
     enabled: true,
-    partNumber: 'ANA-16CH-001',
+    requires_level4_config: true,
+    partNumber: 'ANA-MULTI-001',
     specifications: {
-      channels: 16,
+      channels: 8,
       resolution: '16-bit',
-      inputRange: '±10V, 4-20mA',
-      inputs: 16,
+      inputRange: '±10V, ±5V, 0-10V',
+      inputs: 8,
       slotRequirement: 1,
       compatibleChassis: ['LTX', 'MTX', 'STX']
     }
-  },
-  {
+  }),
+  createLevel3Product({
     id: 'analog-card-multi-stx',
     name: 'Multi-Input Analog Card',
     parentProductId: 'stx-chassis',
     type: 'analog',
-    description: 'High-precision analog input card',
-    price: 1250,
-    cost: 900,
+    description: 'Multi-channel analog input card with configurable inputs',
+    price: 1200,
+    cost: 840,
     enabled: true,
-    partNumber: 'ANA-16CH-001',
-    specifications: {
-      channels: 16,
-      resolution: '16-bit',
-      inputRange: '±10V, 4-20mA',
-      inputs: 16,
-      slotRequirement: 1,
-      compatibleChassis: ['LTX', 'MTX', 'STX']
-    }
-  },
-  // Bushing Cards
-  {
-    id: 'bushing-card-ltx',
-    name: 'Bushing Monitoring Card',
-    parentProductId: 'ltx-chassis',
-    type: 'bushing',
-    description: 'Transformer bushing monitoring interface',
-    price: 2250,
-    cost: 1600,
-    enabled: true,
-    partNumber: 'BSH-12CH-001',
-    specifications: {
-      channels: 12,
-      measurement: 'Capacitance & Tan Delta',
-      slotRequirement: 2,
-      compatibleChassis: ['LTX', 'MTX', 'STX']
-    }
-  },
-  {
-    id: 'bushing-card-mtx',
-    name: 'Bushing Monitoring Card',
-    parentProductId: 'mtx-chassis',
-    type: 'bushing',
-    description: 'Transformer bushing monitoring interface',
-    price: 2250,
-    cost: 1600,
-    enabled: true,
-    partNumber: 'BSH-12CH-001',
-    specifications: {
-      channels: 12,
-      measurement: 'Capacitance & Tan Delta',
-      slotRequirement: 2,
-      compatibleChassis: ['LTX', 'MTX', 'STX']
-    }
-  },
-  {
-    id: 'bushing-card-stx',
-    name: 'Bushing Monitoring Card',
-    parentProductId: 'stx-chassis',
-    type: 'bushing',
-    description: 'Transformer bushing monitoring interface',
-    price: 2250,
-    cost: 1600,
-    enabled: true,
-    partNumber: 'BSH-12CH-001',
-    specifications: {
-      channels: 12,
-      measurement: 'Capacitance & Tan Delta',
-      slotRequirement: 2,
-      compatibleChassis: ['LTX', 'MTX', 'STX']
-    }
-  },
-  // Display Cards (LTX only)
-  {
-    id: 'display-card-ltx',
-    name: 'Local Display Interface',
-    parentProductId: 'ltx-chassis',
-    type: 'display',
-    description: 'Local HMI display interface card',
-    price: 950,
-    cost: 700,
-    enabled: true,
-    partNumber: 'DIS-LCD-001',
-    specifications: {
-      display: 'LCD',
-      resolution: '320x240',
-      backlight: 'LED',
-      slotRequirement: 1,
-      compatibleChassis: ['LTX']
-    }
-  },
-  // Fiber Cards
-  {
-    id: 'fiber-card-4-input-ltx',
-    name: 'Fiber Optic Communication Card (4 Inputs)',
-    parentProductId: 'ltx-chassis',
-    type: 'fiber',
-    description: 'High-speed fiber optic interface with 4 inputs',
-    price: 1850,
-    cost: 1300,
-    enabled: true,
-    partNumber: 'FIB-4I-001',
-    specifications: {
-      ports: 2,
-      inputs: 4,
-      speed: '1Gbps',
-      connector: 'LC',
-      slotRequirement: 1,
-      compatibleChassis: ['LTX', 'MTX', 'STX']
-    }
-  },
-  {
-    id: 'fiber-card-6-input-ltx',
-    name: 'Fiber Optic Communication Card (6 Inputs)',
-    parentProductId: 'ltx-chassis',
-    type: 'fiber',
-    description: 'High-speed fiber optic interface with 6 inputs',
-    price: 2150,
-    cost: 1500,
-    enabled: true,
-    partNumber: 'FIB-6I-001',
-    specifications: {
-      ports: 2,
-      inputs: 6,
-      speed: '1Gbps',
-      connector: 'LC',
-      slotRequirement: 1,
-      compatibleChassis: ['LTX', 'MTX', 'STX']
-    }
-  },
-  {
-    id: 'fiber-card-8-input-ltx',
-    name: 'Fiber Optic Communication Card (8 Inputs)',
-    parentProductId: 'ltx-chassis',
-    type: 'fiber',
-    description: 'High-speed fiber optic interface with 8 inputs',
-    price: 2450,
-    cost: 1700,
-    enabled: true,
-    partNumber: 'FIB-8I-001',
-    specifications: {
-      ports: 2,
-      inputs: 8,
-      speed: '1Gbps',
-      connector: 'LC',
-      slotRequirement: 1,
-      compatibleChassis: ['LTX', 'MTX', 'STX']
-    }
-  },
-  // Duplicate fiber cards for MTX and STX
-  {
-    id: 'fiber-card-4-input-mtx',
-    name: 'Fiber Optic Communication Card (4 Inputs)',
-    parentProductId: 'mtx-chassis',
-    type: 'fiber',
-    description: 'High-speed fiber optic interface with 4 inputs',
-    price: 1850,
-    cost: 1300,
-    enabled: true,
-    partNumber: 'FIB-4I-001',
-    specifications: {
-      ports: 2,
-      inputs: 4,
-      speed: '1Gbps',
-      connector: 'LC',
-      slotRequirement: 1,
-      compatibleChassis: ['LTX', 'MTX', 'STX']
-    }
-  },
-  {
-    id: 'fiber-card-4-input-stx',
-    name: 'Fiber Optic Communication Card (4 Inputs)',
-    parentProductId: 'stx-chassis',
-    type: 'fiber',
-    description: 'High-speed fiber optic interface with 4 inputs',
-    price: 1850,
-    cost: 1300,
-    enabled: true,
-    partNumber: 'FIB-4I-001',
-    specifications: {
-      ports: 2,
-      inputs: 4,
-      speed: '1Gbps',
-      connector: 'LC',
-      slotRequirement: 1,
-      compatibleChassis: ['LTX', 'MTX', 'STX']
-    }
-  },
-  // Original Level 3 products
-  {
-    id: 'relay-card-8',
-    name: '8-Channel Relay Card',
-    parentProductId: 'chassis-6-slot',
-    type: 'Relay',
-    description: '8-channel relay output card for QTMS',
-    price: 800,
-    cost: 600,
-    enabled: true,
-    partNumber: 'RELAY-008',
+    requires_level4_config: true,
+    partNumber: 'ANA-MULTI-001',
     specifications: {
       channels: 8,
-      voltage: '24V DC',
-      current: '2A',
-      slotRequirement: 1
+      resolution: '16-bit',
+      inputRange: '±10V, ±5V, 0-10V',
+      inputs: 8,
+      slotRequirement: 1,
+      compatibleChassis: ['LTX', 'MTX', 'STX']
     }
-  },
-  {
-    id: 'analog-input-card-4',
-    name: '4-Channel Analog Input Card',
-    parentProductId: 'chassis-6-slot',
-    type: 'Analog',
-    description: '4-channel analog input card for QTMS',
-    price: 700,
-    cost: 500,
+  }),
+  // Temperature monitoring cards
+  createLevel3Product({
+    id: 'temp-card-rtd',
+    name: 'RTD Temperature Card',
+    parentProductId: 'ltx-chassis',
+    type: 'temperature',
+    description: '8-channel RTD temperature monitoring',
+    price: 950,
+    cost: 665,
     enabled: true,
-    partNumber: 'ANALOG-IN-004',
+    partNumber: 'TEMP-RTD-8CH',
+    specifications: {
+      channels: 8,
+      measurement: 'RTD (PT100/PT1000)',
+      slotRequirement: 1,
+      compatibleChassis: ['LTX', 'MTX', 'STX']
+    }
+  }),
+  createLevel3Product({
+    id: 'temp-card-tc',
+    name: 'Thermocouple Card',
+    parentProductId: 'mtx-chassis',
+    type: 'temperature',
+    description: '8-channel thermocouple input card',
+    price: 920,
+    cost: 644,
+    enabled: true,
+    partNumber: 'TEMP-TC-8CH',
+    specifications: {
+      channels: 8,
+      measurement: 'Thermocouple (J,K,T)',
+      slotRequirement: 1,
+      compatibleChassis: ['LTX', 'MTX', 'STX']
+    }
+  }),
+  createLevel3Product({
+    id: 'temp-card-ambient',
+    name: 'Ambient Temperature Card',
+    parentProductId: 'stx-chassis',
+    type: 'temperature',
+    description: '4-channel ambient temperature sensor',
+    price: 680,
+    cost: 476,
+    enabled: true,
+    partNumber: 'TEMP-AMB-4CH',
     specifications: {
       channels: 4,
-      inputRange: '0-10V',
-      resolution: '16-bit',
-      slotRequirement: 1
+      measurement: 'Ambient (-40°C to +85°C)',
+      slotRequirement: 1,
+      compatibleChassis: ['LTX', 'MTX', 'STX']
     }
-  },
-  {
-    id: 'fiber-optic-module',
-    name: 'Fiber Optic Communication Module',
-    parentProductId: 'chassis-6-slot',
-    type: 'Fiber',
-    description: 'Fiber optic communication module for QTMS',
-    price: 1200,
-    cost: 900,
+  }),
+  // Display and interface cards
+  createLevel3Product({
+    id: 'display-card-lcd',
+    name: 'LCD Display Card',
+    parentProductId: 'ltx-chassis',
+    type: 'display',
+    description: 'Color LCD display with touch interface',
+    price: 1450,
+    cost: 1015,
     enabled: true,
-    partNumber: 'FIBER-OPTIC-001',
+    partNumber: 'DISP-LCD-COLOR',
     specifications: {
-      wavelength: '1310 nm',
-      distance: '20 km',
-      connectorType: 'LC',
-      slotRequirement: 2
+      display: 'Color LCD',
+      resolution: '800x480',
+      backlight: 'LED',
+      slotRequirement: 2,
+      compatibleChassis: ['LTX', 'MTX']
     }
-  },
-  {
-    id: 'display-module-touchscreen',
-    name: 'Touchscreen Display Module',
-    parentProductId: 'chassis-6-slot',
-    type: 'Display',
-    description: 'Touchscreen display module for local QTMS interface',
-    price: 1500,
-    cost: 1100,
+  }),
+  // Communication cards
+  createLevel3Product({
+    id: 'comm-ethernet',
+    name: 'Ethernet Communication Card',
+    parentProductId: 'ltx-chassis',
+    type: 'communication',
+    description: 'Dual-port Ethernet interface card',
+    price: 720,
+    cost: 504,
     enabled: true,
-    partNumber: 'DISPLAY-TOUCH-001',
+    partNumber: 'COMM-ETH-DUAL',
     specifications: {
-      size: '7 inch',
-      resolution: '1024x600',
-      touchType: 'Capacitive',
-      slotRequirement: 2
-    }
-  },
-  {
-    id: 'digital-input-card-16',
-    name: '16-Channel Digital Input Card',
-    parentProductId: 'chassis-6-slot',
-    type: 'Digital',
-    description: '16-channel digital input card for QTMS',
-    price: 600,
-    cost: 400,
-    enabled: true,
-    partNumber: 'DIGITAL-IN-016',
-    specifications: {
-      channels: 16,
-      voltage: '24V DC',
-      inputType: 'Dry Contact',
-      slotRequirement: 1
-    }
-  },
-  {
-    id: 'iec61850-communication-module',
-    name: 'IEC 61850 Communication Module',
-    parentProductId: 'chassis-6-slot',
-    type: 'Communication',
-    description: 'IEC 61850 communication module for QTMS',
-    price: 1800,
-    cost: 1300,
-    enabled: true,
-    partNumber: 'IEC61850-001',
-    specifications: {
-      protocol: 'IEC 61850',
       ports: 2,
-      connectorType: 'RJ45',
-      slotRequirement: 2
+      inputs: 2,
+      speed: '10/100/1000 Mbps',
+      connector: 'RJ45',
+      slotRequirement: 1,
+      compatibleChassis: ['LTX', 'MTX', 'STX']
     }
-  }
+  }),
+  createLevel3Product({
+    id: 'comm-serial',
+    name: 'Serial Communication Card',
+    parentProductId: 'mtx-chassis',
+    type: 'communication',
+    description: 'Multi-protocol serial interface',
+    price: 580,
+    cost: 406,
+    enabled: true,
+    partNumber: 'COMM-SER-MULTI',
+    specifications: {
+      ports: 4,
+      inputs: 4,
+      speed: 'Up to 115.2 kbps',
+      connector: 'DB9/Terminal',
+      slotRequirement: 1,
+      compatibleChassis: ['LTX', 'MTX', 'STX']
+    }
+  }),
+  createLevel3Product({
+    id: 'comm-modbus',
+    name: 'Modbus Communication Card',
+    parentProductId: 'stx-chassis',
+    type: 'communication',
+    description: 'Modbus RTU/TCP interface card',
+    price: 650,
+    cost: 455,
+    enabled: true,
+    partNumber: 'COMM-MODBUS',
+    specifications: {
+      ports: 2,
+      inputs: 2,
+      speed: '9600-115200 bps',
+      connector: 'Terminal/RJ45',
+      slotRequirement: 1,
+      compatibleChassis: ['LTX', 'MTX', 'STX']
+    }
+  })
 ];
-export { DEFAULT_ANALOG_SENSORS, DEFAULT_BUSHING_TAP_MODELS } from '@/types/product/sensor-config';
