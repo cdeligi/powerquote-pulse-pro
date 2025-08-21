@@ -54,20 +54,14 @@ export interface Level3Product {
   id: string;
   name: string;
   parent_product_id: string; // Links to Level2Product
-  parentProductId?: string; // Backward compatibility
   description: string;
   price: number;
   cost?: number;
   enabled: boolean;
   product_level: 3;
   part_number_format?: string;
-  partNumber?: string;
   requires_level4_config?: boolean; // Flag to enable Level 4 config
   productInfoUrl?: string;
-  type?: string; // For backward compatibility
-  specifications?: Record<string, any>;
-  image?: string;
-  sku?: string;
 }
 
 // Level 4: Dynamic Product Configuration
@@ -121,7 +115,7 @@ export interface Chassis extends Level2Product {
 export interface Card extends Level3Product {
   slotRequirement: number;
   compatibleChassis: string[];
-  enabled: boolean; // Make required to match Level3Product
+  enabled?: boolean; // Optional since many static card objects omit it
 }
 
 export interface Level2Option extends Level3Product {

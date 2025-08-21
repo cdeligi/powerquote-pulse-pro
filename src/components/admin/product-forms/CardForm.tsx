@@ -25,7 +25,7 @@ const CardForm = ({ onSubmit, level2Products, initialData }: CardFormProps) => {
     enabled: initialData?.enabled ?? true,
     requires_level4_config: initialData?.requires_level4_config || false,
     specifications: initialData?.specifications || {},
-    product_level: 3 as const,
+    product_level: 3,
     image: initialData?.image || ''
   });
 
