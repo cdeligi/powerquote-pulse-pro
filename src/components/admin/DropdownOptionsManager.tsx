@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { PlusCircle, Trash2 } from 'lucide-react';
 import { productDataService } from '@/services/productDataService';
-import { Level4Configuration, Level4ConfigurationField, Level4DropdownOption, Level4SharedOption } from '@/types/product';
+import { Level4Configuration, Level4ConfigurationField, Level4DropdownOption, Level4SharedOption } from '@/types/level4';
 
 interface DropdownOptionsManagerPropsFieldScope {
   scope?: 'field';
@@ -42,6 +42,7 @@ export const DropdownOptionsManager: React.FC<DropdownOptionsManagerProps> = (pr
         label: 'New Option',
         value: 'new_option',
         display_order: options.length,
+        is_default: false,
       };
       const newOption = await productDataService.addDropdownOptionToField(newOptionData);
       if (newOption) setOptions([...options, newOption]);
