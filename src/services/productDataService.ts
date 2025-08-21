@@ -483,7 +483,7 @@ export class ProductDataService {
   async getLevel3ProductsRequiringConfig(): Promise<Level3Product[]> { return []; }
   async getPartNumberConfig(id: string): Promise<any> { return null; }
   async getLevel3ProductsForLevel2(id: string): Promise<Level3Product[]> { return this.getLevel3Products(id); }
-  async getPartNumberCodesForLevel2(id: string): Promise<any[]> { return []; }
+  async getPartNumberCodesForLevel2(id: string): Promise<Record<string, any>> { return {}; }
   async upsertPartNumberConfig(data: any): Promise<any> { return null; }
   async upsertPartNumberCodes(data: any): Promise<any> { return null; }
   async updateLevel1Product(id: string, data: any): Promise<any> { return null; }
@@ -495,6 +495,8 @@ export class ProductDataService {
   async deleteLevel3Product(id: string): Promise<boolean> { return false; }
   async getLevel2ProductsByCategory(category: string): Promise<Level2Product[]> { return []; }
   async getLevel2ProductsForLevel1(id: string): Promise<Level2Product[]> { return this.getLevel2Products(id); }
+  async getDGAProducts(): Promise<Level1Product[]> { return []; }
+  async getPDProducts(): Promise<Level1Product[]> { return []; }
   static getAnalogSensorTypes(): any[] { return []; }
   static getBushingTapModels(): any[] { return []; }
 }

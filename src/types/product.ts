@@ -14,11 +14,6 @@ export type {
 } from './product/sensor-config';
 
 export type {
-  Level4Product,
-  Level4ConfigurationOption
-} from './product/interfaces';
-
-export type {
   Level4Configuration,
   Level4ConfigurationField,
   Level4DropdownOption,

@@ -121,7 +121,7 @@ export interface Chassis extends Level2Product {
 export interface Card extends Level3Product {
   slotRequirement: number;
   compatibleChassis: string[];
-  enabled?: boolean; // Optional since many static card objects omit it
+  enabled: boolean; // Make required to match Level3Product
 }
 
 export interface Level2Option extends Level3Product {
