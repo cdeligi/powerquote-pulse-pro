@@ -1,4 +1,3 @@
-
 /**
  * © 2025 Qualitrol Corp. All rights reserved.
  */
@@ -11,17 +10,12 @@ export * from './sensor-config';
 export * from './part-number-utils';
 export * from './chassis-types';
 
-// Explicit re-exports to ensure availability including Level 4
+// Explicit re-exports to ensure availability
 export type {
   AnalogSensorType,
   AnalogSensorOption,
   BushingTapModelOption,
 } from './sensor-config';
-
-export type {
-  Level4Product,
-  Level4ConfigurationOption
-} from './interfaces';
 
 export { 
   ANALOG_SENSOR_TYPES, 
