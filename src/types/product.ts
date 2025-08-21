@@ -14,11 +14,9 @@ export type {
 } from './product/sensor-config';
 
 export type {
-  Level4Configuration,
-  Level4ConfigurationField,
-  Level4DropdownOption,
-  Level4SharedOption
-} from './level4';
+  Level4Product,
+  Level4ConfigurationOption
+} from './product/interfaces';
 
 export { 
   ANALOG_SENSOR_TYPES, 
