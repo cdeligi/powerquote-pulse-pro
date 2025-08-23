@@ -1,22 +1,10 @@
 // Re-export all interfaces from the interfaces file for backward compatibility
-export * from './product/interfaces';
-export * from './product/sensor-config';
-export * from './product/quote-types';
-export * from './product/type-guards';
-export * from './product/part-number-utils';
-export * from './product/chassis-types';
-
-// Explicit re-exports for commonly used types including Level 4
-export type {
-  AnalogSensorType,
-  AnalogSensorOption,
-  BushingTapModelOption,
-} from './product/sensor-config';
-
-export type {
-  Level4Product,
-  Level4ConfigurationOption
-} from './product/interfaces';
+export * from "./product/interfaces";
+export * from "./product/quote-types";
+export * from "./product/type-guards";
+export * from "./product/sensor-config";
+export * from "./product/part-number-utils";
+export * from "./product/chassis-types";
 
 export { 
   ANALOG_SENSOR_TYPES, 
