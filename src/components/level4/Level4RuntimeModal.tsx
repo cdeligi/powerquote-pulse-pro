@@ -147,7 +147,6 @@ export const Level4RuntimeModal: React.FC<Level4RuntimeModalProps> = ({
         value: entry.value
       }))
     };
-    };
 
     onSave(payload);
   };
