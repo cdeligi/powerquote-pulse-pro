@@ -47,8 +47,8 @@ export const Level4ProductForm: React.FC<Level4ProductFormProps> = ({
         
         console.log('Loading Level 3 products for Level 4 form...');
         const products = await productDataService.getLevel3Products();
-        // Filter to only products with has_level4 enabled
-        const level4Products = products.filter(p => p.has_level4);
+        // Filter to products with has_level4 or requires_level4_config enabled
+        const level4Products = products.filter(p => p.has_level4 || p.requires_level4_config);
         console.log('Loaded Level 3 products with Level 4:', level4Products.length);
         
         setLevel3Products(level4Products);
