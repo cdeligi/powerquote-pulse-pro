@@ -37,20 +37,24 @@
     --radius: 0.5rem;
 
     --sidebar-background: 0 0% 98%;
-
     --sidebar-foreground: 240 5.3% 26.1%;
-
     --sidebar-primary: 240 5.9% 10%;
-
     --sidebar-primary-foreground: 0 0% 98%;
-
     --sidebar-accent: 240 4.8% 95.9%;
-
     --sidebar-accent-foreground: 240 5.9% 10%;
-
     --sidebar-border: 220 13% 91%;
-
     --sidebar-ring: 217.2 91.2% 59.8%;
+
+    /* Product theming colors */
+    --qtms-ltx: 197 71% 55%;
+    --qtms-ltx-light: 197 71% 96%;
+    --qtms-ltx-dark: 197 71% 10%;
+    --qtms-mtx: 160 84% 39%;
+    --qtms-mtx-light: 160 84% 95%;
+    --qtms-mtx-dark: 160 84% 15%;
+    --qtms-stx: 43 96% 56%;
+    --qtms-stx-light: 43 96% 95%;
+    --qtms-stx-dark: 43 96% 15%;
   }
 
   .dark {
@@ -89,6 +93,11 @@
     --sidebar-accent-foreground: 240 4.8% 95.9%;
     --sidebar-border: 240 3.7% 15.9%;
     --sidebar-ring: 217.2 91.2% 59.8%;
+
+    /* Dark mode product theming colors */
+    --qtms-ltx-dark: 197 71% 85%;
+    --qtms-mtx-dark: 160 84% 70%;
+    --qtms-stx-dark: 43 96% 70%;
   }
 }
 
