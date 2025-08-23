@@ -54,41 +54,23 @@ export interface Level3Product {
   id: string;
   name: string;
   parent_product_id: string; // Links to Level2Product
+  parentProductId?: string; // Backward compatibility alias
   description: string;
   price: number;
   cost?: number;
   enabled: boolean;
   product_level: 3;
+  type?: string; // Backward compatibility
   part_number_format?: string;
+  partNumber?: string; // Backward compatibility
   requires_level4_config?: boolean; // Flag to enable Level 4 config
+  has_level4?: boolean; // Alias for requires_level4_config
   productInfoUrl?: string;
-}
-
-// Level 4: Dynamic Product Configuration
-export interface Level4Configuration {
-  id: string;
-  level3_product_id: string;
-  name: string;
-  fields: Level4ConfigurationField[];
-}
-
-export interface Level4ConfigurationField {
-  id: string;
-  level4_configuration_id: string;
-  label: string;
-  info_url?: string;
-  field_type: 'dropdown'; // Initially just dropdown
-  display_order: number;
-  dropdown_options?: Level4DropdownOption[];
-  default_option_id?: string;
-}
-
-export interface Level4DropdownOption {
-  id: string;
-  field_id: string;
-  value: string; // The value to be stored
-  label: string; // The value to be displayed
-  is_default: boolean;
+  specifications?: {
+    [key: string]: any;
+  };
+  image?: string;
+  sku?: string; // Backward compatibility
 }
 
 // Type unions for backward compatibility
@@ -145,7 +127,7 @@ export interface BOMItem {
   level2Options?: Level2Product[];
   level3Customizations?: Level3Customization[];
   slotAssignments?: Record<number, Level3Product>; // For chassis configurations
-  level4Selections?: { [fieldId: string]: string }; // fieldId: optionValue
+  level4Selections?: { [fieldId: string]: string }; // Legacy - kept for backward compatibility
   
   // Additional properties for admin quote management
   name?: string;
