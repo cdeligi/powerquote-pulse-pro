@@ -122,31 +122,93 @@ class ProductDataService {
   }
 
   async createChassisType(chassisData: ChassisTypeFormData): Promise<ChassisType> {
-    return { id: 'temp', ...chassisData, createdAt: '', updatedAt: '' };
+    return { 
+      id: 'temp', 
+      code: chassisData.code,
+      name: chassisData.name,
+      totalSlots: chassisData.totalSlots,
+      layoutRows: chassisData.layoutRows,
+      visualLayout: chassisData.visualLayout,
+      enabled: chassisData.enabled,
+      metadata: chassisData.metadata || {},
+      createdAt: '', 
+      updatedAt: '' 
+    };
   }
 
   async updateChassisType(id: string, chassisData: Partial<ChassisTypeFormData>): Promise<ChassisType> {
-    return { id, ...chassisData, createdAt: '', updatedAt: '' } as ChassisType;
+    return { 
+      id, 
+      code: chassisData.code || '',
+      name: chassisData.name || '',
+      totalSlots: chassisData.totalSlots || 0,
+      layoutRows: chassisData.layoutRows,
+      visualLayout: chassisData.visualLayout,
+      enabled: chassisData.enabled ?? true,
+      metadata: chassisData.metadata || {},
+      createdAt: '', 
+      updatedAt: '' 
+    };
   }
 
   async deleteChassisType(id: string): Promise<void> {
     // Implementation
   }
 
-  // Stub methods to prevent build errors
-  getAssetTypes = async () => [];
-  getAssetTypesSync = () => [];
-  getPartNumberConfig = async () => ({});
-  getLevel3ProductsForLevel2 = async () => [];
-  getPartNumberCodesForLevel2 = async () => ({});
-  upsertPartNumberConfig = async () => {};
-  upsertPartNumberCodes = async () => {};
-  deleteLevel1Product = async () => {};
-  updateLevel2Product = async () => ({});
-  deleteLevel2Product = async () => {};
-  deleteLevel3Product = async () => {};
-  getLevel2ProductsByCategory = async () => [];
-  getLevel2ProductsForLevel1 = async () => [];
+  // Stub methods to prevent build errors - with correct signatures
+  getAssetTypes = async (): Promise<AssetType[]> => [];
+  getAssetTypesSync = (): AssetType[] => [];
+  
+  getPartNumberConfig = async (level2Id: string) => ({
+    prefix: '',
+    slot_placeholder: 'XX',
+    slot_count: 2,
+    suffix_separator: '-',
+    remote_off_code: '0',
+    remote_on_code: '1'
+  });
+  
+  getLevel3ProductsForLevel2 = async (level2Id: string): Promise<Level3Product[]> => [];
+  
+  getPartNumberCodesForLevel2 = async (level2Id: string) => ({});
+  
+  upsertPartNumberConfig = async (config: any) => {};
+  
+  upsertPartNumberCodes = async (codes: any) => {};
+  
+  deleteLevel1Product = async (id: string) => {};
+  
+  updateLevel2Product = async (id: string, data: any): Promise<Level2Product> => ({
+    id,
+    name: '',
+    parentProductId: '',
+    type: '',
+    description: '',
+    price: 0,
+    cost: 0,
+    enabled: true,
+    partNumber: '',
+    specifications: {}
+  });
+  
+  deleteLevel2Product = async (id: string) => {};
+  deleteLevel3Product = async (id: string) => {};
+  
+  getLevel2ProductsByCategory = async (category: string): Promise<Level2Product[]> => [];
+  getLevel2ProductsForLevel1 = async (level1Id: string): Promise<Level2Product[]> => [];
+
+  // Sensor configuration methods
+  getAnalogSensorTypes = () => [
+    { id: 'temp', name: 'Temperature', description: 'Temperature sensor' },
+    { id: 'pressure', name: 'Pressure', description: 'Pressure sensor' },
+    { id: 'voltage', name: 'Voltage', description: 'Voltage sensor' }
+  ];
+  
+  getBushingTapModels = () => [
+    { id: 'standard', name: 'Standard' },
+    { id: 'enhanced', name: 'Enhanced' },
+    { id: 'premium', name: 'Premium' }
+  ];
   getChildProducts = async () => [];
   getDGAProducts = async () => [];
   getPDProducts = async () => [];

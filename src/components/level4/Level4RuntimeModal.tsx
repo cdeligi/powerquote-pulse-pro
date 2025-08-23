@@ -139,12 +139,14 @@ export const Level4RuntimeModal: React.FC<Level4RuntimeModalProps> = ({
     }
 
     const payload: Level4RuntimePayload = {
+      bomItemId: bomItem.id,
       configuration_id: configuration.id,
       template_type: configuration.template_type,
       entries: entries.map((entry, idx) => ({
         index: idx, // Re-index sequentially
         value: entry.value
       }))
+    };
     };
 
     onSave(payload);

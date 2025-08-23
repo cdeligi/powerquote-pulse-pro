@@ -50,6 +50,7 @@ export interface Level4DisplayOptions {
 
 // Runtime payload for BOM integration
 export interface Level4RuntimePayload {
+  bomItemId: string;  // Added for BOM item tracking
   configuration_id: string;
   template_type: Level4TemplateType;
   entries: Level4SelectionEntry[];
