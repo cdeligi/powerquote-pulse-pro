@@ -28,7 +28,15 @@ export const BOMItemCard: React.FC<BOMItemCardProps> = ({
   onSelectionChange
 }) => {
   const { getLevel4Summary } = useBOMContext();
-  const hasLevel4Config = item.level4Selections && Object.keys(item.level4Selections).length > 0;
+  
+  // Check for Level 4 configuration using multiple indicators
+  const hasLevel4Config = Boolean(
+    (item as any).level4Config || 
+    item.level4Selections || 
+    (item.product as any).requires_level4_config ||
+    (item.product as any).has_level4
+  );
+  
   const level4Summary = getLevel4Summary(item.id!);
   
   // Get product theme based on product name/code

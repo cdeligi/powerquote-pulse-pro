@@ -13,23 +13,22 @@ export const Level4PreviewModal: React.FC<Level4PreviewModalProps> = ({
   configuration,
   onClose
 }) => {
-
   return (
     <Dialog open={true} onOpenChange={() => onClose()}>
-      <DialogContent className="max-w-3xl w-full max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
+      <DialogContent className="max-w-3xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+        <DialogHeader className="shrink-0">
           <DialogTitle>Preview: Level 4 Configuration</DialogTitle>
         </DialogHeader>
 
-        <div className="py-4">
+        <div className="flex-1 overflow-y-auto py-4">
           <Level4RuntimeView
             mode="preview"
             configuration={configuration}
-            className="max-h-[60vh] overflow-y-auto"
+            className="max-h-full"
           />
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="shrink-0">
           <Button onClick={onClose}>
             Close Preview
           </Button>
