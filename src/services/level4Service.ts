@@ -49,9 +49,9 @@ export class Level4Service {
     try {
       const { data, error } = await supabase
         .from('products')
-        .select('id, name, parent_product_id, has_level4')
+        .select('id, name, parent_product_id, has_level4, requires_level4_config')
         .eq('product_level', 3)
-        .eq('has_level4', true)
+        .or('has_level4.eq.true,requires_level4_config.eq.true')
         .eq('enabled', true);
 
       if (error) {
