@@ -273,28 +273,149 @@ class ProductDataService {
     // Implementation
   }
 
-  // Stub methods to prevent build errors - with correct signatures
-  getAssetTypes = async (): Promise<AssetType[]> => [];
+  // Real implementations for part number configuration
+  getAssetTypes = async (): Promise<AssetType[]> => {
+    try {
+      const { data, error } = await supabase
+        .from('asset_types')
+        .select('*')
+        .eq('enabled', true)
+        .order('name');
+      
+      if (error) throw error;
+      return data || [];
+    } catch (error) {
+      console.error('Error loading asset types:', error);
+      return [];
+    }
+  };
+
   getAssetTypesSync = (): AssetType[] => [];
   
-  getPartNumberConfig = async (level2Id: string) => ({
-    prefix: '',
-    slot_placeholder: 'XX',
-    slot_count: 2,
-    suffix_separator: '-',
-    remote_off_code: '0',
-    remote_on_code: '1'
-  });
+  getPartNumberConfig = async (level2Id: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('part_number_configs')
+        .select('*')
+        .eq('level2_product_id', level2Id)
+        .single();
+      
+      if (error && error.code !== 'PGRST116') throw error;
+      
+      return data || {
+        prefix: '',
+        slot_placeholder: '0',
+        slot_count: 0,
+        slot_span: 1,
+        standard_position: null,
+        designated_only: false,
+        designated_positions: [],
+        outside_chassis: false,
+        exclusive_in_slots: false,
+        color: null,
+        notes: null
+      };
+    } catch (error) {
+      console.error('Error loading part number config:', error);
+      return {
+        prefix: '',
+        slot_placeholder: '0',
+        slot_count: 0,
+        slot_span: 1,
+        standard_position: null,
+        designated_only: false,
+        designated_positions: [],
+        outside_chassis: false,
+        exclusive_in_slots: false,
+        color: null,
+        notes: null
+      };
+    }
+  };
   
   getLevel3ProductsForLevel2 = async (level2Id: string): Promise<Level3Product[]> => {
     return this.level3Products.filter(p => p.parent_product_id === level2Id || p.parentProductId === level2Id);
   };
   
-  getPartNumberCodesForLevel2 = async (level2Id: string) => ({});
+  getPartNumberCodesForLevel2 = async (level2Id: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('part_number_codes')
+        .select('*')
+        .eq('level2_product_id', level2Id);
+      
+      if (error) throw error;
+      
+      const codesMap: Record<string, any> = {};
+      (data || []).forEach(code => {
+        codesMap[code.level3_product_id] = {
+          template: code.template,
+          slot_span: code.slot_span,
+          is_standard: code.is_standard,
+          standard_position: code.standard_position,
+          designated_only: code.designated_only,
+          designated_positions: code.designated_positions || [],
+          outside_chassis: code.outside_chassis,
+          exclusive_in_slots: code.exclusive_in_slots,
+          color: code.color,
+          notes: code.notes
+        };
+      });
+      
+      return codesMap;
+    } catch (error) {
+      console.error('Error loading part number codes:', error);
+      return {};
+    }
+  };
   
-  upsertPartNumberConfig = async (config: any) => {};
+  upsertPartNumberConfig = async (config: any) => {
+    try {
+      const { data, error } = await supabase
+        .from('part_number_configs')
+        .upsert({
+          level2_product_id: config.level2_product_id,
+          prefix: config.prefix,
+          slot_placeholder: config.slot_placeholder,
+          slot_count: config.slot_count,
+          slot_span: config.slot_span || 1,
+          standard_position: config.standard_position,
+          designated_only: config.designated_only || false,
+          designated_positions: config.designated_positions || [],
+          outside_chassis: config.outside_chassis || false,
+          exclusive_in_slots: config.exclusive_in_slots || false,
+          color: config.color,
+          notes: config.notes
+        }, {
+          onConflict: 'level2_product_id'
+        })
+        .select()
+        .single();
+      
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error('Error saving part number config:', error);
+      throw error;
+    }
+  };
   
-  upsertPartNumberCodes = async (codes: any) => {};
+  upsertPartNumberCodes = async (codes: any[]) => {
+    try {
+      const { data, error } = await supabase
+        .from('part_number_codes')
+        .upsert(codes, {
+          onConflict: 'level3_product_id,level2_product_id'
+        })
+        .select();
+      
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error('Error saving part number codes:', error);
+      throw error;
+    }
+  };
   
   deleteLevel1Product = async (id: string) => {};
   

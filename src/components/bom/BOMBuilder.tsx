@@ -538,10 +538,47 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
   };
 
   const handleLevel4Save = (payload: Level4RuntimePayload) => {
-    const updatedItems = bomItems.map(item => 
-      item.id === payload.bomItemId ? { ...item, level4Config: payload } : item
-    );
-    setBomItems(updatedItems);
+    console.log('Saving Level 4 configuration:', payload);
+    
+    if (configuringLevel4Item) {
+      // Update existing item or add to BOM
+      const updatedItem = { ...configuringLevel4Item, level4Config: payload };
+      
+      // Check if it's a new item (not yet in BOM) or existing item
+      const existingIndex = bomItems.findIndex(item => item.id === configuringLevel4Item.id);
+      
+      let updatedItems: BOMItem[];
+      if (existingIndex >= 0) {
+        // Update existing item in BOM
+        updatedItems = bomItems.map(item => 
+          item.id === payload.bomItemId ? updatedItem : item
+        );
+      } else {
+        // Add new item to BOM (for slot assignments or direct additions)
+        if (configuringLevel4Item.slot !== undefined) {
+          // Add to slot assignments
+          setSlotAssignments(prev => ({
+            ...prev,
+            [configuringLevel4Item.slot!]: configuringLevel4Item.product as Level3Product
+          }));
+          setConfiguringLevel4Item(null);
+          setSelectedSlot(null);
+          return;
+        } else {
+          // Add directly to BOM
+          updatedItems = [...bomItems, updatedItem];
+        }
+      }
+      
+      setBomItems(updatedItems);
+      onBOMUpdate(updatedItems);
+      
+      toast({
+        title: 'Configuration Saved',
+        description: `Level 4 configuration for ${configuringLevel4Item.product.name} has been saved.`,
+      });
+    }
+    
     setConfiguringLevel4Item(null);
     setSelectedSlot(null);
   };
@@ -625,6 +662,13 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
   const handleBOMConfigurationEdit = (item: BOMItem) => {
     console.log('Editing BOM item configuration:', item);
     
+    // FIRST: Check for Level 4 configuration
+    if ((item.product as any).requires_level4_config || (item.product as any).has_level4) {
+      console.log('Opening Level 4 configuration for:', item.product.name);
+      setConfiguringLevel4Item(item);
+      return;
+    }
+    
     // Check if this is a chassis-configured item (has slot assignments)
     if (item.slotAssignments || (item.product as any).chassisType && (item.product as any).chassisType !== 'N/A') {
       console.log('Editing chassis configuration for:', item.product.name);
@@ -658,7 +702,7 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
       };
       setEditingQTMS(consolidatedQTMS);
     } else {
-      // For other configurable items (Level 4, analog cards, etc.)
+      // For other configurable items (analog cards, bushing cards, etc.)
       setConfiguringBOMItem(item);
     }
   };

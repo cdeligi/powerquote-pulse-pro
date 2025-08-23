@@ -779,30 +779,54 @@ export type Database = {
       }
       part_number_configs: {
         Row: {
+          color: string | null
           created_at: string
+          designated_only: boolean
+          designated_positions: number[]
+          exclusive_in_slots: boolean
           id: string
           level2_product_id: string
+          notes: string | null
+          outside_chassis: boolean
           prefix: string
           slot_count: number
           slot_placeholder: string
+          slot_span: number
+          standard_position: number | null
           updated_at: string
         }
         Insert: {
+          color?: string | null
           created_at?: string
+          designated_only?: boolean
+          designated_positions?: number[]
+          exclusive_in_slots?: boolean
           id?: string
           level2_product_id: string
+          notes?: string | null
+          outside_chassis?: boolean
           prefix: string
           slot_count: number
           slot_placeholder?: string
+          slot_span?: number
+          standard_position?: number | null
           updated_at?: string
         }
         Update: {
+          color?: string | null
           created_at?: string
+          designated_only?: boolean
+          designated_positions?: number[]
+          exclusive_in_slots?: boolean
           id?: string
           level2_product_id?: string
+          notes?: string | null
+          outside_chassis?: boolean
           prefix?: string
           slot_count?: number
           slot_placeholder?: string
+          slot_span?: number
+          standard_position?: number | null
           updated_at?: string
         }
         Relationships: []
