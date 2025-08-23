@@ -180,6 +180,51 @@ export type Database = {
           },
         ]
       }
+      bom_level4_values: {
+        Row: {
+          bom_item_id: string
+          created_at: string
+          entries: Json
+          id: string
+          level4_configuration_id: string
+          template_type: string
+          updated_at: string
+        }
+        Insert: {
+          bom_item_id: string
+          created_at?: string
+          entries: Json
+          id?: string
+          level4_configuration_id: string
+          template_type: string
+          updated_at?: string
+        }
+        Update: {
+          bom_item_id?: string
+          created_at?: string
+          entries?: Json
+          id?: string
+          level4_configuration_id?: string
+          template_type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bom_level4_values_bom_item_id_fkey"
+            columns: ["bom_item_id"]
+            isOneToOne: false
+            referencedRelation: "bom_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bom_level4_values_level4_configuration_id_fkey"
+            columns: ["level4_configuration_id"]
+            isOneToOne: false
+            referencedRelation: "level4_configurations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       chassis_configurations: {
         Row: {
           created_at: string | null
@@ -427,54 +472,6 @@ export type Database = {
           },
         ]
       }
-      level4_configuration_fields: {
-        Row: {
-          created_at: string | null
-          default_option_id: string | null
-          display_order: number
-          field_type: string
-          id: string
-          info_url: string | null
-          label: string
-          level4_configuration_id: string
-        }
-        Insert: {
-          created_at?: string | null
-          default_option_id?: string | null
-          display_order?: number
-          field_type?: string
-          id?: string
-          info_url?: string | null
-          label: string
-          level4_configuration_id: string
-        }
-        Update: {
-          created_at?: string | null
-          default_option_id?: string | null
-          display_order?: number
-          field_type?: string
-          id?: string
-          info_url?: string | null
-          label?: string
-          level4_configuration_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "level4_configuration_fields_default_option_id_fkey"
-            columns: ["default_option_id"]
-            isOneToOne: false
-            referencedRelation: "level4_dropdown_options"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "level4_configuration_fields_level4_configuration_id_fkey"
-            columns: ["level4_configuration_id"]
-            isOneToOne: false
-            referencedRelation: "level4_configurations"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       level4_configuration_options: {
         Row: {
           created_at: string
@@ -531,38 +528,43 @@ export type Database = {
       }
       level4_configurations: {
         Row: {
-          created_at: string | null
-          default_option_id: string | null
+          created_at: string
+          field_label: string
+          fixed_inputs: number | null
           id: string
+          info_url: string | null
           level3_product_id: string
-          name: string
+          max_inputs: number | null
+          template_type: string
+          updated_at: string
         }
         Insert: {
-          created_at?: string | null
-          default_option_id?: string | null
+          created_at?: string
+          field_label: string
+          fixed_inputs?: number | null
           id?: string
+          info_url?: string | null
           level3_product_id: string
-          name: string
+          max_inputs?: number | null
+          template_type: string
+          updated_at?: string
         }
         Update: {
-          created_at?: string | null
-          default_option_id?: string | null
+          created_at?: string
+          field_label?: string
+          fixed_inputs?: number | null
           id?: string
+          info_url?: string | null
           level3_product_id?: string
-          name?: string
+          max_inputs?: number | null
+          template_type?: string
+          updated_at?: string
         }
         Relationships: [
           {
-            foreignKeyName: "level4_configurations_default_option_id_fkey"
-            columns: ["default_option_id"]
-            isOneToOne: false
-            referencedRelation: "level4_shared_options"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "level4_configurations_level3_product_id_fkey"
             columns: ["level3_product_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "products"
             referencedColumns: ["id"]
           },
@@ -570,38 +572,41 @@ export type Database = {
       }
       level4_dropdown_options: {
         Row: {
-          created_at: string | null
+          created_at: string
           display_order: number
-          field_id: string
           id: string
           is_default: boolean
           label: string
+          level4_configuration_id: string
+          updated_at: string
           value: string
         }
         Insert: {
-          created_at?: string | null
+          created_at?: string
           display_order?: number
-          field_id: string
           id?: string
           is_default?: boolean
           label: string
+          level4_configuration_id: string
+          updated_at?: string
           value: string
         }
         Update: {
-          created_at?: string | null
+          created_at?: string
           display_order?: number
-          field_id?: string
           id?: string
           is_default?: boolean
           label?: string
+          level4_configuration_id?: string
+          updated_at?: string
           value?: string
         }
         Relationships: [
           {
-            foreignKeyName: "level4_dropdown_options_field_id_fkey"
-            columns: ["field_id"]
+            foreignKeyName: "level4_dropdown_options_level4_configuration_id_fkey"
+            columns: ["level4_configuration_id"]
             isOneToOne: false
-            referencedRelation: "level4_configuration_fields"
+            referencedRelation: "level4_configurations"
             referencedColumns: ["id"]
           },
         ]
@@ -647,6 +652,7 @@ export type Database = {
           enabled: boolean | null
           id: string
           name: string
+          options: Json
           parent_product_id: string
           price: number | null
           updated_at: string
@@ -659,6 +665,7 @@ export type Database = {
           enabled?: boolean | null
           id: string
           name: string
+          options?: Json
           parent_product_id: string
           price?: number | null
           updated_at?: string
@@ -671,6 +678,7 @@ export type Database = {
           enabled?: boolean | null
           id?: string
           name?: string
+          options?: Json
           parent_product_id?: string
           price?: number | null
           updated_at?: string
@@ -681,41 +689,6 @@ export type Database = {
             columns: ["parent_product_id"]
             isOneToOne: false
             referencedRelation: "products"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      level4_shared_options: {
-        Row: {
-          created_at: string
-          display_order: number
-          id: string
-          label: string
-          level4_configuration_id: string
-          value: string
-        }
-        Insert: {
-          created_at?: string
-          display_order?: number
-          id?: string
-          label: string
-          level4_configuration_id: string
-          value: string
-        }
-        Update: {
-          created_at?: string
-          display_order?: number
-          id?: string
-          label?: string
-          level4_configuration_id?: string
-          value?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "level4_shared_options_level4_configuration_id_fkey"
-            columns: ["level4_configuration_id"]
-            isOneToOne: false
-            referencedRelation: "level4_configurations"
             referencedColumns: ["id"]
           },
         ]
@@ -844,6 +817,7 @@ export type Database = {
           created_at: string
           description: string | null
           enabled: boolean | null
+          has_level4: boolean
           id: string
           image_url: string | null
           is_active: boolean
@@ -869,6 +843,7 @@ export type Database = {
           created_at?: string
           description?: string | null
           enabled?: boolean | null
+          has_level4?: boolean
           id: string
           image_url?: string | null
           is_active?: boolean
@@ -894,6 +869,7 @@ export type Database = {
           created_at?: string
           description?: string | null
           enabled?: boolean | null
+          has_level4?: boolean
           id?: string
           image_url?: string | null
           is_active?: boolean

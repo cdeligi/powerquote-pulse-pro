@@ -8,7 +8,7 @@ import Level1ProductForm from "./product-forms/Level1ProductForm";
 import ChassisForm from "./product-forms/ChassisForm";
 import CardForm from "./product-forms/CardForm";
 import Level2OptionForm from "./product-forms/Level2OptionForm";
-import { Level4AdminManager } from "./Level4AdminManager";
+import { Level4AdminPage } from '@/pages/admin/Level4AdminPage';
 import PartNumberConfigManager from "./PartNumberConfigManager";
 import { ChassisTypeManager } from "./ChassisTypeManager";
 import { Level1ProductList } from "./product-lists/Level1ProductList";
@@ -394,7 +394,7 @@ export const ProductManagement = () => {
         </TabsContent>
 
         <TabsContent value="level4" className="space-y-4">
-          <Level4AdminManager />
+          <<Level4AdminPage />
         </TabsContent>
 
         <TabsContent value="partnumbers" className="space-y-4">
