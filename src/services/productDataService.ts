@@ -50,24 +50,142 @@ class ProductDataService {
     }
   }
 
-  // Basic methods to prevent build errors
+  // Load products from Supabase database
   private async loadLevel1ProductsFromDB(): Promise<void> {
-    this.level1Products = [];
-    this.level1Initialized = true;
+    try {
+      const { data, error } = await supabase
+        .from('products')
+        .select('*')
+        .eq('product_level', 1)
+        .eq('enabled', true)
+        .order('name');
+
+      if (error) throw error;
+
+      this.level1Products = (data || []).map(product => ({
+        id: product.id,
+        name: product.name,
+        type: product.category || 'standard',
+        description: product.description || '',
+        price: product.price || 0,
+        cost: product.cost || 0,
+        enabled: product.enabled,
+        partNumber: product.part_number,
+        image: product.image_url,
+        productInfoUrl: product.product_info_url,
+        asset_type_id: product.asset_type_id,
+        category: product.category,
+        rackConfigurable: product.rack_configurable || false,
+        specifications: product.specifications || {}
+      }));
+
+      this.level1Initialized = true;
+    } catch (error) {
+      console.error('Error loading Level 1 products:', error);
+      this.level1Products = [];
+      this.level1Initialized = true;
+    }
   }
 
   private async loadLevel2ProductsFromDB(): Promise<void> {
-    this.level2Products = [];
-    this.level2Initialized = true;
+    try {
+      const { data, error } = await supabase
+        .from('products')
+        .select('*')
+        .eq('product_level', 2)
+        .eq('enabled', true)
+        .order('name');
+
+      if (error) throw error;
+
+      this.level2Products = (data || []).map(product => ({
+        id: product.id,
+        name: product.name,
+        parentProductId: product.parent_product_id || '',
+        description: product.description || '',
+        price: product.price || 0,
+        cost: product.cost || 0,
+        enabled: product.enabled,
+        partNumber: product.part_number,
+        chassisType: product.chassis_type || 'N/A',
+        image: product.image_url,
+        productInfoUrl: product.product_info_url,
+        specifications: product.specifications || {}
+      }));
+
+      this.level2Initialized = true;
+    } catch (error) {
+      console.error('Error loading Level 2 products:', error);
+      this.level2Products = [];
+      this.level2Initialized = true;
+    }
   }
 
   private async loadLevel3ProductsFromDB(): Promise<void> {
-    this.level3Products = [];
-    this.level3Initialized = true;
+    try {
+      const { data, error } = await supabase
+        .from('products')
+        .select('*')
+        .eq('product_level', 3)
+        .eq('enabled', true)
+        .order('name');
+
+      if (error) throw error;
+
+      this.level3Products = (data || []).map(product => ({
+        id: product.id,
+        name: product.name,
+        parent_product_id: product.parent_product_id || '',
+        parentProductId: product.parent_product_id || '',
+        description: product.description || '',
+        price: product.price || 0,
+        cost: product.cost || 0,
+        enabled: product.enabled,
+        product_level: 3,
+        part_number_format: product.part_number,
+        partNumber: product.part_number,
+        requires_level4_config: product.requires_level4_config || false,
+        has_level4: product.has_level4 || false,
+        productInfoUrl: product.product_info_url,
+        specifications: product.specifications || {},
+        image: product.image_url,
+        sku: product.part_number
+      }));
+
+      this.level3Initialized = true;
+    } catch (error) {
+      console.error('Error loading Level 3 products:', error);
+      this.level3Products = [];
+      this.level3Initialized = true;
+    }
   }
 
   private async loadChassisTypesFromDB(): Promise<void> {
-    this.chassisTypes = [];
+    try {
+      const { data, error } = await supabase
+        .from('chassis_types')
+        .select('*')
+        .eq('enabled', true)
+        .order('name');
+
+      if (error) throw error;
+
+      this.chassisTypes = (data || []).map(chassis => ({
+        id: chassis.id,
+        code: chassis.code,
+        name: chassis.name,
+        totalSlots: chassis.total_slots,
+        layoutRows: chassis.layout_rows,
+        visualLayout: chassis.visual_layout,
+        enabled: chassis.enabled,
+        metadata: chassis.metadata || {},
+        createdAt: chassis.created_at,
+        updatedAt: chassis.updated_at
+      }));
+    } catch (error) {
+      console.error('Error loading chassis types:', error);
+      this.chassisTypes = [];
+    }
   }
 
   async getLevel1Products(): Promise<Level1Product[]> {
@@ -168,7 +286,9 @@ class ProductDataService {
     remote_on_code: '1'
   });
   
-  getLevel3ProductsForLevel2 = async (level2Id: string): Promise<Level3Product[]> => [];
+  getLevel3ProductsForLevel2 = async (level2Id: string): Promise<Level3Product[]> => {
+    return this.level3Products.filter(p => p.parent_product_id === level2Id || p.parentProductId === level2Id);
+  };
   
   getPartNumberCodesForLevel2 = async (level2Id: string) => ({});
   
@@ -194,8 +314,17 @@ class ProductDataService {
   deleteLevel2Product = async (id: string) => {};
   deleteLevel3Product = async (id: string) => {};
   
-  getLevel2ProductsByCategory = async (category: string): Promise<Level2Product[]> => [];
-  getLevel2ProductsForLevel1 = async (level1Id: string): Promise<Level2Product[]> => [];
+  getLevel2ProductsByCategory = async (category: string): Promise<Level2Product[]> => {
+    return this.level2Products.filter(p => 
+      p.specifications?.category === category || 
+      (p as any).category === category ||
+      (p as any).subcategory === category
+    );
+  };
+
+  getLevel2ProductsForLevel1 = async (level1Id: string): Promise<Level2Product[]> => {
+    return this.level2Products.filter(p => p.parentProductId === level1Id);
+  };
 
   // Sensor configuration methods
   getAnalogSensorTypes = () => [
@@ -210,8 +339,20 @@ class ProductDataService {
     { id: 'premium', name: 'Premium' }
   ];
   getChildProducts = async () => [];
-  getDGAProducts = async () => [];
-  getPDProducts = async () => [];
+  getDGAProducts = async (): Promise<Level2Product[]> => {
+    return this.level2Products.filter(p => 
+      p.specifications?.category === 'DGA' || 
+      (p as any).category === 'DGA' ||
+      (p as any).subcategory === 'DGA'
+    );
+  };
+  getPDProducts = async (): Promise<Level2Product[]> => {
+    return this.level2Products.filter(p => 
+      p.specifications?.category === 'PD' || 
+      (p as any).category === 'PD' ||
+      (p as any).subcategory === 'PD'
+    );
+  };
   findProductById = () => null;
   getProductPath = () => '';
   getTemplateMapping = () => ({});
