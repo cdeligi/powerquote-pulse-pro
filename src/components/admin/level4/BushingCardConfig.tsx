@@ -31,9 +31,10 @@ export interface BushingCardConfigProps {
     bushingTapModels: BushingTapModel[];
     inputs: BushingInputConfig[];
   }) => void;
+  title?: string;
 }
 
-export const BushingCardConfig: React.FC<BushingCardConfigProps> = ({ value, onChange }) => {
+export const BushingCardConfig: React.FC<BushingCardConfigProps> = ({ value, onChange, title }) => {
   const [localConfig, setLocalConfig] = useState(value);
   const [newModel, setNewModel] = useState<Omit<BushingTapModel, 'id'>>({ 
     name: '', 
@@ -118,7 +119,7 @@ export const BushingCardConfig: React.FC<BushingCardConfigProps> = ({ value, onC
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>Bushing Card Configuration</CardTitle>
+          <CardTitle>{title || 'Configuration'}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
           {/* Max Inputs Configuration */}
@@ -126,9 +127,8 @@ export const BushingCardConfig: React.FC<BushingCardConfigProps> = ({ value, onC
             <Label htmlFor="maxInputs">Maximum Number of Bushing Inputs</Label>
             <Input
               id="maxInputs"
-              type="number"
-              min="1"
-              max="12"
+              type="text"
+              inputMode="numeric"
               value={localConfig.maxInputs}
               onChange={(e) => handleConfigChange({ maxInputs: Math.min(12, Math.max(1, parseInt(e.target.value) || 1)) })}
             />
@@ -210,7 +210,8 @@ export const BushingCardConfig: React.FC<BushingCardConfigProps> = ({ value, onC
                   <Label htmlFor="documentationUrl">Documentation URL</Label>
                   <Input
                     id="documentationUrl"
-                    type="url"
+                    type="text"
+                    inputMode="url"
                     value={newModel.documentationUrl || ''}
                     onChange={(e) => setNewModel({...newModel, documentationUrl: e.target.value})}
                     placeholder="https://example.com/docs"

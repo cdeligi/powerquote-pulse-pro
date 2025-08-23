@@ -31,9 +31,10 @@ export interface AnalogCardConfigProps {
     inputTypes: AnalogInputType[];
     inputs: AnalogInputConfig[];
   }) => void;
+  title?: string;
 }
 
-export const AnalogCardConfig: React.FC<AnalogCardConfigProps> = ({ value, onChange }) => {
+export const AnalogCardConfig: React.FC<AnalogCardConfigProps> = ({ value, onChange, title }) => {
   const [localConfig, setLocalConfig] = useState(value);
   const [newType, setNewType] = useState<Omit<AnalogInputType, 'id'>>({ 
     name: '', 
@@ -93,7 +94,7 @@ export const AnalogCardConfig: React.FC<AnalogCardConfigProps> = ({ value, onCha
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>Analog Card Configuration</CardTitle>
+          <CardTitle>{title || 'Configuration'}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
           {/* Input Types Management */}
@@ -145,7 +146,8 @@ export const AnalogCardConfig: React.FC<AnalogCardConfigProps> = ({ value, onCha
                 <div className="space-y-2">
                   <Label>Min</Label>
                   <Input
-                    type="number"
+                    type="text"
+                    inputMode="numeric"
                     value={newType.minValue}
                     onChange={(e) => setNewType({...newType, minValue: Number(e.target.value)})}
                   />
@@ -153,7 +155,8 @@ export const AnalogCardConfig: React.FC<AnalogCardConfigProps> = ({ value, onCha
                 <div className="space-y-2">
                   <Label>Max</Label>
                   <Input
-                    type="number"
+                    type="text"
+                    inputMode="numeric"
                     value={newType.maxValue}
                     onChange={(e) => setNewType({...newType, maxValue: Number(e.target.value)})}
                   />

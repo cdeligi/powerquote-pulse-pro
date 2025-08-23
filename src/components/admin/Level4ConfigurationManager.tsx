@@ -7,10 +7,12 @@ import { Plus, Search, Loader2 } from 'lucide-react';
 import { DataTable } from "@/components/ui/data-table";
 import { ColumnDef } from "@tanstack/react-table";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { useToast } from "@/components/ui/use-toast";
 import { productDataService } from "@/services/productDataService";
 import { Level4ConfigEditor } from "./level4/Level4ConfigEditor";
+import { TypeSelectionDialog } from './level4/TypeSelectionDialog';
+import { PreviewDialog } from './level4/PreviewDialog';
 import { supabase } from "@/integrations/supabase/client";
 
 interface Product {
@@ -25,7 +27,15 @@ interface Product {
   price?: number;
 }
 
-export const Level4ConfigurationManager: React.FC = () => {
+interface Level4ConfigurationManagerProps {
+  level3ProductId?: string;
+  onClose?: () => void;
+}
+
+export const Level4ConfigurationManager: React.FC<Level4ConfigurationManagerProps> = ({ 
+  level3ProductId,
+  onClose 
+}) => {
   const { toast } = useToast();
   const [level3Products, setLevel3Products] = useState<any[]>([]);
   const [level4Products, setLevel4Products] = useState<any[]>([]);
@@ -35,6 +45,53 @@ export const Level4ConfigurationManager: React.FC = () => {
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [showTypeDialog, setShowTypeDialog] = useState(false);
+  const [isChangingType, setIsChangingType] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
+  const [previewData, setPreviewData] = useState<any>(null);
+  const [showConfigPicker, setShowConfigPicker] = useState(false);
+
+  const isOverlayOpen = isEditorOpen || showTypeDialog || showPreview || showConfigPicker;
+
+  // Auto-select the product if level3ProductId is provided
+  useEffect(() => {
+    if (level3ProductId && level3Products.length > 0) {
+      const product = level3Products.find(p => p.id === level3ProductId);
+      if (product) {
+        setSelectedLevel3(level3ProductId);
+      }
+    }
+  }, [level3ProductId, level3Products]);
+
+  // If no explicit selection, auto-select the first Level 3 product
+  useEffect(() => {
+    if (!level3ProductId && !selectedLevel3 && level3Products.length > 0) {
+      setSelectedLevel3(level3Products[0].id);
+    }
+  }, [level3ProductId, selectedLevel3, level3Products]);
+
+  // After level4Products load for selected level 3, handle routing without list
+  useEffect(() => {
+    if (!selectedLevel3) return;
+    if (!level4Products) return;
+    if (level4Products.length === 0) {
+      // no configs yet -> ask for type to create
+      setSelectedProduct({
+        id: 'new',
+        name: 'Configuration',
+        product_level: 4,
+      } as any);
+      setIsChangingType(false);
+      setShowTypeDialog(true);
+    } else if (level4Products.length === 1) {
+      // exactly one -> open editor directly
+      setSelectedProduct(level4Products[0] as any);
+      setIsEditorOpen(true);
+    } else {
+      // multiple -> show picker dialog
+      setShowConfigPicker(true);
+    }
+  }, [selectedLevel3, level4Products]);
 
   // Load Level 3 products on initialization
   useEffect(() => {
@@ -44,24 +101,19 @@ export const Level4ConfigurationManager: React.FC = () => {
         
         // Load Level 3 products that require Level 4 configuration
         const products = await productDataService.getLevel3Products();
-        console.log('All Level 3 products:', products);
-        const filteredProducts = products.filter(p => {
-          console.log(`Product ${p.name} requires_level4_config:`, p.requires_level4_config);
-          return Boolean(p.requires_level4_config);
-        });
-        console.log('Filtered Level 3 products requiring L4 config:', filteredProducts);
-        
+        const filteredProducts = products.filter(p => Boolean(p.requires_level4_config));
         setLevel3Products(filteredProducts);
         
-        if (filteredProducts.length === 1) {
-          setSelectedLevel3(filteredProducts[0].id);
+        // If we have a level3ProductId, select it
+        if (level3ProductId && filteredProducts.some(p => p.id === level3ProductId)) {
+          setSelectedLevel3(level3ProductId);
         }
         
       } catch (error) {
-        console.error('Initialization error:', error);
+        console.error('Error initializing Level 4 Configuration Manager:', error);
         toast({
           title: "Error",
-          description: error instanceof Error ? error.message : 'Failed to load Level 3 products',
+          description: "Failed to load configuration data. Please try again.",
           variant: "destructive",
         });
       } finally {
@@ -70,7 +122,7 @@ export const Level4ConfigurationManager: React.FC = () => {
     };
 
     initialize();
-  }, [toast]);
+  }, [level3ProductId]);
 
   // Load level 4 products when a level 3 product is selected
   useEffect(() => {
@@ -133,34 +185,79 @@ export const Level4ConfigurationManager: React.FC = () => {
     return matchesSearch;
   });
 
-  // Add debug effect to log state changes
-  useEffect(() => {
-    console.log('Selected Level 3:', selectedLevel3);
-    console.log('Level 3 Products:', level3Products);
-    console.log('Level 4 Products:', level4Products);
-    console.log('Filtered Level 4 Products:', filteredLevel4Products);
-  }, [selectedLevel3, level3Products, level4Products, filteredLevel4Products]);
-
-  // Handle opening the editor for a product
-  const handleConfigureProduct = (product: Product) => {
-    setSelectedProduct(product);
-    setIsEditorOpen(true);
+  // Map internal types to display names
+  const getTypeDisplayName = (type?: string) => {
+    if (!type) return 'Unknown';
+    return type === 'bushing' ? 'Option 1' : type === 'analog' ? 'Option 2' : type;
   };
 
   // Handle creating a new configuration
   const handleAddConfiguration = () => {
-    // Determine the type based on the selected level 3 product name or other criteria
-    const level3Product = level3Products.find(p => p.id === selectedLevel3);
-    const productType = level3Product?.name.toLowerCase().includes('bushing') ? 'bushing' : 'analog';
+    setIsChangingType(false);
+    setShowTypeDialog(true);
+  };
+
+  // Handle type selection from dialog
+  const handleTypeSelect = (type: 'bushing' | 'analog') => {
+    setShowTypeDialog(false);
     
+    // If we're changing type for an existing selection, update in place
+    if (isChangingType && selectedProduct) {
+      const updated = {
+        ...selectedProduct,
+        type,
+        configurationType: type,
+        // reset options for the newly selected type
+        options: type === 'bushing'
+          ? { maxInputs: 6, bushingTapModels: [], inputs: [] }
+          : { inputTypes: [], inputs: [] },
+      } as any;
+      setSelectedProduct(updated);
+      setIsEditorOpen(true);
+      setIsChangingType(false);
+      return;
+    }
+
+    // Otherwise, we're adding a new configuration
     setSelectedProduct({
       id: 'new',
-      name: `New ${level3Product?.name || 'Configuration'}`,
+      name: `${getTypeDisplayName(type)} Configuration`,
       sku: '',
       product_level: 4,
       requires_level4_config: false,
-      type: productType
+      type,
+      configurationType: type,
+      price: 0,
+      cost: 0,
+      options: type === 'bushing'
+        ? { maxInputs: 6, bushingTapModels: [], inputs: [] }
+        : { inputTypes: [], inputs: [] }
+    } as any);
+    setIsEditorOpen(true);
+  };
+
+  // Show preview of the configuration
+  const handlePreview = (product: Product) => {
+    setPreviewData({
+      ...product,
+      displayName: getTypeDisplayName(product.type),
+      description: product.name || 'Configuration',
     });
+    setShowPreview(true);
+  };
+
+  // Handle opening the editor for a product
+  const handleConfigureProduct = (product: Product) => {
+    // If the product has no type yet, force a type selection first
+    const needsType = !product.type || !product.configurationType;
+    if (needsType) {
+      setSelectedProduct({ ...product, name: product.name || 'Configuration' });
+      setIsChangingType(false);
+      setShowTypeDialog(true);
+      return;
+    }
+    // Open editor directly when a single type already exists
+    setSelectedProduct(product);
     setIsEditorOpen(true);
   };
 
@@ -197,12 +294,11 @@ export const Level4ConfigurationManager: React.FC = () => {
           enabled: true,
           price: selectedProduct.price || 0,
           cost: 0,
-          options: []
+          options: configData
         };
         savedProduct = await productDataService.createLevel4Product(level4ProductData);
         
-        // Create relationship between Level 3 and Level 4 products
-        await productDataService.createLevel3Level4Relationship(selectedLevel3, savedProduct.id);
+        // Relationship is now created inside createLevel4Product
       } else {
         const updateData = {
           name: selectedProduct.name,
@@ -210,8 +306,15 @@ export const Level4ConfigurationManager: React.FC = () => {
           configurationType: (selectedProduct.type === 'bushing' ? 'bushing' : 'analog') as any,
           enabled: true,
           price: selectedProduct.price || 0,
+          options: configData
         };
         savedProduct = await productDataService.updateLevel4Product(selectedProduct.id, updateData);
+      }
+      
+      // Force-persist options to guarantee config is saved
+      if (savedProduct?.id) {
+        const ok = await productDataService.saveLevel4Options(savedProduct.id, configData);
+        console.log('[Level4ConfigurationManager] saveLevel4Options result:', ok);
       }
       
       console.log('Saved Level 4 product:', savedProduct);
@@ -255,7 +358,7 @@ export const Level4ConfigurationManager: React.FC = () => {
             <span>{product.name}</span>
             {product.type && (
               <Badge variant={product.type === 'bushing' ? 'default' : 'secondary'} className="text-xs">
-                {product.type.charAt(0).toUpperCase() + product.type.slice(1)}
+                {getTypeDisplayName(product.type)}
               </Badge>
             )}
           </div>
@@ -296,19 +399,33 @@ export const Level4ConfigurationManager: React.FC = () => {
     {
       id: "actions",
       cell: ({ row }) => (
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => {
-            setSelectedProduct(row.original);
-            setIsEditorOpen(true);
-          }}
-        >
-          Configure
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => handleConfigureProduct(row.original)}
+          >
+            Configure
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => handlePreview(row.original)}
+          >
+            Preview
+          </Button>
+        </div>
       ),
     },
   ];
+
+  // Add debug effect to log state changes
+  useEffect(() => {
+    console.log('Selected Level 3:', selectedLevel3);
+    console.log('Level 3 Products:', level3Products);
+    console.log('Level 4 Products:', level4Products);
+    console.log('Filtered Level 4 Products:', filteredLevel4Products);
+  }, [selectedLevel3, level3Products, level4Products, filteredLevel4Products]);
 
   const debugDatabaseState = async () => {
     try {
@@ -351,8 +468,14 @@ export const Level4ConfigurationManager: React.FC = () => {
       console.log('Level 3 to Level 4 relationships:', relationships);
       
       // 4. Check if the required Level 4 products exist
-      const requiredProducts = ['bushing-card', 'bushing-card-mtx', 'bushing-card-stx', 
-                              'analog-card-multi', 'analog-card-multi-mtx', 'analog-card-multi-stx'];
+      const requiredProducts = [
+        'option-1-card', 
+        'option-1-card-mtx', 
+        'option-1-card-stx',
+        'option-2-card-multi', 
+        'option-2-card-multi-mtx', 
+        'option-2-card-multi-stx'
+      ];
       
       const { data: requiredProductsData, error: reqError } = await supabase
         .from('products')
@@ -398,119 +521,96 @@ export const Level4ConfigurationManager: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold tracking-tight">Level 4 Product Configurations</h2>
-        <Button 
-          variant="outline" 
-          onClick={handleDebugLevel4}
-          disabled={isLoading}
-        >
-          {isLoading ? 'Debugging...' : 'Debug Level 4'}
-        </Button>
-      </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Manage Configurations</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="level3">Level 3 Product</Label>
-              <select
-                id="level3"
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                value={selectedLevel3}
-                onChange={(e) => setSelectedLevel3(e.target.value)}
-                disabled={isLoading}
-              >
-                <option value="">Select a product</option>
-                {level3Products.map((product) => (
-                  <option key={product.id} value={product.id}>
-                    {product.name}
-                  </option>
-                ))}
-              </select>
+      {/* Type Selection Dialog */}
+      <TypeSelectionDialog 
+        isOpen={showTypeDialog}
+        onClose={() => setShowTypeDialog(false)}
+        onSelect={handleTypeSelect}
+      />
+      
+      {/* Preview Dialog */}
+      <PreviewDialog 
+        isOpen={showPreview}
+        onClose={() => setShowPreview(false)}
+        data={previewData}
+      />
+      
+      {/* Configuration Picker Dialog (shown when multiple L4 exist) */}
+      <Dialog open={showConfigPicker} onOpenChange={setShowConfigPicker}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Select a Configuration</DialogTitle>
+            <DialogDescription>
+              Choose which configuration to edit or preview.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="grid grid-cols-4 gap-2 px-2 py-1 text-sm text-muted-foreground">
+              <span className="font-medium">Name</span>
+              <span className="font-medium">Parent Product ID</span>
+              <span className="font-medium">Type</span>
+              <span className="font-medium text-right">Actions</span>
             </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="search">Search Configurations</Label>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  id="search"
-                  placeholder="Search by name or SKU..."
-                  className="pl-10"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  disabled={isLoading || !selectedLevel3}
-                />
-              </div>
+            <div className="divide-y rounded border">
+              {filteredLevel4Products.map((p) => (
+                <div key={p.id} className="grid grid-cols-4 gap-2 items-center px-3 py-2">
+                  <div className="truncate font-medium">{p.name}</div>
+                  <div className="text-sm text-muted-foreground truncate">{selectedLevel3}</div>
+                  <div>
+                    {p.type ? (
+                      <Badge variant={p.type === 'bushing' ? 'default' : 'secondary'} className="text-xs">
+                        {getTypeDisplayName(p.type)}
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="text-xs">Unknown</Badge>
+                    )}
+                  </div>
+                  <div className="flex items-center justify-end gap-2">
+                    <Button variant="ghost" size="sm" onClick={() => handlePreview(p)}>
+                      Preview
+                    </Button>
+                    <Button size="sm" onClick={() => { setSelectedProduct(p); setIsEditorOpen(true); setShowConfigPicker(false); }}>
+                      Configure
+                    </Button>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
-
-          <div className="mt-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-medium">
-                Configurations
-                {selectedLevel3 && (
-                  <span className="text-sm text-muted-foreground ml-2">
-                    ({filteredLevel4Products.length} found)
-                  </span>
-                )}
-              </h3>
-              <Button 
-                onClick={handleAddConfiguration}
-                disabled={!selectedLevel3 || isLoading}
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Add Configuration
-              </Button>
-            </div>
-
-            {isLoading ? (
-              <div className="flex items-center justify-center h-64">
-                <Loader2 className="h-8 w-8 animate-spin" />
-                <span className="ml-2">Loading configurations...</span>
-              </div>
-            ) : selectedLevel3 ? (
-              <div className="rounded-md border">
-                <DataTable
-                  columns={columns}
-                  data={filteredLevel4Products}
-                  emptyMessage="No configurations found. Click 'Add Configuration' to create one."
-                />
-              </div>
-            ) : (
-              <div className="text-center py-12 bg-muted/50 rounded-md">
-                <p className="text-muted-foreground">
-                  Please select a Level 3 product to view or create configurations.
-                </p>
-              </div>
-            )}
+          <div className="flex justify-end pt-4">
+            <Button onClick={handleAddConfiguration} disabled={!selectedLevel3}>Add Configuration</Button>
           </div>
-        </CardContent>
-      </Card>
-
+        </DialogContent>
+      </Dialog>
+      
       {/* Configuration Editor Dialog */}
       <Dialog open={isEditorOpen} onOpenChange={setIsEditorOpen}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              {selectedProduct?.id === 'new' ? 'Create New' : 'Edit'} Configuration
+            </DialogTitle>
+            <DialogDescription>
+              Configure the settings for this configuration
+            </DialogDescription>
+          </DialogHeader>
+
           {selectedProduct && (
-            <>
-              <DialogHeader>
-                <DialogTitle>
-                  {selectedProduct.id === 'new' ? 'Add New Configuration' : `Configure ${selectedProduct.name}`}
-                </DialogTitle>
-              </DialogHeader>
-              <div className="py-4">
-                <Level4ConfigEditor
-                  productId={selectedProduct.id}
-                  productType={selectedProduct.type || 'analog'}
-                  onSave={(configData) => handleSaveConfiguration(configData)}
-                  onCancel={() => setIsEditorOpen(false)}
-                />
-              </div>
-            </>
+            <Level4ConfigEditor
+              productId={selectedProduct.id}
+              productType={(selectedProduct.type as 'bushing' | 'analog') || 'bushing'}
+              name={selectedProduct.name || 'Configuration'}
+              onNameChange={(n) => setSelectedProduct(prev => prev ? { ...prev, name: n } : prev)}
+              onPreview={(cfg) => handlePreview({ ...selectedProduct, options: cfg } as any)}
+              initialData={(selectedProduct as any).options}
+              onSave={handleSaveConfiguration}
+              onCancel={() => setIsEditorOpen(false)}
+              onRequestChangeType={() => {
+                setIsChangingType(true);
+                setShowTypeDialog(true);
+              }}
+              onRequestChangeConfig={() => setShowConfigPicker(true) as any}
+            />
           )}
         </DialogContent>
       </Dialog>

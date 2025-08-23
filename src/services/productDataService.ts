@@ -11,6 +11,7 @@ import {
 } from "@/types/product";
 import { ChassisType, ChassisTypeFormData } from "@/types/product/chassis-types";
 import { supabase } from "@/integrations/supabase/client";
+import { v4 as uuidv4 } from 'uuid';
 
 export class ProductDataService {
   private initialized: boolean = false;
@@ -1438,23 +1439,6 @@ export class ProductDataService {
     }));
   }
 
-  // Debug and utility methods
-  async resetAndReload(): Promise<void> {
-    console.log('Reset not needed - always fetching fresh data from Supabase');
-  }
-
-  clearCorruptedData(): void {
-    console.log('Clear not needed - using Supabase as source of truth');
-  }
-
-  getDebugInfo(): any {
-    return {
-      service: 'Real Supabase ProductDataService',
-      initialized: this.initialized,
-      note: 'All data fetched real-time from Supabase'
-    };
-  }
-
   // Get relationships between Level 3 and Level 4 products
   async getLevel3Level4Relationships(level3ProductId: string) {
     try {
@@ -1471,11 +1455,219 @@ export class ProductDataService {
     }
   }
 
-  // Create a new product
+  // Create a new Level 4 product (for configuration options)
+  async createLevel4Product(data: {
+    name: string;
+    parentProductId: string;
+    description?: string;
+    configurationType: 'bushing' | 'analog' | 'dropdown' | 'multiline';
+    enabled?: boolean;
+    price?: number;
+    cost?: number;
+    options?: any[];
+    type?: string;
+  }): Promise<any> {
+    try {
+      // First, create the base payload without the type field
+      const payload: any = {
+        id: uuidv4(),
+        name: data.name,
+        parent_product_id: data.parentProductId,
+        description: data.description || '',
+        configuration_type: data.configurationType,
+        enabled: data.enabled ?? true,
+        price: data.price ?? 0,
+        cost: data.cost ?? 0,
+        options: data.options || [],
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+
+      // Only include type if it's provided
+      if (data.type) {
+        payload.type = data.type;
+      } else if (data.configurationType === 'bushing' || data.configurationType === 'analog') {
+        // Only set type from configurationType if it's one of the expected values
+        payload.type = data.configurationType;
+      }
+
+      // First, insert the product
+      const { data: inserted, error } = await supabase
+        .from('level4_products')
+        .insert(payload)
+        .select()
+        .single();
+
+      if (error) {
+        // If the error is about the type column, try again without it
+        if (error.message.includes('type') && error.message.includes('column')) {
+          delete payload.type;
+          const { data: retryInsert, error: retryError } = await supabase
+            .from('level4_products')
+            .insert(payload)
+            .select()
+            .single();
+          
+          if (retryError) throw retryError;
+          return retryInsert;
+        }
+        throw error;
+      }
+
+      // Create relationship with parent L3 product
+      const { error: relError } = await supabase
+        .from('level3_level4_relationships')
+        .insert({
+          level3_product_id: data.parentProductId,
+          level4_product_id: inserted.id
+        });
+
+      if (relError) throw relError;
+
+      return inserted;
+    } catch (error) {
+      console.error('Error creating Level 4 product:', error);
+      throw error;
+    }
+  }
+
+  async updateLevel4Product(
+    id: string,
+    updates: {
+      name?: string;
+      description?: string;
+      configurationType?: string;
+      enabled?: boolean;
+      price?: number;
+      cost?: number;
+      options?: any[];
+      type?: string;
+    }
+  ): Promise<any> {
+    try {
+      const updatePayload: any = {};
+      
+      if (updates.name !== undefined) updatePayload.name = updates.name;
+      if (updates.description !== undefined) updatePayload.description = updates.description;
+      if (updates.configurationType !== undefined) updatePayload.configuration_type = updates.configurationType;
+      if (updates.enabled !== undefined) updatePayload.enabled = updates.enabled;
+      if (updates.price !== undefined) updatePayload.price = updates.price;
+      if (updates.cost !== undefined) updatePayload.cost = updates.cost;
+      if (updates.options !== undefined) updatePayload.options = updates.options;
+      if (updates.type !== undefined) updatePayload.type = updates.type;
+      
+      updatePayload.updated_at = new Date().toISOString();
+
+      const { data, error } = await supabase
+        .from('level4_products')
+        .update(updatePayload)
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error('Error updating Level 4 product:', error);
+      throw error;
+    }
+  }
+
+  async saveLevel4Options(level4Id: string, options: any): Promise<boolean> {
+    try {
+      const { error } = await supabase
+        .from('level4_products')
+        .update({ 
+          options,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', level4Id);
+
+      if (error) throw error;
+      return true;
+    } catch (error) {
+      console.error('Error saving Level 4 options:', error);
+      return false;
+    }
+  }
+
+  async getLevel4Config(productId: string): Promise<any | null> {
+    try {
+      if (!productId || productId === 'new') return null;
+      
+      const { data, error } = await supabase
+        .from('level4_products')
+        .select('*')
+        .eq('id', productId)
+        .single();
+
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error('Error getting Level 4 config:', error);
+      return null;
+    }
+  }
+
+  // Get child products (Level 4) for a Level 3 product
+  async getChildProducts(level3Id: string): Promise<Array<{
+    id: string;
+    name: string;
+    configurationType?: string;
+    type?: string;
+    price?: number;
+    partNumber?: string | null;
+  }>> {
+    try {
+      // First get the relationships
+      const { data: relationships, error: relError } = await supabase
+        .from('level3_level4_relationships')
+        .select('level4_product_id')
+        .eq('level3_product_id', level3Id);
+
+      if (relError) throw relError;
+      if (!relationships || relationships.length === 0) return [];
+
+      // Then get the actual Level 4 products
+      const level4Ids = relationships.map(r => r.level4_product_id);
+      
+      // First try to get products with all columns
+      let { data: products, error } = await supabase
+        .from('level4_products')
+        .select('*')
+        .in('id', level4Ids);
+
+      // If we get a column doesn't exist error, try with just the essential columns
+      if (error?.code === '42703') {
+        const { data: retryProducts, error: retryError } = await supabase
+          .from('level4_products')
+          .select('id, name, configuration_type, price, cost, options, enabled, created_at, updated_at')
+          .in('id', level4Ids);
+          
+        if (retryError) throw retryError;
+        products = retryProducts;
+      } else if (error) {
+        throw error;
+      }
+
+      return (products || []).map(product => ({
+        id: product.id,
+        name: product.name,
+        configurationType: product.configuration_type,
+        type: product.type,  // Will be undefined if column doesn't exist
+        price: product.price,
+        partNumber: product.part_number || null  // Will be null if column doesn't exist
+      }));
+    } catch (error) {
+      console.error('Error getting child products:', error);
+      return [];
+    }
+  }
+
   async createProduct(productData: any): Promise<any> {
     try {
       // First, create the product in the products table
-      const { data: product, error: productError } = await supabase
+      const { data, error } = await supabase
         .from('products')
         .insert([
           {
@@ -1495,36 +1687,17 @@ export class ProductDataService {
         .select()
         .single();
 
-      if (productError) throw productError;
-
-      // If this is a Level 4 product, create a relationship with its parent
-      if (productData.product_level === 4 && productData.parent_product_id) {
-        const { error: relError } = await supabase
-          .from('level3_level4_relationships')
-          .insert([
-            {
-              level3_product_id: productData.parent_product_id,
-              level4_product_id: product.id
-            }
-          ]);
-
-        if (relError) {
-          console.error('Error creating relationship:', relError);
-          // Don't throw here, as the product was created successfully
-        }
-      }
-
-      return product;
+      if (error) throw error;
+      return data;
     } catch (error) {
       console.error('Error in createProduct:', error);
       throw error;
     }
   }
 
-  // Update an existing product
   async updateProduct(id: string, updates: any): Promise<any> {
     try {
-      const { data: product, error } = await supabase
+      const { data, error } = await supabase
         .from('products')
         .update({
           name: updates.name,
@@ -1541,21 +1714,20 @@ export class ProductDataService {
         .single();
 
       if (error) throw error;
-      return product;
+      return data;
     } catch (error) {
       console.error('Error in updateProduct:', error);
       throw error;
     }
   }
 
-  // Ensure required Level 4 products
   async ensureRequiredLevel4Products() {
     try {
       const requiredProducts = [
         {
-          id: 'bushing-card',
-          name: 'Bushing Monitoring Card',
-          description: 'Bushing monitoring and diagnostics card',
+          id: 'option-1-card',
+          name: 'Option 1 Card',
+          description: 'Option 1 configuration card',
           configuration_type: 'dropdown',
           type: 'bushing',
           price: 0,
@@ -1563,9 +1735,9 @@ export class ProductDataService {
           enabled: true
         },
         {
-          id: 'bushing-card-mtx',
-          name: 'Bushing Card (MTX)',
-          description: 'Bushing monitoring card for MTX',
+          id: 'option-1-card-mtx',
+          name: 'Option 1 Card (MTX)',
+          description: 'Option 1 configuration card for MTX',
           configuration_type: 'dropdown',
           type: 'bushing',
           price: 0,
@@ -1573,9 +1745,9 @@ export class ProductDataService {
           enabled: true
         },
         {
-          id: 'bushing-card-stx',
-          name: 'Bushing Card (STX)',
-          description: 'Bushing monitoring card for STX',
+          id: 'option-1-card-stx',
+          name: 'Option 1 Card (STX)',
+          description: 'Option 1 configuration card for STX',
           configuration_type: 'dropdown',
           type: 'bushing',
           price: 0,
@@ -1583,30 +1755,30 @@ export class ProductDataService {
           enabled: true
         },
         {
-          id: 'analog-card-multi',
-          name: 'Multi-Input Analog Card',
-          description: 'Multi-input analog monitoring card',
-          configuration_type: 'multiline',
+          id: 'option-2-card-multi',
+          name: 'Option 2 Card',
+          description: 'Option 2 configuration card',
+          configuration_type: 'dropdown',
           type: 'analog',
           price: 0,
           cost: 0,
           enabled: true
         },
         {
-          id: 'analog-card-multi-mtx',
-          name: 'Multi-Input Analog Card (MTX)',
-          description: 'Multi-input analog card for MTX',
-          configuration_type: 'multiline',
+          id: 'option-2-card-multi-mtx',
+          name: 'Option 2 Card (MTX)',
+          description: 'Option 2 configuration card for MTX',
+          configuration_type: 'dropdown',
           type: 'analog',
           price: 0,
           cost: 0,
           enabled: true
         },
         {
-          id: 'analog-card-multi-stx',
-          name: 'Multi-Input Analog Card (STX)',
-          description: 'Multi-input analog card for STX',
-          configuration_type: 'multiline',
+          id: 'option-2-card-multi-stx',
+          name: 'Option 2 Card (STX)',
+          description: 'Option 2 configuration card for STX',
+          configuration_type: 'dropdown',
           type: 'analog',
           price: 0,
           cost: 0,
@@ -1636,6 +1808,23 @@ export class ProductDataService {
       console.error('Error in ensureRequiredLevel4Products:', error);
       throw error;
     }
+  }
+
+  // Debug and utility methods
+  async resetAndReload(): Promise<void> {
+    console.log('Reset not needed - always fetching fresh data from Supabase');
+  }
+
+  clearCorruptedData(): void {
+    console.log('Clear not needed - using Supabase as source of truth');
+  }
+
+  getDebugInfo(): any {
+    return {
+      service: 'Real Supabase ProductDataService',
+      initialized: this.initialized,
+      note: 'All data fetched real-time from Supabase'
+    };
   }
 }
 

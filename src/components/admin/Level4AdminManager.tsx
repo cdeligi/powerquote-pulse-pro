@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { productDataService } from '@/services/productDataService';
 import { Level3Product } from '@/types/product';
-import { Level4ConfigEditor } from './Level4ConfigEditor';
+import { Level4ConfigurationManager } from './Level4ConfigurationManager';
 
 export const Level4AdminManager: React.FC = () => {
   const [configurableProducts, setConfigurableProducts] = useState<Level3Product[]>([]);
@@ -13,26 +13,41 @@ export const Level4AdminManager: React.FC = () => {
   const [selectedProduct, setSelectedProduct] = useState<Level3Product | null>(null);
 
   useEffect(() => {
-    if (!selectedProduct) {
-      const fetchProducts = async () => {
-        setIsLoading(true);
-        try {
-          const products = await productDataService.getLevel3ProductsRequiringConfig();
-          setConfigurableProducts(products);
-        } catch (err) {
-          setError('Failed to fetch products for configuration.');
-          console.error(err);
-        } finally {
-          setIsLoading(false);
+    const fetchProducts = async () => {
+      setIsLoading(true);
+      try {
+        const products = await productDataService.getLevel3ProductsRequiringConfig();
+        setConfigurableProducts(products);
+        
+        // If there's only one product, automatically select it
+        if (products.length === 1) {
+          setSelectedProduct(products[0]);
         }
-      };
+      } catch (err) {
+        setError('Failed to fetch products for configuration.');
+        console.error(err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
 
+    if (!selectedProduct) {
       fetchProducts();
     }
   }, [selectedProduct]);
 
   if (selectedProduct) {
-    return <Level4ConfigEditor product={selectedProduct} onBack={() => setSelectedProduct(null)} />;
+    return (
+      <div className="space-y-4">
+        <Button variant="outline" onClick={() => setSelectedProduct(null)} className="mb-4">
+          &larr; Back to Products
+        </Button>
+        <Level4ConfigurationManager 
+          level3ProductId={selectedProduct.id}
+          onClose={() => setSelectedProduct(null)}
+        />
+      </div>
+    );
   }
 
   if (isLoading) {
