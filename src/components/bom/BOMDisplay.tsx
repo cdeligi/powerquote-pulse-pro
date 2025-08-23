@@ -7,6 +7,7 @@ import { Trash2, Edit3, Save, X, Settings } from 'lucide-react';
 import { BOMItem } from '@/types/product';
 import { FEATURES, usePermissions } from '@/hooks/usePermissions';
 import { calculateMarginPercentage, formatMargin } from '@/utils/priceUtils';
+import { useBOMContext } from '@/context/BOMContext';
 
 interface BOMDisplayProps {
   bomItems: BOMItem[];
@@ -29,6 +30,7 @@ const BOMDisplay = ({ bomItems, onUpdateBOM, onEditConfiguration, onSubmitQuote,
   const { has } = usePermissions();
   const canShowMargin = has(FEATURES.BOM_SHOW_MARGIN);
   const canEditPrice = has(FEATURES.BOM_EDIT_PRICE);
+  const { getLevel4Summary } = useBOMContext();
 
   const handleEditStart = (item: BOMItem) => {
     setEditingItem(item.id);
@@ -369,6 +371,15 @@ const BOMDisplay = ({ bomItems, onUpdateBOM, onEditConfiguration, onSubmitQuote,
               {needsConfiguration(item) && (
                 <Badge variant="outline" className="text-[10px] text-orange-400 border-orange-400 px-1.5 py-0">
                   Config Required
+                </Badge>
+              )}
+              {getLevel4Summary(item.id) && (
+                <Badge 
+                  variant="outline" 
+                  className="text-[10px] text-green-400 border-green-400 px-1.5 py-0"
+                  title="Level 4 configuration selections"
+                >
+                  {getLevel4Summary(item.id)}
                 </Badge>
               )}
               {item.partNumber && item.partNumber !== item.product.partNumber && (
