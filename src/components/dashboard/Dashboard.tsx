@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { User } from "@/types/auth";
 import Sidebar from "./Sidebar";
 import DashboardOverview from "./DashboardOverview";
@@ -8,6 +8,7 @@ import QuoteManager from "../quotes/QuoteManager";
 import AdminPanel from "../admin/AdminPanel";
 import { BOMItem } from "@/types/product";
 import { usePermissions, FEATURES } from "@/hooks/usePermissions";
+import { productDataService } from "@/services/productDataService";
 
 interface DashboardProps {
   user: User;
@@ -20,6 +21,21 @@ const Dashboard = ({ user, onLogout }: DashboardProps) => {
   const [activeView, setActiveView] = useState<ActiveView>('overview');
   const [bomItems, setBomItems] = useState<BOMItem[]>([]);
   const { has } = usePermissions();
+
+  // Initialize ProductDataService when dashboard loads
+  useEffect(() => {
+    const initializeProducts = async () => {
+      try {
+        console.log('Initializing ProductDataService...');
+        await productDataService.initialize();
+        console.log('ProductDataService initialized successfully');
+      } catch (error) {
+        console.error('Failed to initialize ProductDataService:', error);
+      }
+    };
+
+    initializeProducts();
+  }, []);
 
   const handleBOMUpdate = (items: BOMItem[]) => {
     setBomItems(items);
