@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,34 +8,34 @@ import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Trash2, Plus } from "lucide-react";
-import { Level4Product, Level4ConfigurationOption, Level3Product } from "@/types/product";
+import { Level3Product } from "@/types/product";
+import { Level4Configuration } from "@/types/level4";
 import { productDataService } from "@/services/productDataService";
 
 interface Level4ProductFormProps {
-  product?: Level4Product;
-  onSave: (product: Omit<Level4Product, 'id'> | Level4Product) => void;
+  configuration?: Level4Configuration;
+  onSave: (configuration: Omit<Level4Configuration, 'id'> | Level4Configuration) => void;
   onCancel: () => void;
 }
 
 export const Level4ProductForm: React.FC<Level4ProductFormProps> = ({
-  product,
+  configuration,
   onSave,
   onCancel
 }) => {
-  const [formData, setFormData] = useState<Partial<Level4Product>>({
-    name: '',
-    parentProductId: '',
-    description: '',
-    configurationType: 'dropdown',
-    price: 0,
-    cost: 0,
-    enabled: true,
+  const [formData, setFormData] = useState<Partial<Level4Configuration>>({
+    level3_product_id: '',
+    template_type: 'OPTION_1',
+    field_label: '',
+    info_url: null,
+    max_inputs: 1,
+    fixed_inputs: null,
     options: [],
-    ...product
+    ...configuration
   });
 
   const [level3Products, setLevel3Products] = useState<Level3Product[]>([]);
-  const [newOption, setNewOption] = useState({ optionKey: '', optionValue: '' });
+  const [newOption, setNewOption] = useState({ label: '', value: '' });
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -48,22 +47,16 @@ export const Level4ProductForm: React.FC<Level4ProductFormProps> = ({
         
         console.log('Loading Level 3 products for Level 4 form...');
         const products = await productDataService.getLevel3Products();
-        console.log('Loaded Level 3 products:', products.length);
+        // Filter to only products with has_level4 enabled
+        const level4Products = products.filter(p => p.has_level4);
+        console.log('Loaded Level 3 products with Level 4:', level4Products.length);
         
-        setLevel3Products(products);
+        setLevel3Products(level4Products);
         
       } catch (error) {
         console.error('Error loading Level 3 products:', error);
         setError('Failed to load Level 3 products');
-        // Fallback to sync method
-        try {
-          const syncProducts = productDataService.getLevel3ProductsSync();
-          setLevel3Products(syncProducts);
-          setError(null);
-        } catch (syncError) {
-          console.error('Sync fallback also failed:', syncError);
-          setLevel3Products([]);
-        }
+        setLevel3Products([]);
       } finally {
         setIsLoading(false);
       }
@@ -75,47 +68,57 @@ export const Level4ProductForm: React.FC<Level4ProductFormProps> = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.name?.trim()) {
-      alert('Please enter a configuration name');
+    if (!formData.field_label?.trim()) {
+      alert('Please enter a field label');
       return;
     }
     
-    if (!formData.parentProductId) {
-      alert('Please select a parent Level 3 product');
+    if (!formData.level3_product_id) {
+      alert('Please select a Level 3 product');
       return;
     }
     
-    if (!formData.configurationType) {
-      alert('Please select a configuration type');
+    if (!formData.options || formData.options.length === 0) {
+      alert('Please add at least one option');
+      return;
+    }
+
+    if (formData.template_type === 'OPTION_1' && (!formData.max_inputs || formData.max_inputs < 1)) {
+      alert('Please set max inputs to at least 1 for Option 1');
+      return;
+    }
+
+    if (formData.template_type === 'OPTION_2' && (!formData.fixed_inputs || formData.fixed_inputs < 1)) {
+      alert('Please set fixed inputs to at least 1 for Option 2');
       return;
     }
     
-    const productToSave = {
-      ...formData,
-      name: formData.name.trim(),
-      configurationType: formData.configurationType as 'dropdown' | 'multiline',
-      options: formData.options || [],
-      price: formData.price || 0,
-      cost: formData.cost || 0,
-      enabled: formData.enabled ?? true
-    } as Level4Product;
+    const configurationToSave: Omit<Level4Configuration, 'id'> = {
+      level3_product_id: formData.level3_product_id!,
+      template_type: formData.template_type as 'OPTION_1' | 'OPTION_2',
+      field_label: formData.field_label!.trim(),
+      info_url: formData.info_url || null,
+      max_inputs: formData.template_type === 'OPTION_1' ? formData.max_inputs! : null,
+      fixed_inputs: formData.template_type === 'OPTION_2' ? formData.fixed_inputs! : null,
+      options: formData.options || []
+    };
     
-    onSave(productToSave);
+    onSave(configurationToSave);
   };
 
   const addOption = () => {
-    if (!newOption.optionKey?.trim() || !newOption.optionValue?.trim()) {
-      alert('Please enter both option key and value');
+    if (!newOption.label?.trim() || !newOption.value?.trim()) {
+      alert('Please enter both label and value');
       return;
     }
     
-    const option: Level4ConfigurationOption = {
+    const option = {
       id: `option-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      level4ProductId: formData.id || '',
-      optionKey: newOption.optionKey.trim(),
-      optionValue: newOption.optionValue.trim(),
-      displayOrder: (formData.options?.length || 0) + 1,
-      enabled: true
+      level4_configuration_id: 'temp-id', // Will be set properly when saved
+      label: newOption.label.trim(),
+      value: newOption.value.trim(),
+      display_order: (formData.options?.length || 0),
+      is_default: (formData.options?.length || 0) === 0 // First option is default
     };
     
     setFormData(prev => ({
@@ -123,7 +126,7 @@ export const Level4ProductForm: React.FC<Level4ProductFormProps> = ({
       options: [...(prev.options || []), option]
     }));
     
-    setNewOption({ optionKey: '', optionValue: '' });
+    setNewOption({ label: '', value: '' });
   };
 
   const removeOption = (optionId: string) => {
@@ -133,7 +136,7 @@ export const Level4ProductForm: React.FC<Level4ProductFormProps> = ({
     }));
   };
 
-  const selectedLevel3 = level3Products.find(p => p.id === formData.parentProductId);
+  const selectedLevel3 = level3Products.find(p => p.id === formData.level3_product_id);
 
   if (isLoading) {
     return (
@@ -162,12 +165,12 @@ export const Level4ProductForm: React.FC<Level4ProductFormProps> = ({
     return (
       <div className="space-y-4">
         <div className="text-center py-8">
-          <h3 className="text-lg font-medium text-gray-900 mb-2">No Level 3 Products Available</h3>
+          <h3 className="text-lg font-medium text-gray-900 mb-2">No Level 3 Products with Level 4 Available</h3>
           <p className="text-gray-600 mb-4">
-            You need to create Level 3 products before you can add Level 4 configurations.
+            You need Level 3 products with Level 4 enabled before you can create configurations.
           </p>
           <p className="text-sm text-gray-500 mb-4">
-            Go to the Level 3 Products tab to create cards, components, or options first.
+            Go to the Level 3 Products tab and enable "Has Level 4" for products you want to configure.
           </p>
           <Button onClick={onCancel} variant="outline">
             Cancel
@@ -181,21 +184,10 @@ export const Level4ProductForm: React.FC<Level4ProductFormProps> = ({
     <form onSubmit={handleSubmit} className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <Label htmlFor="name">Configuration Name *</Label>
-          <Input
-            id="name"
-            value={formData.name || ''}
-            onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-            placeholder="Enter configuration name"
-            required
-          />
-        </div>
-
-        <div>
-          <Label htmlFor="parentProduct">Parent Level 3 Product *</Label>
+          <Label htmlFor="level3Product">Level 3 Product *</Label>
           <Select
-            value={formData.parentProductId || ''}
-            onValueChange={(value) => setFormData(prev => ({ ...prev, parentProductId: value }))}
+            value={formData.level3_product_id || ''}
+            onValueChange={(value) => setFormData(prev => ({ ...prev, level3_product_id: value }))}
           >
             <SelectTrigger>
               <SelectValue placeholder="Select Level 3 Product" />
@@ -211,69 +203,77 @@ export const Level4ProductForm: React.FC<Level4ProductFormProps> = ({
         </div>
 
         <div>
-          <Label htmlFor="configurationType">Configuration Type</Label>
+          <Label htmlFor="templateType">Template Type *</Label>
           <Select
-            value={formData.configurationType || 'dropdown'}
-            onValueChange={(value: 'dropdown' | 'multiline') => 
-              setFormData(prev => ({ ...prev, configurationType: value }))
+            value={formData.template_type || 'OPTION_1'}
+            onValueChange={(value: 'OPTION_1' | 'OPTION_2') => 
+              setFormData(prev => ({ 
+                ...prev, 
+                template_type: value,
+                max_inputs: value === 'OPTION_1' ? (prev.max_inputs || 1) : null,
+                fixed_inputs: value === 'OPTION_2' ? (prev.fixed_inputs || 1) : null
+              }))
             }
           >
             <SelectTrigger>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="dropdown">Dropdown Selection</SelectItem>
-              <SelectItem value="multiline">Multi-line Configuration</SelectItem>
+              <SelectItem value="OPTION_1">Option 1 (Variable Inputs)</SelectItem>
+              <SelectItem value="OPTION_2">Option 2 (Fixed Inputs)</SelectItem>
             </SelectContent>
           </Select>
-        </div>
-
-        <div className="flex items-center space-x-2">
-          <Switch
-            id="enabled"
-            checked={formData.enabled || false}
-            onCheckedChange={(checked) => setFormData(prev => ({ ...prev, enabled: checked }))}
-          />
-          <Label htmlFor="enabled">Enabled</Label>
         </div>
       </div>
 
       <div>
-        <Label htmlFor="description">Description</Label>
-        <Textarea
-          id="description"
-          value={formData.description || ''}
-          onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-          placeholder="Enter configuration description"
-          rows={3}
+        <Label htmlFor="fieldLabel">Field Label *</Label>
+        <Input
+          id="fieldLabel"
+          value={formData.field_label || ''}
+          onChange={(e) => setFormData(prev => ({ ...prev, field_label: e.target.value }))}
+          placeholder="Enter field label (e.g., Select model)"
+          required
         />
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <Label htmlFor="price">Price ($)</Label>
-          <Input
-            id="price"
-            type="number"
-            step="0.01"
-            min="0"
-            value={formData.price || 0}
-            onChange={(e) => setFormData(prev => ({ ...prev, price: parseFloat(e.target.value) || 0 }))}
-          />
-        </div>
-
-        <div>
-          <Label htmlFor="cost">Cost ($)</Label>
-          <Input
-            id="cost"
-            type="number"
-            step="0.01"
-            min="0"
-            value={formData.cost || 0}
-            onChange={(e) => setFormData(prev => ({ ...prev, cost: parseFloat(e.target.value) || 0 }))}
-          />
-        </div>
+      <div>
+        <Label htmlFor="infoUrl">Info URL (optional)</Label>
+        <Input
+          id="infoUrl"
+          value={formData.info_url || ''}
+          onChange={(e) => setFormData(prev => ({ ...prev, info_url: e.target.value }))}
+          placeholder="Enter help URL"
+        />
       </div>
+
+      {formData.template_type === 'OPTION_1' && (
+        <div>
+          <Label htmlFor="maxInputs">Max Inputs *</Label>
+          <Input
+            id="maxInputs"
+            type="number"
+            min="1"
+            value={formData.max_inputs || 1}
+            onChange={(e) => setFormData(prev => ({ ...prev, max_inputs: parseInt(e.target.value) || 1 }))}
+            required
+          />
+        </div>
+      )}
+
+      {formData.template_type === 'OPTION_2' && (
+        <div>
+          <Label htmlFor="fixedInputs">Fixed Inputs *</Label>
+          <Input
+            id="fixedInputs"
+            type="number"
+            min="1"
+            value={formData.fixed_inputs || 1}
+            onChange={(e) => setFormData(prev => ({ ...prev, fixed_inputs: parseInt(e.target.value) || 1 }))}
+            required
+          />
+        </div>
+      )}
 
       {selectedLevel3 && (
         <div className="p-3 bg-blue-50 rounded-lg">
@@ -285,34 +285,27 @@ export const Level4ProductForm: React.FC<Level4ProductFormProps> = ({
 
       <Card>
         <CardHeader>
-          <CardTitle>Configuration Options</CardTitle>
+          <CardTitle>Dropdown Options</CardTitle>
           <p className="text-sm text-gray-600">
-            {formData.configurationType === 'dropdown' 
-              ? 'Add options that users can select from a dropdown menu'
-              : 'Add configuration fields with names and descriptions'
-            }
+            Add options that users can select from
           </p>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <Label>
-                {formData.configurationType === 'dropdown' ? 'Option Value' : 'Field Name'}
-              </Label>
+              <Label>Option Label</Label>
               <Input
-                value={newOption.optionKey}
-                onChange={(e) => setNewOption(prev => ({ ...prev, optionKey: e.target.value }))}
-                placeholder={formData.configurationType === 'dropdown' ? 'e.g., option1' : 'e.g., Temperature Range'}
+                value={newOption.label}
+                onChange={(e) => setNewOption(prev => ({ ...prev, label: e.target.value }))}
+                placeholder="e.g., Basic Model"
               />
             </div>
             <div>
-              <Label>
-                {formData.configurationType === 'dropdown' ? 'Display Name' : 'Description'}
-              </Label>
+              <Label>Option Value</Label>
               <Input
-                value={newOption.optionValue}
-                onChange={(e) => setNewOption(prev => ({ ...prev, optionValue: e.target.value }))}
-                placeholder={formData.configurationType === 'dropdown' ? 'e.g., Option 1' : 'e.g., Operating temperature range'}
+                value={newOption.value}
+                onChange={(e) => setNewOption(prev => ({ ...prev, value: e.target.value }))}
+                placeholder="e.g., basic"
               />
             </div>
           </div>
@@ -322,7 +315,7 @@ export const Level4ProductForm: React.FC<Level4ProductFormProps> = ({
             onClick={addOption} 
             className="w-full" 
             variant="outline"
-            disabled={!newOption.optionKey.trim() || !newOption.optionValue.trim()}
+            disabled={!newOption.label.trim() || !newOption.value.trim()}
           >
             <Plus className="h-4 w-4 mr-2" />
             Add Option
@@ -335,8 +328,11 @@ export const Level4ProductForm: React.FC<Level4ProductFormProps> = ({
                 <div key={option.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                   <div>
                     <div className="flex items-center space-x-2">
-                      <Badge variant="secondary">{option.optionKey}</Badge>
-                      <span className="text-sm">{option.optionValue}</span>
+                      <Badge variant={option.is_default ? "default" : "secondary"}>
+                        {option.label}
+                      </Badge>
+                      <span className="text-sm text-gray-600">({option.value})</span>
+                      {option.is_default && <span className="text-xs text-blue-600">Default</span>}
                     </div>
                   </div>
                   <Button
@@ -359,7 +355,7 @@ export const Level4ProductForm: React.FC<Level4ProductFormProps> = ({
           Cancel
         </Button>
         <Button type="submit">
-          {product ? 'Update' : 'Create'} Level 4 Configuration
+          {configuration ? 'Update' : 'Create'} Level 4 Configuration
         </Button>
       </div>
     </form>

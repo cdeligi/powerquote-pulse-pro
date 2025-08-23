@@ -6,7 +6,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { BOMItem, Level3Customization } from "@/types/product/interfaces";
-import { ProductDataService } from "@/services/productDataService";
+import { productDataService } from "@/services/productDataService";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -23,7 +23,7 @@ interface AnalogCardConfiguratorProps {
 }
 
 const AnalogCardConfigurator = ({ bomItem, onSave, onClose }: AnalogCardConfiguratorProps) => {
-  const [sensorOptions, setSensorOptions] = useState(ProductDataService.getAnalogSensorTypes());
+  const [sensorOptions, setSensorOptions] = useState(productDataService.getAnalogSensorTypes());
   const [numberOfChannels, setNumberOfChannels] = useState(8);
   const [channelConfigs, setChannelConfigs] = useState<Record<number, string>>(() => {
     // Initialize with existing configurations or default to first sensor type

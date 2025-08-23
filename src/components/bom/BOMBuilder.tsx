@@ -13,7 +13,8 @@ import BOMDisplay from './BOMDisplay';
 import AnalogCardConfigurator from './AnalogCardConfigurator';
 import BushingCardConfigurator from './BushingCardConfigurator';
 import NonChassisConfigurator from './NonChassisConfigurator';
-import { Level4Configurator } from './Level4Configurator';
+import { Level4RuntimePayload } from "@/types/level4";
+import { Level4RuntimeModal } from "../level4/Level4RuntimeModal";
 
 import { productDataService } from '@/services/productDataService';
 import QuoteFieldsSection from './QuoteFieldsSection';
@@ -303,7 +304,7 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
           const autoIncludeAssignments: Record<number, Level3Product> = {};
           
           // Check for standard items to auto-include
-          Object.entries(codes).forEach(([l3Id, def]) => {
+          Object.entries(codes).forEach(([l3Id, def]: [string, any]) => {
             if (def?.is_standard && !def?.outside_chassis) {
               const standardProduct = l3.find(p => p.id === l3Id);
               if (standardProduct && def.standard_position !== null && def.standard_position !== undefined) {
@@ -536,19 +537,11 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
     }
   };
 
-  const handleLevel4Save = (configuredItem: BOMItem) => {
-    if (configuredItem.slot !== undefined && configuredItem.slot !== null) {
-      // If the item is meant for a slot, add it to the slot assignments
-      setSlotAssignments(prev => ({
-        ...prev,
-        [configuredItem.slot!]: configuredItem.product as Level3Product,
-      }));
-    } else {
-      // Otherwise, add it directly to the BOM as a standalone item
-      const updatedItems = [...bomItems, configuredItem];
-      setBomItems(updatedItems);
-      onBOMUpdate(updatedItems);
-    }
+  const handleLevel4Save = (payload: Level4RuntimePayload) => {
+    const updatedItems = bomItems.map(item => 
+      item.id === payload.bomItemId ? { ...item, level4Config: payload } : item
+    );
+    setBomItems(updatedItems);
     setConfiguringLevel4Item(null);
     setSelectedSlot(null);
   };
@@ -1259,8 +1252,9 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
       )}
 
       {configuringLevel4Item && (
-        <Level4Configurator
+        <Level4RuntimeModal
           bomItem={configuringLevel4Item}
+          level3ProductId={configuringLevel4Item.product.id}
           onSave={handleLevel4Save}
           onCancel={handleLevel4Cancel}
         />
