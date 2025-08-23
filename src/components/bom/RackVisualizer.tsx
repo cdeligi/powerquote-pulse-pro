@@ -88,7 +88,7 @@ const getSlotColor = (slot: number) => {
         );
         return isSecondarySlot ? 'B+' : 'B';
       }
-      return card.type.charAt(0).toUpperCase() + card.type.slice(1);
+      return (card.type || card.name || 'Card').charAt(0).toUpperCase() + (card.type || card.name || 'Card').slice(1);
     }
     // For empty slots, just show the slot number
     return `${slot}`;
@@ -97,7 +97,7 @@ const getSlotColor = (slot: number) => {
 const getSlotTitle = (slot: number) => {
   if (slotAssignments[slot]) {
     const card = slotAssignments[slot];
-    const display = card?.type ? card.type.charAt(0).toUpperCase() + card.type.slice(1) : card?.name;
+    const display = card?.type ? (card.type.charAt(0).toUpperCase() + card.type.slice(1)) : (card?.name || 'Card');
     if (isBushingCard(card)) {
       const isSecondarySlot = Object.values(bushingSlots).some(slots => 
         slots.includes(slot) && slots[0] !== slot
@@ -303,7 +303,7 @@ return (
               <div className="space-y-1 text-sm">
                 {Object.entries(bushingSlots).map(([slot, occupiedSlots]) => (
                   <div key={slot} className="text-orange-300">
-                    Slots {occupiedSlots.join(', ')}: {(() => { const c = slotAssignments[parseInt(slot)]; const t = c?.type || ''; return t ? t.charAt(0).toUpperCase() + t.slice(1) : c?.name; })()}
+                    Slots {occupiedSlots.join(', ')}: {(() => { const c = slotAssignments[parseInt(slot)]; const t = c?.type || ''; return t ? (t.charAt(0).toUpperCase() + t.slice(1)) : (c?.name || 'Card'); })()}
                     <br />
                     <span className="text-xs text-orange-200">
                       (Only one bushing card allowed per chassis)
@@ -336,7 +336,7 @@ return (
                 {Object.entries(bushingSlots).map(([slot, slots]) => (
                   <div key={`bushing-${slot}`} className="flex justify-between text-sm">
                     <span className="text-gray-400">Slots {slots.join('-')}:</span>
-                    <span className="text-white">{(() => { const c = slotAssignments[parseInt(slot)]; const t = c?.type || ''; return t ? t.charAt(0).toUpperCase() + t.slice(1) : c?.name; })()}</span>
+                    <span className="text-white">{(() => { const c = slotAssignments[parseInt(slot)]; const t = c?.type || ''; return t ? (t.charAt(0).toUpperCase() + t.slice(1)) : (c?.name || 'Card'); })()}</span>
                   </div>
                 ))}
                 {Object.entries(slotAssignments)
@@ -344,7 +344,7 @@ return (
                   .map(([slot, card]) => (
                     <div key={slot} className="flex justify-between text-sm">
                       <span className="text-gray-400">Slot {slot}:</span>
-                      <span className="text-white">{card.type ? card.type.charAt(0).toUpperCase() + card.type.slice(1) : card.name}</span>
+                      <span className="text-white">{card.type ? (card.type.charAt(0).toUpperCase() + card.type.slice(1)) : (card.name || 'Card')}</span>
                     </div>
                   ))}
               </div>
