@@ -94,10 +94,10 @@ export interface Chassis extends Level2Product {
   productInfoUrl?: string;
 }
 
-export interface Card extends Level3Product {
+export interface Card extends Omit<Level3Product, 'enabled'> {
+  enabled?: boolean;
   slotRequirement: number;
   compatibleChassis: string[];
-  enabled?: boolean; // Optional since many static card objects omit it
 }
 
 export interface Level2Option extends Level3Product {

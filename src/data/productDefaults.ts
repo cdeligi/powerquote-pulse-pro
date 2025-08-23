@@ -218,7 +218,8 @@ export const DEFAULT_LEVEL3_PRODUCTS: Level3Product[] = [
   {
     id: 'relay-card-basic',
     name: 'Basic Relay Card',
-    parentProductId: 'ltx-chassis',
+    parent_product_id: 'ltx-chassis',
+    product_level: 3,
     type: 'relay',
     description: '8-channel relay output card',
     price: 850,
@@ -236,7 +237,8 @@ export const DEFAULT_LEVEL3_PRODUCTS: Level3Product[] = [
   {
     id: 'relay-card-basic-mtx',
     name: 'Basic Relay Card',
-    parentProductId: 'mtx-chassis',
+    parent_product_id: 'mtx-chassis',
+    product_level: 3,
     type: 'relay',
     description: '8-channel relay output card',
     price: 850,
@@ -254,7 +256,8 @@ export const DEFAULT_LEVEL3_PRODUCTS: Level3Product[] = [
   {
     id: 'relay-card-basic-stx',
     name: 'Basic Relay Card',
-    parentProductId: 'stx-chassis',
+    parent_product_id: 'stx-chassis',
+    product_level: 3,
     type: 'relay',
     description: '8-channel relay output card',
     price: 850,
@@ -273,7 +276,8 @@ export const DEFAULT_LEVEL3_PRODUCTS: Level3Product[] = [
   {
     id: 'analog-card-multi-ltx',
     name: 'Multi-Input Analog Card',
-    parentProductId: 'ltx-chassis',
+    parent_product_id: 'ltx-chassis',
+    product_level: 3,
     type: 'analog',
     description: 'High-precision analog input card',
     price: 1250,
@@ -292,7 +296,8 @@ export const DEFAULT_LEVEL3_PRODUCTS: Level3Product[] = [
   {
     id: 'analog-card-multi-mtx',
     name: 'Multi-Input Analog Card',
-    parentProductId: 'mtx-chassis',
+    parent_product_id: 'mtx-chassis',
+    product_level: 3,
     type: 'analog',
     description: 'High-precision analog input card',
     price: 1250,
@@ -311,7 +316,8 @@ export const DEFAULT_LEVEL3_PRODUCTS: Level3Product[] = [
   {
     id: 'analog-card-multi-stx',
     name: 'Multi-Input Analog Card',
-    parentProductId: 'stx-chassis',
+    parent_product_id: 'stx-chassis',
+    product_level: 3,
     type: 'analog',
     description: 'High-precision analog input card',
     price: 1250,
@@ -331,7 +337,8 @@ export const DEFAULT_LEVEL3_PRODUCTS: Level3Product[] = [
   {
     id: 'bushing-card-ltx',
     name: 'Bushing Monitoring Card',
-    parentProductId: 'ltx-chassis',
+    parent_product_id: 'ltx-chassis',
+    product_level: 3,
     type: 'bushing',
     description: 'Transformer bushing monitoring interface',
     price: 2250,
@@ -348,7 +355,8 @@ export const DEFAULT_LEVEL3_PRODUCTS: Level3Product[] = [
   {
     id: 'bushing-card-mtx',
     name: 'Bushing Monitoring Card',
-    parentProductId: 'mtx-chassis',
+    parent_product_id: 'mtx-chassis',
+    product_level: 3,
     type: 'bushing',
     description: 'Transformer bushing monitoring interface',
     price: 2250,
@@ -365,7 +373,8 @@ export const DEFAULT_LEVEL3_PRODUCTS: Level3Product[] = [
   {
     id: 'bushing-card-stx',
     name: 'Bushing Monitoring Card',
-    parentProductId: 'stx-chassis',
+    parent_product_id: 'stx-chassis',
+    product_level: 3,
     type: 'bushing',
     description: 'Transformer bushing monitoring interface',
     price: 2250,
@@ -383,7 +392,8 @@ export const DEFAULT_LEVEL3_PRODUCTS: Level3Product[] = [
   {
     id: 'display-card-ltx',
     name: 'Local Display Interface',
-    parentProductId: 'ltx-chassis',
+    parent_product_id: 'ltx-chassis',
+    product_level: 3,
     type: 'display',
     description: 'Local HMI display interface card',
     price: 950,
@@ -402,7 +412,8 @@ export const DEFAULT_LEVEL3_PRODUCTS: Level3Product[] = [
   {
     id: 'fiber-card-4-input-ltx',
     name: 'Fiber Optic Communication Card (4 Inputs)',
-    parentProductId: 'ltx-chassis',
+    parent_product_id: 'ltx-chassis',
+    product_level: 3,
     type: 'fiber',
     description: 'High-speed fiber optic interface with 4 inputs',
     price: 1850,
@@ -421,7 +432,8 @@ export const DEFAULT_LEVEL3_PRODUCTS: Level3Product[] = [
   {
     id: 'fiber-card-6-input-ltx',
     name: 'Fiber Optic Communication Card (6 Inputs)',
-    parentProductId: 'ltx-chassis',
+    parent_product_id: 'ltx-chassis',
+    product_level: 3,
     type: 'fiber',
     description: 'High-speed fiber optic interface with 6 inputs',
     price: 2150,
@@ -440,7 +452,8 @@ export const DEFAULT_LEVEL3_PRODUCTS: Level3Product[] = [
   {
     id: 'fiber-card-8-input-ltx',
     name: 'Fiber Optic Communication Card (8 Inputs)',
-    parentProductId: 'ltx-chassis',
+    parent_product_id: 'ltx-chassis',
+    product_level: 3,
     type: 'fiber',
     description: 'High-speed fiber optic interface with 8 inputs',
     price: 2450,
@@ -460,7 +473,8 @@ export const DEFAULT_LEVEL3_PRODUCTS: Level3Product[] = [
   {
     id: 'fiber-card-4-input-mtx',
     name: 'Fiber Optic Communication Card (4 Inputs)',
-    parentProductId: 'mtx-chassis',
+    parent_product_id: 'mtx-chassis',
+    product_level: 3,
     type: 'fiber',
     description: 'High-speed fiber optic interface with 4 inputs',
     price: 1850,
@@ -479,7 +493,8 @@ export const DEFAULT_LEVEL3_PRODUCTS: Level3Product[] = [
   {
     id: 'fiber-card-4-input-stx',
     name: 'Fiber Optic Communication Card (4 Inputs)',
-    parentProductId: 'stx-chassis',
+    parent_product_id: 'stx-chassis',
+    product_level: 3,
     type: 'fiber',
     description: 'High-speed fiber optic interface with 4 inputs',
     price: 1850,
@@ -499,7 +514,8 @@ export const DEFAULT_LEVEL3_PRODUCTS: Level3Product[] = [
   {
     id: 'relay-card-8',
     name: '8-Channel Relay Card',
-    parentProductId: 'chassis-6-slot',
+    parent_product_id: 'chassis-6-slot',
+    product_level: 3,
     type: 'Relay',
     description: '8-channel relay output card for QTMS',
     price: 800,
@@ -516,7 +532,8 @@ export const DEFAULT_LEVEL3_PRODUCTS: Level3Product[] = [
   {
     id: 'analog-input-card-4',
     name: '4-Channel Analog Input Card',
-    parentProductId: 'chassis-6-slot',
+    parent_product_id: 'chassis-6-slot',
+    product_level: 3,
     type: 'Analog',
     description: '4-channel analog input card for QTMS',
     price: 700,
@@ -533,7 +550,8 @@ export const DEFAULT_LEVEL3_PRODUCTS: Level3Product[] = [
   {
     id: 'fiber-optic-module',
     name: 'Fiber Optic Communication Module',
-    parentProductId: 'chassis-6-slot',
+    parent_product_id: 'chassis-6-slot',
+    product_level: 3,
     type: 'Fiber',
     description: 'Fiber optic communication module for QTMS',
     price: 1200,
@@ -550,7 +568,8 @@ export const DEFAULT_LEVEL3_PRODUCTS: Level3Product[] = [
   {
     id: 'display-module-touchscreen',
     name: 'Touchscreen Display Module',
-    parentProductId: 'chassis-6-slot',
+    parent_product_id: 'chassis-6-slot',
+    product_level: 3,
     type: 'Display',
     description: 'Touchscreen display module for local QTMS interface',
     price: 1500,
@@ -567,7 +586,8 @@ export const DEFAULT_LEVEL3_PRODUCTS: Level3Product[] = [
   {
     id: 'digital-input-card-16',
     name: '16-Channel Digital Input Card',
-    parentProductId: 'chassis-6-slot',
+    parent_product_id: 'chassis-6-slot',
+    product_level: 3,
     type: 'Digital',
     description: '16-channel digital input card for QTMS',
     price: 600,
@@ -584,7 +604,8 @@ export const DEFAULT_LEVEL3_PRODUCTS: Level3Product[] = [
   {
     id: 'iec61850-communication-module',
     name: 'IEC 61850 Communication Module',
-    parentProductId: 'chassis-6-slot',
+    parent_product_id: 'chassis-6-slot',
+    product_level: 3,
     type: 'Communication',
     description: 'IEC 61850 communication module for QTMS',
     price: 1800,
@@ -599,4 +620,5 @@ export const DEFAULT_LEVEL3_PRODUCTS: Level3Product[] = [
     }
   }
 ];
+
 export { DEFAULT_ANALOG_SENSORS, DEFAULT_BUSHING_TAP_MODELS } from '@/types/product/sensor-config';

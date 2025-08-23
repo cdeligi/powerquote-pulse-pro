@@ -394,7 +394,7 @@ export const ProductManagement = () => {
         </TabsContent>
 
         <TabsContent value="level4" className="space-y-4">
-          <<Level4AdminPage />
+          <Level4AdminPage />
         </TabsContent>
 
         <TabsContent value="partnumbers" className="space-y-4">

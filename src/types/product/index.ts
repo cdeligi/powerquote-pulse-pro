@@ -18,11 +18,6 @@ export type {
   BushingTapModelOption,
 } from './sensor-config';
 
-export type {
-  Level4Product,
-  Level4ConfigurationOption
-} from './interfaces';
-
 export { 
   ANALOG_SENSOR_TYPES, 
   ANALOG_SENSOR_DESCRIPTIONS,
