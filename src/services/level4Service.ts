@@ -47,19 +47,62 @@ export class Level4Service {
   // Get all Level 3 products that have Level 4 enabled
   static async getLevel3ProductsWithLevel4(): Promise<any[]> {
     try {
-      const { data, error } = await supabase
+      console.log('Level4Service: Fetching Level 3 products with Level 4...');
+      
+      // Get products with Level 4 flags set
+      const { data: flaggedProducts, error: flagError } = await supabase
         .from('products')
-        .select('id, name, parent_product_id, has_level4, requires_level4_config')
+        .select('id, name, parent_product_id, has_level4, requires_level4_config, enabled')
         .eq('product_level', 3)
-        .or('has_level4.eq.true,requires_level4_config.eq.true')
-        .eq('enabled', true);
+        .or('has_level4.eq.true,requires_level4_config.eq.true');
 
-      if (error) {
-        console.error('Error loading Level 3 products with Level 4:', error);
+      if (flagError) {
+        console.error('Error loading flagged Level 3 products:', flagError);
         return [];
       }
 
-      return data || [];
+      console.log('Level4Service: Found flagged products:', flaggedProducts?.length || 0, flaggedProducts);
+
+      // Get product IDs that have level4_configurations
+      const { data: configIds, error: configIdsError } = await supabase
+        .from('level4_configurations')
+        .select('level3_product_id');
+
+      if (configIdsError) {
+        console.error('Error loading configuration IDs:', configIdsError);
+      }
+
+      const configuredProductIds = configIds?.map(c => c.level3_product_id) || [];
+      console.log('Level4Service: Found configured product IDs:', configuredProductIds);
+
+      // Get products that have configurations, even if flags are not set
+      let configuredProducts: any[] = [];
+      if (configuredProductIds.length > 0) {
+        const { data: products, error: configError } = await supabase
+          .from('products')
+          .select('id, name, parent_product_id, has_level4, requires_level4_config, enabled')
+          .eq('product_level', 3)
+          .in('id', configuredProductIds);
+
+        if (configError) {
+          console.error('Error loading configured Level 3 products:', configError);
+        } else {
+          configuredProducts = products || [];
+        }
+      }
+
+      console.log('Level4Service: Found configured products:', configuredProducts.length, configuredProducts);
+
+      // Merge and deduplicate products
+      const allProducts = [...(flaggedProducts || [])];
+      configuredProducts.forEach(product => {
+        if (!allProducts.find(p => p.id === product.id)) {
+          allProducts.push(product);
+        }
+      });
+
+      console.log('Level4Service: Total unique products:', allProducts.length, allProducts);
+      return allProducts;
     } catch (error) {
       console.error('Error in getLevel3ProductsWithLevel4:', error);
       return [];
