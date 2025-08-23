@@ -334,14 +334,87 @@ export class Level4Service {
   // Helper function to format Level 4 display
   static formatLevel4Display(value: Level4BOMValue, config: Level4Configuration): string[] {
     try {
+      if (!value || !value.entries || !config) {
+        return ['Level 4 configuration error'];
+      }
+
       return value.entries.map((entry, index) => {
         const option = config.options.find(opt => opt.value === entry.value);
-        const rowNumber = config.template_type === 'OPTION_1' ? ` #${index + 1}` : ` ${index + 1}`;
-        return `${config.field_label}${rowNumber}: ${option?.label || entry.value}`;
+        const label = option?.label || entry.value;
+        
+        // Format based on template type
+        if (config.template_type === 'OPTION_1') {
+          // Variable inputs: show entry number
+          return `${config.field_label} #${index + 1}: ${label}`;
+        } else {
+          // Fixed inputs: just show position number
+          return `${config.field_label} ${index + 1}: ${label}`;
+        }
       });
     } catch (error) {
       console.error('Error formatting Level 4 display:', error);
       return ['Level 4 configuration error'];
     }
+  }
+
+  // Get formatted summary for BOM display
+  static getLevel4Summary(value: Level4BOMValue, config?: Level4Configuration): string {
+    try {
+      if (!value || !value.entries || value.entries.length === 0) {
+        return 'No Level 4 configuration';
+      }
+
+      const count = value.entries.length;
+      const hasMultiple = count > 1;
+      
+      if (config) {
+        const templateType = config.template_type === 'OPTION_1' ? 'Variable' : 'Fixed';
+        return `L4: ${count} ${config.field_label.toLowerCase()}${hasMultiple ? 's' : ''} (${templateType})`;
+      }
+      
+      return `L4: ${count} selection${hasMultiple ? 's' : ''}`;
+    } catch (error) {
+      console.error('Error generating Level 4 summary:', error);
+      return 'L4: Error';
+    }
+  }
+
+  // Validate Level 4 configuration completeness
+  static validateLevel4Configuration(value: Level4BOMValue, config: Level4Configuration): { isValid: boolean; errors: string[] } {
+    const errors: string[] = [];
+    
+    if (!value || !value.entries) {
+      errors.push('No Level 4 selections found');
+      return { isValid: false, errors };
+    }
+
+    if (config.template_type === 'OPTION_1') {
+      const maxInputs = config.max_inputs || 1;
+      if (value.entries.length > maxInputs) {
+        errors.push(`Too many selections: ${value.entries.length}/${maxInputs}`);
+      }
+      if (value.entries.length === 0) {
+        errors.push('At least one selection is required');
+      }
+    } else if (config.template_type === 'OPTION_2') {
+      const requiredInputs = config.fixed_inputs || 1;
+      if (value.entries.length !== requiredInputs) {
+        errors.push(`Incorrect number of selections: ${value.entries.length}/${requiredInputs}`);
+      }
+    }
+
+    // Check all entries have valid values
+    value.entries.forEach((entry, index) => {
+      if (!entry.value) {
+        errors.push(`Selection ${index + 1} is empty`);
+      } else {
+        const isValidOption = config.options.some(opt => opt.value === entry.value);
+        if (!isValidOption) {
+          errors.push(`Selection ${index + 1} has invalid option: ${entry.value}`);
+        }
+      }
+    });
+
+    return { isValid: errors.length === 0, errors };
   }
 }

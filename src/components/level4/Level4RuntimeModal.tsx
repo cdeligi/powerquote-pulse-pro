@@ -1,9 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Minus, ExternalLink } from 'lucide-react';
 import { Level4Service } from '@/services/level4Service';
 import { BOMItem } from '@/types/product';
 import { 
@@ -12,6 +9,7 @@ import {
   Level4RuntimePayload 
 } from '@/types/level4';
 import { toast } from '@/components/ui/use-toast';
+import { Level4RuntimeView, useLevel4Validation } from './Level4RuntimeView';
 
 interface Level4RuntimeModalProps {
   bomItem: BOMItem;
@@ -30,6 +28,7 @@ export const Level4RuntimeModal: React.FC<Level4RuntimeModalProps> = ({
   const [entries, setEntries] = useState<Level4SelectionEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { validateEntries } = useLevel4Validation();
 
   useEffect(() => {
     const loadConfiguration = async () => {
@@ -46,28 +45,33 @@ export const Level4RuntimeModal: React.FC<Level4RuntimeModalProps> = ({
 
         setConfiguration(config);
 
-        // Initialize entries based on template type
-        const initialEntries: Level4SelectionEntry[] = [];
-        const defaultOption = config.options.find(opt => opt.is_default);
+        // Check for existing Level 4 values
+        const existingValue = await Level4Service.getBOMLevel4Value(bomItem.id);
         
-        if (config.template_type === 'OPTION_1') {
-          // Variable inputs: start with 1 entry
-          initialEntries.push({
-            index: 0,
-            value: defaultOption?.value || ''
-          });
+        if (existingValue && existingValue.entries.length > 0) {
+          // Pre-populate with existing selections
+          setEntries(existingValue.entries);
         } else {
-          // Fixed inputs: create exactly fixed_inputs entries
-          const count = config.fixed_inputs || 1;
-          for (let i = 0; i < count; i++) {
+          // Initialize with defaults
+          const initialEntries: Level4SelectionEntry[] = [];
+          const defaultOption = config.options.find(opt => opt.is_default);
+          
+          if (config.template_type === 'OPTION_1') {
             initialEntries.push({
-              index: i,
+              index: 0,
               value: defaultOption?.value || ''
             });
+          } else {
+            const count = config.fixed_inputs || 1;
+            for (let i = 0; i < count; i++) {
+              initialEntries.push({
+                index: i,
+                value: defaultOption?.value || ''
+              });
+            }
           }
+          setEntries(initialEntries);
         }
-
-        setEntries(initialEntries);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load configuration.');
         console.error('Error loading Level 4 configuration:', err);
@@ -77,59 +81,17 @@ export const Level4RuntimeModal: React.FC<Level4RuntimeModalProps> = ({
     };
 
     loadConfiguration();
-  }, [level3ProductId]);
+  }, [level3ProductId, bomItem.id]);
 
-  const handleEntryChange = (index: number, value: string) => {
-    setEntries(prev => prev.map(entry => 
-      entry.index === index 
-        ? { ...entry, value }
-        : entry
-    ));
+  const handleEntriesChange = (newEntries: Level4SelectionEntry[]) => {
+    setEntries(newEntries);
   };
 
-  const addEntry = () => {
-    if (!configuration || configuration.template_type !== 'OPTION_1') return;
-    
-    const maxInputs = configuration.max_inputs || 1;
-    if (entries.length >= maxInputs) {
-      toast({
-        title: "Maximum inputs reached",
-        description: `You can only add up to ${maxInputs} inputs.`,
-        variant: "destructive"
-      });
-      return;
-    }
-
-    const newIndex = Math.max(...entries.map(e => e.index), -1) + 1;
-    const defaultOption = configuration.options.find(opt => opt.is_default);
-    
-    setEntries(prev => [...prev, {
-      index: newIndex,
-      value: defaultOption?.value || ''
-    }]);
-  };
-
-  const removeEntry = (index: number) => {
-    if (!configuration || configuration.template_type !== 'OPTION_1') return;
-    
-    if (entries.length <= 1) {
-      toast({
-        title: "Minimum inputs required",
-        description: "At least one input is required.",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    setEntries(prev => prev.filter(entry => entry.index !== index));
-  };
-
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!configuration) return;
 
     // Validate all entries have selections
-    const emptyEntries = entries.filter(entry => !entry.value);
-    if (emptyEntries.length > 0) {
+    if (!validateEntries(entries)) {
       toast({
         title: "Incomplete configuration",
         description: "Please make a selection for all inputs.",
@@ -148,8 +110,39 @@ export const Level4RuntimeModal: React.FC<Level4RuntimeModalProps> = ({
       }))
     };
 
-    onSave(payload);
+    try {
+      // Save to database
+      await Level4Service.saveBOMLevel4Value(bomItem.id, payload);
+      
+      toast({
+        title: "Configuration saved",
+        description: "Level 4 configuration has been saved successfully.",
+      });
+      
+      onSave(payload);
+    } catch (error) {
+      console.error('Error saving Level 4 configuration:', error);
+      toast({
+        title: "Save failed",
+        description: "Failed to save Level 4 configuration. Please try again.",
+        variant: "destructive"
+      });
+    }
   };
+
+  // Handle keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        onCancel();
+      } else if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
+        handleSave();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [onCancel, handleSave]);
 
   if (isLoading) {
     return (
@@ -187,98 +180,21 @@ export const Level4RuntimeModal: React.FC<Level4RuntimeModalProps> = ({
 
   return (
     <Dialog open={true} onOpenChange={() => onCancel()}>
-      <DialogContent className="sm:max-w-[525px]">
-        <DialogHeader>
+      <DialogContent className="max-w-3xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+        <DialogHeader className="shrink-0">
           <DialogTitle>Configure: {bomItem.product.name}</DialogTitle>
-          {configuration.info_url && (
-            <div className="mt-2">
-              <a 
-                href={configuration.info_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center text-sm text-primary hover:underline"
-              >
-                <ExternalLink className="h-3 w-3 mr-1" />
-                Help & Information
-              </a>
-            </div>
-          )}
         </DialogHeader>
 
-        <div className="py-4 space-y-4">
-          <div className="text-sm text-muted-foreground">
-            Template: {configuration.template_type === 'OPTION_1' 
-              ? `Variable inputs (max ${configuration.max_inputs})`
-              : `Fixed inputs (${configuration.fixed_inputs})`
-            }
-          </div>
-
-          {entries.map((entry, idx) => (
-            <div key={`${entry.index}-${idx}`} className="flex items-center gap-2">
-              <div className="flex-1">
-                <Label htmlFor={`entry-${idx}`} className="text-sm font-medium">
-                  {configuration.field_label} {entries.length > 1 ? `#${idx + 1}` : ''}
-                </Label>
-                <Select
-                  value={entry.value}
-                  onValueChange={(value) => handleEntryChange(entry.index, value)}
-                >
-                  <SelectTrigger id={`entry-${idx}`} className="mt-1">
-                    <SelectValue placeholder="Select an option" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {configuration.options
-                      .sort((a, b) => a.display_order - b.display_order)
-                      .map(option => (
-                        <SelectItem key={option.id} value={option.value}>
-                          {option.label}
-                        </SelectItem>
-                      ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {configuration.template_type === 'OPTION_1' && (
-                <div className="flex flex-col gap-1 mt-6">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={addEntry}
-                    disabled={entries.length >= (configuration.max_inputs || 1)}
-                    className="h-8 w-8 p-0"
-                  >
-                    <Plus className="h-3 w-3" />
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => removeEntry(entry.index)}
-                    disabled={entries.length <= 1}
-                    className="h-8 w-8 p-0"
-                  >
-                    <Minus className="h-3 w-3" />
-                  </Button>
-                </div>
-              )}
-            </div>
-          ))}
-
-          {configuration.template_type === 'OPTION_1' && entries.length < (configuration.max_inputs || 1) && (
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={addEntry}
-              className="w-full border-dashed border-2"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Add Input ({entries.length}/{configuration.max_inputs})
-            </Button>
-          )}
+        <div className="flex-1 overflow-y-auto py-4">
+          <Level4RuntimeView
+            mode="interactive"
+            configuration={configuration}
+            initialEntries={entries}
+            onEntriesChange={handleEntriesChange}
+          />
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="shrink-0">
           <Button variant="outline" onClick={onCancel}>
             Cancel
           </Button>
