@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -8,6 +8,8 @@ import { BOMItem } from '@/types/product';
 import { FEATURES, usePermissions } from '@/hooks/usePermissions';
 import { calculateMarginPercentage, formatMargin } from '@/utils/priceUtils';
 import { useBOMContext } from '@/context/BOMContext';
+import { Table, TableHeader, TableBody, TableRow, TableCell, TableHead } from '@/components/ui/table';
+import { Fragment } from 'react';
 
 interface BOMDisplayProps {
   bomItems: BOMItem[];
@@ -166,6 +168,351 @@ const BOMDisplay = ({ bomItems, onUpdateBOM, onEditConfiguration, onSubmitQuote,
 
   const totalMargin = calculateMarginPercentage(totalPrice, totalCost);
 
+  // Group items by chassis configuration
+  const groupedItems = useMemo(() => {
+    const groups: { chassis: BOMItem | null; accessories: BOMItem[] }[] = [];
+    let currentGroup: { chassis: BOMItem | null; accessories: BOMItem[] } | null = null;
+
+    bomItems.forEach(item => {
+      if (item.isAccessory) {
+        // Add to current group if exists, otherwise create a new group
+        if (currentGroup) {
+          currentGroup.accessories.push(item);
+        } else {
+          groups.push({ chassis: null, accessories: [item] });
+        }
+      } else if (item.slotAssignments) {
+        // This is a chassis configuration, create a new group
+        currentGroup = { chassis: item, accessories: [] };
+        groups.push(currentGroup);
+      } else {
+        // Regular item, add as its own group
+        groups.push({ chassis: item, accessories: [] });
+        currentGroup = null;
+      }
+    });
+
+    return groups;
+  }, [bomItems]);
+
+  // Render a chassis configuration with its accessories
+  const renderChassisGroup = (group: { chassis: BOMItem | null; accessories: BOMItem[] }, index: number) => {
+    if (!group.chassis) {
+      return group.accessories.map((item) => (
+        <TableRow key={`accessory-${item.id}`} className="bg-gray-800">
+          <TableCell className="pl-8">
+            <div className="flex flex-col">
+              <span className="text-gray-200">• {item.displayName || item.product.name}</span>
+              {item.product.description && (
+                <span className="text-xs text-gray-400">{item.product.description}</span>
+              )}
+            </div>
+          </TableCell>
+          <TableCell>
+            {editingPartNumber === item.id ? (
+              <div className="flex items-center gap-1">
+                <Input
+                  value={editPartNumber}
+                  onChange={(e) => setEditPartNumber(e.target.value)}
+                  className="h-7 text-xs bg-gray-700 border-gray-600 text-white font-mono"
+                />
+                <Button size="sm" onClick={() => handlePartNumberEditSave(item.id!)} className="h-6 w-6 p-0">
+                  <Save className="h-3 w-3" />
+                </Button>
+                <Button size="sm" variant="ghost" onClick={handlePartNumberEditCancel} className="h-6 w-6 p-0">
+                  <X className="h-3 w-3" />
+                </Button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-1">
+                <code className="text-xs bg-gray-700 px-2 py-0.5 rounded font-mono">
+                  {getPartNumber(item)}
+                </code>
+                {canEditPartNumber && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handlePartNumberEditStart(item)}
+                    className="h-6 w-6 p-0 text-gray-400 hover:text-white"
+                  >
+                    <Edit3 className="h-3 w-3" />
+                  </Button>
+                )}
+              </div>
+            )}
+          </TableCell>
+          <TableCell>
+            {editingItem === item.id ? (
+              <div className="flex items-center gap-1 w-32">
+                <Input
+                  type="number"
+                  min="1"
+                  value={editQuantity}
+                  onChange={(e) => setEditQuantity(parseInt(e.target.value) || 1)}
+                  className="h-7 text-xs bg-gray-700 border-gray-600 text-white"
+                />
+                <Button size="sm" onClick={() => handleEditSave(item.id!)} className="h-6 w-6 p-0">
+                  <Save className="h-3 w-3" />
+                </Button>
+                <Button size="sm" variant="ghost" onClick={handleEditCancel} className="h-6 w-6 p-0">
+                  <X className="h-3 w-3" />
+                </Button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-1">
+                <span 
+                  className="text-white font-medium cursor-pointer hover:bg-gray-700 rounded px-1.5 py-0.5"
+                  onClick={() => handleEditStart(item)}
+                >
+                  {item.quantity}
+                </span>
+              </div>
+            )}
+          </TableCell>
+          <TableCell>
+            {canSeePrices && item.product.price !== undefined && (
+              <div className="flex flex-col">
+                <div className="text-white">
+                  ${(item.product.price * item.quantity).toFixed(2)}
+                </div>
+                {canSeeCosts && item.product.cost > 0 && (
+                  <div className="text-xs text-orange-400">
+                    ${(item.product.cost * item.quantity).toFixed(2)}
+                  </div>
+                )}
+                {canShowMargin && item.product.price > 0 && item.product.cost > 0 && (
+                  <div className="text-xs text-blue-400">
+                    {formatMargin(calculateItemMargin(item) || 0)}
+                  </div>
+                )}
+              </div>
+            )}
+          </TableCell>
+          <TableCell className="text-right">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => handleRemoveItem(item.id!)}
+              className="text-red-500 hover:text-red-700"
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </TableCell>
+        </TableRow>
+      ));
+    }
+
+    return (
+      <Fragment key={`group-${index}`}>
+        {/* Chassis row */}
+        <TableRow className="bg-gray-700">
+          <TableCell className="font-medium">
+            <div className="flex flex-col">
+              <span className="text-white">{group.chassis.displayName || group.chassis.product.name}</span>
+              {group.chassis.product.description && (
+                <span className="text-xs text-gray-300">{group.chassis.product.description}</span>
+              )}
+              <div className="flex flex-wrap gap-1 mt-1">
+                {isConfigurableItem(group.chassis) && (
+                  <Badge variant="outline" className="text-[10px] text-purple-400 border-purple-400 px-1.5 py-0">
+                    Configurable
+                  </Badge>
+                )}
+                {needsConfiguration(group.chassis) && (
+                  <Badge variant="outline" className="text-[10px] text-orange-400 border-orange-400 px-1.5 py-0">
+                    Config Required
+                  </Badge>
+                )}
+                {getLevel4Summary(group.chassis.id!) && (
+                  <Badge variant="outline" className="text-[10px] text-green-400 border-green-400 px-1.5 py-0">
+                    {getLevel4Summary(group.chassis.id!)}
+                  </Badge>
+                )}
+              </div>
+            </div>
+          </TableCell>
+          <TableCell>
+            {editingPartNumber === group.chassis.id ? (
+              <div className="flex items-center gap-1">
+                <Input
+                  value={editPartNumber}
+                  onChange={(e) => setEditPartNumber(e.target.value)}
+                  className="h-7 text-xs bg-gray-600 border-gray-500 text-white font-mono"
+                />
+                <Button size="sm" onClick={() => handlePartNumberEditSave(group.chassis!.id!)} className="h-6 w-6 p-0">
+                  <Save className="h-3 w-3" />
+                </Button>
+                <Button size="sm" variant="ghost" onClick={handlePartNumberEditCancel} className="h-6 w-6 p-0">
+                  <X className="h-3 w-3" />
+                </Button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-1">
+                <code className="text-xs bg-gray-600 px-2 py-0.5 rounded font-mono">
+                  {getPartNumber(group.chassis)}
+                </code>
+                {canEditPartNumber && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handlePartNumberEditStart(group.chassis!)}
+                    className="h-6 w-6 p-0 text-gray-300 hover:text-white"
+                  >
+                    <Edit3 className="h-3 w-3" />
+                  </Button>
+                )}
+              </div>
+            )}
+          </TableCell>
+          <TableCell>
+            {editingItem === group.chassis.id ? (
+              <div className="flex items-center gap-1 w-32">
+                <Input
+                  type="number"
+                  min="1"
+                  value={editQuantity}
+                  onChange={(e) => setEditQuantity(parseInt(e.target.value) || 1)}
+                  className="h-7 text-xs bg-gray-600 border-gray-500 text-white"
+                />
+                <Button size="sm" onClick={() => handleEditSave(group.chassis!.id!)} className="h-6 w-6 p-0">
+                  <Save className="h-3 w-3" />
+                </Button>
+                <Button size="sm" variant="ghost" onClick={handleEditCancel} className="h-6 w-6 p-0">
+                  <X className="h-3 w-3" />
+                </Button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-1">
+                <span 
+                  className="text-white font-medium cursor-pointer hover:bg-gray-600 rounded px-1.5 py-0.5"
+                  onClick={() => handleEditStart(group.chassis!)}
+                >
+                  {group.chassis.quantity}
+                </span>
+              </div>
+            )}
+          </TableCell>
+          <TableCell>
+            {canSeePrices && group.chassis.product.price !== undefined && (
+              <div className="flex flex-col">
+                <div className="text-white">
+                  ${(group.chassis.product.price * group.chassis.quantity).toFixed(2)}
+                </div>
+                {canSeeCosts && group.chassis.product.cost > 0 && (
+                  <div className="text-xs text-orange-400">
+                    ${(group.chassis.product.cost * group.chassis.quantity).toFixed(2)}
+                  </div>
+                )}
+                {canShowMargin && group.chassis.product.price > 0 && group.chassis.product.cost > 0 && (
+                  <div className="text-xs text-blue-400">
+                    {formatMargin(calculateItemMargin(group.chassis) || 0)}
+                  </div>
+                )}
+              </div>
+            )}
+          </TableCell>
+          <TableCell className="text-right">
+            {isConfigurableItem(group.chassis) && onEditConfiguration && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => handleConfigurationEdit(group.chassis!)}
+                className="mr-2 text-gray-300 hover:text-white"
+                title="Configure"
+              >
+                <Settings className="h-4 w-4" />
+              </Button>
+            )}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => handleRemoveItem(group.chassis!.id!)}
+              className="text-red-500 hover:text-red-700"
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </TableCell>
+        </TableRow>
+
+        {/* Accessories */}
+        {group.accessories.map((accessory) => (
+          <TableRow key={`accessory-${accessory.id}`} className="bg-gray-800">
+            <TableCell className="pl-8">
+              <div className="flex flex-col">
+                <span className="text-gray-200">• {accessory.displayName || accessory.product.name}</span>
+                {accessory.product.description && (
+                  <span className="text-xs text-gray-400">{accessory.product.description}</span>
+                )}
+              </div>
+            </TableCell>
+            <TableCell>
+              <code className="text-xs bg-gray-700 px-2 py-0.5 rounded font-mono">
+                {getPartNumber(accessory)}
+              </code>
+            </TableCell>
+            <TableCell>
+              {editingItem === accessory.id ? (
+                <div className="flex items-center gap-1 w-32">
+                  <Input
+                    type="number"
+                    min="1"
+                    value={editQuantity}
+                    onChange={(e) => setEditQuantity(parseInt(e.target.value) || 1)}
+                    className="h-7 text-xs bg-gray-700 border-gray-600 text-white"
+                  />
+                  <Button size="sm" onClick={() => handleEditSave(accessory.id!)} className="h-6 w-6 p-0">
+                    <Save className="h-3 w-3" />
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={handleEditCancel} className="h-6 w-6 p-0">
+                    <X className="h-3 w-3" />
+                  </Button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-1">
+                  <span 
+                    className="text-gray-200 font-medium cursor-pointer hover:bg-gray-700 rounded px-1.5 py-0.5"
+                    onClick={() => handleEditStart(accessory)}
+                  >
+                    {accessory.quantity}
+                  </span>
+                </div>
+              )}
+            </TableCell>
+            <TableCell>
+              {canSeePrices && accessory.product.price !== undefined && (
+                <div className="flex flex-col">
+                  <div className="text-gray-200">
+                    ${(accessory.product.price * accessory.quantity).toFixed(2)}
+                  </div>
+                  {canSeeCosts && accessory.product.cost > 0 && (
+                    <div className="text-xs text-orange-400">
+                      ${(accessory.product.cost * accessory.quantity).toFixed(2)}
+                    </div>
+                  )}
+                  {canShowMargin && accessory.product.price > 0 && accessory.product.cost > 0 && (
+                    <div className="text-xs text-blue-400">
+                      {formatMargin(calculateItemMargin(accessory) || 0)}
+                    </div>
+                  )}
+                </div>
+              )}
+            </TableCell>
+            <TableCell className="text-right">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => handleRemoveItem(accessory.id!)}
+                className="text-red-500 hover:text-red-700"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </TableCell>
+          </TableRow>
+        ))}
+      </Fragment>
+    );
+  };
+
   if (bomItems.length === 0) {
     return (
       <Card className="bg-gray-900 border-gray-800 h-fit">
@@ -182,258 +529,67 @@ const BOMDisplay = ({ bomItems, onUpdateBOM, onEditConfiguration, onSubmitQuote,
   }
 
   return (
-    <Card className="bg-gray-900 border-gray-800 h-fit">
-      <CardHeader>
-        <CardTitle className="text-white flex items-center justify-between">
-          Bill of Materials
-          <Badge variant="outline" className="text-white border-gray-500">
-            {bomItems.length} items
-          </Badge>
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        {bomItems.map((item) => (
-          <div key={item.id} className="p-3 bg-gray-800 rounded border border-gray-700 space-y-2">
-            {/* Header Row */}
-            <div className="flex justify-between items-start gap-2">
-              <h4 className="text-white font-medium text-sm leading-tight flex-1 min-w-0 break-words">
-                {item.product.name}
-              </h4>
-              <div className="flex items-center gap-1 flex-shrink-0">
-                {isConfigurableItem(item) && onEditConfiguration && (
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => handleConfigurationEdit(item)}
-                    className="h-6 w-6 p-0 text-purple-400 hover:text-purple-300"
-                    title="Configure"
-                  >
-                    <Settings className="h-3.5 w-3.5" />
-                  </Button>
-                )}
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => handleRemoveItem(item.id)}
-                  className="h-6 w-6 p-0 text-red-400 hover:text-red-300"
-                  title="Remove"
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </Button>
+    <div className="space-y-4">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Item</TableHead>
+            <TableHead>Part Number</TableHead>
+            <TableHead>Qty</TableHead>
+            <TableHead>Price</TableHead>
+            <TableHead className="text-right">Actions</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {groupedItems.length > 0 ? (
+            groupedItems.map(renderChassisGroup)
+          ) : (
+            <TableRow>
+              <TableCell colSpan={5} className="text-center py-4 text-muted-foreground">
+                No items in the bill of materials.
+              </TableCell>
+            </TableRow>
+          )}
+        </TableBody>
+      </Table>
+
+      {/* Totals */}
+      {bomItems.length > 0 && (
+        <div className="border-t border-gray-700 pt-4 mt-4">
+          <div className="flex justify-between items-center">
+            <span className="text-gray-300 font-medium">Total:</span>
+            <div className="text-right">
+              <div className="text-white font-medium">
+                ${totalPrice.toFixed(2)}
               </div>
-            </div>
-
-            {/* Description */}
-            {item.product.description && (
-              <p className="text-gray-400 text-xs line-clamp-2 leading-tight">
-                {item.product.description}
-              </p>
-            )}
-
-            {/* Part Number */}
-            <div className="flex items-center gap-2 text-xs">
-              <span className="text-gray-400 whitespace-nowrap">PN:</span>
-              {editingPartNumber === item.id ? (
-                <div className="flex items-center gap-1 flex-1">
-                  <Input
-                    value={editPartNumber}
-                    onChange={(e) => setEditPartNumber(e.target.value)}
-                    className="h-7 text-xs bg-gray-700 border-gray-600 text-white font-mono flex-1 min-w-0"
-                    placeholder="Part number"
-                  />
-                  <Button
-                    size="sm"
-                    onClick={() => handlePartNumberEditSave(item.id)}
-                    className="h-6 w-6 p-0 bg-green-600 hover:bg-green-700"
-                    title="Save"
-                  >
-                    <Save className="h-3 w-3" />
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={handlePartNumberEditCancel}
-                    className="h-6 w-6 p-0 text-gray-400 hover:text-white"
-                    title="Cancel"
-                  >
-                    <X className="h-3 w-3" />
-                  </Button>
-                </div>
-              ) : (
-                <div className="flex items-center gap-1 flex-1 min-w-0">
-                  <code 
-                    className="text-xs bg-gray-700 px-2 py-0.5 rounded font-mono truncate flex-1 min-w-0"
-                    title={getPartNumber(item)}
-                  >
-                    {getPartNumber(item)}
-                  </code>
-                  {canEditPartNumber && (
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => handlePartNumberEditStart(item)}
-                      className="h-6 w-6 p-0 text-gray-400 hover:text-white"
-                      title="Edit part number"
-                    >
-                      <Edit3 className="h-3 w-3" />
-                    </Button>
-                  )}
+              {canSeeCosts && totalCost > 0 && (
+                <div className="text-orange-400 text-sm">
+                  Cost: ${totalCost.toFixed(2)}
                 </div>
               )}
-            </div>
-
-            {/* Price and Quantity */}
-            <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
-              <div className="flex items-center gap-2">
-                <span className="text-gray-400 text-xs">Qty:</span>
-                {editingItem === item.id ? (
-                  <div className="flex items-center gap-1">
-                    <Input
-                      type="number"
-                      min="1"
-                      value={editQuantity}
-                      onChange={(e) => setEditQuantity(parseInt(e.target.value) || 1)}
-                      className="w-14 h-7 text-xs bg-gray-700 border-gray-600 text-white"
-                    />
-                    <Button
-                      size="sm"
-                      onClick={() => handleEditSave(item.id)}
-                      className="h-6 w-6 p-0 bg-green-600 hover:bg-green-700"
-                      title="Save"
-                    >
-                      <Save className="h-3 w-3" />
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={handleEditCancel}
-                      className="h-6 w-6 p-0 text-gray-400 hover:text-white"
-                      title="Cancel"
-                    >
-                      <X className="h-3 w-3" />
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-1">
-                    <span 
-                      className="text-white font-medium cursor-pointer hover:bg-gray-700 rounded px-1.5 py-0.5 text-sm"
-                      onClick={() => handleEditStart(item)}
-                      title="Click to edit quantity"
-                    >
-                      {item.quantity}
-                    </span>
-                  </div>
-                )}
-              </div>
-
-              {canSeePrices && (
-                <div className="flex flex-col items-end gap-0.5">
-                  <div className="flex items-center gap-1">
-                    <span className="text-gray-400 text-xs">Price:</span>
-                    <span className="text-white font-medium text-sm">
-                      ${((item.product.price || 0) * item.quantity).toLocaleString(undefined, {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2
-                      })}
-                    </span>
-                  </div>
-                  
-                  {canSeeCosts && item.product.cost > 0 && (
-                    <div className="text-orange-400 text-xs">
-                      Cost: ${(item.product.cost * item.quantity).toLocaleString(undefined, {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2
-                      })}
-                    </div>
-                  )}
-                  
-                  {canShowMargin && item.product.price > 0 && item.product.cost > 0 && (
-                    <div className="text-blue-400 text-xs">
-                      Margin: {formatMargin(calculateMarginPercentage(item.product.price, item.product.cost))}
-                    </div>
-                  )}
+              {canShowMargin && totalMargin !== null && (
+                <div className="text-blue-400 text-sm">
+                  Margin: {formatMargin(totalMargin)}
                 </div>
-              )}
-            </div>
-
-            {/* Badges */}
-            <div className="flex flex-wrap items-center gap-1 mt-1">
-              {item.slot && (
-                <Badge variant="outline" className="text-[10px] text-blue-400 border-blue-400 px-1.5 py-0">
-                  Slot {item.slot}
-                </Badge>
-              )}
-              {isConfigurableItem(item) && (
-                <Badge variant="outline" className="text-[10px] text-purple-400 border-purple-400 px-1.5 py-0">
-                  Configurable
-                </Badge>
-              )}
-              {needsConfiguration(item) && (
-                <Badge variant="outline" className="text-[10px] text-orange-400 border-orange-400 px-1.5 py-0">
-                  Config Required
-                </Badge>
-              )}
-              {getLevel4Summary(item.id) && (
-                <Badge 
-                  variant="outline" 
-                  className="text-[10px] text-green-400 border-green-400 px-1.5 py-0"
-                  title="Level 4 configuration selections"
-                >
-                  {getLevel4Summary(item.id)}
-                </Badge>
-              )}
-              {item.partNumber && item.partNumber !== item.product.partNumber && (
-                <Badge variant="outline" className="text-[10px] text-yellow-400 border-yellow-400 px-1.5 py-0">
-                  Custom PN
-                </Badge>
               )}
             </div>
           </div>
-        ))}
-        
-        {canSeePrices && bomItems.length > 0 && (
-          <div className="border-t border-gray-700 pt-3 mt-3">
-            <div className="flex justify-between items-center">
-              <span className="text-gray-300 font-medium">Total:</span>
-              <div className="text-right">
-                <div className="text-white font-medium">
-                  ${totalPrice.toLocaleString(undefined, {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2
-                  })}
-                </div>
-                {canSeeCosts && totalCost > 0 && (
-                  <div className="text-orange-400 text-sm">
-                    Cost: ${totalCost.toLocaleString(undefined, {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2
-                    })}
-                  </div>
-                )}
-                {canShowMargin && totalMargin !== null && (
-                  <div className="text-blue-400 text-sm">
-                    Margin: {formatMargin(totalMargin)}
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-        
-        {/* Submit to Quote Button */}
-        {bomItems.length > 0 && onSubmitQuote && (
-          <div className="pt-3 border-t border-gray-700">
-            <Button
-              onClick={onSubmitQuote}
-              className="w-full bg-red-600 hover:bg-red-700 text-white"
-              size="lg"
-            >
-              Submit to Quote
-            </Button>
-          </div>
-        )}
-      </CardContent>
-    </Card>
+        </div>
+      )}
+
+      {/* Submit to Quote Button */}
+      {bomItems.length > 0 && onSubmitQuote && (
+        <div className="pt-4">
+          <Button
+            onClick={onSubmitQuote}
+            className="w-full bg-red-600 hover:bg-red-700 text-white"
+            size="lg"
+          >
+            Submit to Quote
+          </Button>
+        </div>
+      )}
+    </div>
   );
 };
 

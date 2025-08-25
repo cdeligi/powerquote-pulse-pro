@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { User } from "@/types/auth";
 import Sidebar from "./Sidebar";
@@ -9,6 +8,7 @@ import AdminPanel from "../admin/AdminPanel";
 import { BOMItem } from "@/types/product";
 import { usePermissions, FEATURES } from "@/hooks/usePermissions";
 import { productDataService } from "@/services/productDataService";
+import { BOMProvider } from "@/context/BOMContext";
 
 interface DashboardProps {
   user: User;
@@ -50,11 +50,13 @@ const Dashboard = ({ user, onLogout }: DashboardProps) => {
         return <DashboardOverview user={user} />;
       case 'bom':
         return (
-          <BOMBuilder 
-            onBOMUpdate={handleBOMUpdate}
-            canSeePrices={user.role === 'ADMIN' || user.role === 'FINANCE' || user.role === 'LEVEL_3'}
-            canSeeCosts={canSeeCosts}
-          />
+          <BOMProvider>
+            <BOMBuilder 
+              onBOMUpdate={handleBOMUpdate}
+              canSeePrices={true}
+              canSeeCosts={canSeeCosts}
+            />
+          </BOMProvider>
         );
       case 'quotes':
         return <QuoteManager user={user} />;

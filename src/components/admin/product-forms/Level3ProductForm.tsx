@@ -10,6 +10,7 @@ import { Level3Product } from "@/types/product";
 
 const formSchema = z.object({
   name: z.string().min(1, 'Name is required'),
+  displayName: z.string().optional(),
   sku: z.string().optional(),
   price: z.number().min(0, 'Price must be 0 or greater').optional(),
   requires_level4_config: z.boolean().default(false),
@@ -35,6 +36,7 @@ export const Level3ProductForm: React.FC<Level3ProductFormProps> = ({
     resolver: zodResolver(formSchema),
     defaultValues: {
       name: initialData?.name || '',
+      displayName: (initialData as any)?.displayName || '',
       sku: initialData?.sku || '',
       price: initialData?.price,
       requires_level4_config: initialData?.requires_level4_config || false,
@@ -57,6 +59,19 @@ export const Level3ProductForm: React.FC<Level3ProductFormProps> = ({
             {errors.name && <p className="text-sm text-destructive">{errors.name.message}</p>}
           </div>
           <div className="space-y-2">
+            <Label htmlFor="displayName">Display Name</Label>
+            <Input
+              id="displayName"
+              {...register('displayName')}
+              placeholder="Enter display name (shorter version)"
+            />
+            <p className="text-xs text-muted-foreground">Shorter name for BOM display</p>
+            {errors.displayName && <p className="text-sm text-destructive">{errors.displayName.message}</p>}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-2">
             <Label htmlFor="sku">SKU</Label>
             <Input
               id="sku"
@@ -65,9 +80,6 @@ export const Level3ProductForm: React.FC<Level3ProductFormProps> = ({
             />
             {errors.sku && <p className="text-sm text-destructive">{errors.sku.message}</p>}
           </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label htmlFor="price">Price</Label>
             <Input
@@ -78,9 +90,6 @@ export const Level3ProductForm: React.FC<Level3ProductFormProps> = ({
               placeholder="Enter price"
             />
             {errors.price && <p className="text-sm text-destructive">{errors.price.message}</p>}
-          </div>
-          <div className="space-y-2">
-            {/* Additional fields can go here */}
           </div>
         </div>
 
@@ -98,25 +107,17 @@ export const Level3ProductForm: React.FC<Level3ProductFormProps> = ({
             </Label>
           </div>
           <p className="text-xs text-muted-foreground">
-            Check this if this product needs additional configuration (e.g., analog or bushing card settings)
+            Enable if this product requires additional configuration
           </p>
         </div>
       </div>
 
       <div className="flex justify-end space-x-4">
-        <Button 
-          type="button" 
-          variant="outline" 
-          onClick={onCancel}
-          disabled={isSubmitting}
-        >
+        <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting}>
           Cancel
         </Button>
-        <Button 
-          type="submit" 
-          disabled={isSubmitting}
-        >
-          {isSubmitting ? 'Saving...' : 'Save Product'}
+        <Button type="submit" disabled={isSubmitting}>
+          {isSubmitting ? 'Saving...' : 'Save'}
         </Button>
       </div>
     </form>
