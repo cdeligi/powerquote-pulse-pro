@@ -82,13 +82,12 @@ const getSlotColor = (slot: number) => {
     if (slotAssignments[slot]) {
       const card = slotAssignments[slot];
       if (isBushingCard(card)) {
-        // Check if this is the primary slot of the bushing card
-        const isSecondarySlot = Object.values(bushingSlots).some(slots => 
-          slots.includes(slot) && slots[0] !== slot
-        );
-        return isSecondarySlot ? 'B+' : 'B';
+        // Always show just the display name without slot number
+        return card.displayName || 'Bushing';
       }
-      return (card.type || card.name || 'Card').charAt(0).toUpperCase() + (card.type || card.name || 'Card').slice(1);
+      // For non-bushing cards, use the existing logic
+      const displayText = (card as any).displayName || card.type || card.name || 'Card';
+      return displayText.charAt(0).toUpperCase() + displayText.slice(1);
     }
     // For empty slots, just show the slot number
     return `${slot}`;
@@ -97,15 +96,19 @@ const getSlotColor = (slot: number) => {
 const getSlotTitle = (slot: number) => {
   if (slotAssignments[slot]) {
     const card = slotAssignments[slot];
-    const display = card?.type ? (card.type.charAt(0).toUpperCase() + card.type.slice(1)) : (card?.name || 'Card');
     if (isBushingCard(card)) {
-      const isSecondarySlot = Object.values(bushingSlots).some(slots => 
-        slots.includes(slot) && slots[0] !== slot
-      );
-      return isSecondarySlot ? `${display} (Extension Slot)` : display;
+      // For bushing cards, show only the display name
+      return card.displayName || 'Bushing';
     }
-    return display;
+    
+    // For non-bushing cards, use the existing logic
+    const displayText = (card as any).displayName || 
+                       (card?.type ? (card.type.charAt(0).toUpperCase() + card.type.slice(1)) : '') || 
+                       card?.name || 
+                       'Card';
+    return displayText;
   }
+  
   // Empty slots - show standard hints when available
   const hints = standardSlotHints?.[slot];
   if (hints && hints.length) {
@@ -142,8 +145,19 @@ const getSlotTitle = (slot: number) => {
       slots.includes(slot) && slots[0] === slot
     );
     const isLTXDisplaySlot = chassis.type === 'LTX' && slot === 8;
+    const assignedCard = slotAssignments[slot];
     
-return (
+    // Get display name from the card, with proper fallbacks
+    const displayName = assignedCard ? 
+      ((assignedCard as any).displayName || assignedCard.name || 'Card') : 
+      undefined;
+    
+    // Get the full title for the tooltip
+    const slotTitle = assignedCard ? 
+      displayName : 
+      getSlotTitle(slot);
+    
+    return (
       <div
         key={slot}
         className={`
@@ -154,43 +168,42 @@ return (
           ${selectedSlot === slot ? 'ring-2 ring-yellow-400' : ''}
           ${isSecondaryBushingSlot ? 'border-l-0 rounded-l-none border-orange-500' : ''}
           ${isPrimaryBushingSlot ? 'border-r-0 rounded-r-none border-orange-500' : ''}
-          ${isLTXDisplaySlot && !slotAssignments[slot] ? 'border-gray-500' : ''}
+          ${isLTXDisplaySlot && !assignedCard ? 'border-gray-500' : ''}
         `}
         onClick={() => clickable && onSlotClick(slot)}
-        title={getSlotTitle(slot)}
+        title={slotTitle}
         style={(() => {
-          const assigned = slotAssignments[slot];
-          const adminColor = assigned ? (colorByProductId?.[assigned.id] || null) : null;
+          const adminColor = assignedCard ? (colorByProductId?.[assignedCard.id] || null) : null;
           return adminColor ? { backgroundColor: adminColor } : undefined;
         })()}
       >
-        
         {getSlotLabel(slot)}
-{/* Standard hint badge */}
-{!slotAssignments[slot] && standardSlotHints && standardSlotHints[slot] && (
-  <span
-    className="absolute top-1 left-1 text-[10px] px-1.5 py-0.5 rounded bg-gray-900/70 border border-gray-600"
-    title={`Standard: ${standardSlotHints[slot].join(', ')}`}
-  >
-    Std
-  </span>
-)}
+        
+        {/* Standard hint badge */}
+        {!assignedCard && standardSlotHints && standardSlotHints[slot] && (
+          <span
+            className="absolute top-1 left-1 text-[10px] px-1.5 py-0.5 rounded bg-gray-900/70 border border-gray-600"
+            title={`Standard: ${standardSlotHints[slot].join(', ')}`}
+          >
+            Std
+          </span>
+        )}
 
-{/* Clear button for occupied slots */}
-{slotAssignments[slot] && !isSecondaryBushingSlot && (
-  <Button
-    size="sm"
-    variant="ghost"
-    className="absolute -top-2 -right-2 h-5 w-5 p-0 bg-red-600 hover:bg-red-700 text-white rounded-full"
-    onClick={(e) => {
-      e.stopPropagation();
-      handleSlotClear(slot);
-    }}
-    title={isPrimaryBushingSlot ? "Clear all bushing cards" : "Clear slot"}
-  >
-    <X className="h-3 w-3" />
-  </Button>
-)}
+        {/* Clear button for occupied slots */}
+        {assignedCard && !isSecondaryBushingSlot && (
+          <Button
+            size="sm"
+            variant="ghost"
+            className="absolute -top-2 -right-2 h-5 w-5 p-0 bg-red-600 hover:bg-red-700 text-white rounded-full"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleSlotClear(slot);
+            }}
+            title={`Clear ${displayName || 'card'}`}
+          >
+            <X className="h-3 w-3" />
+          </Button>
+        )}
       </div>
     );
   };

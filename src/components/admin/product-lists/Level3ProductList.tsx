@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -30,11 +29,13 @@ export const Level3ProductList: React.FC<Level3ProductListProps> = ({
   const [editingProduct, setEditingProduct] = useState<string | null>(null);
   const [editFormData, setEditFormData] = useState<Partial<Level3Product>>({});
   const [parentFilter, setParentFilter] = useState<string>('all');
+  const [isSaving, setIsSaving] = useState(false);
 
   const handleEditStart = (product: Level3Product) => {
     setEditingProduct(product.id);
     setEditFormData({
       name: product.name,
+      displayName: (product as any).displayName || '',
       parentProductId: product.parentProductId,
       type: product.type,
       description: product.description,
@@ -58,22 +59,43 @@ export const Level3ProductList: React.FC<Level3ProductListProps> = ({
   }, [parentFilter]);
 
   const handleEditSave = async (productId: string) => {
+    if (!editingProduct) return;
+    
     try {
-      await productDataService.updateLevel3Product(productId, editFormData);
-      toast({
-        title: "Success",
-        description: "Level 3 product updated successfully"
-      });
+      setIsSaving(true);
+      
+      // Get the current product to ensure we have the correct ID
+      const currentProduct = products.find(p => p.id === productId || p.name === productId);
+      if (!currentProduct) {
+        throw new Error('Product not found');
+      }
+      
+      // If displayName is in the form data, update only the display name
+      if ('displayName' in editFormData) {
+        await productDataService.updateDisplayNameOnly(
+          currentProduct.id,
+          editFormData.displayName || currentProduct.name
+        );
+      }
+      
+      // Refresh the product list
+      onProductUpdate();
       setEditingProduct(null);
       setEditFormData({});
-      onProductUpdate();
+      
+      toast({
+        title: "Success",
+        description: "Product display name updated successfully.",
+      });
     } catch (error) {
-      console.error('Error updating Level 3 product:', error);
+      console.error('Error updating product display name:', error);
       toast({
         title: "Error",
-        description: "Failed to update Level 3 product",
-        variant: "destructive"
+        description: error instanceof Error ? error.message : "Failed to update product display name. Please try again.",
+        variant: "destructive",
       });
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -166,6 +188,15 @@ export const Level3ProductList: React.FC<Level3ProductListProps> = ({
                       />
                     </div>
                     <div>
+                      <Label htmlFor={`displayName-${product.id}`} className="text-gray-700">Display Name</Label>
+                      <Input
+                        id={`displayName-${product.id}`}
+                        value={editFormData.displayName || ''}
+                        onChange={(e) => setEditFormData(prev => ({ ...prev, displayName: e.target.value }))}
+                        className="bg-white border-gray-300 text-gray-900"
+                      />
+                    </div>
+                    <div>
                       <Label htmlFor={`parent-${product.id}`} className="text-gray-700">Parent Product</Label>
                       <Select
                         value={editFormData.parentProductId || ''}
@@ -184,7 +215,7 @@ export const Level3ProductList: React.FC<Level3ProductListProps> = ({
                       </Select>
                     </div>
                     <div>
-                      <Label htmlFor={`type-${product.id}`} className="text-gray-700">Display Name</Label>
+                      <Label htmlFor={`type-${product.id}`} className="text-gray-700">Type</Label>
                       <Input
                         id={`type-${product.id}`}
                         value={editFormData.type || ''}
@@ -245,7 +276,7 @@ export const Level3ProductList: React.FC<Level3ProductListProps> = ({
                     <Button
                       onClick={() => handleEditSave(product.id)}
                       className="bg-green-600 hover:bg-green-700 text-white"
-                      disabled={!editFormData.name?.trim()}
+                      disabled={!editFormData.name?.trim() || isSaving}
                     >
                       <Save className="h-4 w-4 mr-2" />
                       Save

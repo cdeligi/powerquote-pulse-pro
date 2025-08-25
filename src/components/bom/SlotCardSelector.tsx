@@ -39,10 +39,11 @@ const SlotCardSelector = ({
         setLoading(true);
         const level3Products = await productDataService.getLevel3ProductsForLevel2(chassis.id);
         
-        // Convert to the expected format
+        // Convert to the expected format and include displayName
         const cards = level3Products.map(product => ({
           id: product.id,
           name: product.name,
+          displayName: product.displayName, // Include displayName
           parentProductId: product.parentProductId,
           type: product.type,
           description: product.description,
@@ -197,34 +198,47 @@ const compatibleCards = getCompatibleCards();
   };
 
 const handleCardSelect = (card: any) => {
-  const def = codeMap?.[card.id];
-  const totalSlots = chassis.specifications?.slots || chassis.slots || pnConfig?.slot_count || 0;
-  const span = def?.slot_span || card.slotRequirement || 1;
-  const canPlace = (start: number, span: number) => {
-    if (start < 1 || start + span - 1 > totalSlots) return false;
-    for (let s = 0; s < span; s++) {
-      if (currentSlotAssignments[start + s]) return false;
-    }
-    return true;
+  // Create a copy of the card with displayName
+  const cardWithDisplay = {
+    ...card,
+    displayName: card.displayName || card.name  // Ensure displayName is always set
   };
 
-  if (def && def.standard_position !== null && def.standard_position !== undefined && def.standard_position !== 0 && canPlace(def.standard_position, span)) {
-    onCardSelect(card, def.standard_position);
-    return;
-  }
-
-  // Fallback behavior when no admin rule exists
-  const chassisType = (chassis.chassisType || chassis.type || '').toUpperCase();
-  if (!def && card.type === 'display' && chassisType === 'LTX') {
-    onCardSelect(card, 8);
+  // If it's a bushing card, mark it as a primary card and create a secondary card for the next slot
+  if (isBushingCard(card)) {
+    const primaryCard = {
+      ...cardWithDisplay,
+      isBushingPrimary: true,
+      bushingPairSlot: slot + 1,
+      specifications: {
+        ...cardWithDisplay.specifications,
+        slotRequirement: 2 // Ensure bushing cards always take 2 slots
+      }
+    };
+    
+    const secondaryCard = {
+      ...cardWithDisplay,
+      isBushingSecondary: true,
+      bushingPairSlot: slot,
+      displayName: cardWithDisplay.displayName,  // Use the same display name as primary
+      specifications: {
+        ...cardWithDisplay.specifications,
+        slotRequirement: 2 // Ensure bushing cards always take 2 slots
+      }
+    };
+    
+    // Call onCardSelect for both slots
+    onCardSelect(primaryCard, slot);
+    onCardSelect(secondaryCard, slot + 1);
   } else {
-    onCardSelect(card, slot);
+    // For non-bushing cards, just assign to the selected slot
+    onCardSelect(cardWithDisplay, slot);
   }
 };
 
-  const needsConfiguration = (card: any) => {
-    return card.name.toLowerCase().includes('analog') || card.name.toLowerCase().includes('bushing');
-  };
+const needsConfiguration = (card: any) => {
+  return card.name.toLowerCase().includes('analog') || card.name.toLowerCase().includes('bushing');
+};
 
   // Show error message for bushing cards that can't be placed
   const bushingErrorCards = availableCards.filter(card => {

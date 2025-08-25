@@ -1,4 +1,3 @@
-
 import { BOMItem, Level2Product, Level3Product } from '@/types/product';
 import { generateQTMSPartNumber } from '@/types/product/part-number-utils';
 
@@ -33,16 +32,21 @@ export const consolidateQTMSConfiguration = (
     product: chassis,
     quantity: 1,
     enabled: true,
-    partNumber: chassis.partNumber
+    partNumber: chassis.partNumber,
+    displayName: chassis.displayName || chassis.name
   };
 
   const cardItems: BOMItem[] = Object.entries(slotAssignments).map(([slot, card]) => ({
     id: `${Date.now()}-card-${slot}`,
-    product: card,
+    product: {
+      ...card,
+      displayName: card.displayName || card.name // Ensure displayName is included
+    },
     quantity: 1,
-    slot: parseInt(slot),
     enabled: true,
-    partNumber: card.partNumber
+    slot: parseInt(slot),
+    partNumber: card.partNumber,
+    displayName: card.displayName || card.name // Include displayName in the BOM item
   }));
 
   const components = [chassisItem, ...cardItems];

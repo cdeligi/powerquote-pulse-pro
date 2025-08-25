@@ -2,6 +2,23 @@
  * 2025 Qualitrol Corp. All rights reserved.
  */
 
+// Base product interface with common fields
+export interface BaseProduct {
+  id: string;
+  name: string;
+  displayName?: string;  // Shorter, display-friendly name
+  description: string;
+  price: number;
+  cost?: number;
+  enabled: boolean;
+  partNumber?: string;
+  image?: string;
+  productInfoUrl?: string;
+  specifications?: {
+    [key: string]: any;
+  };
+}
+
 // Level 0: Asset Types (Power Transformer, GIS, Breaker, etc.)
 export interface AssetType {
   id: string;
@@ -10,67 +27,39 @@ export interface AssetType {
 }
 
 // Level 1: Main Product Categories (QTMS, etc.)
-export interface Level1Product {
-  id: string;
-  name: string;
+export interface Level1Product extends BaseProduct {
   type: string; // Made mandatory since code depends on it for branching
   asset_type_id?: string; // Links to AssetType table
   category?: string; // Optional internal category for organization
-  description: string;
-  price: number;
-  cost?: number; // Hidden admin-only field
-  productInfoUrl?: string;
-  enabled: boolean;
-  image?: string;
-  partNumber?: string;
   customizations?: string[]; // For DGA products
   hasQuantitySelection?: boolean; // For PD couplers
   rackConfigurable?: boolean; // Whether this product supports rack configuration
 }
 
 // Level 2: Product Variants/Chassis (LTX, MTX, STX for QTMS)
-export interface Level2Product {
-  id: string;
-  name: string;
+export interface Level2Product extends BaseProduct {
   parentProductId: string; // Links to Level1Product
   type?: string; // Deprecated: use chassisType instead - kept for backward compatibility
-  description: string;
-  price: number;
-  cost?: number;
-  enabled: boolean;
   chassisType?: string; // Chassis type: N/A, LTX, MTX, STX
   specifications?: {
     slots?: number;
     capacity?: string;
     [key: string]: any;
   };
-  partNumber?: string;
-  image?: string;
-  productInfoUrl?: string;
 }
 
 // Level 3: Components/Cards/Options (Cards for chassis, accessories for others)
-export interface Level3Product {
-  id: string;
-  name: string;
+export interface Level3Product extends Omit<BaseProduct, 'partNumber'> {
   parent_product_id: string; // Links to Level2Product
   parentProductId?: string; // Backward compatibility alias
-  description: string;
-  price: number;
-  cost?: number;
-  enabled: boolean;
   product_level: 3;
   type?: string; // Backward compatibility
   part_number_format?: string;
   partNumber?: string; // Backward compatibility
   requires_level4_config?: boolean; // Flag to enable Level 4 config
   has_level4?: boolean; // Alias for requires_level4_config
-  productInfoUrl?: string;
-  specifications?: {
-    [key: string]: any;
-  };
-  image?: string;
   sku?: string; // Backward compatibility
+  displayName: string; // Explicitly include displayName as required
 }
 
 // Type unions for backward compatibility
@@ -123,13 +112,13 @@ export interface BOMItem {
   enabled: boolean;
   slot?: number;
   partNumber?: string;
+  displayName?: string;  // Add displayName to BOMItem
   configuration?: Record<string, any>;
   level2Options?: Level2Product[];
   level3Customizations?: Level3Customization[];
-  slotAssignments?: Record<number, Level3Product>; // For chassis configurations
-  level4Selections?: { [fieldId: string]: string }; // Legacy - kept for backward compatibility
-  
-  // Additional properties for admin quote management
+  slotAssignments?: Record<number, Level3Product>;
+  level4Selections?: { [fieldId: string]: string };
+  isAccessory?: boolean; // Add isAccessory flag
   name?: string;
   description?: string;
   part_number?: string;
