@@ -241,10 +241,9 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
       quantity: 1,
       enabled: true,
       partNumber: customPartNumber || 
-                 pnConfig?.prefix || 
-                 configuringNonChassis.partNumber || 
-                 `${configuringNonChassis.name}-001`,
-      children: []
+                  pnConfig?.prefix || 
+                  configuringNonChassis.partNumber || 
+                  `${configuringNonChassis.name}-001`
     };
 
     // Create BOM items for selected accessories
@@ -261,7 +260,7 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
         quantity: 1,
         enabled: true,
         partNumber: accessory.partNumber || `${accessory.name}-001`,
-        parentId: mainProduct.id
+        isAccessory: true
       };
       
       accessoryItems.push(accessoryItem);
@@ -477,6 +476,7 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
         id: `item-${Date.now()}`,
         product: cardWithDisplayName,
         quantity: 1,
+        enabled: true,
         partNumber: card.partNumber,
         displayName: displayName,
         slot: slot
@@ -498,6 +498,7 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
         displayName: product.displayName || product.name
       },
       quantity: 1,
+      enabled: true,
       partNumber: product.partNumber,
       displayName: product.displayName || product.name,
       slot: Number(slot)
@@ -611,6 +612,7 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
         partNumber: partNumber
       },
       quantity: 1,
+      enabled: true,
       partNumber: partNumber,
       displayName: selectedChassis.name,
       slotAssignments: { ...slotAssignments },
@@ -638,6 +640,7 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
             partNumber: partNumber
           },
           quantity: 1,
+          enabled: true,
           partNumber: partNumber,
           displayName: accessory.name,
           isAccessory: true
@@ -715,24 +718,45 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
   const handleQTMSConfigurationSave = (updatedQTMS: ConsolidatedQTMS) => {
     console.log('Saving QTMS configuration:', updatedQTMS);
     
-    const updatedBOMItem = createQTMSBOMItem(updatedQTMS);
-    
-    const existingItemIndex = bomItems.findIndex(item => item.id === updatedQTMS.id);
-    
-    let updatedItems;
-    if (existingItemIndex >= 0) {
-      console.log('Updating existing QTMS item at index:', existingItemIndex);
-      updatedItems = bomItems.map((item, index) => 
-        index === existingItemIndex ? updatedBOMItem : item
-      );
+    if (editingQTMS) {
+      // Update existing QTMS item instead of creating a new one
+      const updatedBOMItems = bomItems.map(item => {
+        if (item.id === editingQTMS.id) {
+          return {
+            ...item,
+            product: {
+              ...item.product,
+              name: updatedQTMS.name,
+              description: updatedQTMS.description,
+              partNumber: updatedQTMS.partNumber,
+              price: updatedQTMS.price
+            },
+            configuration: updatedQTMS.configuration,
+            partNumber: updatedQTMS.partNumber
+          };
+        }
+        return item;
+      });
+      
+      setBomItems(updatedBOMItems);
+      onBOMUpdate(updatedBOMItems);
+      
+      toast({
+        title: 'Configuration Updated',
+        description: `${updatedQTMS.name} configuration has been updated successfully.`,
+      });
     } else {
-      console.log('Adding new QTMS item to BOM');
-      updatedItems = [...bomItems, updatedBOMItem];
+      // Create new QTMS item (existing logic)
+      const qtmsItem = createQTMSBOMItem(updatedQTMS);
+      setBomItems(prev => [...prev, qtmsItem]);
+      onBOMUpdate([...bomItems, qtmsItem]);
+      
+      toast({
+        title: 'Configuration Added',
+        description: `${updatedQTMS.name} has been added to your bill of materials.`,
+      });
     }
     
-    console.log('Updated BOM items:', updatedItems);
-    setBomItems(updatedItems);
-    onBOMUpdate(updatedItems);
     setEditingQTMS(null);
   };
 
