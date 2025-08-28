@@ -31,7 +31,22 @@ const CardForm = ({ onSubmit, level2Products, initialData }: CardFormProps) => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSubmit(formData);
+    const newCard: Omit<Level3Product, 'id'> = {
+      name: formData.name,
+      displayName: formData.name,
+      parentProductId: formData.parentProductId,
+      parent_product_id: formData.parent_product_id,
+      type: formData.type,
+      description: formData.description,
+      price: Number(formData.price),
+      cost: Number(formData.cost),
+      enabled: formData.enabled,
+      requires_level4_config: formData.requires_level4_config,
+      specifications: formData.specifications,
+      product_level: 3,
+      image: formData.image || undefined
+    };
+    onSubmit(newCard);
   };
 
   const handleSpecificationChange = (key: string, value: any) => {

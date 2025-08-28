@@ -136,7 +136,9 @@ class ProductDataService {
         id: product.id,
         name: product.name,
         displayName: product.display_name || product.name,
+        parent_product_id: product.parent_product_id,
         parentProductId: product.parent_product_id,
+        product_level: 3,
         type: product.type || 'standard',
         description: product.description || '',
         price: product.price || 0,
@@ -146,9 +148,7 @@ class ProductDataService {
         image: product.image_url,
         productInfoUrl: product.product_info_url,
         requires_level4_config: product.requires_level4_config || false,
-        specifications: product.specifications || {},
-        category: product.category,
-        subcategory: product.subcategory
+        specifications: product.specifications || {}
       }));
 
       this.level3Initialized = true;
@@ -253,7 +253,9 @@ class ProductDataService {
         id: data.id,
         name: data.name,
         displayName: data.display_name || data.name,
+        parent_product_id: data.parent_product_id,
         parentProductId: data.parent_product_id,
+        product_level: 3,
         type: data.type,
         description: data.description || '',
         price: data.price || 0,
@@ -915,33 +917,6 @@ class ProductDataService {
         errorString: JSON.stringify(error, Object.getOwnPropertyNames(error)),
         timestamp: new Date().toISOString()
       });
-      throw error;
-    }
-  }
-
-  async updateDisplayNameOnly(id: string, displayName: string) {
-    try {
-      const { data, error } = await supabase
-        .from('products')
-        .update({ 
-          display_name: displayName,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', id)
-        .select('id, name, display_name')
-        .single();
-
-      if (error) throw error;
-      
-      // Update local cache
-      const index = this.level3Products.findIndex(p => p.id === id);
-      if (index !== -1) {
-        this.level3Products[index].displayName = displayName;
-      }
-      
-      return data;
-    } catch (error) {
-      console.error('Error updating display name:', error);
       throw error;
     }
   }
