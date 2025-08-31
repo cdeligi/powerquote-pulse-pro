@@ -154,24 +154,46 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
 
   // Load Level 1 products for dynamic tabs - use real Supabase data
   const [level1Products, setLevel1Products] = useState<Level1Product[]>([]);
+  const [allLevel2Products, setAllLevel2Products] = useState<Level2Product[]>([]);
+  const [allLevel3Products, setAllLevel3Products] = useState<Level3Product[]>([]);
   const [level1Loading, setLevel1Loading] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    const loadLevel1Products = async () => {
+    const loadAllProducts = async () => {
       try {
-        const products = await productDataService.getLevel1Products();
-        setLevel1Products(products.filter(p => p.enabled));
+        const [l1, l2, l3] = await Promise.all([
+          productDataService.getLevel1Products(),
+          productDataService.getLevel2Products(),
+          productDataService.getLevel3Products(),
+        ]);
+        setLevel1Products(l1.filter(p => p.enabled));
+        setAllLevel2Products(l2);
+        setAllLevel3Products(l3);
       } catch (error) {
-        console.error('Error loading Level 1 products:', error);
+        console.error('Error loading all products:', error);
         setLevel1Products([]);
+        setAllLevel2Products([]);
+        setAllLevel3Products([]);
       } finally {
         setLevel1Loading(false);
       }
     };
 
-    loadLevel1Products();
+    loadAllProducts();
   }, []);
+
+  useEffect(() => {
+    // TODO: Add logic here if this useEffect was intended to perform an action
+  }, [level3Products, codeMap, selectedAccessories]);
+
+  const productMap = useMemo(() => {
+    const map = new Map<string, string>();
+    [...level1Products, ...allLevel2Products, ...allLevel3Products].forEach(p => {
+      map.set(p.id, p.displayName || p.name);
+    });
+    return map;
+  }, [level1Products, allLevel2Products, allLevel3Products]);
 
   // Set default active tab when products are loaded
   useEffect(() => {
@@ -591,6 +613,10 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
   };
 
   const handleAddChassisToBOM = () => {
+    if (editingOriginalItem) {
+      handleUpdateChassisInBOM();
+      return;
+    }
     if (!selectedChassis) return;
 
     // Generate the part number for this configuration
@@ -667,6 +693,93 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
     });
   };
 
+  const handleUpdateChassisInBOM = () => {
+    if (!selectedChassis || !editingOriginalItem) return;
+
+    const partNumber = buildQTMSPartNumber({
+      chassis: selectedChassis,
+      slotAssignments,
+      hasRemoteDisplay,
+      pnConfig,
+      codeMap,
+      includeSuffix: true,
+    });
+
+    const updatedItem: BOMItem = {
+      ...editingOriginalItem,
+      product: {
+        ...selectedChassis,
+        displayName: selectedChassis.name,
+        partNumber: partNumber,
+      },
+      partNumber: partNumber,
+      displayName: selectedChassis.name,
+      slotAssignments: { ...slotAssignments },
+      configuration: {
+        hasRemoteDisplay,
+      },
+    };
+
+    
+
+    const chassisIndex = bomItems.findIndex(item => item.id === editingOriginalItem.id);
+
+    if (chassisIndex === -1) return;
+
+    
+
+    const newAccessoryItems = Array.from(selectedAccessories).map(accessoryId => {
+      const accessory = level3Products.find(p => p.id === accessoryId);
+      if (!accessory) return null;
+      const def = codeMap[accessory.id];
+      const template = def?.template;
+      const partNumber = template ? String(template).replace(/\{[^}]+\}/g, '') : (accessory.partNumber || undefined);
+      return {
+        id: `accessory-${accessory.id}-${Date.now()}`,
+        product: {
+          ...accessory,
+          displayName: accessory.name,
+          partNumber: partNumber
+        },
+        quantity: 1,
+        enabled: true,
+        partNumber: partNumber,
+        displayName: accessory.name,
+        isAccessory: true
+      };
+    }).filter((item): item is BOMItem => item !== null);
+
+    // Find the end of the original chassis item's accessories
+    let endOfOriginalAccessoriesIndex = chassisIndex + 1;
+    while (endOfOriginalAccessoriesIndex < bomItems.length && bomItems[endOfOriginalAccessoriesIndex].isAccessory) {
+      endOfOriginalAccessoriesIndex++;
+    }
+
+    const finalBomItems = [
+      ...bomItems.slice(0, chassisIndex), // Items before the edited chassis
+      updatedItem,                        // The updated chassis
+      ...newAccessoryItems,               // Currently selected accessories (newly created or updated)
+      ...bomItems.slice(endOfOriginalAccessoriesIndex) // Items after the original chassis and its accessories
+    ];
+
+    setBomItems(finalBomItems);
+    onBOMUpdate(finalBomItems);
+
+    // Reset state
+    setSelectedChassis(null);
+    setConfiguringChassis(null);
+    setSlotAssignments({});
+    setSelectedSlot(null);
+    setHasRemoteDisplay(false);
+    setEditingOriginalItem(null);
+    setSelectedAccessories(new Set());
+
+    toast({
+      title: "Configuration Updated",
+      description: `${selectedChassis.name} has been updated in your bill of materials.`,
+    });
+  };
+
   const handleBOMConfigurationEdit = (item: BOMItem) => {
     console.log('Editing BOM item configuration:', item);
     
@@ -689,7 +802,22 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
       // Store the original item for restoration if edit is cancelled
       setEditingOriginalItem(item);
       
-      // Scroll to configuration section
+      const chassisIndex = bomItems.findIndex(bomItem => bomItem.id === item.id);
+
+      if (chassisIndex !== -1) {
+        const accessoriesToSelect = new Set<string>();
+        for (let i = chassisIndex + 1; i < bomItems.length; i++) {
+          const currentItem = bomItems[i];
+          if (currentItem.isAccessory) {
+            accessoriesToSelect.add(currentItem.product.id);
+          } else {
+            break; 
+          }
+        }
+        setSelectedAccessories(accessoriesToSelect);
+      }
+      
+      setHasRemoteDisplay(item.configuration?.hasRemoteDisplay || false);
       setTimeout(() => {
         const configSection = document.getElementById('chassis-configuration');
         if (configSection) {
@@ -956,6 +1084,7 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
               variant="outline" 
               size="sm"
               onClick={() => {
+                setEditingOriginalItem(null);
                 setConfiguringChassis(null);
                 setSelectedChassis(null);
                 setSlotAssignments({});
@@ -986,7 +1115,7 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
             selectedAccessories={selectedAccessories}
             onAccessoryToggle={toggleAccessory}
             partNumber={buildQTMSPartNumber({ chassis: configuringChassis, slotAssignments, hasRemoteDisplay, pnConfig, codeMap, includeSuffix: false })}
-            onAddChassis={handleAddChassisToBOM}
+            
           />
           
           {selectedSlot !== null && (
@@ -1020,7 +1149,7 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
               disabled={Object.keys(slotAssignments).length === 0}
               className="bg-green-600 hover:bg-green-700 text-white disabled:opacity-50"
             >
-              Add to BOM
+              {editingOriginalItem ? 'Update BOM' : 'Add to BOM'}
             </Button>
           </div>
         </div>
@@ -1041,6 +1170,7 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
                 <Button
                   variant="outline"
                   onClick={() => {
+                    setEditingOriginalItem(null);
                     setConfiguringChassis(null);
                     setSelectedChassis(null);
                     setSlotAssignments({});
@@ -1091,6 +1221,7 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
                 <Button
                   variant="outline"
                   onClick={() => {
+                    setEditingOriginalItem(null);
                     setConfiguringChassis(null);
                     setSelectedChassis(null);
                     setSlotAssignments({});
@@ -1105,7 +1236,7 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
                   disabled={Object.keys(slotAssignments).length === 0}
                   className="bg-green-600 hover:bg-green-700 text-white disabled:opacity-50"
                 >
-                  Add to BOM
+                  {editingOriginalItem ? 'Update BOM' : 'Add to BOM'}
                 </Button>
               </div>
             </div>
@@ -1280,6 +1411,7 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
               canSeePrices={canSeePrices}
               canSeeCosts={canSeeCosts}
               canEditPartNumber={canEditPN}
+              productMap={productMap}
             />
           </div>
         </div>
