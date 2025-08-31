@@ -19,6 +19,7 @@ interface BOMDisplayProps {
   canSeePrices: boolean;
   canSeeCosts?: boolean;
   canEditPartNumber?: boolean;
+  productMap: Map<string, string>; // New prop: Map of product ID to display name
 }
 
 const BOMDisplay = ({ bomItems, onUpdateBOM, onEditConfiguration, onSubmitQuote, canSeePrices, canSeeCosts = false, canEditPartNumber = false }: BOMDisplayProps) => {

@@ -34,7 +34,7 @@ interface RackVisualizerProps {
   onAccessoryToggle?: (id: string) => void;
   partNumber?: string;
   chassisType?: ChassisType; // Optional chassis type for custom layouts
-  onAddChassis?: () => void; // Add the missing prop
+  
 }
 
 const RackVisualizer = ({ 
@@ -53,7 +53,7 @@ const RackVisualizer = ({
   onAccessoryToggle,
   partNumber,
   chassisType,
-  onAddChassis,
+  
 }: RackVisualizerProps) => {
   
   const bushingSlots = getBushingOccupiedSlots(slotAssignments);
