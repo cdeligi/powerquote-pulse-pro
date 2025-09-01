@@ -40,6 +40,7 @@ const QTMSConfigurationEditor = ({
   const [selectedSlot, setSelectedSlot] = useState<number | null>(null);
   const [configuringCard, setConfiguringCard] = useState<BOMItem | null>(null);
   const [cardConfigurations, setCardConfigurations] = useState<Record<string, Level3Customization[]>>({});
+  const [remoteDisplayProduct, setRemoteDisplayProduct] = useState<Level3Product | null>(null);
 
   // Initialize card configurations from existing components
   useState(() => {
@@ -93,6 +94,19 @@ const QTMSConfigurationEditor = ({
     loadPN();
     return () => { isMounted = false; };
   }, [consolidatedQTMS.configuration.chassis.id]);
+
+  useEffect(() => {
+    const fetchRemoteDisplayProduct = async () => {
+      // Assuming 'remote-display-product-id' is the ID of your Remote Display product in the database
+      const product = await productDataService.findProductById('remote-display-product-id');
+      if (product && product.product_level === 3) {
+        setRemoteDisplayProduct(product as Level3Product);
+      } else {
+        console.warn('Remote Display product not found or not a Level 3 product in DB.');
+      }
+    };
+    fetchRemoteDisplayProduct();
+  }, []);
 
   // Compute live part number from data-driven config
   const computedPartNumber = useMemo(() => {
@@ -519,7 +533,8 @@ if (editedHasRemoteDisplay) {
       name: 'Remote Display',
       type: 'accessory',
       description: `Remote display for QTMS ${chassisType.toUpperCase()} chassis`,
-      price: 850,
+      price: remoteDisplayProduct?.price || 0,
+      cost: remoteDisplayProduct?.cost || 0,
       enabled: true
     } as any,
     quantity: 1,

@@ -858,7 +858,8 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
               name: updatedQTMS.name,
               description: updatedQTMS.description,
               partNumber: updatedQTMS.partNumber,
-              price: updatedQTMS.price
+              price: updatedQTMS.price,
+              cost: updatedQTMS.cost // Add this line
             },
             configuration: updatedQTMS.configuration,
             partNumber: updatedQTMS.partNumber

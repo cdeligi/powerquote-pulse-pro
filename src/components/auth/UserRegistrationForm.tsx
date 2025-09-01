@@ -12,6 +12,7 @@ import { Shield, User, Mail, Phone, Building, FileText, ArrowLeft } from "lucide
 import { supabase } from "@/integrations/supabase/client";
 import LegalDocumentModal from "@/components/admin/LegalDocumentModal";
 import { departmentService, Department } from "@/services/departmentService";
+import { roleService, RoleMetadata } from "@/services/roleService";
 
 interface UserRegistrationFormProps {
   onSubmit?: (data: Partial<UserRegistrationRequest>) => void;
@@ -35,13 +36,19 @@ const UserRegistrationForm = ({ onSubmit, onBack }: UserRegistrationFormProps) =
   });
 
   const [departments, setDepartments] = useState<Department[]>([]);
+  const [rolesMetadata, setRolesMetadata] = useState<RoleMetadata[]>([]);
 
   useEffect(() => {
     const loadDepartments = async () => {
       const fetchedDepartments = await departmentService.fetchDepartments();
       setDepartments(fetchedDepartments);
     };
+    const loadRoles = async () => {
+      const fetchedRoles = await roleService.fetchRoles();
+      setRolesMetadata(fetchedRoles);
+    };
     loadDepartments();
+    loadRoles();
   }, []);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -322,30 +329,11 @@ const UserRegistrationForm = ({ onSubmit, onBack }: UserRegistrationFormProps) =
                     <SelectValue placeholder="Select access level" />
                   </SelectTrigger>
                   <SelectContent className="bg-gray-800 border-gray-600 z-50">
-                    <SelectItem value="LEVEL_1" className="text-white hover:bg-gray-700 focus:bg-gray-700">
-                      Level 1 - Channel Partners
-                    </SelectItem>
-                    <SelectItem value="LEVEL_2" className="text-white hover:bg-gray-700 focus:bg-gray-700">
-                      Level 2 - Qualitrol Sales
-                    </SelectItem>
-                    <SelectItem value="LEVEL_3" className="text-white hover:bg-gray-700 focus:bg-gray-700">
-                      Level 3 - Directors
-                    </SelectItem>
-                    <SelectItem value="ADMIN" className="text-white hover:bg-gray-700 focus:bg-gray-700">
-                      Admin - Administrators
-                    </SelectItem>
-                    <SelectItem value="FINANCE" className="text-white hover:bg-gray-700 focus:bg-gray-700">
-                      Finance - Finance Team
-                    </SelectItem>
-                    <SelectItem value="LEVEL_3" className="text-white hover:bg-gray-700 focus:bg-gray-700">
-                      Level 3 - Directors
-                    </SelectItem>
-                    <SelectItem value="ADMIN" className="text-white hover:bg-gray-700 focus:bg-gray-700">
-                      Admin - Administrators
-                    </SelectItem>
-                    <SelectItem value="FINANCE" className="text-white hover:bg-gray-700 focus:bg-gray-700">
-                      Finance - Finance Team
-                    </SelectItem>
+                    {rolesMetadata.map((role) => (
+                      <SelectItem key={role.role_name} value={role.role_name} className="text-white hover:bg-gray-700 focus:bg-gray-700">
+                        {role.display_name}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
                 <p className="text-gray-400 text-sm mt-1">

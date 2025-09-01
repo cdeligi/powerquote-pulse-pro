@@ -201,9 +201,9 @@ const BOMDisplay = ({ bomItems, onUpdateBOM, onEditConfiguration, onSubmitQuote,
     if (!group.chassis) {
       return group.accessories.map((item) => (
         <TableRow key={`accessory-${item.id}`} className="bg-gray-800">
-          <TableCell className="pl-8">
+          <TableCell className="pl-4">
             <div className="flex flex-col">
-              <span className="text-gray-200">• {item.displayName || item.product.name}</span>
+              <span className="text-gray-200">{item.displayName || item.product.name}</span>
               {item.product.description && (
                 <span className="text-xs text-gray-400">{item.product.description}</span>
               )}
@@ -438,9 +438,9 @@ const BOMDisplay = ({ bomItems, onUpdateBOM, onEditConfiguration, onSubmitQuote,
         {/* Accessories */}
         {group.accessories.map((accessory) => (
           <TableRow key={`accessory-${accessory.id}`} className="bg-gray-800">
-            <TableCell className="pl-8">
+            <TableCell className="pl-4">
               <div className="flex flex-col">
-                <span className="text-gray-200">• {accessory.displayName || accessory.product.name}</span>
+                <span className="text-gray-200">{accessory.displayName || accessory.product.name}</span>
                 {accessory.product.description && (
                   <span className="text-xs text-gray-400">{accessory.product.description}</span>
                 )}
