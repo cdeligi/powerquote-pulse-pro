@@ -213,17 +213,135 @@ class ProductDataService {
   }
 
   async createLevel1Product(productData: Omit<Level1Product, 'id'>): Promise<Level1Product> {
-    const newProduct = { id: 'temp', ...productData };
-    return newProduct;
+    try {
+      const { displayName, asset_type_id, category, rackConfigurable, ...restOfProductData } = productData;
+      const { data, error } = await supabase
+        .from('products')
+        .insert({
+          ...restOfProductData, // Spread the rest of the data
+          product_level: 1,
+          display_name: displayName || productData.name,
+          asset_type_id: asset_type_id,
+          category: category,
+          rack_configurable: rackConfigurable || false,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      const newProduct: Level1Product = {
+        id: data.id,
+        name: data.name,
+        displayName: data.display_name || data.name,
+        type: data.category || 'standard',
+        description: data.description || '',
+        price: data.price || 0,
+        cost: data.cost || 0,
+        enabled: data.enabled,
+        partNumber: data.part_number,
+        image: data.image_url,
+        productInfoUrl: data.product_info_url,
+        asset_type_id: data.asset_type_id,
+        category: data.category,
+        rackConfigurable: data.rack_configurable || false,
+        specifications: data.specifications || {}
+      };
+
+      this.level1Products = [...this.level1Products, newProduct];
+      return newProduct;
+    } catch (error) {
+      console.error('Error creating Level 1 product:', error);
+      throw error;
+    }
   }
 
   async updateLevel1Product(id: string, productData: Partial<Level1Product>): Promise<Level1Product> {
-    return { id, ...productData } as Level1Product;
+    try {
+      const { displayName, asset_type_id, category, rackConfigurable, ...restOfProductData } = productData;
+      const { data: currentProduct, error: fetchError } = await supabase
+        .from('products')
+        .select('*')
+        .eq('id', id)
+        .single();
+
+      if (fetchError) throw fetchError;
+
+      const updateData: any = {
+        ...restOfProductData, // Spread the rest of the data
+        updated_at: new Date().toISOString(),
+        display_name: displayName || currentProduct?.display_name || currentProduct?.name,
+        price: productData.price !== undefined ? productData.price : currentProduct?.price,
+        cost: productData.cost !== undefined ? productData.cost : currentProduct?.cost,
+        enabled: productData.enabled !== undefined ? productData.enabled : currentProduct?.enabled,
+        asset_type_id: asset_type_id !== undefined ? asset_type_id : currentProduct?.asset_type_id,
+        category: category !== undefined ? category : currentProduct?.category,
+        rack_configurable: rackConfigurable !== undefined ? rackConfigurable : currentProduct?.rack_configurable,
+        specifications: productData.specifications !== undefined ? productData.specifications : currentProduct?.specifications,
+      };
+
+      const { data, error } = await supabase
+        .from('products')
+        .update(updateData)
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      const index = this.level1Products.findIndex(p => p.id === id);
+      if (index !== -1) {
+        this.level1Products[index] = { ...this.level1Products[index], ...updateData };
+      }
+
+      return data as Level1Product;
+    } catch (error) {
+      console.error('Error updating Level 1 product:', error);
+      throw error;
+    }
   }
 
   async createLevel2Product(productData: Omit<Level2Product, 'id'>): Promise<Level2Product> {
-    const newProduct = { id: 'temp', ...productData };
-    return newProduct;
+    try {
+      const { parentProductId, chassisType, image, productInfoUrl, ...restOfProductData } = productData;
+      const { data, error } = await supabase
+        .from('products')
+        .insert({
+          ...restOfProductData, // Spread the rest of the data
+          product_level: 2,
+          parent_product_id: parentProductId,
+          chassis_type: chassisType,
+          image_url: image, // Corrected: image -> image_url
+          product_info_url: productInfoUrl,
+          display_name: productData.displayName || productData.name, // Ensure display_name is set
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      const newProduct: Level2Product = {
+        id: data.id,
+        name: data.name,
+        displayName: data.display_name || data.name,
+        parentProductId: data.parent_product_id,
+        description: data.description || '',
+        price: data.price || 0,
+        cost: data.cost || 0,
+        enabled: data.enabled,
+        partNumber: data.part_number,
+        chassisType: data.chassis_type,
+        image: data.image_url,
+        productInfoUrl: data.product_info_url,
+        specifications: data.specifications || {}
+      };
+
+      this.level2Products = [...this.level2Products, newProduct];
+      return newProduct;
+    } catch (error) {
+      console.error('Error creating Level 2 product:', error);
+      throw error;
+    }
   }
 
   async createLevel3Product(productData: Omit<Level3Product, 'id'>): Promise<Level3Product> {
@@ -278,13 +396,12 @@ class ProductDataService {
 
   async updateLevel3Product(id: string, productData: Partial<Level3Product>): Promise<Level3Product> {
     try {
-      console.log('Updating Level 3 product with ID:', id);
-      console.log('Update data:', JSON.stringify(productData, null, 2));
+      console.log('Update data (productData received):', JSON.stringify(productData, null, 2)); // Added log
 
-      // First, get the current product to preserve the display_name
+      // First, get the current product to preserve all existing data
       const { data: currentProduct, error: fetchError } = await supabase
         .from('products')
-        .select('display_name')
+        .select('*') // Select all columns to preserve existing data
         .eq('id', id)
         .single();
 
@@ -293,15 +410,20 @@ class ProductDataService {
         throw fetchError;
       }
 
+      console.log('Current product from DB:', JSON.stringify(currentProduct, null, 2)); // Added log
+
       // Prepare the update data
       const updateData: any = {
-        ...productData,
+        ...productData, // This contains the new values from the form
         updated_at: new Date().toISOString(),
-        // Preserve the existing display_name
-        display_name: currentProduct?.display_name || productData.name
+        // Preserve the existing display_name if not provided in productData
+        display_name: productData.displayName || currentProduct?.display_name || currentProduct?.name,
+        // Ensure price and cost are explicitly passed if they are in productData
+        price: productData.price !== undefined ? productData.price : currentProduct?.price,
+        cost: productData.cost !== undefined ? productData.cost : currentProduct?.cost,
       };
 
-      console.log('Sending update to Supabase:', JSON.stringify(updateData, null, 2));
+      console.log('Update data sent to Supabase:', JSON.stringify(updateData, null, 2)); // Added log
 
       const { data, error } = await supabase
         .from('products')
@@ -315,7 +437,7 @@ class ProductDataService {
         throw error;
       }
 
-      console.log('Update successful, response:', data);
+      console.log('Update successful, response from Supabase:', JSON.stringify(data, null, 2)); // Added log
 
       // Update the local cache
       const index = this.level3Products.findIndex(p => p.id === id);
@@ -521,18 +643,53 @@ class ProductDataService {
   
   deleteLevel1Product = async (id: string) => {};
   
-  updateLevel2Product = async (id: string, data: any): Promise<Level2Product> => ({
-    id,
-    name: '',
-    parentProductId: '',
-    type: '',
-    description: '',
-    price: 0,
-    cost: 0,
-    enabled: true,
-    partNumber: '',
-    specifications: {}
-  });
+  async updateLevel2Product(id: string, productData: Partial<Level2Product>): Promise<Level2Product> {
+    try {
+      const { data: currentProduct, error: fetchError } = await supabase
+        .from('products')
+        .select('*')
+        .eq('id', id)
+        .single();
+
+      if (fetchError) throw fetchError;
+
+      const { chassisType, parentProductId, image, productInfoUrl, ...restOfProductData } = productData;
+
+      const updateData: any = {
+        ...restOfProductData, // Spread the rest of the data
+        updated_at: new Date().toISOString(),
+        display_name: productData.displayName || currentProduct?.display_name || currentProduct?.name,
+        price: productData.price !== undefined ? productData.price : currentProduct?.price,
+        cost: productData.cost !== undefined ? productData.cost : currentProduct?.cost,
+        enabled: productData.enabled !== undefined ? productData.enabled : currentProduct?.enabled,
+        // Explicitly map camelCase to snake_case
+        parent_product_id: parentProductId !== undefined ? parentProductId : currentProduct?.parent_product_id,
+        chassis_type: chassisType !== undefined ? chassisType : currentProduct?.chassis_type,
+        image_url: image !== undefined ? image : currentProduct?.image_url, // Corrected: image -> image_url
+        product_info_url: productInfoUrl !== undefined ? productInfoUrl : currentProduct?.product_info_url,
+        specifications: productData.specifications !== undefined ? productData.specifications : currentProduct?.specifications,
+      };
+
+      const { data, error } = await supabase
+        .from('products')
+        .update(updateData)
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      const index = this.level2Products.findIndex(p => p.id === id);
+      if (index !== -1) {
+        this.level2Products[index] = { ...this.level2Products[index], ...updateData };
+      }
+
+      return data as Level2Product;
+    } catch (error) {
+      console.error('Error updating Level 2 product:', error);
+      throw error;
+    }
+  }
   
   deleteLevel2Product = async (id: string) => {};
   deleteLevel3Product = async (id: string) => {};
@@ -576,7 +733,84 @@ class ProductDataService {
       (p as any).subcategory === 'PD'
     );
   };
-  findProductById = () => null;
+  async findProductById(id: string): Promise<Level1Product | Level2Product | Level3Product | null> {
+    try {
+      const { data, error } = await supabase
+        .from('products')
+        .select('*')
+        .eq('id', id)
+        .single();
+
+      if (error && error.code !== 'PGRST116') { // PGRST116 = no rows returned
+        console.error('Error finding product by ID:', error);
+        throw error;
+      }
+
+      if (!data) return null;
+
+      // Map to appropriate product type based on product_level
+      if (data.product_level === 1) {
+        return {
+          id: data.id,
+          name: data.name,
+          displayName: data.display_name || data.name,
+          type: data.category || 'standard',
+          description: data.description || '',
+          price: data.price || 0,
+          cost: data.cost || 0,
+          enabled: data.enabled,
+          partNumber: data.part_number,
+          image: data.image_url,
+          productInfoUrl: data.product_info_url,
+          asset_type_id: data.asset_type_id,
+          category: data.category,
+          rackConfigurable: data.rack_configurable || false,
+          specifications: data.specifications || {}
+        } as Level1Product;
+      } else if (data.product_level === 2) {
+        return {
+          id: data.id,
+          name: data.name,
+          displayName: data.display_name || data.name, // Assuming Level2 also has display_name
+          parentProductId: data.parent_product_id || '',
+          description: data.description || '',
+          price: data.price || 0,
+          cost: data.cost || 0,
+          enabled: data.enabled,
+          partNumber: data.part_number,
+          chassisType: data.chassis_type || 'N/A',
+          image: data.image_url,
+          productInfoUrl: data.product_info_url,
+          specifications: data.specifications || {}
+        } as Level2Product;
+      } else if (data.product_level === 3) {
+        return {
+          id: data.id,
+          name: data.name,
+          displayName: data.display_name || data.name,
+          parent_product_id: data.parent_product_id,
+          parentProductId: data.parent_product_id,
+          product_level: 3,
+          type: data.type || 'standard',
+          description: data.description || '',
+          price: data.price || 0,
+          cost: data.cost || 0,
+          enabled: data.enabled !== false,
+          partNumber: data.part_number,
+          image: data.image_url,
+          productInfoUrl: data.product_info_url,
+          requires_level4_config: data.requires_level4_config || false,
+          has_level4: data.requires_level4_config || false, // Alias
+          sku: data.sku,
+          specifications: data.specifications || {}
+        } as Level3Product;
+      }
+      return null;
+    } catch (error) {
+      console.error('Error in findProductById:', error);
+      throw error;
+    }
+  }
   getProductPath = () => '';
   getTemplateMapping = () => ({});
   resetToDefaults = async () => {};

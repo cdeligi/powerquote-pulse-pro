@@ -15,6 +15,7 @@ export interface ConsolidatedQTMS {
   description: string;
   partNumber: string;
   price: number;
+  cost: number; // Add cost here
   configuration: QTMSConfiguration;
   components: BOMItem[];
 }
@@ -23,6 +24,7 @@ export const consolidateQTMSConfiguration = (
   chassis: Level2Product,
   slotAssignments: Record<number, Level3Product>,
   hasRemoteDisplay: boolean,
+  remoteDisplayProduct: Level3Product | null, // Add this parameter
   analogConfigurations?: Record<string, any>,
   bushingConfigurations?: Record<string, any>
 ): ConsolidatedQTMS => {
@@ -52,27 +54,29 @@ export const consolidateQTMSConfiguration = (
   const components = [chassisItem, ...cardItems];
 
   // Add remote display if selected
-  if (hasRemoteDisplay) {
+  if (hasRemoteDisplay && remoteDisplayProduct) { // Add remoteDisplayProduct check
     const remoteDisplayItem: BOMItem = {
       id: `${Date.now()}-remote-display`,
       product: {
-        id: 'remote-display',
-        name: 'Remote Display',
-        type: 'accessory',
-        description: 'Remote display for QTMS chassis',
-        price: 850,
-        enabled: true,
-        partNumber: 'QTMS-RD-001'
+        id: remoteDisplayProduct.id, // Use product ID
+        name: remoteDisplayProduct.name, // Use product name
+        type: remoteDisplayProduct.type || 'accessory', // Use product type
+        description: remoteDisplayProduct.description || `Remote display for QTMS chassis`, // Use product description
+        price: remoteDisplayProduct.price || 0, // Use product price
+        cost: remoteDisplayProduct.cost || 0, // Use product cost
+        enabled: remoteDisplayProduct.enabled,
+        partNumber: remoteDisplayProduct.partNumber || 'QTMS-RD-001' // Use product part number
       } as any,
       quantity: 1,
       enabled: true,
-      partNumber: 'QTMS-RD-001'
+      partNumber: remoteDisplayProduct.partNumber || 'QTMS-RD-001'
     };
     components.push(remoteDisplayItem);
   }
 
-  // Calculate total price
+  // Calculate total price and cost
   const totalPrice = components.reduce((sum, item) => sum + (item.product.price || 0), 0);
+  const totalCost = components.reduce((sum, item) => sum + (item.product.cost || 0), 0); // Add this line
 
   // Generate consolidated part number
   const partNumber = generateQTMSPartNumber(
@@ -102,6 +106,7 @@ export const consolidateQTMSConfiguration = (
     description,
     partNumber,
     price: totalPrice,
+    cost: totalCost, // Add this line
     configuration,
     components
   };
@@ -116,6 +121,7 @@ export const createQTMSBOMItem = (consolidatedQTMS: ConsolidatedQTMS): BOMItem =
       type: 'QTMS',
       description: consolidatedQTMS.description,
       price: consolidatedQTMS.price,
+      cost: consolidatedQTMS.cost, // Add this line
       enabled: true,
       partNumber: consolidatedQTMS.partNumber
     } as any,
