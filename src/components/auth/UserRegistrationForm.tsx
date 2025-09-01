@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,6 +11,7 @@ import { UserRegistrationRequest } from "@/types/user-management";
 import { Shield, User, Mail, Phone, Building, FileText, ArrowLeft } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import LegalDocumentModal from "@/components/admin/LegalDocumentModal";
+import { departmentService, Department } from "@/services/departmentService";
 
 interface UserRegistrationFormProps {
   onSubmit?: (data: Partial<UserRegistrationRequest>) => void;
@@ -32,6 +33,16 @@ const UserRegistrationForm = ({ onSubmit, onBack }: UserRegistrationFormProps) =
     agreedToTerms: false,
     agreedToPrivacyPolicy: false
   });
+
+  const [departments, setDepartments] = useState<Department[]>([]);
+
+  useEffect(() => {
+    const loadDepartments = async () => {
+      const fetchedDepartments = await departmentService.fetchDepartments();
+      setDepartments(fetchedDepartments);
+    };
+    loadDepartments();
+  }, []);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showTerms, setShowTerms] = useState(false);
@@ -244,14 +255,22 @@ const UserRegistrationForm = ({ onSubmit, onBack }: UserRegistrationFormProps) =
                   <Label htmlFor="department" className="text-white font-medium mb-2 block">
                     Department *
                   </Label>
-                  <Input
-                    id="department"
+                  <Select
                     value={formData.department}
-                    onChange={(e) => handleInputChange('department', e.target.value)}
-                    className="bg-gray-800 border-gray-600 text-white placeholder:text-gray-400 focus:border-red-500 focus:ring-red-500"
-                    placeholder="e.g., Sales, Engineering"
+                    onValueChange={(value: string) => handleInputChange('department', value)}
                     required
-                  />
+                  >
+                    <SelectTrigger className="bg-gray-800 border-gray-600 text-white focus:border-red-500 focus:ring-red-500">
+                      <SelectValue placeholder="Select a department" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-gray-800 border-gray-600 z-50">
+                      {departments.map((dept) => (
+                        <SelectItem key={dept.id} value={dept.name}>
+                          {dept.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 
                 <div>

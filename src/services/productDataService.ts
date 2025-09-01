@@ -65,6 +65,7 @@ class ProductDataService {
       this.level1Products = (data || []).map(product => ({
         id: product.id,
         name: product.name,
+        displayName: product.display_name || product.name, // Add this line
         type: product.category || 'standard',
         description: product.description || '',
         price: product.price || 0,

@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/hooks/use-toast";
+import { Department } from "@/services/departmentService";
 
 interface User {
   id: string;
@@ -27,9 +28,10 @@ interface UserEditDialogProps {
   isOpen: boolean;
   onClose: () => void;
   onSave: (userData: any) => Promise<void>;
+  departments: Department[]; // Add this prop
 }
 
-export default function UserEditDialog({ user, isOpen, onClose, onSave }: UserEditDialogProps) {
+export default function UserEditDialog({ user, isOpen, onClose, onSave, departments }: UserEditDialogProps) {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [role, setRole] = useState('level1');
@@ -172,22 +174,28 @@ export default function UserEditDialog({ user, isOpen, onClose, onSave }: UserEd
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label htmlFor="department" className="text-gray-400">Department</Label>
-              <Input
-                id="department"
-                value={department}
-                onChange={(e) => setDepartment(e.target.value)}
-                className="bg-gray-800 border-gray-700 text-white"
-                placeholder="e.g. Engineering, Sales"
-              />
+              <Select value={department} onValueChange={setDepartment}>
+                <SelectTrigger className="bg-gray-800 border-gray-700 text-white">
+                  <SelectValue placeholder="Select a department" />
+                </SelectTrigger>
+                <SelectContent className="bg-gray-800 border-gray-700">
+                  {departments.map((dept) => (
+                    <SelectItem key={dept.id} value={dept.name}>
+                      {dept.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div>
-              <Label htmlFor="jobTitle" className="text-gray-400">Job Title</Label>
+              <Label htmlFor="jobTitle" className="text-gray-400">Job Title *</Label>
               <Input
                 id="jobTitle"
                 value={jobTitle}
                 onChange={(e) => setJobTitle(e.target.value)}
                 className="bg-gray-800 border-gray-700 text-white"
                 placeholder="e.g. Software Engineer"
+                required
               />
             </div>
           </div>

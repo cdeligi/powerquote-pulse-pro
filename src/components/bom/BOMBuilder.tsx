@@ -13,12 +13,13 @@ import BOMDisplay from './BOMDisplay';
 import AnalogCardConfigurator from './AnalogCardConfigurator';
 import BushingCardConfigurator from './BushingCardConfigurator';
 import NonChassisConfigurator from './NonChassisConfigurator';
+
 import { Level4RuntimePayload } from "@/types/level4";
 import { Level4RuntimeModal } from "../level4/Level4RuntimeModal";
 
 import { productDataService } from '@/services/productDataService';
 import QuoteFieldsSection from './QuoteFieldsSection';
-import DiscountSection from './DiscountSection';
+
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/components/ui/use-toast';
 import QTMSConfigurationEditor from './QTMSConfigurationEditor';
@@ -1417,14 +1418,7 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
         </div>
       </div>
 
-      {/* Discount Section */}
-      <DiscountSection
-        bomItems={bomItems}
-        onDiscountChange={handleDiscountChange}
-        canSeePrices={canSeePrices}
-        initialDiscount={discountPercentage}
-        initialJustification={discountJustification}
-      />
+      
 
       {/* Submit Button */}
       <div className="flex justify-end">
