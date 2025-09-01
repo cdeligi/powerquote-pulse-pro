@@ -120,7 +120,7 @@ const Level2OptionsSelector = ({
                       )}
                       {/* Add Level 1 tag */}
                       <Badge variant="outline" className="text-xs">
-                        {level1Product.type || 'Product'}
+                        {level1Product.displayName || level1Product.name}
                       </Badge>
                     </div>
                   </CardTitle>

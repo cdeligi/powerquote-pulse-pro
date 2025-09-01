@@ -14,6 +14,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { departmentService, Department } from "@/services/departmentService";
 import { 
   Users, 
   CheckCircle, 
@@ -59,8 +62,24 @@ const UserManagementEnhanced = ({ user }: UserManagementEnhancedProps) => {
   const [loading, setLoading] = useState(true);
   const [selectedUserToRemove, setSelectedUserToRemove] = useState<UserProfile | null>(null);
   const [isRemoveDialogOpen, setIsRemoveDialogOpen] = useState(false);
-  const [selectedUserForPermissions, setSelectedUserForPermissions] = useState<UserProfile | null>(null);
   const [selectedUserForEdit, setSelectedUserForEdit] = useState<UserProfile | null>(null);
+
+  const [newEmail, setNewEmail] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [newFirstName, setNewFirstName] = useState('');
+  const [newLastName, setNewLastName] = useState('');
+  const [newRole, setNewRole] = useState<Role>('LEVEL_1'); // Default role
+  const [newDepartment, setNewDepartment] = useState('');
+  const [newJobTitle, setNewJobTitle] = useState('');
+  const [newPhoneNumber, setNewPhoneNumber] = useState('');
+  const [newManagerEmail, setNewManagerEmail] = useState('');
+  const [newBusinessJustification, setNewBusinessJustification] = useState('');
+  const [isCreatingUser, setIsCreatingUser] = useState(false);
+
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [newDepartmentName, setNewDepartmentName] = useState('');
+  const [isCreatingDepartment, setIsCreatingDepartment] = useState(false);
+  const [isDepartmentDialogOpen, setIsDepartmentDialogOpen] = useState(false); // For the new department dialog
 
   // Mock data for registration requests - in real app this would come from API
   const [pendingRequests, setPendingRequests] = useState<UserRegistrationRequest[]>([
@@ -127,6 +146,11 @@ const UserManagementEnhanced = ({ user }: UserManagementEnhancedProps) => {
 
   useEffect(() => {
     fetchUserProfiles();
+    const loadDepartments = async () => {
+      const fetchedDepartments = await departmentService.fetchDepartments();
+      setDepartments(fetchedDepartments);
+    };
+    loadDepartments();
   }, []);
 
   const handleRemoveUser = async (userProfile: UserProfile) => {
@@ -191,6 +215,118 @@ const UserManagementEnhanced = ({ user }: UserManagementEnhancedProps) => {
     } catch (error: any) {
       console.error('Error updating user:', error);
       throw new Error(error.message || "Failed to update user.");
+    }
+  };
+
+  const handleCreateUser = async () => {
+    setIsCreatingUser(true);
+    try {
+      // 1. Sign up user with Supabase Auth
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: newEmail,
+        password: newPassword,
+      });
+
+      if (authError) {
+        throw new Error(authError.message);
+      }
+
+      if (!authData.user) {
+        throw new Error('User data not returned after signup.');
+      }
+
+      // 2. Insert profile data into public.profiles table
+      const { error: profileError } = await supabase.from('profiles').insert({
+        id: authData.user.id,
+        email: newEmail,
+        first_name: newFirstName,
+        last_name: newLastName,
+        role: newRole,
+        department: newDepartment,
+        job_title: newJobTitle,
+        phone_number: newPhoneNumber,
+        manager_email: newManagerEmail,
+        business_justification: newBusinessJustification,
+        user_status: 'active', // Default to active
+      });
+
+      if (profileError) {
+        // If profile creation fails, attempt to delete the auth user to prevent orphaned users
+        await supabase.auth.admin.deleteUser(authData.user.id);
+        throw new Error(profileError.message);
+      }
+
+      toast({
+        title: 'User Created',
+        description: `New user ${newEmail} created successfully!`,
+      });
+
+      // Clear form
+      setNewEmail('');
+      setNewPassword('');
+      setNewFirstName('');
+      setNewLastName('');
+      setNewRole('LEVEL_1');
+      setNewDepartment('');
+      setNewJobTitle('');
+      setNewPhoneNumber('');
+      setNewManagerEmail('');
+      setNewBusinessJustification('');
+
+      // Refresh user list
+      fetchUserProfiles();
+
+    } catch (error: any) {
+      console.error('Error creating user:', error);
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to create user.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsCreatingUser(false);
+    }
+  };
+
+  const handleCreateDepartment = async () => {
+    if (!newDepartmentName.trim()) {
+      toast({
+        title: "Error",
+        description: "Department name cannot be empty.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setIsCreatingDepartment(true);
+    try {
+      const newDept = await departmentService.createDepartment(newDepartmentName.trim());
+      if (newDept) {
+        toast({
+          title: "Success",
+          description: `Department "${newDept.name}" created.`,
+        });
+        setNewDepartmentName('');
+        setIsDepartmentDialogOpen(false);
+        
+        // Instead of optimistically adding, re-fetch all departments to ensure sync
+        const updatedDepartments = await departmentService.fetchDepartments();
+        setDepartments(updatedDepartments);
+      } else {
+        toast({
+          title: "Error",
+          description: "Failed to create department. It might already exist.",
+          variant: "destructive",
+        });
+      }
+    } catch (error: any) {
+      console.error('Error creating department:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create department.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsCreatingDepartment(false);
     }
   };
 
@@ -382,6 +518,156 @@ const UserManagementEnhanced = ({ user }: UserManagementEnhancedProps) => {
         </TabsList>
 
         <TabsContent value="users">
+          <Card className="bg-gray-900 border-gray-800 mb-6">
+            <CardHeader>
+              <CardTitle className="text-white flex items-center">
+                <Users className="h-5 w-5 mr-2" />
+                Create New User
+              </CardTitle>
+              <CardDescription className="text-gray-400">
+                Add a new user to the system
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="new-email" className="text-white">Email</Label>
+                  <Input
+                    id="new-email"
+                    type="email"
+                    value={newEmail}
+                    onChange={(e) => setNewEmail(e.target.value)}
+                    className="bg-gray-800 border-gray-700 text-white"
+                    placeholder="user@example.com"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="new-password" className="text-white">Password</Label>
+                  <Input
+                    id="new-password"
+                    type="password"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    className="bg-gray-800 border-gray-700 text-white"
+                    placeholder="********"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="new-first-name" className="text-white">First Name</Label>
+                  <Input
+                    id="new-first-name"
+                    value={newFirstName}
+                    onChange={(e) => setNewFirstName(e.target.value)}
+                    className="bg-gray-800 border-gray-700 text-white"
+                    placeholder="John"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="new-last-name" className="text-white">Last Name</Label>
+                  <Input
+                    id="new-last-name"
+                    value={newLastName}
+                    onChange={(e) => setNewLastName(e.target.value)}
+                    className="bg-gray-800 border-gray-700 text-white"
+                    placeholder="Doe"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="new-role" className="text-white">Role</Label>
+                  <Select onValueChange={(value: Role) => setNewRole(value)} value={newRole}>
+                    <SelectTrigger className="bg-gray-800 border-gray-700 text-white">
+                      <SelectValue placeholder="Select a role" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-gray-800 border-gray-700 text-white">
+                      <SelectItem value="LEVEL_1">Level 1</SelectItem>
+                      <SelectItem value="LEVEL_2">Level 2</SelectItem>
+                      <SelectItem value="LEVEL_3">Level 3</SelectItem>
+                      <SelectItem value="ADMIN">Admin</SelectItem>
+                      <SelectItem value="FINANCE">Finance</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label htmlFor="new-department" className="text-white">Department</Label>
+                  <div className="flex items-center space-x-2">
+                    <Select onValueChange={(value: string) => setNewDepartment(value)} value={newDepartment}>
+                      <SelectTrigger className="flex-grow bg-gray-800 border-gray-700 text-white">
+                        <SelectValue placeholder="Select a department" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-gray-800 border-gray-700 text-white">
+                        {console.log('Departments being rendered:', departments)}
+                        {departments.map((dept) => (
+                          <SelectItem key={dept.id} value={dept.name}>
+                            {dept.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={() => setIsDepartmentDialogOpen(true)}
+                      className="text-white border-gray-600 hover:bg-gray-700"
+                      title="Add New Department"
+                    >
+                      <span className="text-black">+</span>
+                    </Button>
+                  </div>
+                </div>
+                <div>
+                  <Label htmlFor="new-job-title" className="text-white">Job Title</Label>
+                  <Input
+                    id="new-job-title"
+                    value={newJobTitle}
+                    onChange={(e) => setNewJobTitle(e.target.value)}
+                    className="bg-gray-800 border-gray-700 text-white"
+                    placeholder="Software Engineer"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="new-phone-number" className="text-white">Phone Number (Optional)</Label>
+                  <Input
+                    id="new-phone-number"
+                    value={newPhoneNumber}
+                    onChange={(e) => setNewPhoneNumber(e.target.value)}
+                    className="bg-gray-800 border-gray-700 text-white"
+                    placeholder="+1 (123) 456-7890"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="new-manager-email" className="text-white">Manager Email (Optional)</Label>
+                  <Input
+                    id="new-manager-email"
+                    type="email"
+                    value={newManagerEmail}
+                    onChange={(e) => setNewManagerEmail(e.target.value)}
+                    className="bg-gray-800 border-gray-700 text-white"
+                    placeholder="manager@example.com"
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <Label htmlFor="new-business-justification" className="text-white">Business Justification (Optional)</Label>
+                  <Textarea
+                    id="new-business-justification"
+                    value={newBusinessJustification}
+                    onChange={(e) => setNewBusinessJustification(e.target.value)}
+                    className="bg-gray-800 border-gray-700 text-white"
+                    placeholder="Reason for needing access..."
+                    rows={3}
+                  />
+                </div>
+              </div>
+              <div className="flex justify-end mt-6">
+                <Button
+                  onClick={handleCreateUser}
+                  disabled={isCreatingUser || !newEmail || !newPassword || !newFirstName || !newLastName || !newDepartment || !newJobTitle}
+                  className="bg-green-600 hover:bg-green-700 text-white"
+                >
+                  {isCreatingUser ? 'Creating User...' : 'Create User'}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
           <Card className="bg-gray-900 border-gray-800">
             <CardHeader>
               <CardTitle className="text-white flex items-center">
@@ -441,17 +727,9 @@ const UserManagementEnhanced = ({ user }: UserManagementEnhancedProps) => {
                               className="text-white border-gray-600 hover:bg-gray-700"
                               title="Edit User"
                             >
-                              <Edit className="h-4 w-4" />
+                              <Edit className="h-4 w-4 text-black" />
                             </Button>
-                            <Button
-                              onClick={() => setSelectedUserForPermissions(profile)}
-                              size="sm"
-                              variant="outline"
-                              className="text-white border-gray-600 hover:bg-gray-700"
-                              title="Manage Permissions"
-                            >
-                              <Shield className="h-4 w-4" />
-                            </Button>
+                            
                             {profile.role !== 'ADMIN' && profile.user_status === 'active' && (
                               <Button
                                 onClick={() => {
@@ -760,27 +1038,7 @@ const UserManagementEnhanced = ({ user }: UserManagementEnhancedProps) => {
         </DialogContent>
       </Dialog>
 
-      {/* User Permissions Dialog */}
-      <Dialog open={!!selectedUserForPermissions} onOpenChange={() => setSelectedUserForPermissions(null)}>
-        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>
-              Manage Permissions - {selectedUserForPermissions?.first_name} {selectedUserForPermissions?.last_name}
-            </DialogTitle>
-          </DialogHeader>
-          {selectedUserForPermissions && (
-            <UserPermissionsTab
-              userProfile={{
-                id: selectedUserForPermissions.id,
-                email: selectedUserForPermissions.email,
-                first_name: selectedUserForPermissions.first_name,
-                last_name: selectedUserForPermissions.last_name,
-                role: selectedUserForPermissions.role as any
-              }}
-            />
-          )}
-        </DialogContent>
-      </Dialog>
+      
 
       {/* User Edit Dialog */}
       <UserEditDialog
@@ -800,7 +1058,45 @@ const UserManagementEnhanced = ({ user }: UserManagementEnhancedProps) => {
         isOpen={!!selectedUserForEdit}
         onClose={() => setSelectedUserForEdit(null)}
         onSave={handleUpdateUser}
+        departments={departments} // Add this line
       />
+
+      {/* New Department Dialog */}
+      <Dialog open={isDepartmentDialogOpen} onOpenChange={setIsDepartmentDialogOpen}>
+        <DialogContent className="bg-gray-900 border-gray-800">
+          <DialogHeader>
+            <DialogTitle className="text-white">Create New Department</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="department-name" className="text-white">Department Name</Label>
+              <Input
+                id="department-name"
+                value={newDepartmentName}
+                onChange={(e) => setNewDepartmentName(e.target.value)}
+                className="bg-gray-800 border-gray-700 text-white"
+                placeholder="e.g., Engineering, Marketing"
+              />
+            </div>
+            <div className="flex justify-end space-x-2">
+              <Button
+                variant="outline"
+                onClick={() => setIsDepartmentDialogOpen(false)}
+                className="border-gray-600 text-white hover:bg-gray-800"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleCreateDepartment}
+                disabled={isCreatingDepartment || !newDepartmentName.trim()}
+                className="bg-green-600 hover:bg-green-700 text-white"
+              >
+                {isCreatingDepartment ? 'Creating...' : 'Create Department'}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

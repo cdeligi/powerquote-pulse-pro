@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,6 +8,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Level2Product, Level3Product } from '@/types/product';
 import { Level4RuntimeModal } from '../level4/Level4RuntimeModal';
 import { toast } from '@/components/ui/use-toast';
+import AccessoryList from './AccessoryList';
 
 interface NonChassisConfiguratorProps {
   level2Product: Level2Product;
@@ -18,17 +19,6 @@ interface NonChassisConfiguratorProps {
   onToggleAccessory: (id: string) => void;
   onAddToBOM: (customPartNumber?: string) => void;
   canOverridePartNumber: boolean;
-}
-
-interface AccessoryWithConfig {
-  id: string;
-  name: string;
-  description?: string;
-  hasLevel4: boolean;
-  level4Data?: any;
-  isSelected: boolean;
-  partNumber?: string;
-  color?: string;
 }
 
 export const NonChassisConfigurator = ({
@@ -43,54 +33,20 @@ export const NonChassisConfigurator = ({
 }: NonChassisConfiguratorProps) => {
   const [customPartNumber, setCustomPartNumber] = useState<string>('');
   const [isOverriding, setIsOverriding] = useState<boolean>(false);
-  const [configuringAccessory, setConfiguringAccessory] = useState<AccessoryWithConfig | null>(null);
-  const [accessories, setAccessories] = useState<AccessoryWithConfig[]>([]);
-  
-  // Initialize accessories with Level 4 configuration status
-  useEffect(() => {
-    const processedAccessories = level3Products.map(accessory => {
-      const config = codeMap[accessory.id] || {};
-      return {
-        id: accessory.id,
-        name: accessory.name,
-        description: accessory.description,
-        hasLevel4: accessory.has_level4 || false,
-        isSelected: selectedAccessories.has(accessory.id),
-        partNumber: config.template ? String(config.template).replace(/\{[^}]+\}/g, '') : accessory.partNumber,
-        color: config.color
-      };
-    });
-    
-    setAccessories(processedAccessories);
-  }, [level3Products, selectedAccessories, codeMap]);
+  const [configuringAccessory, setConfiguringAccessory] = useState<Level3Product | null>(null);
+  const [configuredLevel4Accessories, setConfiguredLevel4Accessories] = useState<Set<string>>(new Set());
 
   const finalPartNumber = isOverriding && customPartNumber.trim() 
     ? customPartNumber.trim() 
     : partNumberPrefix;
 
-  const handleToggleAccessory = async (accessory: AccessoryWithConfig) => {
-    // If accessory has Level 4 config, open the modal first
-    if (accessory.hasLevel4) {
-      setConfiguringAccessory(accessory);
-      return;
-    }
-    
-    // Toggle the accessory if it doesn't have Level 4 config
-    onToggleAccessory(accessory.id);
-  };
+  
 
   const handleLevel4Save = (data: any) => {
     if (!configuringAccessory) return;
     
-    // Update the accessory with Level 4 data
-    const updatedAccessories = accessories.map(acc => 
-      acc.id === configuringAccessory.id 
-        ? { ...acc, level4Data: data, isSelected: true }
-        : acc
-    );
-    
-    setAccessories(updatedAccessories);
-    onToggleAccessory(configuringAccessory.id);
+    setConfiguredLevel4Accessories(prev => new Set(prev).add(configuringAccessory.id));
+    onToggleAccessory(configuringAccessory.id); // Toggle the accessory to select it
     setConfiguringAccessory(null);
     
     toast({
@@ -108,9 +64,10 @@ export const NonChassisConfigurator = ({
   };
 
   // Check if all selected accessories with Level 4 have been configured
-  const allLevel4Configured = accessories.every(acc => 
-    !acc.isSelected || (acc.isSelected && !acc.hasLevel4) || acc.level4Data
-  );
+  const allLevel4Configured = Array.from(selectedAccessories).every(id => {
+    const accessory = level3Products.find(p => p.id === id);
+    return !accessory || !accessory.has_level4 || configuredLevel4Accessories.has(id);
+  });
 
   // Check if part number is valid
   const isPartNumberValid = !isOverriding || (isOverriding && customPartNumber.trim() !== '');
@@ -179,64 +136,21 @@ export const NonChassisConfigurator = ({
       </Card>
 
       {/* Accessories Section */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Available Accessories</CardTitle>
-          <CardDescription>
-            Select optional accessories to include with this product.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {accessories.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No accessories available for this product.</p>
-          ) : (
-            <div className="space-y-3">
-              {accessories.map((accessory) => (
-                <div 
-                  key={accessory.id} 
-                  className={`flex items-center justify-between p-3 rounded-md border ${
-                    accessory.isSelected 
-                      ? 'bg-primary/10 border-primary' 
-                      : 'border-border hover:bg-accent/50'
-                  }`}
-                >
-                  <div className="flex items-center space-x-3">
-                    <Checkbox
-                      id={`accessory-${accessory.id}`}
-                      checked={accessory.isSelected}
-                      onCheckedChange={() => handleToggleAccessory(accessory)}
-                      disabled={!accessory.isSelected && !allLevel4Configured}
-                    />
-                    <div>
-                      <Label 
-                        htmlFor={`accessory-${accessory.id}`}
-                        className="flex items-center space-x-2 cursor-pointer"
-                      >
-                        <span>{accessory.name}</span>
-                        {accessory.hasLevel4 && (
-                          <Badge variant="outline" className="text-xs">
-                            Requires Configuration
-                          </Badge>
-                        )}
-                      </Label>
-                      {accessory.description && (
-                        <p className="text-sm text-muted-foreground">
-                          {accessory.description}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                  {accessory.partNumber && (
-                    <span className="text-sm text-muted-foreground font-mono">
-                      {accessory.partNumber}
-                    </span>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      <AccessoryList
+        level3Products={level3Products}
+        codeMap={codeMap}
+        selectedAccessories={selectedAccessories}
+        onToggleAccessory={(id) => {
+          const accessory = level3Products.find(p => p.id === id);
+          if (accessory && accessory.has_level4) {
+            setConfiguringAccessory(accessory);
+          } else {
+            onToggleAccessory(id);
+          }
+        }}
+        title="Available Accessories"
+        description="Select optional accessories to include with this product."
+      />
 
       {/* Add to BOM Button */}
       <div className="flex justify-end">
@@ -260,17 +174,8 @@ export const NonChassisConfigurator = ({
           bomItem={{
             id: `config-${configuringAccessory.id}`,
             product: {
-              id: configuringAccessory.id,
-              name: configuringAccessory.name,
-              displayName: configuringAccessory.name,
-              parent_product_id: level2Product.id,
-              product_level: 3,
-              description: configuringAccessory.description || '',
-              price: 0,
-              cost: 0,
-              enabled: true,
-              has_level4: true,
-              requires_level4_config: true,
+              ...configuringAccessory, // Use the Level3Product directly
+              displayName: configuringAccessory.name, // Ensure displayName is set
             },
             quantity: 1,
             enabled: true,

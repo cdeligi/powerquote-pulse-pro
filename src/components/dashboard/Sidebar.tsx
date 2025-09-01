@@ -27,11 +27,13 @@ const Sidebar = ({ user, activeView, onViewChange, onLogout }: SidebarProps) => 
 
   const getRoleBadge = (role: string) => {
     const badges = {
-      level1: { text: 'Level 1 Sales', color: 'bg-blue-600' },
-      level2: { text: 'Level 2 Sales', color: 'bg-green-600' },
-      admin: { text: 'Administrator', color: 'bg-red-600' }
+      LEVEL_1: { text: 'Level 1 Sales', color: 'bg-blue-600' },
+      LEVEL_2: { text: 'Level 2 Sales', color: 'bg-green-600' },
+      LEVEL_3: { text: 'Level 3 Sales', color: 'bg-purple-600' }, // Added LEVEL_3
+      ADMIN: { text: 'Administrator', color: 'bg-red-600' },
+      FINANCE: { text: 'Finance', color: 'bg-yellow-600' } // Added FINANCE
     };
-    return badges[role as keyof typeof badges] || badges.level1;
+    return badges[role as keyof typeof badges] || badges.LEVEL_1; // Changed fallback to LEVEL_1
   };
 
   const badge = getRoleBadge(user.role);
