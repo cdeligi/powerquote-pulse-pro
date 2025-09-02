@@ -99,7 +99,7 @@ const QTMSConfigurationEditor = ({
     const fetchRemoteDisplayProduct = async () => {
       // Assuming 'remote-display-product-id' is the ID of your Remote Display product in the database
       const product = await productDataService.findProductById('remote-display-product-id');
-      if (product && product.product_level === 3) {
+      if (product && 'product_level' in product && product.product_level === 3) {
         setRemoteDisplayProduct(product as Level3Product);
       } else {
         console.warn('Remote Display product not found or not a Level 3 product in DB.');

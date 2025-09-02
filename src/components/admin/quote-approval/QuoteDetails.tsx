@@ -57,7 +57,7 @@ const QuoteDetails = ({
         config.chassis,
         config.slotAssignments,
         config.hasRemoteDisplay,
-        config.analogConfigurations,
+        config.analogConfigurations as any,
         config.bushingConfigurations
       );
       setQtmsConfig({ ...consolidated, id: item.id, price: item.unit_price, name: item.name, description: item.description || '' });

@@ -923,6 +923,7 @@ const UserManagement = ({ user }: UserManagementProps) => {
           setSelectedUserToEdit(null);
         }}
         onSave={handleUpdateUser}
+        departments={[]} // Add empty departments array for now
       />
     </div>
   );

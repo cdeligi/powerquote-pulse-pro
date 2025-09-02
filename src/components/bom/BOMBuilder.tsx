@@ -748,7 +748,7 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
         displayName: accessory.name,
         isAccessory: true
       };
-    }).filter((item): item is BOMItem => item !== null);
+    }).filter((item) => item !== null) as BOMItem[];
 
     // Find the end of the original chassis item's accessories
     let endOfOriginalAccessoriesIndex = chassisIndex + 1;
@@ -834,6 +834,7 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
         description: item.product.description || '',
         partNumber: item.partNumber || item.product.partNumber || '',
         price: item.product.price || 0,
+        cost: item.unit_cost || item.product.cost || 0,
         configuration: item.configuration as QTMSConfiguration,
         components: []
       };
