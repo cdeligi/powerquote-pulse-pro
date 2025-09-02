@@ -3,7 +3,7 @@
  */
 
 import { useState, useEffect } from "react";
-import { User } from "@/types/auth";
+import { User, Role } from "@/types/auth";
 import { UserRegistrationRequest, SecurityAuditLog } from "@/types/user-management";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -594,9 +594,8 @@ const UserManagementEnhanced = ({ user }: UserManagementEnhancedProps) => {
                       <SelectTrigger className="flex-grow bg-gray-800 border-gray-700 text-white">
                         <SelectValue placeholder="Select a department" />
                       </SelectTrigger>
-                      <SelectContent className="bg-gray-800 border-gray-700 text-white">
-                        {console.log('Departments being rendered:', departments)}
-                        {departments.map((dept) => (
+                       <SelectContent className="bg-gray-800 border-gray-700 text-white">
+                         {departments.map((dept) => (
                           <SelectItem key={dept.id} value={dept.name}>
                             {dept.name}
                           </SelectItem>

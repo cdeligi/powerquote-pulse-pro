@@ -144,7 +144,7 @@ export const updateQTMSConfiguration = (
     existingQTMS.configuration.chassis,
     newSlotAssignments,
     newHasRemoteDisplay,
-    analogConfigurations,
+    analogConfigurations as any,
     bushingConfigurations
   );
 };
