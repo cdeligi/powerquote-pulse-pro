@@ -10,6 +10,8 @@ import {
 } from '@/types/level4';
 import { toast } from '@/components/ui/use-toast';
 import { Level4RuntimeView, useLevel4Validation } from './Level4RuntimeView';
+import Level4Configurator from './Level4Configurator';
+import { Level4Config } from './Level4ConfigTypes';
 
 interface Level4RuntimeModalProps {
   bomItem: BOMItem;
@@ -25,7 +27,9 @@ export const Level4RuntimeModal: React.FC<Level4RuntimeModalProps> = ({
   onCancel 
 }) => {
   const [configuration, setConfiguration] = useState<Level4Configuration | null>(null);
+  const [level4Config, setLevel4Config] = useState<Level4Config | null>(null);
   const [entries, setEntries] = useState<Level4SelectionEntry[]>([]);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { validateEntries } = useLevel4Validation();
@@ -45,30 +49,51 @@ export const Level4RuntimeModal: React.FC<Level4RuntimeModalProps> = ({
 
         setConfiguration(config);
 
+        // Convert to Level4Config format for new UI
+        const newFormatConfig: Level4Config = {
+          id: config.id,
+          fieldLabel: config.field_label,
+          mode: config.template_type === 'OPTION_1' ? 'variable' : 'fixed',
+          fixed: config.template_type === 'OPTION_2' ? { numberOfInputs: config.fixed_inputs || 1 } : undefined,
+          variable: config.template_type === 'OPTION_1' ? { maxInputs: config.max_inputs || 3 } : undefined,
+          options: config.options.map(opt => ({
+            id: opt.value,
+            name: opt.label,
+            url: '' // Level4Option doesn't have info_url, each option URL is managed in new system
+          }))
+        };
+        setLevel4Config(newFormatConfig);
+
         // Check for existing Level 4 values
         const existingValue = await Level4Service.getBOMLevel4Value(bomItem.id);
         
         if (existingValue && existingValue.entries.length > 0) {
           // Pre-populate with existing selections
           setEntries(existingValue.entries);
+          setSelectedIds(existingValue.entries.map(e => e.value));
         } else {
           // Initialize with defaults
           const initialEntries: Level4SelectionEntry[] = [];
           const defaultOption = config.options.find(opt => opt.is_default);
+          const defaultValue = defaultOption?.value || '';
           
           if (config.template_type === 'OPTION_1') {
             initialEntries.push({
               index: 0,
-              value: defaultOption?.value || ''
+              value: defaultValue
             });
+            setSelectedIds([defaultValue]);
           } else {
             const count = config.fixed_inputs || 1;
+            const initialIds: string[] = [];
             for (let i = 0; i < count; i++) {
               initialEntries.push({
                 index: i,
-                value: defaultOption?.value || ''
+                value: defaultValue
               });
+              initialIds.push(defaultValue);
             }
+            setSelectedIds(initialIds);
           }
           setEntries(initialEntries);
         }
@@ -84,6 +109,16 @@ export const Level4RuntimeModal: React.FC<Level4RuntimeModalProps> = ({
   }, [level3ProductId, bomItem.id]);
 
   const handleEntriesChange = (newEntries: Level4SelectionEntry[]) => {
+    setEntries(newEntries);
+  };
+
+  const handleSelectionChange = (ids: string[]) => {
+    setSelectedIds(ids);
+    // Convert to entries format
+    const newEntries = ids.map((id, index) => ({
+      index,
+      value: id
+    }));
     setEntries(newEntries);
   };
 
@@ -186,12 +221,20 @@ export const Level4RuntimeModal: React.FC<Level4RuntimeModalProps> = ({
         </DialogHeader>
 
         <div className="flex-1 overflow-y-auto py-4">
-          <Level4RuntimeView
-            mode="interactive"
-            configuration={configuration}
-            initialEntries={entries}
-            onEntriesChange={handleEntriesChange}
-          />
+          {level4Config ? (
+            <Level4Configurator
+              config={level4Config}
+              initial={selectedIds}
+              onChange={handleSelectionChange}
+            />
+          ) : (
+            <Level4RuntimeView
+              mode="interactive"
+              configuration={configuration}
+              initialEntries={entries}
+              onEntriesChange={handleEntriesChange}
+            />
+          )}
         </div>
 
         <DialogFooter className="shrink-0">
