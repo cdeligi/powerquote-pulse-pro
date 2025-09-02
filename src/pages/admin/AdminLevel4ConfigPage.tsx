@@ -6,6 +6,8 @@ import {
   emptyVariableConfig,
   emptyFixedConfig,
 } from "@/components/level4/Level4ConfigTypes";
+import { Level4Service } from "@/services/level4Service";
+import { Level4TemplateType } from "@/types/level4";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
@@ -19,15 +21,29 @@ export default function AdminLevel4ConfigPage() {
     const loadConfig = async () => {
       try {
         setLoading(true);
-        // TODO: fetch config from your backend for productId
-        // const { data } = await api.get(`/api/level4-config/${productId}`);
-        // if (data) setCfg(data);
+        // Load existing configuration from Supabase if available
+        const level4Config = await Level4Service.getLevel4Configuration(productId);
         
-        // Mock data for now
-        await new Promise(resolve => setTimeout(resolve, 500));
-        setCfg(emptyVariableConfig());
+        if (level4Config) {
+          // Convert Supabase format to Level4Config format
+          setCfg({
+            id: level4Config.id,
+            fieldLabel: level4Config.field_label,
+            mode: level4Config.template_type === 'OPTION_1' ? 'variable' : 'fixed',
+            fixed: level4Config.template_type === 'OPTION_2' ? { numberOfInputs: level4Config.fixed_inputs || 1 } : undefined,
+            variable: level4Config.template_type === 'OPTION_1' ? { maxInputs: level4Config.max_inputs || 3 } : undefined,
+            options: level4Config.options.map(opt => ({
+              id: opt.id,
+              name: opt.label,
+              url: '' // Level4Option doesn't have info_url field
+            }))
+          });
+        } else {
+          setCfg(emptyVariableConfig());
+        }
       } catch (error) {
         console.error('Failed to load Level 4 config:', error);
+        setCfg(emptyVariableConfig());
       } finally {
         setLoading(false);
       }
@@ -40,10 +56,45 @@ export default function AdminLevel4ConfigPage() {
 
   const save = async (updated: Level4Config) => {
     try {
-      // TODO: persist to your backend
-      // await api.put(`/api/level4-config/${productId}`, updated);
-      console.log("Saving Level-4 config for product", productId, updated);
-      setCfg(updated);
+      // Convert Level4Config format to Supabase format
+      const configToSave = {
+        id: updated.id !== emptyVariableConfig().id ? updated.id : undefined,
+        level3_product_id: productId!,
+        template_type: (updated.mode === 'variable' ? 'OPTION_1' : 'OPTION_2') as Level4TemplateType,
+        field_label: updated.fieldLabel,
+        max_inputs: updated.mode === 'variable' ? updated.variable?.maxInputs : null,
+        fixed_inputs: updated.mode === 'fixed' ? updated.fixed?.numberOfInputs : null,
+        info_url: null // Global URL not used in new system
+      };
+
+      // Save configuration
+      const savedConfig = await Level4Service.saveLevel4Configuration(configToSave);
+      if (!savedConfig) throw new Error('Failed to save configuration');
+
+      // Delete existing options and recreate
+      if (updated.id && updated.id !== emptyVariableConfig().id) {
+        // Delete existing options
+        const existingConfig = await Level4Service.getLevel4Configuration(productId);
+        if (existingConfig?.options) {
+          for (const opt of existingConfig.options) {
+            await Level4Service.deleteLevel4Option(opt.id);
+          }
+        }
+      }
+
+      // Save new options
+      for (let i = 0; i < updated.options.length; i++) {
+        const option = updated.options[i];
+        await Level4Service.saveLevel4Option({
+          level4_configuration_id: savedConfig.id,
+          label: option.name,
+          value: option.id,
+          display_order: i,
+          is_default: i === 0 // First option is default
+        });
+      }
+
+      setCfg({ ...updated, id: savedConfig.id });
     } catch (error) {
       console.error('Failed to save Level 4 config:', error);
       throw error;

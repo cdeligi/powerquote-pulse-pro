@@ -200,12 +200,12 @@ const BOMDisplay = ({ bomItems, onUpdateBOM, onEditConfiguration, onSubmitQuote,
   const renderChassisGroup = (group: { chassis: BOMItem | null; accessories: BOMItem[] }, index: number) => {
     if (!group.chassis) {
       return group.accessories.map((item) => (
-        <TableRow key={`accessory-${item.id}`} className="bg-gray-800">
+        <TableRow key={`accessory-${item.id}`} className="bg-gradient-to-r from-slate-800/60 to-slate-700/60 hover:from-slate-700/80 hover:to-slate-600/80 transition-all duration-200">
           <TableCell className="pl-4">
             <div className="flex flex-col">
-              <span className="text-gray-200">{item.displayName || item.product.name}</span>
+              <span className="text-slate-200 font-medium">{item.displayName || item.product.name}</span>
               {item.product.description && (
-                <span className="text-xs text-gray-400">{item.product.description}</span>
+                <span className="text-xs text-slate-400 mt-1">{item.product.description}</span>
               )}
             </div>
           </TableCell>
@@ -306,26 +306,26 @@ const BOMDisplay = ({ bomItems, onUpdateBOM, onEditConfiguration, onSubmitQuote,
     return (
       <Fragment key={`group-${index}`}>
         {/* Chassis row */}
-        <TableRow className="bg-gray-700">
+        <TableRow className="bg-gradient-to-r from-slate-700/70 to-slate-600/70 hover:from-slate-600/90 hover:to-slate-500/90 transition-all duration-200">
           <TableCell className="font-medium">
             <div className="flex flex-col">
-              <span className="text-white">{group.chassis.displayName || group.chassis.product.name}</span>
+              <span className="text-slate-100 font-semibold">{group.chassis.displayName || group.chassis.product.name}</span>
               {group.chassis.product.description && (
-                <span className="text-xs text-gray-300">{group.chassis.product.description}</span>
+                <span className="text-xs text-slate-300 mt-1">{group.chassis.product.description}</span>
               )}
-              <div className="flex flex-wrap gap-1 mt-1">
+              <div className="flex flex-wrap gap-1 mt-2">
                 {isConfigurableItem(group.chassis) && (
-                  <Badge variant="outline" className="text-[10px] text-purple-400 border-purple-400 px-1.5 py-0">
+                  <Badge variant="outline" className="text-[10px] text-purple-300 border-purple-400/60 bg-purple-500/10 px-1.5 py-0">
                     Configurable
                   </Badge>
                 )}
                 {needsConfiguration(group.chassis) && (
-                  <Badge variant="outline" className="text-[10px] text-orange-400 border-orange-400 px-1.5 py-0">
+                  <Badge variant="outline" className="text-[10px] text-orange-300 border-orange-400/60 bg-orange-500/10 px-1.5 py-0">
                     Config Required
                   </Badge>
                 )}
                 {getLevel4Summary(group.chassis.id!) && (
-                  <Badge variant="outline" className="text-[10px] text-green-400 border-green-400 px-1.5 py-0">
+                  <Badge variant="outline" className="text-[10px] text-emerald-300 border-emerald-400/60 bg-emerald-500/10 px-1.5 py-0">
                     {getLevel4Summary(group.chassis.id!)}
                   </Badge>
                 )}
