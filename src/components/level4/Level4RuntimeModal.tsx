@@ -123,43 +123,55 @@ export const Level4RuntimeModal: React.FC<Level4RuntimeModalProps> = ({
   };
 
   const handleSave = async () => {
-    if (!configuration) return;
-
-    // Validate all entries have selections
-    if (!validateEntries(entries)) {
-      toast({
-        title: "Incomplete configuration",
-        description: "Please make a selection for all inputs.",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    const payload: Level4RuntimePayload = {
-      bomItemId: bomItem.id,
-      configuration_id: configuration.id,
-      template_type: configuration.template_type,
-      entries: entries.map((entry, idx) => ({
-        index: idx, // Re-index sequentially
-        value: entry.value
-      }))
-    };
-
     try {
-      // Save to database
-      await Level4Service.saveBOMLevel4Value(bomItem.id, payload);
-      
+      if (!configuration) {
+        toast({
+          title: "Error",
+          description: "No Level 4 configuration found",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Validate all entries have selections
+      if (!validateEntries(entries)) {
+        toast({
+          title: "Incomplete configuration",
+          description: "Please make a selection for all inputs.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Create the payload
+      const payload: Level4RuntimePayload = {
+        bomItemId: bomItem.id!,
+        configuration_id: configuration.id,
+        template_type: configuration.template_type,
+        entries: entries.map((entry, idx) => ({
+          index: idx, // Re-index sequentially
+          value: entry.value
+        }))
+      };
+
+      // Save the configuration
+      const savedValue = await Level4Service.saveBOMLevel4Value(bomItem.id!, payload);
+      if (!savedValue) {
+        throw new Error('Failed to save Level 4 configuration');
+      }
+
       toast({
-        title: "Configuration saved",
-        description: "Level 4 configuration has been saved successfully.",
+        title: "Success",
+        description: "Level 4 configuration saved successfully",
       });
-      
+
+      // Pass the saved value to parent
       onSave(payload);
     } catch (error) {
       console.error('Error saving Level 4 configuration:', error);
       toast({
-        title: "Save failed",
-        description: "Failed to save Level 4 configuration. Please try again.",
+        title: "Error",
+        description: "Failed to save Level 4 configuration",
         variant: "destructive"
       });
     }

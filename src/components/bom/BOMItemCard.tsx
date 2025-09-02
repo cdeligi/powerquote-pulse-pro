@@ -8,6 +8,7 @@ import { Trash2, Settings, Cog } from 'lucide-react';
 import { BOMItem, isLevel2Product, isLevel3Product } from '@/types/product';
 import { getProductTheme, getThemedCardClasses } from '@/utils/productThemes';
 import { useBOMContext } from '@/context/BOMContext';
+import { Level1ParentDisplay } from './Level1ParentDisplay';
 import { cn } from '@/lib/utils';
 
 interface BOMItemCardProps {
@@ -102,15 +103,16 @@ export const BOMItemCard: React.FC<BOMItemCardProps> = ({
                   </TooltipContent>
                 </Tooltip>
               )}
+              <Level1ParentDisplay item={item} />
               {!isQTMS && parentProductName && (
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <Badge variant="outline" className="text-xs bg-gray-800 text-gray-300 border-gray-600">
-                      {parentProductName}
+                    <Badge variant="outline" className="text-xs bg-muted text-muted-foreground border-border">
+                      Parent: {parentProductName}
                     </Badge>
                   </TooltipTrigger>
                   <TooltipContent>
-                    <p>Parent Product</p>
+                    <p>Immediate Parent Product</p>
                   </TooltipContent>
                 </Tooltip>
               )}

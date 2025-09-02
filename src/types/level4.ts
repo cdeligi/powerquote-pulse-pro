@@ -23,6 +23,7 @@ export interface Level4Option {
   value: string;
   display_order: number;
   is_default: boolean;
+  info_url?: string | null;
   created_at?: string;
   updated_at?: string;
 }
