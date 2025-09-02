@@ -36,6 +36,18 @@ const Level2OptionsSelector = ({
         console.log('Calling getLevel2ProductsForLevel1 with ID:', level1Product.id);
         const options = await productDataService.getLevel2ProductsForLevel1(level1Product.id);
         
+        // Debug: Log the structure of the first option
+        if (options.length > 0) {
+          console.log('First option details:', {
+            id: options[0].id,
+            name: options[0].name,
+            parentProductId: options[0].parentProductId,
+            parentProduct: options[0].parentProduct,
+            hasParentProduct: !!options[0].parentProduct,
+            level1Product: level1Product
+          });
+        }
+        
         console.log('Raw options from service:', options);
         
         // Filter enabled products
@@ -90,38 +102,84 @@ const Level2OptionsSelector = ({
     );
   }
 
+  console.log('[Level2OptionsSelector] Rendering with level1Product:', {
+    id: level1Product.id,
+    name: level1Product.name,
+    displayName: level1Product.displayName
+  });
+
+  // Get the parent display name using the parent product ID
+  const getParentTagContent = (option: Level2Product) => {
+    // If we have a direct parent reference, use its display name or name
+    if (option.parentProduct) {
+      return option.parentProduct.displayName || option.parentProduct.name;
+    }
+    
+    // If we have a parentProductId, use it directly
+    if (option.parentProductId) {
+      return `Parent: ${option.parentProductId}`;
+    }
+    
+    // Fallback to the level1Product prop if available
+    if (level1Product) {
+      return level1Product.displayName || level1Product.name;
+    }
+    
+    return 'Parent';
+  };
+
+  console.log('[Level2OptionsSelector] Rendering with level1Product:', {
+    id: level1Product.id,
+    name: level1Product.name,
+    displayName: level1Product.displayName,
+    availableOptions: availableOptions.map(opt => ({
+      id: opt.id,
+      name: opt.name,
+      parentProductId: opt.parentProductId,
+      parentProduct: opt.parentProduct
+    }))
+  });
+
   return (
     <div className="space-y-4">
-      <h3 className="text-xl font-medium text-foreground">Select {level1Product.name} Options</h3>
-      
-      {availableOptions.length > 0 ? (
-        <div className="grid gap-3 md:grid-cols-3 lg:grid-cols-4">
+      {loading ? (
+        <div className="flex items-center justify-center p-8">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        </div>
+      ) : availableOptions.length > 0 ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {availableOptions.map((option) => {
             const isCurrentlySelected = isSelected(option);
             const requiresChassisConfig = option.chassisType && option.chassisType !== 'N/A';
             
+            console.log(`[Level2OptionsSelector] Rendering option ${option.name} with parent:`, {
+              optionId: option.id,
+              parentProductId: option.parentProductId,
+              parentProduct: option.parentProduct,
+              resolvedParentName: getParentTagContent(option)
+            });
+            
             return (
-              <Card
+              <div 
                 key={option.id}
-                className={cn(
-                  "cursor-pointer transition-all hover:shadow-md h-full overflow-hidden",
-                  isCurrentlySelected ? "ring-2 ring-primary" : "hover:border-primary"
-                )}
+                title={`Parent ID: ${option.parentProductId || 'N/A'} - ${option.name}`}
                 onClick={() => handleOptionClick(option)}
               >
+                <Card
+                  className={cn(
+                    "cursor-pointer transition-all hover:shadow-md h-full overflow-hidden group",
+                    isCurrentlySelected ? "ring-2 ring-primary" : "hover:border-primary"
+                  )}
+                >
                 <CardHeader className="pb-2">
                   <CardTitle className="flex items-center justify-between text-sm leading-tight">
-                    {option.name}
-                    <div className="flex items-center gap-1">
+                    <span className="truncate">{option.name}</span>
+                    <div className="flex items-center gap-1 flex-shrink-0 ml-2">
                       {requiresChassisConfig && (
                         <Badge variant="secondary" className="text-xs">
                           Configure
                         </Badge>
                       )}
-                      {/* Add Level 1 tag */}
-                      <Badge variant="outline" className="text-xs">
-                        {level1Product.displayName || level1Product.name}
-                      </Badge>
                     </div>
                   </CardTitle>
                 </CardHeader>
@@ -154,7 +212,8 @@ const Level2OptionsSelector = ({
                     </a>
                   )}
                 </CardContent>
-              </Card>
+                </Card>
+              </div>
             );
           })}
         </div>

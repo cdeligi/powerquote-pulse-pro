@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Trash2, Settings, Cog } from 'lucide-react';
-import { BOMItem } from '@/types/product';
+import { BOMItem, isLevel2Product, isLevel3Product } from '@/types/product';
 import { getProductTheme, getThemedCardClasses } from '@/utils/productThemes';
 import { useBOMContext } from '@/context/BOMContext';
 import { cn } from '@/lib/utils';
@@ -38,6 +38,24 @@ export const BOMItemCard: React.FC<BOMItemCardProps> = ({
   );
   
   const level4Summary = getLevel4Summary(item.id!);
+  
+  // Skip parent product tag for QTMS products
+  const isQTMS = item.product.id?.toLowerCase() === 'qtms' || 
+                item.product.name?.toLowerCase() === 'qtms' ||
+                item.product.type?.toLowerCase() === 'qtms';
+  
+  // Get parent product display name if available
+  const getParentProductName = () => {
+    if (isLevel2Product(item.product) && item.product.parentProduct) {
+      return item.product.parentProduct.displayName || item.product.parentProduct.name;
+    }
+    if (isLevel3Product(item.product) && item.product.parentProduct) {
+      return item.product.parentProduct.displayName || item.product.parentProduct.name;
+    }
+    return null;
+  };
+  
+  const parentProductName = getParentProductName();
   
   // Get product theme based on product name/code
   const productTheme = getProductTheme(item.product.id, item.product.name);
@@ -81,6 +99,18 @@ export const BOMItemCard: React.FC<BOMItemCardProps> = ({
                   </TooltipTrigger>
                   <TooltipContent>
                     <p>Level 4 configuration applied</p>
+                  </TooltipContent>
+                </Tooltip>
+              )}
+              {!isQTMS && parentProductName && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Badge variant="outline" className="text-xs bg-gray-800 text-gray-300 border-gray-600">
+                      {parentProductName}
+                    </Badge>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Parent Product</p>
                   </TooltipContent>
                 </Tooltip>
               )}

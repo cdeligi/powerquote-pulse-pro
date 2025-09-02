@@ -154,11 +154,8 @@ const ChassisSelector = ({ onChassisSelect, selectedChassis, onAddToBOM, canSeeP
             )}
           >
             <CardHeader className="pb-2">
-              <CardTitle className="flex items-center justify-between text-sm leading-tight">
+              <CardTitle className="text-sm leading-tight">
                 {chassis.name}
-                <Badge variant="outline" className="text-xs">
-                  QTMS
-                </Badge>
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
@@ -182,25 +179,17 @@ const ChassisSelector = ({ onChassisSelect, selectedChassis, onAddToBOM, canSeeP
                   Configure Chassis
                 </Button>
                 
-                {onAddToBOM && (
-                  <Button
-                    onClick={(e) => handleAddToBOMClick(e, chassis)}
-                    size="sm"
-                    variant="outline"
-                    className="w-full text-xs"
-                  >
-                    Add to BOM
-                  </Button>
-                )}
               </div>
               
               {chassis.specifications && (
                 <div className="mt-2 flex flex-wrap gap-1">
-                  {Object.entries(chassis.specifications).map(([key, value]) => (
-                    <Badge key={key} variant="secondary" className="text-xs">
-                      {key}: {value}
-                    </Badge>
-                  ))}
+                  {Object.entries(chassis.specifications)
+                    .filter(([key]) => key.toLowerCase() !== 'height') // Filter out height
+                    .map(([key, value]) => (
+                      <Badge key={key} variant="secondary" className="text-xs">
+                        {key}: {value}
+                      </Badge>
+                    ))}
                 </div>
               )}
             </CardContent>
