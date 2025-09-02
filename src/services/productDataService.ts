@@ -53,6 +53,7 @@ class ProductDataService {
   // Load products from Supabase database
   private async loadLevel1ProductsFromDB(): Promise<void> {
     try {
+      console.log('[ProductDataService] Loading level 1 products from database...');
       const { data, error } = await supabase
         .from('products')
         .select('*')
@@ -62,23 +63,33 @@ class ProductDataService {
 
       if (error) throw error;
 
-      this.level1Products = (data || []).map(product => ({
-        id: product.id,
-        name: product.name,
-        displayName: product.display_name || product.name, // Add this line
-        type: product.category || 'standard',
-        description: product.description || '',
-        price: product.price || 0,
-        cost: product.cost || 0,
-        enabled: product.enabled,
-        partNumber: product.part_number,
-        image: product.image_url,
-        productInfoUrl: product.product_info_url,
-        asset_type_id: product.asset_type_id,
-        category: product.category,
-        rackConfigurable: product.rack_configurable || false,
-        specifications: product.specifications || {}
-      }));
+      this.level1Products = (data || []).map(product => {
+        // Log the product data for debugging
+        console.log('[ProductDataService] Processing level 1 product:', {
+          id: product.id,
+          name: product.name,
+          display_name: product.display_name,
+          part_number: product.part_number
+        });
+        
+        return {
+          id: product.id,
+          name: product.name,
+          displayName: product.part_number || product.name, // Use part_number as displayName if available
+          type: product.category || 'standard',
+          description: product.description || '',
+          price: product.price || 0,
+          cost: product.cost || 0,
+          enabled: product.enabled,
+          partNumber: product.part_number,
+          image: product.image_url,
+          productInfoUrl: product.product_info_url,
+          asset_type_id: product.asset_type_id,
+          category: product.category,
+          rackConfigurable: product.rack_configurable || false,
+          specifications: product.specifications || {}
+        };
+      });
 
       this.level1Initialized = true;
     } catch (error) {
@@ -90,30 +101,57 @@ class ProductDataService {
 
   private async loadLevel2ProductsFromDB(): Promise<void> {
     try {
+      console.log('[ProductDataService] Loading level 2 products from database...');
       const { data, error } = await supabase
         .from('products')
         .select('*')
         .eq('product_level', 2)
-        .eq('enabled', true)
         .order('name');
 
       if (error) throw error;
 
-      this.level2Products = (data || []).map(product => ({
-        id: product.id,
-        name: product.name,
-        parentProductId: product.parent_product_id || '',
-        description: product.description || '',
-        price: product.price || 0,
-        cost: product.cost || 0,
-        enabled: product.enabled,
-        partNumber: product.part_number,
-        chassisType: product.chassis_type || 'N/A',
-        image: product.image_url,
-        productInfoUrl: product.product_info_url,
-        specifications: product.specifications || {}
-      }));
-
+      this.level2Products = (data || []).map(product => {
+        console.log('[ProductDataService] Processing level 2 product:', {
+          id: product.id,
+          name: product.name,
+          parent_product_id: product.parent_product_id,
+          has_parent: !!product.parent_product_id
+        });
+        
+        const level2Product = {
+          ...product,
+          parentProductId: product.parent_product_id,
+          displayName: product.display_name || product.name,
+          cost: product.cost || 0,
+          enabled: product.enabled,
+          partNumber: product.part_number,
+          chassisType: product.chassis_type || 'N/A',
+          image: product.image_url,
+          productInfoUrl: product.product_info_url,
+          specifications: product.specifications || {}
+        };
+        
+        console.log('[ProductDataService] Created level 2 product:', {
+          id: level2Product.id,
+          name: level2Product.name,
+          parentProductId: level2Product.parentProductId,
+          hasParent: !!level2Product.parentProductId
+        });
+        
+        return level2Product;
+      });
+      
+      console.log(`[ProductDataService] Loaded ${this.level2Products.length} level 2 products`);
+      
+      // Log a few sample products with their parent IDs
+      const sampleProducts = this.level2Products.slice(0, 3);
+      console.log('[ProductDataService] Sample level 2 products:', sampleProducts.map(p => ({
+        id: p.id,
+        name: p.name,
+        parentProductId: p.parentProductId,
+        hasParentInLevel1: !!this.level1Products.find(l1 => l1.id === p.parentProductId)
+      })));
+      
       this.level2Initialized = true;
     } catch (error) {
       console.error('Error loading Level 2 products:', error);
@@ -703,7 +741,67 @@ class ProductDataService {
   };
 
   getLevel2ProductsForLevel1 = async (level1Id: string): Promise<Level2Product[]> => {
-    return this.level2Products.filter(p => p.parentProductId === level1Id);
+    console.log(`[ProductDataService] Getting level 2 products for level 1 ID: ${level1Id}`);
+    
+    // Ensure level 1 products are loaded
+    if (!this.level1Initialized) {
+      console.log('[ProductDataService] Level 1 products not initialized, loading now...');
+      await this.loadLevel1ProductsFromDB();
+    }
+    
+    // Get parent product details
+    const parentProduct = this.level1Products.find(p => p.id === level1Id);
+    if (!parentProduct) {
+      console.error(`[ProductDataService] Parent product with ID ${level1Id} not found`);
+      return [];
+    }
+    
+    console.log(`[ProductDataService] Found parent product:`, {
+      id: parentProduct.id,
+      name: parentProduct.name,
+      displayName: parentProduct.displayName,
+      hasDisplayName: !!parentProduct.displayName
+    });
+    
+    // Get all level 2 products for this level 1 product
+    const level2Products = this.level2Products.filter(p => {
+      const matches = p.parentProductId === level1Id || p.parent_product_id === level1Id;
+      console.log(`[ProductDataService] Checking product ${p.name} (${p.id}):`, {
+        parentProductId: p.parentProductId,
+        parent_product_id: p.parent_product_id,
+        matchesParent: matches
+      });
+      return matches;
+    });
+    
+    console.log(`[ProductDataService] Found ${level2Products.length} level 2 products for parent ID ${level1Id}`);
+    
+    // Add parent product reference to each level 2 product
+    const result = level2Products.map(product => {
+      const enhancedProduct = {
+        ...product,
+        // Ensure parentProductId is set correctly
+        parentProductId: product.parentProductId || product.parent_product_id || level1Id,
+        // Add parent product details for reference
+        parentProduct: {
+          id: parentProduct.id, 
+          name: parentProduct.name, 
+          displayName: parentProduct.displayName || parentProduct.name
+        }
+      };
+      
+      console.log(`[ProductDataService] Enhanced product ${product.name} with parent:`, {
+        productId: product.id,
+        productName: product.name,
+        originalParentId: product.parentProductId || product.parent_product_id,
+        finalParentId: enhancedProduct.parentProductId,
+        parentDisplayName: enhancedProduct.parentProduct.displayName
+      });
+      
+      return enhancedProduct;
+    });
+    
+    return result;
   };
 
   // Sensor configuration methods

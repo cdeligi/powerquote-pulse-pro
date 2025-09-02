@@ -38,7 +38,13 @@ export interface Level1Product extends BaseProduct {
 
 // Level 2: Product Variants/Chassis (LTX, MTX, STX for QTMS)
 export interface Level2Product extends BaseProduct {
-  parentProductId: string; // Links to Level1Product
+  parentProductId: string; // Links to Level1Product (camelCase for frontend)
+  parent_product_id?: string; // snake_case for database compatibility
+  parentProduct?: {      // Added for easy access to parent product details
+    id: string;
+    name: string;
+    displayName?: string;
+  };
   type?: string; // Deprecated: use chassisType instead - kept for backward compatibility
   chassisType?: string; // Chassis type: N/A, LTX, MTX, STX
   specifications?: {
@@ -52,6 +58,11 @@ export interface Level2Product extends BaseProduct {
 export interface Level3Product extends Omit<BaseProduct, 'partNumber'> {
   parent_product_id: string; // Links to Level2Product
   parentProductId?: string; // Backward compatibility alias
+  parentProduct?: {      // Added for easy access to parent product details
+    id: string;
+    name: string;
+    displayName?: string;
+  };
   product_level: 3;
   type?: string; // Backward compatibility
   part_number_format?: string;
