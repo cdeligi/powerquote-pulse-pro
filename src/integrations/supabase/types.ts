@@ -341,6 +341,24 @@ export type Database = {
         }
         Relationships: []
       }
+      departments: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
       features: {
         Row: {
           created_at: string | null
@@ -575,6 +593,7 @@ export type Database = {
           created_at: string
           display_order: number
           id: string
+          info_url: string | null
           is_default: boolean
           label: string
           level4_configuration_id: string
@@ -585,6 +604,7 @@ export type Database = {
           created_at?: string
           display_order?: number
           id?: string
+          info_url?: string | null
           is_default?: boolean
           label: string
           level4_configuration_id: string
@@ -595,6 +615,7 @@ export type Database = {
           created_at?: string
           display_order?: number
           id?: string
+          info_url?: string | null
           is_default?: boolean
           label?: string
           level4_configuration_id?: string
@@ -840,9 +861,11 @@ export type Database = {
           cost: number | null
           created_at: string
           description: string | null
+          display_name: string | null
           enabled: boolean | null
           has_level4: boolean
           id: string
+          image: string | null
           image_url: string | null
           is_active: boolean
           name: string
@@ -866,9 +889,11 @@ export type Database = {
           cost?: number | null
           created_at?: string
           description?: string | null
+          display_name?: string | null
           enabled?: boolean | null
           has_level4?: boolean
           id: string
+          image?: string | null
           image_url?: string | null
           is_active?: boolean
           name: string
@@ -892,9 +917,11 @@ export type Database = {
           cost?: number | null
           created_at?: string
           description?: string | null
+          display_name?: string | null
           enabled?: boolean | null
           has_level4?: boolean
           id?: string
+          image?: string | null
           image_url?: string | null
           is_active?: boolean
           name?: string
@@ -1709,6 +1736,10 @@ export type Database = {
         Args: { target_user_id: string }
         Returns: boolean
       }
+      execute_sql: {
+        Args: { query: string }
+        Returns: Json
+      }
       get_admin_user_ids: {
         Args: Record<PropertyKey, never>
         Returns: string[]
@@ -1887,6 +1918,12 @@ export type Database = {
           p_user_id: string
         }
         Returns: string
+      }
+      update_product_display_name: {
+        Args:
+          | { p_display_name: string; p_id: string }
+          | { p_display_name: string; p_id: string }
+        Returns: Json
       }
       update_quote_analytics: {
         Args: Record<PropertyKey, never>

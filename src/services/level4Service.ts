@@ -162,7 +162,7 @@ export class Level4Service {
   }
 
   // Add or update dropdown option
-  static async saveLevel4Option(option: Omit<Level4Option, 'id' | 'created_at' | 'updated_at'> & { id?: string }): Promise<Level4Option | null> {
+  static async saveLevel4Option(option: Omit<Level4Option, 'id' | 'created_at' | 'updated_at'> & { id?: string; info_url?: string }): Promise<Level4Option | null> {
     try {
       if (option.id) {
         // Update existing option
@@ -172,7 +172,8 @@ export class Level4Service {
             label: option.label,
             value: option.value,
             display_order: option.display_order,
-            is_default: option.is_default
+            is_default: option.is_default,
+            info_url: option.info_url
           })
           .eq('id', option.id)
           .select()
@@ -193,7 +194,8 @@ export class Level4Service {
             label: option.label,
             value: option.value,
             display_order: option.display_order,
-            is_default: option.is_default
+            is_default: option.is_default,
+            info_url: option.info_url
           })
           .select()
           .single();

@@ -4,6 +4,7 @@ export interface DropdownOption {
   id: string;
   name: string;
   url: string;
+  info_url?: string;
 }
 
 export interface FixedSettings {

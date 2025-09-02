@@ -86,7 +86,7 @@ export const BOMProvider: React.FC<BOMProviderProps> = ({ children }) => {
     const value = level4Values[bomItemId];
     if (!value || !value.entries.length) return null;
     
-    return `L4: ${value.entries.length} selection${value.entries.length !== 1 ? 's' : ''}`;
+    return `L4: ${value.entries.length} selection${value.entries.length !== 1 ? 's' : ''} configured`;
   };
 
   const value: BOMContextType = {
