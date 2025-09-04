@@ -7,7 +7,6 @@ import {
   emptyFixedConfig,
 } from "@/components/level4/Level4ConfigTypes";
 import { Level4Service } from "@/services/level4Service";
-import { Level4TemplateType } from "@/types/level4";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
@@ -16,34 +15,31 @@ export default function AdminLevel4ConfigPage() {
   const { productId } = useParams();
   const [cfg, setCfg] = useState<Level4Config>(emptyVariableConfig());
   const [loading, setLoading] = useState(true);
+  const [dbSchemaError, setDbSchemaError] = useState<string | null>(null);
 
   useEffect(() => {
     const loadConfig = async () => {
       try {
         setLoading(true);
-        // Load existing configuration from Supabase if available
-        const level4Config = await Level4Service.getLevel4Configuration(productId);
+        const config = await Level4Service.getLevel4Configuration(productId!);
         
-        if (level4Config) {
-          // Convert Supabase format to Level4Config format
-          setCfg({
-            id: level4Config.id,
-            fieldLabel: level4Config.field_label,
-            mode: level4Config.template_type === 'OPTION_1' ? 'variable' : 'fixed',
-            fixed: level4Config.template_type === 'OPTION_2' ? { numberOfInputs: level4Config.fixed_inputs || 1 } : undefined,
-            variable: level4Config.template_type === 'OPTION_1' ? { maxInputs: level4Config.max_inputs || 3 } : undefined,
-            options: level4Config.options.map(opt => ({
-              id: opt.id,
-              name: opt.label,
-              url: '' // Level4Option doesn't have info_url field
-            }))
-          });
+        if (config) {
+          setCfg(config);
         } else {
           setCfg(emptyVariableConfig());
         }
       } catch (error) {
         console.error('Failed to load Level 4 config:', error);
-        setCfg(emptyVariableConfig());
+        if (error && typeof error === 'object' && 'code' in error && error.code === '42P01') {
+          const description = "The 'level4_configs' table is missing from your database. Please apply the latest database migrations to resolve this issue.";
+          setDbSchemaError(description);
+        } else if (error && typeof error === 'object' && 'status' in error && error.status === 406) {
+          const description = "The API schema is out of date. This can happen after database migrations. Restarting your Supabase services (or project on the cloud) will force the schema to reload.";
+          setDbSchemaError(description);
+        } else {
+          setDbSchemaError(error instanceof Error ? error.message : 'An unknown error occurred while loading the configuration.');
+        }
+        setCfg(emptyVariableConfig()); // Set a default empty state
       } finally {
         setLoading(false);
       }
@@ -56,45 +52,14 @@ export default function AdminLevel4ConfigPage() {
 
   const save = async (updated: Level4Config) => {
     try {
-      // Convert Level4Config format to Supabase format
-      const configToSave = {
-        id: updated.id !== emptyVariableConfig().id ? updated.id : undefined,
-        level3_product_id: productId!,
-        template_type: (updated.mode === 'variable' ? 'OPTION_1' : 'OPTION_2') as Level4TemplateType,
-        field_label: updated.fieldLabel,
-        max_inputs: updated.mode === 'variable' ? updated.variable?.maxInputs : null,
-        fixed_inputs: updated.mode === 'fixed' ? updated.fixed?.numberOfInputs : null,
-        info_url: null // Global URL not used in new system
-      };
-
-      // Save configuration
-      const savedConfig = await Level4Service.saveLevel4Configuration(configToSave);
-      if (!savedConfig) throw new Error('Failed to save configuration');
-
-      // Delete existing options and recreate
-      if (updated.id && updated.id !== emptyVariableConfig().id) {
-        // Delete existing options
-        const existingConfig = await Level4Service.getLevel4Configuration(productId);
-        if (existingConfig?.options) {
-          for (const opt of existingConfig.options) {
-            await Level4Service.deleteLevel4Option(opt.id);
-          }
-        }
+      const savedConfig = await Level4Service.saveLevel4Configuration(updated, productId!);
+      if (!savedConfig) {
+        throw new Error('Failed to save configuration');
       }
-
-      // Save new options
-      for (let i = 0; i < updated.options.length; i++) {
-        const option = updated.options[i];
-        await Level4Service.saveLevel4Option({
-          level4_configuration_id: savedConfig.id,
-          label: option.name,
-          value: option.id,
-          display_order: i,
-          is_default: i === 0 // First option is default
-        });
-      }
-
-      setCfg({ ...updated, id: savedConfig.id });
+      // The service now returns the full config, so we can just set it.
+      // The ID is managed by the database, so the `updated` object might have a temporary one.
+      // The `savedConfig` will have the real, persisted state.
+      setCfg(savedConfig);
     } catch (error) {
       console.error('Failed to save Level 4 config:', error);
       throw error;
@@ -105,6 +70,34 @@ export default function AdminLevel4ConfigPage() {
     return (
       <div className="flex items-center justify-center min-h-96">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  if (dbSchemaError) {
+    return (
+      <div className="container mx-auto p-6 max-w-6xl">
+        <div className="flex items-center gap-4 mb-4">
+          <Button variant="ghost" size="sm" onClick={() => window.history.back()}>
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back
+          </Button>
+        </div>
+        <Card className="border-destructive">
+          <CardHeader>
+            <CardTitle className="text-destructive">Configuration Error</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="mb-4">{dbSchemaError}</p>
+            <p className="text-sm text-muted-foreground">
+              This error indicates that your application code is ahead of your database schema. Run the following command in your project's terminal and then refresh this page.
+            </p>
+            <div className="mt-4 p-4 bg-muted rounded font-mono text-sm">
+              <pre><code>supabase db push</code></pre>
+            </div>
+            <Button onClick={() => window.location.reload()} className="mt-4">Refresh Page</Button>
+          </CardContent>
+        </Card>
       </div>
     );
   }

@@ -24,7 +24,7 @@ const CardForm = ({ onSubmit, level2Products, initialData }: CardFormProps) => {
     price: initialData?.price || 0,
     cost: initialData?.cost || 0,
     enabled: initialData?.enabled ?? true,
-    requires_level4_config: initialData?.requires_level4_config || false,
+    has_level4: (initialData as any)?.has_level4 || false,
     specifications: initialData?.specifications || {},
     product_level: 3 as const,
     image: initialData?.image || ''
@@ -43,7 +43,7 @@ const CardForm = ({ onSubmit, level2Products, initialData }: CardFormProps) => {
       price: Number(formData.price),
       cost: Number(formData.cost),
       enabled: formData.enabled,
-      requires_level4_config: formData.requires_level4_config,
+      has_level4: (formData as any).has_level4,
       specifications: formData.specifications,
       product_level: 3,
       image: formData.image || undefined
@@ -233,11 +233,11 @@ const CardForm = ({ onSubmit, level2Products, initialData }: CardFormProps) => {
 
       <div className="flex items-center space-x-2">
         <Switch
-          id="requires-level4"
-          checked={formData.requires_level4_config}
-          onCheckedChange={(requires_level4_config) => setFormData({ ...formData, requires_level4_config })}
+          id="has-level4"
+          checked={(formData as any).has_level4}
+          onCheckedChange={(checked) => setFormData({ ...formData, has_level4: checked })}
         />
-        <Label htmlFor="requires-level4" className="text-foreground">Requires Level 4 Configuration</Label>
+        <Label htmlFor="has-level4" className="text-foreground">Has Level 4 Configuration</Label>
       </div>
 
       <div className="flex justify-end space-x-3 pt-4">

@@ -27,7 +27,7 @@ const ChassisSelector = ({ onChassisSelect, selectedChassis, onAddToBOM, canSeeP
     if (!onAddToBOM) return;
 
     // Check if this product requires Level 4 configuration
-    const requiresLevel4 = (product as any).requires_level4_config === true;
+    const requiresLevel4 = (product as any).has_level4 === true;
     
     console.log(`Adding ${product.name} to BOM, requires Level 4: ${requiresLevel4}`);
     

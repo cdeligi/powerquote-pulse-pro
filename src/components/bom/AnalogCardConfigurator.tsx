@@ -80,7 +80,7 @@ const AnalogCardConfigurator = ({ bomItem, onSave, onClose }: AnalogCardConfigur
       }
     };
 
-    if ((bomItem.product as any).requires_level4_config) {
+    if ((bomItem.product as any).has_level4) {
       loadLevel4Config();
     }
   }, [bomItem.product.id]);

@@ -2,16 +2,11 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Level4Service } from '@/services/level4Service';
-import { BOMItem } from '@/types/product';
-import { 
-  Level4Configuration, 
-  Level4SelectionEntry, 
-  Level4RuntimePayload 
-} from '@/types/level4';
-import { toast } from '@/components/ui/use-toast';
-import { Level4RuntimeView, useLevel4Validation } from './Level4RuntimeView';
+import type { BOMItem } from '@/types/product';
+import type { Level4SelectionEntry, Level4RuntimePayload } from '@/types/level4';
+import { toast } from 'sonner';
 import Level4Configurator from './Level4Configurator';
-import { Level4Config } from './Level4ConfigTypes';
+import type { Level4Config } from './Level4ConfigTypes';
 
 interface Level4RuntimeModalProps {
   bomItem: BOMItem;
@@ -26,80 +21,83 @@ export const Level4RuntimeModal: React.FC<Level4RuntimeModalProps> = ({
   onSave, 
   onCancel 
 }) => {
-  const [configuration, setConfiguration] = useState<Level4Configuration | null>(null);
   const [level4Config, setLevel4Config] = useState<Level4Config | null>(null);
   const [entries, setEntries] = useState<Level4SelectionEntry[]>([]);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const { validateEntries } = useLevel4Validation();
 
   useEffect(() => {
     const loadConfiguration = async () => {
       setIsLoading(true);
+      setError(null);
+      
       try {
+        // Load the Level 4 configuration
         const config = await Level4Service.getLevel4Configuration(level3ProductId);
         if (!config) {
-          throw new Error('No Level 4 configuration found for this product.');
+          throw new Error('No Level 4 configuration found for this product. Please configure it in the admin panel first.');
         }
 
-        if (config.options.length === 0) {
-          throw new Error('No options configured for this Level 4 configuration.');
+        if (!config.options || config.options.length === 0) {
+          throw new Error('No options configured for this Level 4 configuration. Please add options in the admin panel.');
         }
 
-        setConfiguration(config);
+        setLevel4Config(config);
 
-        // Convert to Level4Config format for new UI
-        const newFormatConfig: Level4Config = {
-          id: config.id,
-          fieldLabel: config.field_label,
-          mode: config.template_type === 'OPTION_1' ? 'variable' : 'fixed',
-          fixed: config.template_type === 'OPTION_2' ? { numberOfInputs: config.fixed_inputs || 1 } : undefined,
-          variable: config.template_type === 'OPTION_1' ? { maxInputs: config.max_inputs || 3 } : undefined,
-          options: config.options.map(opt => ({
-            id: opt.value,
-            name: opt.label,
-            url: '' // Level4Option doesn't have info_url, each option URL is managed in new system
-          }))
-        };
-        setLevel4Config(newFormatConfig);
-
-        // Check for existing Level 4 values
-        const existingValue = await Level4Service.getBOMLevel4Value(bomItem.id);
-        
-        if (existingValue && existingValue.entries.length > 0) {
-          // Pre-populate with existing selections
-          setEntries(existingValue.entries);
-          setSelectedIds(existingValue.entries.map(e => e.value));
-        } else {
-          // Initialize with defaults
-          const initialEntries: Level4SelectionEntry[] = [];
-          const defaultOption = config.options.find(opt => opt.is_default);
-          const defaultValue = defaultOption?.value || '';
+        try {
+          // Try to load existing configuration
+          const existingValue = await Level4Service.getBOMLevel4Value(bomItem.id);
           
-          if (config.template_type === 'OPTION_1') {
-            initialEntries.push({
-              index: 0,
-              value: defaultValue
-            });
-            setSelectedIds([defaultValue]);
-          } else {
-            const count = config.fixed_inputs || 1;
-            const initialIds: string[] = [];
-            for (let i = 0; i < count; i++) {
-              initialEntries.push({
-                index: i,
-                value: defaultValue
-              });
-              initialIds.push(defaultValue);
+          if (existingValue?.entries?.length > 0) {
+            // Pre-populate with existing selections
+            const validSelections = existingValue.entries
+              .filter(entry => config.options.some(opt => opt.id === entry.value));
+              
+            if (validSelections.length > 0) {
+              setEntries(validSelections);
+              setSelectedIds(validSelections.map(e => e.value));
+              return;
             }
-            setSelectedIds(initialIds);
           }
-          setEntries(initialEntries);
+        } catch (loadError) {
+          console.warn('Could not load existing Level 4 values, using defaults:', loadError);
         }
+
+        // Initialize with defaults if no existing values found
+        const initialEntries: Level4SelectionEntry[] = [];
+        const defaultValue = config.options[0]?.id || '';
+        const count = config.fixed?.numberOfInputs || 1;
+        const initialIds: string[] = [];
+        
+        for (let i = 0; i < count; i++) {
+          initialEntries.push({
+            index: i,
+            value: defaultValue
+          });
+          initialIds.push(defaultValue);
+        }
+        
+        setEntries(initialEntries);
+        setSelectedIds(initialIds);
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load configuration.');
+        let description = "Failed to load configuration.";
+        
+        if (err && typeof err === 'object') {
+          if ('code' in err && err.code === '42P01') {
+            description = "The database schema is out of date. Please run the latest migrations.";
+          } else if ('status' in err && err.status === 406) {
+            description = "The API schema is out of date. Please refresh the Supabase API schema.";
+          } else if ('message' in err) {
+            description = err.message as string;
+          }
+        } else if (err instanceof Error) {
+          description = err.message;
+        }
+        
         console.error('Error loading Level 4 configuration:', err);
+        setError(description);
+        toast.error(description);
       } finally {
         setIsLoading(false);
       }
@@ -107,10 +105,6 @@ export const Level4RuntimeModal: React.FC<Level4RuntimeModalProps> = ({
 
     loadConfiguration();
   }, [level3ProductId, bomItem.id]);
-
-  const handleEntriesChange = (newEntries: Level4SelectionEntry[]) => {
-    setEntries(newEntries);
-  };
 
   const handleSelectionChange = (ids: string[]) => {
     setSelectedIds(ids);
@@ -123,57 +117,44 @@ export const Level4RuntimeModal: React.FC<Level4RuntimeModalProps> = ({
   };
 
   const handleSave = async () => {
+    if (!level4Config) {
+      toast.error("No Level 4 configuration found");
+      return;
+    }
+
+    // Validate all entries have selections
+    if (selectedIds.some(id => !id)) {
+      toast.error("Please complete all required fields");
+      return;
+    }
+
     try {
-      if (!configuration) {
-        toast({
-          title: "Error",
-          description: "No Level 4 configuration found",
-          variant: "destructive"
-        });
-        return;
-      }
-
-      // Validate all entries have selections
-      if (!validateEntries(entries)) {
-        toast({
-          title: "Incomplete configuration",
-          description: "Please make a selection for all inputs.",
-          variant: "destructive"
-        });
-        return;
-      }
-
-      // Create the payload
+      setIsLoading(true);
+      
       const payload: Level4RuntimePayload = {
-        bomItemId: bomItem.id!,
-        configuration_id: configuration.id,
-        template_type: configuration.template_type,
-        entries: entries.map((entry, idx) => ({
-          index: idx, // Re-index sequentially
-          value: entry.value
-        }))
+        bomItemId: bomItem.id,
+        configuration_id: level4Config.id,
+        template_type: 'OPTION_2', // Using OPTION_2 for fixed template type
+        entries: entries.map((entry, index) => ({
+          index,
+          value: selectedIds[index] || ''
+        })).filter(entry => entry.value) // Remove empty selections
       };
 
       // Save the configuration
-      const savedValue = await Level4Service.saveBOMLevel4Value(bomItem.id!, payload);
-      if (!savedValue) {
-        throw new Error('Failed to save Level 4 configuration');
-      }
-
-      toast({
-        title: "Success",
-        description: "Level 4 configuration saved successfully",
-      });
-
-      // Pass the saved value to parent
+      await Level4Service.saveBOMLevel4Value(bomItem.id, payload);
+      
+      // Notify parent component
       onSave(payload);
+      
+      toast.success('Level 4 configuration saved successfully');
     } catch (error) {
       console.error('Error saving Level 4 configuration:', error);
-      toast({
-        title: "Error",
-        description: "Failed to save Level 4 configuration",
-        variant: "destructive"
-      });
+      const errorMessage = error instanceof Error ? error.message : 'Failed to save configuration';
+      setError(errorMessage);
+      toast.error(errorMessage);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -207,7 +188,7 @@ export const Level4RuntimeModal: React.FC<Level4RuntimeModalProps> = ({
     );
   }
 
-  if (error || !configuration) {
+  if (error || !level4Config) {
     return (
       <Dialog open={true} onOpenChange={() => onCancel()}>
         <DialogContent className="sm:max-w-[525px]">
@@ -239,14 +220,7 @@ export const Level4RuntimeModal: React.FC<Level4RuntimeModalProps> = ({
               initial={selectedIds}
               onChange={handleSelectionChange}
             />
-          ) : (
-            <Level4RuntimeView
-              mode="interactive"
-              configuration={configuration}
-              initialEntries={entries}
-              onEntriesChange={handleEntriesChange}
-            />
-          )}
+          ) : null}
         </div>
 
         <DialogFooter className="shrink-0">

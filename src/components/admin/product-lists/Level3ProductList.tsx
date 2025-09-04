@@ -35,14 +35,14 @@ export const Level3ProductList: React.FC<Level3ProductListProps> = ({
     setEditingProduct(product.id);
     setEditFormData({
       name: product.name,
-      displayName: (product as any).displayName || '',
+      displayName: (product as any).displayName || product.name,
       parentProductId: product.parentProductId,
       type: product.type,
       description: product.description,
       price: product.price,
       cost: product.cost || 0,
       enabled: product.enabled !== false,
-      requires_level4_config: product.requires_level4_config || false
+      has_level4: (product as any).has_level4 || false
     });
   };
 
@@ -63,35 +63,21 @@ export const Level3ProductList: React.FC<Level3ProductListProps> = ({
     
     try {
       setIsSaving(true);
-      
-      // Get the current product to ensure we have the correct ID
-      const currentProduct = products.find(p => p.id === productId || p.name === productId);
-      if (!currentProduct) {
-        throw new Error('Product not found');
-      }
-      
-      // If displayName is in the form data, update only the display name
-      if ('displayName' in editFormData) {
-        await productDataService.updateDisplayNameOnly(
-          currentProduct.id,
-          editFormData.displayName || currentProduct.name
-        );
-      }
-      
-      // Refresh the product list
+      await productDataService.updateLevel3Product(productId, editFormData);
+
       onProductUpdate();
       setEditingProduct(null);
       setEditFormData({});
       
       toast({
         title: "Success",
-        description: "Product display name updated successfully.",
+        description: "Product updated successfully.",
       });
     } catch (error) {
-      console.error('Error updating product display name:', error);
+      console.error('Error updating product:', error);
       toast({
         title: "Error",
-        description: error instanceof Error ? error.message : "Failed to update product display name. Please try again.",
+        description: error instanceof Error ? error.message : "Failed to update product. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -233,11 +219,11 @@ export const Level3ProductList: React.FC<Level3ProductListProps> = ({
                       </div>
                       <div className="flex items-center space-x-2">
                         <Switch
-                          id={`requires-level4-${product.id}`}
-                          checked={editFormData.requires_level4_config || false}
-                          onCheckedChange={(checked) => setEditFormData(prev => ({ ...prev, requires_level4_config: checked }))}
+                          id={`has-level4-${product.id}`}
+                          checked={(editFormData as any).has_level4 || false}
+                          onCheckedChange={(checked) => setEditFormData(prev => ({ ...prev, has_level4: checked }))}
                         />
-                        <Label htmlFor={`requires-level4-${product.id}`} className="text-gray-700">Level 4 Configuration</Label>
+                        <Label htmlFor={`has-level4-${product.id}`} className="text-gray-700">Has Level 4 Config</Label>
                       </div>
                     <div>
                       <Label htmlFor={`price-${product.id}`} className="text-gray-700">Price ($)</Label>
@@ -310,7 +296,7 @@ export const Level3ProductList: React.FC<Level3ProductListProps> = ({
                                className={product.enabled !== false ? "bg-green-100 text-green-800 border-green-200" : "bg-gray-100 text-gray-600 border-gray-200"}>
                           {product.enabled !== false ? 'Enabled' : 'Disabled'}
                         </Badge>
-                        {product.requires_level4_config && (
+                        {(product as any).has_level4 && (
                           <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-200">
                             L4 Enabled
                           </Badge>
@@ -334,7 +320,7 @@ export const Level3ProductList: React.FC<Level3ProductListProps> = ({
                       >
                         Part Numbers
                       </Button>
-                      {product.requires_level4_config && (
+                      {(product as any).has_level4 && (
                         <Button
                           onClick={() => window.open(`/admin/level4?product=${product.id}`, '_blank')}
                           variant="outline"
