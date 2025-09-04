@@ -72,8 +72,8 @@ export default function Level4Configurator({
 
   const openDetailsUrl = (selectionId: string) => {
     const option = getSelectedOption(selectionId);
-    if (option?.url || option?.info_url) {
-      window.open(option.url || option.info_url!, '_blank', 'noopener,noreferrer');
+    if (option?.url) {
+      window.open(option.url, '_blank', 'noopener,noreferrer');
     }
   };
 
@@ -126,7 +126,7 @@ export default function Level4Configurator({
               variant="outline"
               size="sm"
               onClick={() => openDetailsUrl(selection)}
-              disabled={!selection || (!getSelectedOption(selection)?.url && !getSelectedOption(selection)?.info_url)}
+              disabled={!selection || !getSelectedOption(selection)?.url}
               className="shrink-0"
             >
               <ExternalLink className="h-4 w-4" />

@@ -48,8 +48,10 @@ const App = () => {
             <Sonner />
             <BrowserRouter>
               <Routes>
-                <Route path="/" element={<Index />} />
-                <Route path="*" element={<NotFound />} />
+                {/* This makes the Index component the entry point for all routes,
+                    allowing it to handle auth and render the Dashboard, which in turn
+                    should contain its own nested <Routes> to handle sub-paths like /admin. */}
+                <Route path="/*" element={<Index />} />
               </Routes>
             </BrowserRouter>
           </ErrorBoundary>

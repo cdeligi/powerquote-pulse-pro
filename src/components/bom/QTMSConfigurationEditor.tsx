@@ -343,7 +343,7 @@ const QTMSConfigurationEditor = ({
       });
 
       // Open configuration if needed based on Level 4 flag
-      if (card.requires_level4_config && card.name.toLowerCase().includes('bushing')) {
+      if ((card as any).has_level4 && card.name.toLowerCase().includes('bushing')) {
         const newItem: BOMItem = {
           id: `${Date.now()}-${Math.random()}`,
           product: card,
@@ -429,7 +429,7 @@ const QTMSConfigurationEditor = ({
     }
 
     // Check if card needs configuration based on Level 4 flag
-    if (card.requires_level4_config && card.name.toLowerCase().includes('analog')) {
+    if ((card as any).has_level4 && card.name.toLowerCase().includes('analog')) {
       const newItem: BOMItem = {
         id: `${Date.now()}-${Math.random()}`,
         product: card,

@@ -45,6 +45,8 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
   const canEditPN = has(FEATURES.BOM_EDIT_PART_NUMBER);
   const canForcePN = has(FEATURES.BOM_FORCE_PART_NUMBER);
 
+  const [l4ModalOpen, setL4ModalOpen] = useState(false);
+  const [selectedBomItem, setSelectedBomItem] = useState<BOMItem | null>(null);
   const [selectedLevel1Product, setSelectedLevel1Product] = useState<Level1Product | null>(null);
   const [selectedLevel2Options, setSelectedLevel2Options] = useState<Level2Product[]>([]);
   const [selectedChassis, setSelectedChassis] = useState<Level2Product | null>(null);
@@ -53,9 +55,7 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
   const [bomItems, setBomItems] = useState<BOMItem[]>([]);
   const [activeTab, setActiveTab] = useState<string>('');
   const [hasRemoteDisplay, setHasRemoteDisplay] = useState<boolean>(false);
-  const [configuringCard, setConfiguringCard] = useState<BOMItem | null>(null); // Legacy, to be removed
   const [configuringLevel4Item, setConfiguringLevel4Item] = useState<BOMItem | null>(null);
-  const [configuringBOMItem, setConfiguringBOMItem] = useState<BOMItem | null>(null);
   const [quoteFields, setQuoteFields] = useState<Record<string, any>>({});
   const [discountPercentage, setDiscountPercentage] = useState<number>(0);
   const [discountJustification, setDiscountJustification] = useState<string>('');
@@ -494,7 +494,7 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
     setSlotAssignments(updatedAssignments);
     
     // Check if this card requires level 4 configuration
-    if ((card as any).requires_level4_config) {
+    if ((card as any).has_level4) {
       const newItem: BOMItem = {
         id: `item-${Date.now()}`,
         product: cardWithDisplayName,
@@ -534,10 +534,15 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
     onBOMUpdate(updatedItems);
   };
 
+  const handleConfigureL4 = (item: BOMItem) => {
+    setSelectedBomItem(item);
+    setL4ModalOpen(true);
+  };
+
   const handleLevel4Save = (payload: Level4RuntimePayload) => {
     console.log('Saving Level 4 configuration:', payload);
     
-    if (configuringLevel4Item) {
+    if (selectedBomItem) {
       const updatedItem = { 
         ...configuringLevel4Item, 
         level4Config: payload,
@@ -575,38 +580,6 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
   const handleLevel4Cancel = () => {
     setConfiguringLevel4Item(null);
     setSelectedSlot(null);
-  };
-
-  const handleCardConfiguration = (customizations: Level3Customization[]) => {
-    if (!configuringCard) return;
-
-    const configuredItem: BOMItem = {
-      ...configuringCard,
-      level3Customizations: customizations,
-      product: {
-        ...configuringCard.product,
-        displayName: (configuringCard as any).displayName || configuringCard.product.name
-      },
-      name: (configuringCard as any).displayName || configuringCard.product.name
-    };
-
-    if (configuringCard.slot !== undefined) {
-      setSlotAssignments(prev => ({
-        ...prev,
-        [configuringCard.slot!]: {
-          ...configuredItem.product as Level3Product,
-          displayName: (configuredItem as any).displayName || configuredItem.product.name
-        }
-      }));
-      setConfiguringCard(null);
-    } else {
-      const updatedItems = bomItems.map(item => 
-        item.id === configuringCard.id ? configuredItem : item
-      );
-      setBomItems(updatedItems);
-      onBOMUpdate(updatedItems);
-      setConfiguringCard(null);
-    }
   };
 
   const handleRemoteDisplayToggle = (enabled: boolean) => {
@@ -785,7 +758,7 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
     console.log('Editing BOM item configuration:', item);
     
     // FIRST: Check for Level 4 configuration
-    if ((item.product as any).requires_level4_config || (item.product as any).has_level4) {
+    if ((item.product as any).has_level4) {
       console.log('Opening Level 4 configuration for:', item.product.name);
       setConfiguringLevel4Item(item);
       return;
@@ -841,7 +814,7 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
       setEditingQTMS(consolidatedQTMS);
     } else {
       // For other configurable items (analog cards, bushing cards, etc.)
-      setConfiguringBOMItem(item);
+      setConfiguringLevel4Item(item);
     }
   };
 
@@ -1350,6 +1323,28 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
 
   return (
     <div className="space-y-6">
+      {/* Level 4 Configuration Modal */}
+      {l4ModalOpen && selectedBomItem && (
+        <Level4RuntimeModal
+          isOpen={l4ModalOpen}
+          onClose={() => setL4ModalOpen(false)}
+          onSave={(config) => {
+            console.log('Level 4 configuration saved:', config);
+            // Update the BOM item with the configuration
+            const updatedItems = bomItems.map(item => 
+              item.id === selectedBomItem.id 
+                ? { ...item, level4Config: config }
+                : item
+            );
+            setBomItems(updatedItems);
+            onBOMUpdate(updatedItems);
+            setL4ModalOpen(false);
+          }}
+          productId={selectedBomItem.product.id}
+          initialConfig={selectedBomItem.level4Config}
+        />
+      )}
+      
       {/* Quote Fields Section */}
       <QuoteFieldsSection
         quoteFields={quoteFields}
@@ -1432,23 +1427,6 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
           {isSubmitting ? 'Submitting...' : 'Submit Quote Request'}
         </Button>
       </div>
-
-      {/* Configuration Dialogs */}
-      {configuringCard && (configuringCard.product as any).requires_level4_config && (
-        configuringCard.product.name.toLowerCase().includes('analog') ? (
-          <AnalogCardConfigurator
-            bomItem={configuringCard}
-            onSave={handleCardConfiguration}
-            onClose={() => setConfiguringCard(null)}
-          />
-        ) : configuringCard.product.name.toLowerCase().includes('bushing') ? (
-          <BushingCardConfigurator
-            bomItem={configuringCard}
-            onSave={handleCardConfiguration}
-            onClose={() => setConfiguringCard(null)}
-          />
-        ) : null
-      )}
 
       {configuringLevel4Item && (
         <Level4RuntimeModal

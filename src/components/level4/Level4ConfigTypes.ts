@@ -1,10 +1,11 @@
 // Level 4 Configuration Types and Helpers
 
+import { v4 as uuidv4 } from 'uuid';
+import { z } from "zod";
 export interface DropdownOption {
   id: string;
   name: string;
   url: string;
-  info_url?: string;
 }
 
 export interface FixedSettings {
@@ -26,7 +27,7 @@ export interface Level4Config {
 
 // Helper functions
 export function uid(): string {
-  return `opt-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  return uuidv4();
 }
 
 export function emptyFixedConfig(): Level4Config {
@@ -49,26 +50,32 @@ export function emptyVariableConfig(): Level4Config {
   };
 }
 
+export const DropdownOptionSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1, { message: "Option name cannot be empty." }),
+  url: z.string().url({ message: "Invalid URL format." }).optional().or(z.literal("")),
+});
+
+export const Level4ConfigSchema = z.object({
+  id: z.string().min(1),
+  fieldLabel: z.string().min(1, { message: "Field Label is required." }),
+  mode: z.enum(["fixed", "variable"]),
+  fixed: z.object({ 
+    numberOfInputs: z.number({ invalid_type_error: "Number of inputs must be a number." }).int().min(1) 
+  }).optional(),
+  variable: z.object({ 
+    maxInputs: z.number({ invalid_type_error: "Maximum inputs must be a number." }).int().min(1) 
+  }).optional(),
+  options: z.array(DropdownOptionSchema).min(1, { message: "At least one dropdown option is required." }),
+}).refine(
+  (v) => (v.mode === "fixed" && v.fixed) || (v.mode === "variable" && v.variable),
+  { message: "Fixed mode requires 'numberOfInputs' OR Variable mode requires 'maxInputs'." }
+);
+
 export function validateConfig(config: Level4Config): string[] {
-  const errors: string[] = [];
-  
-  if (!config.fieldLabel?.trim()) {
-    errors.push("Field label is required");
+  const result = Level4ConfigSchema.safeParse(config);
+  if (result.success) {
+    return [];
   }
-  
-  if (config.mode === 'fixed') {
-    if (!config.fixed?.numberOfInputs || config.fixed.numberOfInputs < 1) {
-      errors.push("Fixed mode requires a valid number of inputs");
-    }
-  } else if (config.mode === 'variable') {
-    if (!config.variable?.maxInputs || config.variable.maxInputs < 1) {
-      errors.push("Variable mode requires a valid maximum inputs");
-    }
-  }
-  
-  if (config.options.length === 0) {
-    errors.push("At least one option is required");
-  }
-  
-  return errors;
+  return result.error.issues.map(issue => issue.message);
 }

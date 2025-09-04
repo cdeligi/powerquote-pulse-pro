@@ -178,7 +178,7 @@ class ProductDataService {
         parent_product_id: product.parent_product_id,
         parentProductId: product.parent_product_id,
         product_level: 3,
-        type: product.type || 'standard',
+        type: product.category || 'standard',
         description: product.description || '',
         price: product.price || 0,
         cost: product.cost || 0,
@@ -186,7 +186,7 @@ class ProductDataService {
         partNumber: product.part_number,
         image: product.image_url,
         productInfoUrl: product.product_info_url,
-        requires_level4_config: product.requires_level4_config || false,
+        has_level4: product.has_level4 || false,
         specifications: product.specifications || {}
       }));
 
@@ -396,8 +396,8 @@ class ProductDataService {
             enabled: productData.enabled !== false,
             product_level: 3,
             parent_product_id: productData.parentProductId,
-            type: productData.type || 'standard',
-            requires_level4_config: (productData as any).requires_level4_config || false,
+            category: productData.type || 'standard',
+            has_level4: (productData as any).has_level4 || false,
             specifications: productData.specifications || {}
           }
         ])
@@ -418,7 +418,7 @@ class ProductDataService {
         price: data.price || 0,
         cost: data.cost || 0,
         enabled: data.enabled !== false,
-        requires_level4_config: data.requires_level4_config || false,
+        has_level4: data.has_level4 || false,
         specifications: data.specifications || {}
       };
 
@@ -450,18 +450,21 @@ class ProductDataService {
 
       console.log('Current product from DB:', JSON.stringify(currentProduct, null, 2)); // Added log
 
-      // Prepare the update data
+      // Destructure to separate client-side properties from DB columns
+      const { displayName, parentProductId, type, ...restOfProductData } = productData;
+
+      // Prepare the update data, ensuring only valid DB columns are sent
       const updateData: any = {
-        ...productData, // This contains the new values from the form
+        ...restOfProductData,
         updated_at: new Date().toISOString(),
-        // Preserve the existing display_name if not provided in productData
-        display_name: productData.displayName || currentProduct?.display_name || currentProduct?.name,
-        // Ensure price and cost are explicitly passed if they are in productData
-        price: productData.price !== undefined ? productData.price : currentProduct?.price,
-        cost: productData.cost !== undefined ? productData.cost : currentProduct?.cost,
+        // Map camelCase properties to snake_case DB columns
+        display_name: displayName,
+        parent_product_id: parentProductId,
+        category: type,
       };
 
-      console.log('Update data sent to Supabase:', JSON.stringify(updateData, null, 2)); // Added log
+      // Remove undefined properties to avoid sending them to Supabase
+      Object.keys(updateData).forEach(key => updateData[key] === undefined && delete updateData[key]);
 
       const { data, error } = await supabase
         .from('products')
@@ -889,7 +892,7 @@ class ProductDataService {
           parent_product_id: data.parent_product_id,
           parentProductId: data.parent_product_id,
           product_level: 3,
-          type: data.type || 'standard',
+          type: data.category || 'standard',
           description: data.description || '',
           price: data.price || 0,
           cost: data.cost || 0,
@@ -897,8 +900,7 @@ class ProductDataService {
           partNumber: data.part_number,
           image: data.image_url,
           productInfoUrl: data.product_info_url,
-          requires_level4_config: data.requires_level4_config || false,
-          has_level4: data.requires_level4_config || false, // Alias
+          has_level4: data.has_level4 || false,
           sku: data.sku,
           specifications: data.specifications || {}
         } as Level3Product;

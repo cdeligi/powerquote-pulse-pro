@@ -5,8 +5,11 @@ import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Trash2, ChevronUp, ChevronDown, Copy, Plus, Save } from 'lucide-react';
+import { Trash2, GripVertical, Copy, Plus, Save, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
+import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import {
   type Level4Config,
   type DropdownOption,
@@ -19,9 +22,38 @@ import {
 interface Level4ConfiguratorAdminProps {
   value: Level4Config;
   onChange: (config: Level4Config) => void;
-  onSave?: (config: Level4Config) => void;
+  onSave?: (config: Level4Config) => Promise<void>;
   readOnly?: boolean;
 }
+
+const SortableOptionRow = ({ option, children }: { option: DropdownOption, children: React.ReactNode }) => {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: option.id });
+
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    zIndex: isDragging ? 1 : 'auto',
+  };
+
+  return (
+    <TableRow ref={setNodeRef} style={style} {...attributes}>
+      {React.Children.map(children, child => {
+        if (React.isValidElement(child) && child.props.className?.includes('drag-handle-cell')) {
+          return React.cloneElement(child, { ...child.props, listeners });
+        }
+        return child;
+      })}
+    </TableRow>
+  );
+};
 
 export default function Level4ConfiguratorAdmin({
   value,
@@ -30,6 +62,13 @@ export default function Level4ConfiguratorAdmin({
   readOnly = false
 }: Level4ConfiguratorAdminProps) {
   const [editingOption, setEditingOption] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
 
   const updateConfig = (updates: Partial<Level4Config>) => {
     const newConfig = { ...value, ...updates };
@@ -98,34 +137,49 @@ export default function Level4ConfiguratorAdmin({
     updateConfig({ options: newOptions });
   };
 
-  const moveOption = (id: string, direction: 'up' | 'down') => {
-    if (readOnly) return;
-    
-    const index = value.options.findIndex(opt => opt.id === id);
-    if (index === -1) return;
-    
-    const newIndex = direction === 'up' ? index - 1 : index + 1;
-    if (newIndex < 0 || newIndex >= value.options.length) return;
-    
-    const newOptions = [...value.options];
-    [newOptions[index], newOptions[newIndex]] = [newOptions[newIndex], newOptions[index]];
-    
-    updateConfig({ options: newOptions });
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (readOnly || !over || active.id === over.id) return;
+
+    const oldIndex = value.options.findIndex(opt => opt.id === active.id);
+    const newIndex = value.options.findIndex(opt => opt.id === over.id);
+
+    if (oldIndex !== -1 && newIndex !== -1) {
+      updateConfig({ options: arrayMove(value.options, oldIndex, newIndex) });
+    }
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const errors = validateConfig(value);
     if (errors.length > 0) {
-      toast.error(`Validation failed: ${errors.join(', ')}`);
+      toast.error("Validation Failed", {
+        description: (
+          <ul className="list-disc list-inside ml-4">
+            {errors.map((error, i) => <li key={i}>{error}</li>)}
+          </ul>
+        ),
+      });
       return;
     }
     
-    onSave?.(value);
-    toast.success('Level 4 configuration saved successfully');
+    if (onSave) {
+      setIsSaving(true);
+      try {
+        await onSave(value);
+        toast.success('Level 4 configuration saved successfully');
+      } catch (error) {
+        toast.error('Failed to save configuration', {
+          description: error instanceof Error ? error.message : 'An unknown error occurred.'
+        });
+      } finally {
+        setIsSaving(false);
+      }
+    }
   };
 
   return (
-    <div className="space-y-6">
+    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+      <div className="space-y-6">
       {/* Mode Selection */}
       <Card>
         <CardHeader>
@@ -238,63 +292,54 @@ export default function Level4ConfiguratorAdmin({
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-[40px]"></TableHead>
                   <TableHead>Option Name</TableHead>
                   <TableHead>View Link (URL)</TableHead>
-                  <TableHead className="w-[120px]">Actions</TableHead>
+                  <TableHead className="w-[80px]">Actions</TableHead>
                 </TableRow>
               </TableHeader>
-              <TableBody>
-                {value.options.map((option, index) => (
-                  <TableRow key={option.id}>
-                    <TableCell>
-                      {editingOption === option.id ? (
+              <SortableContext items={value.options} strategy={verticalListSortingStrategy}>
+                <TableBody>
+                  {value.options.map((option) => (
+                    <SortableOptionRow key={option.id} option={option}>
+                      <TableCell className="drag-handle-cell" listeners={{}}>
+                        <Button variant="ghost" size="sm" className="cursor-grab" disabled={readOnly}>
+                          <GripVertical className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
+                      <TableCell>
+                        {editingOption === option.id ? (
+                          <Input
+                            value={option.name}
+                            onChange={(e) => updateOption(option.id, { name: e.target.value })}
+                            onBlur={() => setEditingOption(null)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') setEditingOption(null);
+                            }}
+                            autoFocus
+                            disabled={readOnly}
+                          />
+                        ) : (
+                          <button
+                            onClick={() => !readOnly && setEditingOption(option.id)}
+                            className="text-left hover:underline disabled:hover:no-underline disabled:cursor-default w-full h-full p-2 -m-2"
+                            disabled={readOnly}
+                          >
+                            {option.name}
+                          </button>
+                        )}
+                      </TableCell>
+                      <TableCell>
                         <Input
-                          value={option.name}
-                          onChange={(e) => updateOption(option.id, { name: e.target.value })}
-                          onBlur={() => setEditingOption(null)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') setEditingOption(null);
-                          }}
-                          autoFocus
+                          value={option.url}
+                          onChange={(e) => updateOption(option.id, { url: e.target.value })}
+                          placeholder="https://example.com/details"
                           disabled={readOnly}
+                          className="text-sm"
                         />
-                      ) : (
-                        <button
-                          onClick={() => !readOnly && setEditingOption(option.id)}
-                          className="text-left hover:underline disabled:hover:no-underline disabled:cursor-default"
-                          disabled={readOnly}
-                        >
-                          {option.name}
-                        </button>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <Input
-                        value={option.url}
-                        onChange={(e) => updateOption(option.id, { url: e.target.value })}
-                        placeholder="https://example.com/details"
-                        disabled={readOnly}
-                        className="text-sm"
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => moveOption(option.id, 'up')}
-                          disabled={readOnly || index === 0}
-                        >
-                          <ChevronUp className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => moveOption(option.id, 'down')}
-                          disabled={readOnly || index === value.options.length - 1}
-                        >
-                          <ChevronDown className="h-4 w-4" />
-                        </Button>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-1">
                         <Button
                           variant="ghost"
                           size="sm"
@@ -312,10 +357,11 @@ export default function Level4ConfiguratorAdmin({
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
+                      </TableCell>
+                    </SortableOptionRow>
+                  ))}
+                </TableBody>
+              </SortableContext>
             </Table>
           )}
         </CardContent>
@@ -324,12 +370,14 @@ export default function Level4ConfiguratorAdmin({
       {/* Save Button */}
       {onSave && !readOnly && (
         <div className="flex justify-end">
-          <Button onClick={handleSave}>
-            <Save className="h-4 w-4 mr-2" />
+          <Button onClick={handleSave} disabled={isSaving}>
+            {isSaving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+            {!isSaving && <Save className="h-4 w-4 mr-2" />}
             Save Configuration
           </Button>
         </div>
       )}
-    </div>
+      </div>
+    </DndContext>
   );
 }

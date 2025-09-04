@@ -1,30 +1,30 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Eye, Settings, Plus } from 'lucide-react';
+import { Eye, Settings } from 'lucide-react';
 import { Level4Service } from '@/services/level4Service';
-import { Level4Editor } from '@/components/level4/Level4Editor';
-import { Level4PreviewModal } from '@/components/level4/Level4PreviewModal';
-import { Level4Configuration } from '@/types/level4';
+import type { Level4Config } from '@/components/level4/Level4ConfigTypes';
 import { productDataService } from '@/services/productDataService';
 import { toast } from '@/components/ui/use-toast';
 
 interface Level3ProductWithConfig {
   id: string;
   name: string;
-  parent_product_id: string;
+  parent_product_id: string | null;
   parentChain?: string;
-  configuration?: Level4Configuration;
+  configuration?: Level4Config;
   hasConfiguration: boolean;
+  enabled: boolean;
 }
 
 export const Level4AdminPage: React.FC = () => {
   const [products, setProducts] = useState<Level3ProductWithConfig[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [selectedProduct, setSelectedProduct] = useState<Level3ProductWithConfig | null>(null);
-  const [editorMode, setEditorMode] = useState<'edit' | 'preview' | null>(null);
+  const [dbSchemaError, setDbSchemaError] = useState<string | null>(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
     loadLevel3Products();
@@ -33,50 +33,76 @@ export const Level4AdminPage: React.FC = () => {
   const loadLevel3Products = async () => {
     setIsLoading(true);
     try {
-      // Get all Level 3 products with Level 4 enabled
-      const level3Products = await Level4Service.getLevel3ProductsWithLevel4();
+      // 1. Fetch all data in parallel for efficiency
+      const [level3Products, level2Products, level1Products] = await Promise.all([
+        Level4Service.getLevel3ProductsWithLevel4(),
+        productDataService.getLevel2Products(),
+        productDataService.getLevel1Products(),
+      ]);
       
-      // Build parent chain and check for configurations
-      const productsWithConfig: Level3ProductWithConfig[] = [];
-      
-      for (const product of level3Products) {
-        // Get parent chain
-        let parentChain = 'Unknown';
-        try {
-          const level2Products = await productDataService.getLevel2Products();
-          const parentLevel2 = level2Products.find(p => p.id === product.parent_product_id);
-          
+      // 2. Create lookup maps for fast access, avoiding nested loops
+      const level1Map = new Map(level1Products.map(p => [p.id, p]));
+      const level2Map = new Map(level2Products.map(p => [p.id, p]));
+
+      // 3. Fetch all configurations in parallel
+      const configPromises = level3Products.map(p => 
+        // The service returns null for "not found" and throws for other errors.
+        // This allows Promise.all to fail correctly on critical errors like 406.
+        Level4Service.getLevel4Configuration(p.id).then(config => ({ productId: p.id, config }))
+      );
+      const configResults = await Promise.all(configPromises);
+      const configMap = new Map(configResults.map(r => [r.productId, r.config]));
+
+      // 4. Process all products with the fetched data
+      const productsWithConfig = level3Products.map(product => {
+        // Build parent chain using maps
+        let parentChain = product.name;
+        if (product.parent_product_id) {
+          const parentLevel2 = level2Map.get(product.parent_product_id);
           if (parentLevel2) {
-            const level1Products = await productDataService.getLevel1Products();
-            const parentLevel1 = level1Products.find(p => p.id === parentLevel2.parentProductId);
-            
-            if (parentLevel1) {
-              parentChain = `${parentLevel1.name} → ${parentLevel2.name} → ${product.name}`;
+            // Check if parentProductId exists and is a valid key in level1Map
+            if (parentLevel2.parentProductId && level1Map.has(parentLevel2.parentProductId)) {
+              const parentLevel1 = level1Map.get(parentLevel2.parentProductId);
+              parentChain = `${parentLevel1?.name || 'Unknown'} → ${parentLevel2.name} → ${product.name}`;
             } else {
+              // If no valid parentProductId, just show the direct parent
               parentChain = `${parentLevel2.name} → ${product.name}`;
             }
+          } else {
+            // If parent level 2 not found, just show the product name with unknown parent
+            parentChain = `Unknown → ${product.name}`;
           }
-        } catch (error) {
-          console.error('Error building parent chain:', error);
         }
 
-        // Check for existing configuration
-        const config = await Level4Service.getLevel4Configuration(product.id);
+        // Get configuration from map
+        const config = configMap.get(product.id) || undefined;
         
-        productsWithConfig.push({
+        return {
           ...product,
           parentChain,
-          configuration: config || undefined,
+          configuration: config,
           hasConfiguration: !!config
-        });
-      }
+        };
+      });
 
       setProducts(productsWithConfig);
     } catch (error) {
       console.error('Error loading Level 3 products:', error);
+      let description = "Failed to load Level 4 products. Please try again.";
+      // Check for a specific Supabase error code for a missing table
+      if (error && typeof error === 'object' && 'code' in error && error.code === '42P01') {
+        description = "The 'level4_configurations' table is missing from your database. Please apply the latest database migrations to resolve this issue.";
+        setDbSchemaError(description);
+      } else if (error && typeof error === 'object' && 'status' in error && error.status === 406) {
+          description = "The API schema appears to be out of date. This can happen after database migrations. Restarting your Supabase services (or project on the cloud) will force the schema to reload.";
+        setDbSchemaError(description);
+      } else if (error instanceof Error) {
+        description = error.message;
+      }
+
       toast({
         title: "Error",
-        description: "Failed to load Level 4 products. Please try again.",
+        description: description,
         variant: "destructive"
       });
     } finally {
@@ -85,38 +111,12 @@ export const Level4AdminPage: React.FC = () => {
   };
 
   const handleConfigure = (product: Level3ProductWithConfig) => {
-    setSelectedProduct(product);
-    setEditorMode('edit');
+    navigate(`/admin/level4-config/${product.id}`);
   };
 
   const handlePreview = (product: Level3ProductWithConfig) => {
-    if (!product.configuration) {
-      toast({
-        title: "No Configuration",
-        description: "This product has not been configured yet.",
-        variant: "destructive"
-      });
-      return;
-    }
-    setSelectedProduct(product);
-    setEditorMode('preview');
-  };
-
-  const handleEditorSave = async () => {
-    // Refresh the products list to reflect changes
-    await loadLevel3Products();
-    setSelectedProduct(null);
-    setEditorMode(null);
-    
-    toast({
-      title: "Success",
-      description: "Level 4 configuration saved successfully.",
-    });
-  };
-
-  const handleEditorCancel = () => {
-    setSelectedProduct(null);
-    setEditorMode(null);
+    // The new admin page serves as the preview as well
+    navigate(`/admin/level4-config/${product.id}`);
   };
 
   if (isLoading) {
@@ -131,6 +131,30 @@ export const Level4AdminPage: React.FC = () => {
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
               <span className="ml-2">Loading Level 4 configurations...</span>
             </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (dbSchemaError) {
+    return (
+      <div className="container mx-auto p-6">
+        <Card className="border-destructive">
+          <CardHeader>
+            <CardTitle className="text-destructive">Database Schema Mismatch</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="mb-4">{dbSchemaError}</p>
+            <p className="text-sm text-muted-foreground">
+              This error indicates that your application code is ahead of your database schema. Run the following command in your project's terminal and then refresh this page.
+            </p>
+            <div className="mt-4 p-4 bg-muted rounded font-mono text-sm">
+              <pre><code>supabase db push</code></pre>
+            </div>
+            <Button onClick={() => window.location.reload()} className="mt-4">
+              Refresh Page
+            </Button>
           </CardContent>
         </Card>
       </div>
@@ -186,9 +210,9 @@ export const Level4AdminPage: React.FC = () => {
                     <TableCell>
                       {product.configuration ? (
                         <Badge variant="secondary">
-                          {product.configuration.template_type === 'OPTION_1' 
-                            ? `Option 1 (max ${product.configuration.max_inputs})`
-                            : `Option 2 (${product.configuration.fixed_inputs} fixed)`
+                          {product.configuration.mode === 'variable'
+                            ? `Variable (max ${product.configuration.variable?.maxInputs})`
+                            : `Fixed (${product.configuration.fixed?.numberOfInputs})`
                           }
                         </Badge>
                       ) : (
@@ -231,25 +255,6 @@ export const Level4AdminPage: React.FC = () => {
           )}
         </CardContent>
       </Card>
-
-      {/* Editor Modal */}
-      {selectedProduct && editorMode === 'edit' && (
-        <Level4Editor
-          level3ProductId={selectedProduct.id}
-          level3ProductName={selectedProduct.name}
-          existingConfiguration={selectedProduct.configuration}
-          onSave={handleEditorSave}
-          onCancel={handleEditorCancel}
-        />
-      )}
-
-      {/* Preview Modal */}
-      {selectedProduct && editorMode === 'preview' && selectedProduct.configuration && (
-        <Level4PreviewModal
-          configuration={selectedProduct.configuration}
-          onClose={handleEditorCancel}
-        />
-      )}
     </div>
   );
 };
