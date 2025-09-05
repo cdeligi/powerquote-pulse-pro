@@ -151,7 +151,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         setSession(session);
 
         if (session?.user) {
-          await fetchProfile(session.user.id, 3000);
+          await fetchProfile(session.user.id, 8000);
         }
       } catch (err) {
         console.error("[AuthProvider] Initial session timeout or error:", err);

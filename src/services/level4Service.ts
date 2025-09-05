@@ -20,6 +20,19 @@ export class Level4Service {
   static async getLevel4Configuration(
     productId: string,
   ): Promise<Level4Config | null> {
+codex/fix-profile-fetch-timeout-error-l1kto9
+    // Fetch configuration, allowing zero results without 406 errors
+    const { data, error } = await supabase
+      .from("level4_configs")
+      .select("*")
+      .eq("product_id", productId)
+      .maybeSingle();
+
+    if (error) {
+      if (error.code === "PGRST116") {
+        return null;
+      }
+=======
     // Fetch without forcing a single row to avoid PGRST116 errors
     const { data, error } = await supabase
       .from("level4_configs")
@@ -27,6 +40,7 @@ export class Level4Service {
       .eq("product_id", productId);
 
     if (error && error.code !== "PGRST116") {
+main
       console.error("Error loading Level 4 config:", error);
       throw error;
     }
@@ -39,6 +53,20 @@ export class Level4Service {
 
     // Transform the database row into the Level4Config shape
     return {
+codex/fix-profile-fetch-timeout-error-l1kto9
+      id: data.id,
+      fieldLabel: data.field_label,
+      mode: data.mode,
+      fixed:
+        data.mode === "fixed"
+          ? { numberOfInputs: data.fixed_number_of_inputs! }
+          : undefined,
+      variable:
+        data.mode === "variable"
+          ? { maxInputs: data.variable_max_inputs! }
+          : undefined,
+      options: data.options || [],
+=======
       id: row.id,
       fieldLabel: row.field_label,
       mode: row.mode,
@@ -51,12 +79,14 @@ export class Level4Service {
           ? { maxInputs: row.variable_max_inputs! }
           : undefined,
       options: row.options || [],
+main
     };
   }
 
   // Get all Level 3 products that have Level 4 enabled
   static async getLevel3ProductsWithLevel4(): Promise<any[]> {
     console.log("Level4Service: Fetching all L3 products and L4 configs...");
+codex/fix-profile-fetch-timeout-error-l1kto9
 
     // 1. Fetch all L3 products and all L4 config IDs in parallel.
     const [productsResult, configsResult] = await Promise.all([
@@ -70,6 +100,21 @@ export class Level4Service {
     const { data: allL3Products, error: productsError } = productsResult;
     const { data: l4Configs, error: configsError } = configsResult;
 
+=======
+
+    // 1. Fetch all L3 products and all L4 config IDs in parallel.
+    const [productsResult, configsResult] = await Promise.all([
+      supabase
+        .from("products")
+        .select("id, name, parent_product_id, has_level4, enabled")
+        .eq("product_level", 3),
+      supabase.from("level4_configs").select("product_id"),
+    ]);
+
+    const { data: allL3Products, error: productsError } = productsResult;
+    const { data: l4Configs, error: configsError } = configsResult;
+
+main
     if (productsError) {
       console.error("Error loading L3 products:", productsError);
       throw productsError;
@@ -80,6 +125,7 @@ export class Level4Service {
       console.error("Error loading L4 configs:", configsError);
       throw configsError;
     }
+codex/fix-profile-fetch-timeout-error-l1kto9
 
     // 2. Filter L3 products that are relevant for Level 4 configuration.
     const configuredProductIds = new Set(
@@ -89,6 +135,17 @@ export class Level4Service {
       (p) => p.has_level4 || configuredProductIds.has(p.id),
     );
 
+=======
+
+    // 2. Filter L3 products that are relevant for Level 4 configuration.
+    const configuredProductIds = new Set(
+      l4Configs?.map((c) => c.product_id) || [],
+    );
+    const relevantProducts = (allL3Products || []).filter(
+      (p) => p.has_level4 || configuredProductIds.has(p.id),
+    );
+
+main
     console.log(
       "Level4Service: Total relevant L4 products:",
       relevantProducts.length,
