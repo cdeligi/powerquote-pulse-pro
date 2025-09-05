@@ -335,9 +335,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         .from("profiles")
         .select("*")
         .eq("id", uid)
-        .single();
+        .maybeSingle();
 
-      const { data, error } = await Promise.race([
+      const { data: profile, error } = await Promise.race([
         profilePromise,
         new Promise<never>((_, reject) =>
           setTimeout(
@@ -346,73 +346,61 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           ),
         ),
       ]);
+      if (error) throw error;
 
-      if (error) {
-        if (error.code === "PGRST116") {
-          console.log(
-            "[AuthProvider] No profile found, creating new profile for user:",
-            uid,
+      let profileData = profile;
+
+      if (!profileData) {
+        console.log(
+          "[AuthProvider] No profile found, creating new profile for user:",
+          uid,
+        );
+        const { error: createError } = await supabase
+          .from("profiles")
+          .insert({
+            id: uid,
+            email: session?.user?.email,
+            first_name: "",
+            last_name: "",
+            role: "level1",
+            department: null,
+          });
+
+        if (createError) {
+          console.error(
+            "[AuthProvider] Error creating profile:",
+            createError,
           );
-          const { error: createError } = await supabase
-            .from("profiles")
-            .insert({
-              id: uid,
-              email: session?.user?.email,
-              first_name: "",
-              last_name: "",
-              role: "level1",
-              department: null,
-            });
-
-          if (createError) {
-            console.error(
-              "[AuthProvider] Error creating profile:",
-              createError,
-            );
-            setError({
-              code: createError.code || "PROFILE_CREATE_ERROR",
-              message: createError.message || "Failed to create user profile",
-              type: "profile",
-            });
-            throw createError;
-          }
-
-          const { data: createdProfile } = await supabase
-            .from("profiles")
-            .select("*")
-            .eq("id", uid)
-            .single();
-
-          if (!createdProfile) {
-            throw new Error("Failed to fetch newly created profile");
-          }
-
-          const appUser: User = {
-            id: createdProfile.id,
-            name: "User",
-            email: createdProfile.email,
-            role: mapDatabaseRoleToAppRole(createdProfile.role),
-            department: createdProfile.department,
-          };
-          setUser(appUser);
-          return;
+          setError({
+            code: createError.code || "PROFILE_CREATE_ERROR",
+            message: createError.message || "Failed to create user profile",
+            type: "profile",
+          });
+          throw createError;
         }
 
-        throw error;
+        const { data: createdProfile, error: fetchErr } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("id", uid)
+          .maybeSingle();
+
+        if (fetchErr) throw fetchErr;
+        profileData = createdProfile || null;
       }
 
-      if (!data) {
-        throw new Error("Profile data is null");
+      if (!profileData) {
+        throw new Error("Failed to fetch user profile");
       }
 
-      console.log("[AuthProvider] Profile loaded successfully:", data.email);
+      console.log("[AuthProvider] Profile loaded successfully:", profileData.email);
       const appUser: User = {
-        id: data.id,
+        id: profileData.id,
         name:
-          `${data.first_name || ""} ${data.last_name || ""}`.trim() || "User",
-        email: data.email,
-        role: mapDatabaseRoleToAppRole(data.role),
-        department: data.department,
+          `${profileData.first_name || ""} ${profileData.last_name || ""}`.trim() || "User",
+        email: profileData.email,
+        role: mapDatabaseRoleToAppRole(profileData.role),
+        department: profileData.department,
       };
       setUser(appUser);
     } catch (err) {
