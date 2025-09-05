@@ -62,6 +62,7 @@ export interface BaseBOMItem {
   partNumber?: string;
   displayName?: string;
   configuration?: Record<string, any>;
+  level4Config?: any;
   slot?: number;
   isAccessory?: boolean;
   level3Customizations?: Record<string, any>;
