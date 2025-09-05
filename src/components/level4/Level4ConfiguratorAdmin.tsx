@@ -302,7 +302,7 @@ export default function Level4ConfiguratorAdmin({
                 <TableBody>
                   {value.options.map((option) => (
                     <SortableOptionRow key={option.id} option={option}>
-                      <TableCell className="drag-handle-cell" listeners={{}}>
+                      <TableCell className="drag-handle-cell">
                         <Button variant="ghost" size="sm" className="cursor-grab" disabled={readOnly}>
                           <GripVertical className="h-4 w-4" />
                         </Button>

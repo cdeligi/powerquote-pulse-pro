@@ -45,8 +45,6 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
   const canEditPN = has(FEATURES.BOM_EDIT_PART_NUMBER);
   const canForcePN = has(FEATURES.BOM_FORCE_PART_NUMBER);
 
-  const [l4ModalOpen, setL4ModalOpen] = useState(false);
-  const [selectedBomItem, setSelectedBomItem] = useState<BOMItem | null>(null);
   const [selectedLevel1Product, setSelectedLevel1Product] = useState<Level1Product | null>(null);
   const [selectedLevel2Options, setSelectedLevel2Options] = useState<Level2Product[]>([]);
   const [selectedChassis, setSelectedChassis] = useState<Level2Product | null>(null);
@@ -534,45 +532,35 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
     onBOMUpdate(updatedItems);
   };
 
-  const handleConfigureL4 = (item: BOMItem) => {
-    setSelectedBomItem(item);
-    setL4ModalOpen(true);
-  };
 
   const handleLevel4Save = (payload: Level4RuntimePayload) => {
     console.log('Saving Level 4 configuration:', payload);
-    
-    if (selectedBomItem) {
-      const updatedItem = { 
-        ...configuringLevel4Item, 
+
+    if (configuringLevel4Item) {
+      const updatedItem: BOMItem = {
+        ...configuringLevel4Item,
         level4Config: payload,
         product: {
           ...configuringLevel4Item.product,
           displayName: (configuringLevel4Item as any).displayName || configuringLevel4Item.product.name
         },
-        name: (configuringLevel4Item as any).displayName || configuringLevel4Item.product.name
+        displayName: (configuringLevel4Item as any).displayName || configuringLevel4Item.product.name
       };
-      
+
       const existingIndex = bomItems.findIndex(item => item.id === configuringLevel4Item.id);
-      
-      let updatedItems;
-      if (existingIndex >= 0) {
-        updatedItems = bomItems.map(item => 
-          item.id === payload.bomItemId ? updatedItem : item
-        );
-      } else {
-        updatedItems = [...bomItems, updatedItem];
-      }
-      
+      const updatedItems = existingIndex >= 0
+        ? bomItems.map(item => (item.id === payload.bomItemId ? updatedItem : item))
+        : [...bomItems, updatedItem];
+
       setBomItems(updatedItems);
       onBOMUpdate(updatedItems);
-      
+
       toast({
         title: 'Configuration Saved',
         description: `Level 4 configuration for ${configuringLevel4Item.product.name} has been saved.`,
       });
     }
-    
+
     setConfiguringLevel4Item(null);
     setSelectedSlot(null);
   };
@@ -1323,27 +1311,7 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
 
   return (
     <div className="space-y-6">
-      {/* Level 4 Configuration Modal */}
-      {l4ModalOpen && selectedBomItem && (
-        <Level4RuntimeModal
-          isOpen={l4ModalOpen}
-          onClose={() => setL4ModalOpen(false)}
-          onSave={(config) => {
-            console.log('Level 4 configuration saved:', config);
-            // Update the BOM item with the configuration
-            const updatedItems = bomItems.map(item => 
-              item.id === selectedBomItem.id 
-                ? { ...item, level4Config: config }
-                : item
-            );
-            setBomItems(updatedItems);
-            onBOMUpdate(updatedItems);
-            setL4ModalOpen(false);
-          }}
-          productId={selectedBomItem.product.id}
-          initialConfig={selectedBomItem.level4Config}
-        />
-      )}
+      {/* Level 4 Configuration Modal handled via configuringLevel4Item */}
       
       {/* Quote Fields Section */}
       <QuoteFieldsSection
