@@ -423,7 +423,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         message: errorMessage,
         type: "profile",
       });
-      throw err;
+      // Clear any existing user state and avoid propagating the error further
+      setUser(null);
+      return;
     }
   };
 
