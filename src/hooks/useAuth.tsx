@@ -1,8 +1,6 @@
 import { createContext, useContext, useEffect, useState } from "react";
-import { createClient } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { User, AuthError, Role } from "@/types/auth";
-import { toast } from "@/hooks/use-toast";
 
 // Helper function to map database role to app role
 const mapDatabaseRoleToAppRole = (dbRole: string): Role => {
@@ -127,16 +125,18 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         const {
           data: { session },
           error,
-        } = await Promise.race([sessionPromise, timeoutPromise]);
+        } = await Promise.race([sessionPromise, timeoutPromise]) as Awaited<
+          ReturnType<typeof supabase.auth.getSession>
+        >;
 
         if (error) {
           console.error("[AuthProvider] Initial session error:", {
-            errorCode: error.code,
-            errorMessage: error.message,
+            errorCode: (error as any)?.code,
+            errorMessage: (error as any)?.message,
           });
           setError({
-            code: error.code || "SESSION_ERROR",
-            message: error.message,
+            code: (error as any)?.code || "SESSION_ERROR",
+            message: (error as any)?.message || "Session error",
             type: "session",
           });
           setLoading(false);
@@ -308,8 +308,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       if (error) {
         console.error("Error logging user session:", error);
         setError({
-          code: error.code || "SESSION_LOG_ERROR",
-          message: error.message || "Failed to log user session",
+          code: (error as any)?.code || "SESSION_LOG_ERROR",
+          message: (error as any)?.message || "Failed to log user session",
           type: "session",
         });
       }
@@ -323,29 +323,24 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
-  const fetchProfile = async (
-    uid: string,
-    timeoutMs: number = 8000,
-  ): Promise<void> => {
+  // Helper to fetch profile, with optional timeout, and no 406 (uses maybeSingle)
+  const fetchProfile = async (uid: string, timeoutMs = 8000): Promise<void> => {
     console.log("[AuthProvider] fetchProfile start for:", uid);
 
     try {
-      // First try to get the profile
       const profilePromise = supabase
         .from("profiles")
         .select("*")
         .eq("id", uid)
         .maybeSingle();
 
-      const { data: profile, error } = await Promise.race([
+      const { data: profile, error } = (await Promise.race([
         profilePromise,
         new Promise<never>((_, reject) =>
-          setTimeout(
-            () => reject(new Error("Profile fetch timeout")),
-            timeoutMs,
-          ),
+          setTimeout(() => reject(new Error("Profile fetch timeout")), timeoutMs),
         ),
-      ]);
+      ])) as Awaited<typeof profilePromise>;
+
       if (error) throw error;
 
       let profileData = profile;
@@ -355,25 +350,22 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           "[AuthProvider] No profile found, creating new profile for user:",
           uid,
         );
-        const { error: createError } = await supabase
-          .from("profiles")
-          .insert({
-            id: uid,
-            email: session?.user?.email,
-            first_name: "",
-            last_name: "",
-            role: "level1",
-            department: null,
-          });
+        const { error: createError } = await supabase.from("profiles").insert({
+          id: uid,
+          email: session?.user?.email,
+          first_name: "",
+          last_name: "",
+          company: "",
+          phone: "",
+          role: "level1",
+          department: null,
+        });
 
         if (createError) {
-          console.error(
-            "[AuthProvider] Error creating profile:",
-            createError,
-          );
+          console.error("[AuthProvider] Error creating profile:", createError);
           setError({
-            code: createError.code || "PROFILE_CREATE_ERROR",
-            message: createError.message || "Failed to create user profile",
+            code: (createError as any)?.code || "PROFILE_CREATE_ERROR",
+            message: (createError as any)?.message || "Failed to create user profile",
             type: "profile",
           });
           throw createError;
@@ -411,7 +403,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         message: errorMessage,
         type: "profile",
       });
-      // Clear any existing user state and avoid propagating the error further
       setUser(null);
       return;
     }
