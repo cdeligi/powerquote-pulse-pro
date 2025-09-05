@@ -301,9 +301,10 @@ class ProductDataService {
         .from('products')
         .select('*')
         .eq('id', id)
-        .single();
+        .maybeSingle();
 
       if (fetchError) throw fetchError;
+      if (!currentProduct) throw new Error('Product not found');
 
       const updateData: any = {
         ...restOfProductData, // Spread the rest of the data
@@ -441,11 +442,14 @@ class ProductDataService {
         .from('products')
         .select('*') // Select all columns to preserve existing data
         .eq('id', id)
-        .single();
+        .maybeSingle();
 
       if (fetchError) {
         console.error('Error fetching current product:', fetchError);
         throw fetchError;
+      }
+      if (!currentProduct) {
+        throw new Error('Product not found');
       }
 
       console.log('Current product from DB:', JSON.stringify(currentProduct, null, 2)); // Added log
@@ -560,9 +564,9 @@ class ProductDataService {
         .from('part_number_configs')
         .select('*')
         .eq('level2_product_id', level2Id)
-        .single();
-      
-      if (error && error.code !== 'PGRST116') { // PGRST116 = no rows returned
+        .maybeSingle();
+
+      if (error) {
         console.error('Error loading part number config:', error);
         throw error;
       }
@@ -690,9 +694,10 @@ class ProductDataService {
         .from('products')
         .select('*')
         .eq('id', id)
-        .single();
+        .maybeSingle();
 
       if (fetchError) throw fetchError;
+      if (!currentProduct) throw new Error('Product not found');
 
       const { chassisType, parentProductId, image, productInfoUrl, ...restOfProductData } = productData;
 
@@ -840,9 +845,9 @@ class ProductDataService {
         .from('products')
         .select('*')
         .eq('id', id)
-        .single();
+        .maybeSingle();
 
-      if (error && error.code !== 'PGRST116') { // PGRST116 = no rows returned
+      if (error) {
         console.error('Error finding product by ID:', error);
         throw error;
       }
@@ -924,9 +929,10 @@ class ProductDataService {
         .from('products')
         .select('*')
         .eq('id', id)
-        .single();
+        .maybeSingle();
 
       if (fetchError) throw fetchError;
+      if (!currentProduct) throw new Error('Product not found');
       
       console.log('Current product data:', JSON.stringify(currentProduct, null, 2));
       
@@ -1124,9 +1130,9 @@ class ProductDataService {
         .select('column_name')
         .eq('table_name', 'products')
         .eq('column_name', 'display_name')
-        .single();
-      
-      if (columnError && columnError.code !== 'PGRST116') { // PGRST116 = no rows returned
+        .maybeSingle();
+
+      if (columnError) {
         console.error('Error checking for display_name column:', columnError);
         throw columnError;
       }
@@ -1175,7 +1181,7 @@ class ProductDataService {
             .from('products')
             .select('*')
             .eq('id', id)
-            .single();
+            .maybeSingle();
           
           console.log('Current product data:', errorInfo);
           
