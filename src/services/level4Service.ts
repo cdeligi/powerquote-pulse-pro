@@ -21,7 +21,7 @@ export class Level4Service {
     productId: string
   ): Promise<Level4Config | null> {
     const { data, error } = await supabase
-      .from<Level4ConfigRow>("level4_configs")
+      .from("level4_configs")
       .select(
         "id, product_id, field_label, mode, fixed_number_of_inputs, variable_max_inputs, options"
       )
@@ -101,19 +101,17 @@ export class Level4Service {
     config: Level4Config,
     productId: string
   ): Promise<Level4Config | null> {
-    // Note: if your TS interface doesn't include created_at/updated_at,
-    // don't omit them here. Keep it simple and omit only "id".
-    const rowToSave: Omit<Level4ConfigRow, "id"> = {
+    const rowToSave = {
       product_id: productId,
       field_label: config.fieldLabel,
       mode: config.mode,
       fixed_number_of_inputs: config.fixed?.numberOfInputs ?? null,
       variable_max_inputs: config.variable?.maxInputs ?? null,
       options: config.options,
-    } as Omit<Level4ConfigRow, "id">;
+    };
 
     const { data, error } = await supabase
-      .from<Level4ConfigRow>("level4_configs")
+      .from("level4_configs")
       .upsert(rowToSave, { onConflict: "product_id" })
       .select(
         "id, product_id, field_label, mode, fixed_number_of_inputs, variable_max_inputs, options"
@@ -219,6 +217,7 @@ export class Level4Service {
       return value.entries.map((entry, index) => {
         const option = config.options.find((opt) => opt.id === entry.value);
         const label = option?.name || entry.value;
+
         if (config.mode === "variable") {
           return `${config.fieldLabel} #${index + 1}: ${label}`;
         } else {
