@@ -25,14 +25,14 @@ export class Level4Service {
       .from('level4_configs')
       .select('*')
       .eq('product_id', productId)
-      .single();
+      .maybeSingle();
 
     if (error) {
-      // 'PGRST116' means no row was found, which is a valid outcome (no config exists yet).
-      if (error.code !== 'PGRST116') {
-        console.error('Error loading Level 4 config:', error);
-        throw error;
-      }
+      console.error('Error loading Level 4 config:', error);
+      throw error;
+    }
+
+    if (!data) {
       return null;
     }
 
@@ -133,10 +133,10 @@ export class Level4Service {
           onConflict: 'bom_item_id'
         })
         .select()
-        .single();
+        .maybeSingle();
 
       if (error) throw error;
-      return data;
+      return data || null;
     } catch (error) {
       console.error('Error in saveBOMLevel4Value:', error);
       throw error; // Re-throw the error to be handled by the caller
@@ -150,18 +150,14 @@ export class Level4Service {
         .from('bom_level4_values')
         .select('*')
         .eq('bom_item_id', bomItemId)
-        .single();
+        .maybeSingle();
 
       if (error) {
-        if (error.code === 'PGRST116') {
-          // No rows found - this is normal
-          return null;
-        }
         console.error('Error getting BOM Level 4 value:', error);
         return null;
       }
 
-      return data;
+      return data || null;
     } catch (error) {
       console.error('Error in getBOMLevel4Value:', error);
       return null;
