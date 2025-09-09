@@ -1,10 +1,12 @@
 import { useState, useEffect } from "react";
+import { useLocation } from "react-router-dom";
 import { User } from "@/types/auth";
 import Sidebar from "./Sidebar";
 import DashboardOverview from "./DashboardOverview";
 import BOMBuilder from "../bom/BOMBuilder";
 import QuoteManager from "../quotes/QuoteManager";
 import AdminPanel from "../admin/AdminPanel";
+import AdminLevel4ConfigPage from "@/pages/admin/AdminLevel4ConfigPage";
 import { BOMItem } from "@/types/product";
 import { usePermissions, FEATURES } from "@/hooks/usePermissions";
 import { productDataService } from "@/services/productDataService";
@@ -21,6 +23,10 @@ const Dashboard = ({ user, onLogout }: DashboardProps) => {
   const [activeView, setActiveView] = useState<ActiveView>('overview');
   const [bomItems, setBomItems] = useState<BOMItem[]>([]);
   const { has } = usePermissions();
+  const location = useLocation();
+  
+  // Check if we're on a Level 4 configuration page
+  const isLevel4ConfigPage = location.pathname.startsWith('/admin/level4-config/');
 
   // Initialize ProductDataService when dashboard loads
   useEffect(() => {
@@ -66,6 +72,23 @@ const Dashboard = ({ user, onLogout }: DashboardProps) => {
         return <DashboardOverview user={user} />;
     }
   };
+
+  // If we're on a Level 4 config page, render it directly
+  if (isLevel4ConfigPage) {
+    return (
+      <div className="min-h-screen bg-black flex">
+        <Sidebar 
+          user={user}
+          activeView="admin"
+          onViewChange={setActiveView}
+          onLogout={onLogout}
+        />
+        <main className="flex-1 ml-64 p-8">
+          <AdminLevel4ConfigPage />
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-black flex">
