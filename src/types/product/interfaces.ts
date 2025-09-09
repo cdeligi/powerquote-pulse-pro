@@ -2,6 +2,8 @@
  * 2025 Qualitrol Corp. All rights reserved.
  */
 
+import type { Level4RuntimePayload } from '@/types/level4';
+
 // Base product interface with common fields
 export interface BaseProduct {
   id: string;
@@ -129,6 +131,7 @@ export interface BOMItem {
   level3Customizations?: Level3Customization[];
   slotAssignments?: Record<number, Level3Product>;
   level4Selections?: { [fieldId: string]: string };
+  level4Config?: Level4RuntimePayload; // Add Level 4 configuration payload
   isAccessory?: boolean; // Add isAccessory flag
   name?: string;
   description?: string;

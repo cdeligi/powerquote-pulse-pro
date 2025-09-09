@@ -105,7 +105,7 @@ export default function Level4Configurator({
                 <SelectTrigger>
                   <SelectValue placeholder="Select an option" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="z-50 bg-popover">
                   {config.options.length === 0 ? (
                     <SelectItem value="" disabled>
                       No options available

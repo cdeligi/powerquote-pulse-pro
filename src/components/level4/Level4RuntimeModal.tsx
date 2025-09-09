@@ -134,7 +134,7 @@ export const Level4RuntimeModal: React.FC<Level4RuntimeModalProps> = ({
       const payload: Level4RuntimePayload = {
         bomItemId: bomItem.id,
         configuration_id: level4Config.id,
-        template_type: 'OPTION_2', // Using OPTION_2 for fixed template type
+        template_type: level4Config.mode === 'fixed' ? 'OPTION_2' : 'OPTION_1',
         entries: entries.map((entry, index) => ({
           index,
           value: selectedIds[index] || ''

@@ -15,7 +15,7 @@ interface Level4ConfigRow {
 export class Level4Service {
   static async getLevel4Configuration(productId: string): Promise<Level4Config | null> {
     const { data, error } = await supabase
-      .from<Level4ConfigRow>("level4_configs")
+      .from("level4_configs")
       .select(
         "id, product_id, field_label, mode, fixed_number_of_inputs, variable_max_inputs, options"
       )
@@ -71,7 +71,7 @@ export class Level4Service {
     } as Omit<Level4ConfigRow, "id">;
 
     const { data, error } = await supabase
-      .from<Level4ConfigRow>("level4_configs")
+      .from("level4_configs")
       .upsert(rowToSave, { onConflict: "product_id" })
       .select(
         "id, product_id, field_label, mode, fixed_number_of_inputs, variable_max_inputs, options"
