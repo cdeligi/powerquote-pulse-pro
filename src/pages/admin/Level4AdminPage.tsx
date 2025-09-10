@@ -8,7 +8,7 @@ import { Eye, Settings } from 'lucide-react';
 import { Level4Service } from '@/services/level4Service';
 import type { Level4Config } from '@/components/level4/Level4ConfigTypes';
 import { productDataService } from '@/services/productDataService';
-import { toast } from '@/components/ui/use-toast';
+import { toast } from "sonner";
 
 interface Level3ProductWithConfig {
   id: string;
@@ -100,11 +100,7 @@ export const Level4AdminPage: React.FC = () => {
         description = error.message;
       }
 
-      toast({
-        title: "Error",
-        description: description,
-        variant: "destructive"
-      });
+      toast.error(description);
     } finally {
       setIsLoading(false);
     }
@@ -112,6 +108,7 @@ export const Level4AdminPage: React.FC = () => {
 
   const handleConfigure = (product: Level3ProductWithConfig) => {
     navigate(`/admin/level4-config/${product.id}`);
+    toast.success(`Opening Level 4 configuration for ${product.name}`);
   };
 
   const handlePreview = (product: Level3ProductWithConfig) => {
