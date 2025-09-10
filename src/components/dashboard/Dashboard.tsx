@@ -75,6 +75,10 @@ const Dashboard = ({ user, onLogout }: DashboardProps) => {
 
   // If we're on a Level 4 config page, render it directly
   if (isLevel4ConfigPage) {
+    const match = location.pathname.match(/^\/admin\/level4-config\/([^/]+)$/);
+    const productId = match?.[1];
+    console.log('Level4 config route detected:', { pathname: location.pathname, productId });
+    
     return (
       <div className="min-h-screen bg-black flex">
         <Sidebar 
@@ -84,7 +88,7 @@ const Dashboard = ({ user, onLogout }: DashboardProps) => {
           onLogout={onLogout}
         />
         <main className="flex-1 ml-64 p-8">
-          <AdminLevel4ConfigPage />
+          <AdminLevel4ConfigPage productId={productId} />
         </main>
       </div>
     );
