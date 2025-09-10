@@ -28,8 +28,8 @@ const Index = () => {
   if (loading) {
     console.log('Showing loading state...');
     return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
-        <div className="flex items-center space-x-2 text-white">
+      <div className="min-h-screen bg-background text-foreground flex items-center justify-center">
+        <div className="flex items-center space-x-2">
           <Loader2 className="h-6 w-6 animate-spin" />
           <span>Loading application...</span>
         </div>
@@ -40,7 +40,7 @@ const Index = () => {
   if (!user) {
     console.log('No authenticated user, showing login form...');
     return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
+      <div className="min-h-screen bg-background text-foreground flex items-center justify-center">
         <LoginForm onLogin={() => {
           console.log('Login callback triggered');
         }} />

@@ -110,7 +110,7 @@ export default function AdminLevel4ConfigPage({ productId: productIdProp }: { pr
   }
 
   return (
-    <div className="container mx-auto p-6 max-w-6xl">
+    <div className="container mx-auto p-6 max-w-6xl bg-background text-foreground">
       {/* Header */}
       <div className="mb-6">
         <div className="flex items-center gap-4 mb-4">
@@ -128,6 +128,11 @@ export default function AdminLevel4ConfigPage({ productId: productIdProp }: { pr
             </CardDescription>
           </CardHeader>
         </Card>
+      </div>
+
+      {/* Debug Info */}
+      <div className="mb-4 p-2 bg-muted rounded text-sm">
+        <strong>Debug:</strong> ProductId: {productId} | Loading: {loading.toString()} | HasError: {!!dbSchemaError}
       </div>
 
       {/* Main Configuration */}
