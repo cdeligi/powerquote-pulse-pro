@@ -80,7 +80,7 @@ const Dashboard = ({ user, onLogout }: DashboardProps) => {
     console.log('Level4 config route detected:', { pathname: location.pathname, productId });
     
     return (
-      <div className="min-h-screen bg-black flex">
+      <div className="min-h-screen bg-background text-foreground flex">
         <Sidebar 
           user={user}
           activeView="admin"
@@ -95,7 +95,7 @@ const Dashboard = ({ user, onLogout }: DashboardProps) => {
   }
 
   return (
-    <div className="min-h-screen bg-black flex">
+    <div className="min-h-screen bg-background text-foreground flex">
       <Sidebar 
         user={user}
         activeView={activeView}
