@@ -11,8 +11,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 
-export default function AdminLevel4ConfigPage() {
-  const { productId } = useParams();
+export default function AdminLevel4ConfigPage({ productId: productIdProp }: { productId?: string } = {}) {
+  const { productId: paramsProductId } = useParams();
+  const productId = productIdProp ?? paramsProductId ?? (() => {
+    const match = window.location.pathname.match(/^\/admin\/level4-config\/([^/]+)$/);
+    return match?.[1];
+  })();
   const [cfg, setCfg] = useState<Level4Config>(emptyVariableConfig());
   const [loading, setLoading] = useState(true);
   const [dbSchemaError, setDbSchemaError] = useState<string | null>(null);
@@ -47,6 +51,9 @@ export default function AdminLevel4ConfigPage() {
 
     if (productId) {
       loadConfig();
+    } else {
+      setLoading(false);
+      setDbSchemaError('Invalid product ID - cannot load configuration.');
     }
   }, [productId]);
 
