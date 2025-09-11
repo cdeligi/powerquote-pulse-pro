@@ -25,6 +25,7 @@ export const Level4PreviewModal: React.FC<Level4PreviewModalProps> = ({
             mode="preview"
             configuration={configuration}
             className="max-h-full"
+            allowInteractions={true}
           />
         </div>
 

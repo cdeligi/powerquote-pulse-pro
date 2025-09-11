@@ -495,7 +495,14 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
     setSlotAssignments(updatedAssignments);
     
     // Check if this card requires level 4 configuration
+    console.log('Card level 4 check:', {
+      card: card.name,
+      has_level4: (card as any).has_level4,
+      requires_level4_config: (card as any).requires_level4_config
+    });
+    
     if ((card as any).has_level4 || (card as any).requires_level4_config) {
+      console.log('Triggering Level 4 modal for:', card.name);
       const newItem: BOMItem = {
         id: `item-${Date.now()}`,
         product: cardWithDisplayName,

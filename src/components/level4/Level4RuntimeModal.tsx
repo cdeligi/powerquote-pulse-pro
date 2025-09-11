@@ -1,11 +1,11 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Level4Service } from '@/services/level4Service';
+import { Level4RuntimeView } from './Level4RuntimeView';
 import type { BOMItem } from '@/types/product';
-import type { Level4SelectionEntry, Level4RuntimePayload } from '@/types/level4';
+import type { Level4SelectionEntry, Level4RuntimePayload, Level4Configuration } from '@/types/level4';
 import { toast } from 'sonner';
-import Level4Configurator from './Level4Configurator';
 import type { Level4Config } from './Level4ConfigTypes';
 
 interface Level4RuntimeModalProps {
@@ -21,9 +21,9 @@ export const Level4RuntimeModal: React.FC<Level4RuntimeModalProps> = ({
   onSave, 
   onCancel 
 }) => {
-  const [level4Config, setLevel4Config] = useState<Level4Config | null>(null);
+  const [adminConfig, setAdminConfig] = useState<Level4Config | null>(null);
+  const [runtimeConfig, setRuntimeConfig] = useState<Level4Configuration | null>(null);
   const [entries, setEntries] = useState<Level4SelectionEntry[]>([]);
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -33,6 +33,8 @@ export const Level4RuntimeModal: React.FC<Level4RuntimeModalProps> = ({
       setError(null);
       
       try {
+        console.log('Loading Level 4 config for product:', level3ProductId);
+        
         // Load the Level 4 configuration
         const config = await Level4Service.getLevel4Configuration(level3ProductId);
         if (!config) {
@@ -43,7 +45,13 @@ export const Level4RuntimeModal: React.FC<Level4RuntimeModalProps> = ({
           throw new Error('No options configured for this Level 4 configuration. Please add options in the admin panel.');
         }
 
-        setLevel4Config(config);
+        console.log('Loaded admin config:', config);
+        setAdminConfig(config);
+        
+        // Convert to runtime format
+        const runtime = Level4Service.convertToRuntimeConfiguration(config);
+        console.log('Converted to runtime config:', runtime);
+        setRuntimeConfig(runtime);
 
         try {
           // Try to load existing configuration
@@ -56,7 +64,6 @@ export const Level4RuntimeModal: React.FC<Level4RuntimeModalProps> = ({
               
             if (validSelections.length > 0) {
               setEntries(validSelections);
-              setSelectedIds(validSelections.map(e => e.value));
               return;
             }
           }
@@ -67,19 +74,16 @@ export const Level4RuntimeModal: React.FC<Level4RuntimeModalProps> = ({
         // Initialize with defaults if no existing values found
         const initialEntries: Level4SelectionEntry[] = [];
         const defaultValue = config.options[0]?.id || '';
-        const count = config.fixed?.numberOfInputs || 1;
-        const initialIds: string[] = [];
+        const count = config.mode === 'fixed' ? config.fixed?.numberOfInputs || 1 : 1;
         
         for (let i = 0; i < count; i++) {
           initialEntries.push({
             index: i,
             value: defaultValue
           });
-          initialIds.push(defaultValue);
         }
         
         setEntries(initialEntries);
-        setSelectedIds(initialIds);
       } catch (err) {
         let description = "Failed to load configuration.";
         
@@ -106,24 +110,18 @@ export const Level4RuntimeModal: React.FC<Level4RuntimeModalProps> = ({
     loadConfiguration();
   }, [level3ProductId, bomItem.id]);
 
-  const handleSelectionChange = (ids: string[]) => {
-    setSelectedIds(ids);
-    // Convert to entries format
-    const newEntries = ids.map((id, index) => ({
-      index,
-      value: id
-    }));
+  const handleEntriesChange = (newEntries: Level4SelectionEntry[]) => {
     setEntries(newEntries);
   };
 
   const handleSave = async () => {
-    if (!level4Config) {
+    if (!adminConfig || !runtimeConfig) {
       toast.error("No Level 4 configuration found");
       return;
     }
 
     // Validate all entries have selections
-    if (selectedIds.some(id => !id)) {
+    if (entries.some(entry => !entry.value)) {
       toast.error("Please complete all required fields");
       return;
     }
@@ -133,12 +131,9 @@ export const Level4RuntimeModal: React.FC<Level4RuntimeModalProps> = ({
       
       const payload: Level4RuntimePayload = {
         bomItemId: bomItem.id,
-        configuration_id: level4Config.id,
-        template_type: level4Config.mode === 'fixed' ? 'OPTION_2' : 'OPTION_1',
-        entries: entries.map((entry, index) => ({
-          index,
-          value: selectedIds[index] || ''
-        })).filter(entry => entry.value) // Remove empty selections
+        configuration_id: adminConfig.id,
+        template_type: runtimeConfig.template_type,
+        entries: entries
       };
 
       // Save the configuration
@@ -188,7 +183,7 @@ export const Level4RuntimeModal: React.FC<Level4RuntimeModalProps> = ({
     );
   }
 
-  if (error || !level4Config) {
+  if (error || !runtimeConfig) {
     return (
       <Dialog open={true} onOpenChange={() => onCancel()}>
         <DialogContent className="sm:max-w-[525px]">
@@ -214,11 +209,13 @@ export const Level4RuntimeModal: React.FC<Level4RuntimeModalProps> = ({
         </DialogHeader>
 
         <div className="flex-1 overflow-y-auto py-4">
-          {level4Config ? (
-            <Level4Configurator
-              config={level4Config}
-              initial={selectedIds}
-              onChange={handleSelectionChange}
+          {runtimeConfig ? (
+            <Level4RuntimeView
+              mode="interactive"
+              configuration={runtimeConfig}
+              initialEntries={entries}
+              onEntriesChange={handleEntriesChange}
+              allowInteractions={true}
             />
           ) : null}
         </div>

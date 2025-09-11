@@ -1,178 +1,183 @@
-import { getSupabaseClient, getSupabaseAdminClient, isAdminAvailable } from "@/integrations/supabase/client";
-
-const supabase = getSupabaseClient();
-const supabaseAdmin = getSupabaseAdminClient();;
-import type { Level4Config } from "@/components/level4/Level4ConfigTypes";
-import { Level4BOMValue, Level4RuntimePayload } from "@/types/level4";
-
-interface Level4ConfigRow {
-  id: string;
-  product_id: string;
-  field_label: string;
-  mode: "fixed" | "variable";
-  fixed_number_of_inputs: number | null;
-  variable_max_inputs: number | null;
-  options: { id: string; name: string; url: string }[];
-}
+import { supabase } from '@/integrations/supabase/client';
+import type { Level4Configuration, Level4BOMValue, Level4RuntimePayload } from '@/types/level4';
+import type { Level4Config } from '@/components/level4/Level4ConfigTypes';
 
 export class Level4Service {
-  static async getLevel4Configuration(productId: string): Promise<Level4Config | null> {
-    const { data, error } = await supabase
-      .from("level4_configs")
-      .select(
-        "id, product_id, field_label, mode, fixed_number_of_inputs, variable_max_inputs, options"
-      )
-      .eq("product_id", productId)
-      .maybeSingle(); // <- prevents 406
+  /**
+   * Fetch Level 4 configuration for a product from the admin configs table
+   */
+  static async getLevel4Configuration(level3ProductId: string): Promise<Level4Config | null> {
+    try {
+      console.log('Fetching Level 4 config for product:', level3ProductId);
+      
+      const { data, error } = await supabase
+        .from('level4_configs')
+        .select('*')
+        .eq('product_id', level3ProductId)
+        .single();
 
-    if (error) {
-      console.error("Error loading Level 4 config:", error);
+      if (error) {
+        console.error('Error fetching Level 4 config:', error);
+        if (error.code === 'PGRST116') {
+          return null; // No configuration found
+        }
+        throw error;
+      }
+
+      console.log('Found Level 4 config:', data);
+      return data;
+    } catch (error) {
+      console.error('Level4Service.getLevel4Configuration error:', error);
       throw error;
     }
-    if (!data) return null;
+  }
 
+  /**
+   * Convert admin Level4Config to runtime Level4Configuration format
+   */
+  static convertToRuntimeConfiguration(adminConfig: Level4Config): Level4Configuration {
+    const options = Array.isArray(adminConfig.options) ? adminConfig.options : [];
+    
     return {
-      id: data.id,
-      fieldLabel: data.field_label,
-      mode: data.mode,
-      fixed: data.mode === "fixed" ? { numberOfInputs: data.fixed_number_of_inputs ?? 1 } : undefined,
-      variable: data.mode === "variable" ? { maxInputs: data.variable_max_inputs ?? 1 } : undefined,
-      options: data.options || [],
+      id: adminConfig.id,
+      level3_product_id: adminConfig.id, // Using config ID as reference
+      template_type: adminConfig.mode === 'fixed' ? 'OPTION_2' : 'OPTION_1',
+      field_label: adminConfig.fieldLabel,
+      max_inputs: adminConfig.mode === 'variable' ? adminConfig.variable?.maxInputs : null,
+      fixed_inputs: adminConfig.mode === 'fixed' ? adminConfig.fixed?.numberOfInputs : null,
+      options: options.map((opt: any, index: number) => ({
+        id: opt.id,
+        level4_configuration_id: adminConfig.id,
+        label: opt.name,
+        value: opt.id,
+        display_order: index,
+        is_default: index === 0,
+        info_url: opt.url || null
+      }))
     };
   }
 
-  static async getLevel3ProductsWithLevel4(): Promise<any[]> {
-    const [productsResult, configsResult] = await Promise.all([
-      supabase
-        .from("products")
-        .select("id, name, parent_product_id, has_level4, enabled")
-        .eq("product_level", 3),
-      supabase.from("level4_configs").select("product_id"),
-    ]);
+  /**
+   * Get existing BOM Level 4 value if it exists
+   */
+  static async getBOMLevel4Value(bomItemId: string): Promise<Level4BOMValue | null> {
+    try {
+      const { data, error } = await supabase
+        .from('bom_level4_values')
+        .select('*')
+        .eq('bom_item_id', bomItemId)
+        .single();
 
-    const { data: allL3Products, error: productsError } = productsResult;
-    const { data: l4Configs, error: configsError } = configsResult;
+      if (error) {
+        if (error.code === 'PGRST116') {
+          return null; // No existing value
+        }
+        throw error;
+      }
 
-    if (productsError) throw productsError;
-    if (configsError) throw configsError;
-
-    const configuredProductIds = new Set((l4Configs || []).map((c: { product_id: string }) => c.product_id));
-    const relevantProducts = (allL3Products || []).filter(
-      (p: any) => p.has_level4 || configuredProductIds.has(p.id)
-    );
-    return relevantProducts;
-  }
-
-  static async saveLevel4Configuration(config: Level4Config, productId: string): Promise<Level4Config | null> {
-    const rowToSave: Omit<Level4ConfigRow, "id"> = {
-      product_id: productId,
-      field_label: config.fieldLabel,
-      mode: config.mode,
-      fixed_number_of_inputs: config.fixed?.numberOfInputs ?? null,
-      variable_max_inputs: config.variable?.maxInputs ?? null,
-      options: config.options,
-    } as Omit<Level4ConfigRow, "id">;
-
-    const { data, error } = await supabase
-      .from("level4_configs")
-      .upsert(rowToSave, { onConflict: "product_id" })
-      .select(
-        "id, product_id, field_label, mode, fixed_number_of_inputs, variable_max_inputs, options"
-      )
-      .single(); // ← here we *expect* one row back
-
-    if (error) {
-      console.error("Error saving Level 4 config:", error);
-      throw error;
+      return data;
+    } catch (error) {
+      console.error('Level4Service.getBOMLevel4Value error:', error);
+      return null;
     }
-
-    return {
-      id: data.id,
-      fieldLabel: data.field_label,
-      mode: data.mode,
-      fixed: data.mode === "fixed" ? { numberOfInputs: data.fixed_number_of_inputs ?? 1 } : undefined,
-      variable: data.mode === "variable" ? { maxInputs: data.variable_max_inputs ?? 1 } : undefined,
-      options: data.options || [],
-    };
   }
 
-  static async saveBOMLevel4Value(
-    bomItemId: string,
-    payload: Level4RuntimePayload
-  ): Promise<Level4BOMValue | null> {
-    const { data, error } = await supabase
-      .from("bom_level4_values")
-      .upsert(
-        {
+  /**
+   * Save BOM Level 4 configuration value
+   */
+  static async saveBOMLevel4Value(bomItemId: string, payload: Level4RuntimePayload): Promise<void> {
+    try {
+      const { error } = await supabase
+        .from('bom_level4_values')
+        .upsert({
           bom_item_id: bomItemId,
           level4_config_id: payload.configuration_id,
-          entries: payload.entries,
-        },
-        { onConflict: "bom_item_id" }
-      )
-      .select()
-      .maybeSingle(); // safe
+          entries: payload.entries
+        });
 
-    if (error) throw error;
-    return data || null;
-  }
-
-  static async getBOMLevel4Value(bomItemId: string): Promise<Level4BOMValue | null> {
-    const { data, error } = await supabase
-      .from("bom_level4_values")
-      .select("*")
-      .eq("bom_item_id", bomItemId)
-      .maybeSingle();
-
-    if (error) return null;
-    return data || null;
-  }
-
-  static async deleteBOMLevel4Value(bomItemId: string): Promise<boolean> {
-    const { error } = await supabase.from("bom_level4_values").delete().eq("bom_item_id", bomItemId);
-    return !error;
-  }
-
-  static formatLevel4Display(value: Level4BOMValue, config: Level4Config): string[] {
-    if (!value || !value.entries || !config) return ["Level 4 configuration error"];
-    return value.entries.map((entry, i) => {
-      const option = config.options.find((opt) => opt.id === entry.value);
-      const label = option?.name || entry.value;
-      return config.mode === "variable"
-        ? `${config.fieldLabel} #${i + 1}: ${label}`
-        : `${config.fieldLabel} ${i + 1}: ${label}`;
-    });
-  }
-
-  static getLevel4Summary(value: Level4BOMValue, config?: Level4Config): string {
-    if (!value || !value.entries || value.entries.length === 0) return "No Level 4 configuration";
-    const count = value.entries.length;
-    if (config) {
-      const template = config.mode.charAt(0).toUpperCase() + config.mode.slice(1);
-      return `L4: ${count} ${config.fieldLabel.toLowerCase()}${count > 1 ? "s" : ""} (${template})`;
+      if (error) {
+        throw error;
+      }
+    } catch (error) {
+      console.error('Level4Service.saveBOMLevel4Value error:', error);
+      throw error;
     }
-    return `L4: ${count} selection${count > 1 ? "s" : ""}`;
   }
 
-  static validateLevel4Configuration(value: Level4BOMValue, config: Level4Config) {
-    const errors: string[] = [];
-    if (!value || !value.entries) return { isValid: false, errors: ["No Level 4 selections found"] };
+  /**
+   * Check if a product has Level 4 configuration
+   */
+  static async hasLevel4Configuration(level3ProductId: string): Promise<boolean> {
+    try {
+      const { data, error } = await supabase
+        .from('level4_configs')
+        .select('id')
+        .eq('product_id', level3ProductId)
+        .limit(1);
 
-    if (config.mode === "variable") {
-      const maxInputs = config.variable?.maxInputs || 1;
-      if (value.entries.length > maxInputs) errors.push(`Too many selections: ${value.entries.length}/${maxInputs}`);
-      if (value.entries.length === 0) errors.push("At least one selection is required");
-    } else if (config.mode === "fixed") {
-      const required = config.fixed?.numberOfInputs || 1;
-      if (value.entries.length !== required) errors.push(`Incorrect number of selections: ${value.entries.length}/${required}`);
+      if (error) {
+        console.error('Error checking Level 4 config:', error);
+        return false;
+      }
+
+      return data && data.length > 0;
+    } catch (error) {
+      console.error('Level4Service.hasLevel4Configuration error:', error);
+      return false;
     }
+  }
 
-    value.entries.forEach((entry, i) => {
-      if (!entry.value) errors.push(`Selection ${i + 1} is empty`);
-      else if (!config.options.some((opt) => opt.id === entry.value))
-        errors.push(`Selection ${i + 1} has invalid option: ${entry.value}`);
-    });
+  /**
+   * Save Level 4 configuration (for admin panel)
+   */
+  static async saveLevel4Configuration(config: Level4Config, productId: string): Promise<Level4Config> {
+    try {
+      const configToSave = {
+        id: config.id,
+        product_id: productId,
+        field_label: config.fieldLabel,
+        mode: config.mode,
+        fixed_number_of_inputs: config.fixed?.numberOfInputs,
+        variable_max_inputs: config.variable?.maxInputs,
+        options: config.options
+      };
+      
+      const { data, error } = await supabase
+        .from('level4_configs')
+        .upsert(configToSave)
+        .select()
+        .single();
 
-    return { isValid: errors.length === 0, errors };
+      if (error) {
+        throw error;
+      }
+      
+      return config; // Return the original config
+    } catch (error) {
+      console.error('Level4Service.saveLevel4Configuration error:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get Level 3 products with Level 4 configurations (for admin panel)
+   */
+  static async getLevel3ProductsWithLevel4(): Promise<any[]> {
+    try {
+      const { data, error } = await supabase
+        .from('products')
+        .select('*')
+        .eq('product_level', 3)
+        .eq('enabled', true);
+
+      if (error) {
+        throw error;
+      }
+
+      return data || [];
+    } catch (error) {
+      console.error('Level4Service.getLevel3ProductsWithLevel4 error:', error);
+      throw error;
+    }
   }
 }

@@ -15,6 +15,7 @@ export interface Level4RuntimeViewProps {
   initialEntries?: Level4SelectionEntry[];
   onEntriesChange?: (entries: Level4SelectionEntry[]) => void;
   className?: string;
+  allowInteractions?: boolean; // New prop to control interaction ability in preview mode
 }
 
 export const Level4RuntimeView: React.FC<Level4RuntimeViewProps> = ({
@@ -22,7 +23,8 @@ export const Level4RuntimeView: React.FC<Level4RuntimeViewProps> = ({
   configuration,
   initialEntries,
   onEntriesChange,
-  className
+  className,
+  allowInteractions = true // Default to true for backward compatibility
 }) => {
   const [entries, setEntries] = useState<Level4SelectionEntry[]>(() => {
     if (initialEntries && initialEntries.length > 0) {
@@ -51,7 +53,7 @@ export const Level4RuntimeView: React.FC<Level4RuntimeViewProps> = ({
   }, [entries, onEntriesChange]);
 
   const handleEntryChange = (index: number, value: string) => {
-    if (mode === 'preview') return;
+    if (!allowInteractions) return;
     
     setEntries(prev => prev.map(entry => 
       entry.index === index 
@@ -70,7 +72,7 @@ export const Level4RuntimeView: React.FC<Level4RuntimeViewProps> = ({
   };
 
   const addEntry = () => {
-    if (mode === 'preview' || configuration.template_type !== 'OPTION_1') return;
+    if (!allowInteractions || configuration.template_type !== 'OPTION_1') return;
     
     const maxInputs = configuration.max_inputs || 1;
     if (entries.length >= maxInputs) return;
@@ -85,7 +87,7 @@ export const Level4RuntimeView: React.FC<Level4RuntimeViewProps> = ({
   };
 
   const removeEntry = (index: number) => {
-    if (mode === 'preview' || configuration.template_type !== 'OPTION_1') return;
+    if (!allowInteractions || configuration.template_type !== 'OPTION_1') return;
     if (entries.length <= 1) return;
 
     setEntries(prev => prev.filter(entry => entry.index !== index));
@@ -110,7 +112,7 @@ export const Level4RuntimeView: React.FC<Level4RuntimeViewProps> = ({
   }));
 
   const hasInfoUrl = configuration.info_url && isValidUrl(configuration.info_url);
-  const isReadOnly = mode === 'preview';
+  const isReadOnly = !allowInteractions;
 
   return (
     <div className={cn("space-y-6", className)}>
@@ -202,7 +204,7 @@ export const Level4RuntimeView: React.FC<Level4RuntimeViewProps> = ({
                   >
                     <SelectValue placeholder="Select an option" />
                   </SelectTrigger>
-                  <SelectContent className="z-50 bg-popover">
+                  <SelectContent className="z-[100] bg-background border shadow-lg">
                     {configuration.options
                       .sort((a, b) => a.display_order - b.display_order)
                       .map(option => (
@@ -218,7 +220,7 @@ export const Level4RuntimeView: React.FC<Level4RuntimeViewProps> = ({
               </div>
 
               {/* Add/Remove buttons for variable inputs */}
-              {!isReadOnly && configuration.template_type === 'OPTION_1' && (
+              {allowInteractions && configuration.template_type === 'OPTION_1' && (
                 <div className="flex flex-col gap-1 mt-6">
                   <Button
                     type="button"
@@ -247,7 +249,7 @@ export const Level4RuntimeView: React.FC<Level4RuntimeViewProps> = ({
         ))}
 
         {/* Add more button for variable inputs */}
-        {!isReadOnly && 
+        {allowInteractions && 
          configuration.template_type === 'OPTION_1' && 
          entries.length < (configuration.max_inputs || 1) && (
           <Button
