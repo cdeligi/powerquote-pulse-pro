@@ -52,7 +52,8 @@ const SlotCardSelector = ({
           slotRequirement: product.specifications?.slotRequirement || 1,
           compatibleChassis: product.specifications?.compatibleChassis || [chassis.type],
           specifications: product.specifications,
-          partNumber: product.partNumber
+          partNumber: product.partNumber,
+          has_level4: (product as any)?.has_level4 === true
         }));
         
         setAvailableCards(cards);
