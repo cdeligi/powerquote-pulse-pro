@@ -211,7 +211,11 @@ export const Level4RuntimeView: React.FC<Level4RuntimeViewProps> = ({
                     {configuration.options
                       .sort((a, b) => a.display_order - b.display_order)
                       .map(option => (
-                        <SelectItem key={option.id} value={option.value}>
+                        <SelectItem
+                          key={option.id}
+                          value={option.value}
+                          className="text-foreground"
+                        >
                           {option.label}
                           {option.is_default && isReadOnly && (
                             <span className="ml-2 text-xs text-muted-foreground">(default)</span>
