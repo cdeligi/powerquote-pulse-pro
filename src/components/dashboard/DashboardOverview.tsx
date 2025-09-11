@@ -69,10 +69,10 @@ const DashboardOverview = ({ user }: DashboardOverviewProps) => {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-3xl font-bold text-white mb-2">
+        <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
           Welcome back, {user.name}
         </h1>
-        <p className="text-gray-400">
+        <p className="text-gray-500 dark:text-gray-400">
           Here's an overview of your quoting activity
         </p>
       </div>
@@ -82,60 +82,60 @@ const DashboardOverview = ({ user }: DashboardOverviewProps) => {
 
       {/* Quick Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Card className="bg-gray-900 border-gray-800">
+        <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-gray-400">
+            <CardTitle className="text-sm font-medium text-gray-500 dark:text-gray-400">
               Total Quotes
             </CardTitle>
-            <FileText className="h-4 w-4 text-gray-400" />
+            <FileText className="h-4 w-4 text-gray-500 dark:text-gray-400" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-white">{stats.totalQuotes}</div>
+            <div className="text-2xl font-bold text-gray-900 dark:text-white">{stats.totalQuotes}</div>
           </CardContent>
         </Card>
 
-        <Card className="bg-gray-900 border-gray-800">
+        <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-gray-400">
+            <CardTitle className="text-sm font-medium text-gray-500 dark:text-gray-400">
               Pending Approval
             </CardTitle>
             <Clock className="h-4 w-4 text-yellow-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-white">{stats.pendingApproval}</div>
+            <div className="text-2xl font-bold text-gray-900 dark:text-white">{stats.pendingApproval}</div>
           </CardContent>
         </Card>
 
-        <Card className="bg-gray-900 border-gray-800">
+        <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-gray-400">
+            <CardTitle className="text-sm font-medium text-gray-500 dark:text-gray-400">
               Approved
             </CardTitle>
             <CheckCircle className="h-4 w-4 text-green-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-white">{stats.approved}</div>
+            <div className="text-2xl font-bold text-gray-900 dark:text-white">{stats.approved}</div>
           </CardContent>
         </Card>
 
-        <Card className="bg-gray-900 border-gray-800">
+        <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-gray-400">
+            <CardTitle className="text-sm font-medium text-gray-500 dark:text-gray-400">
               Rejected
             </CardTitle>
             <AlertCircle className="h-4 w-4 text-red-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-white">{stats.rejected}</div>
+            <div className="text-2xl font-bold text-gray-900 dark:text-white">{stats.rejected}</div>
           </CardContent>
         </Card>
       </div>
 
       {/* Recent Quotes */}
-      <Card className="bg-gray-900 border-gray-800">
+      <Card>
         <CardHeader>
-          <CardTitle className="text-white">Recent Quotes</CardTitle>
-          <CardDescription className="text-gray-400">
+          <CardTitle className="text-gray-900 dark:text-white">Recent Quotes</CardTitle>
+          <CardDescription className="text-gray-500 dark:text-gray-400">
             Your latest quoting activity
           </CardDescription>
         </CardHeader>
@@ -146,22 +146,22 @@ const DashboardOverview = ({ user }: DashboardOverviewProps) => {
               return (
                 <div
                   key={quote.id}
-                  className="flex items-center justify-between p-4 bg-gray-800 rounded-lg"
+                  className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
                 >
                   <div className="flex-1">
                     <div className="flex items-center space-x-3">
-                      <span className="text-white font-medium">{quote.id}</span>
+                      <span className="font-medium text-gray-900 dark:text-white">{quote.id}</span>
                       <Badge className={`${statusBadge.color} text-white`}>
                         {statusBadge.text}
                       </Badge>
                     </div>
-                    <p className="text-gray-400 text-sm mt-1">{quote.customer}</p>
+                    <p className="text-sm mt-1 text-gray-500 dark:text-gray-400">{quote.customer}</p>
                   </div>
                   <div className="text-right">
-                    <p className="text-white font-bold">
+                    <p className="font-bold text-gray-900 dark:text-white">
                       {user.role === 'LEVEL_1' ? '—' : quote.value}
                     </p>
-                    <p className="text-gray-400 text-sm">{quote.date}</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">{quote.date}</p>
                   </div>
                 </div>
               );

@@ -7,7 +7,10 @@ import {
   BushingTapModelOption
 } from "@/types/product";
 import { ChassisType, ChassisTypeFormData } from "@/types/product/chassis-types";
-import { supabase } from "@/integrations/supabase/client";
+import { getSupabaseClient, getSupabaseAdminClient, isAdminAvailable } from "@/integrations/supabase/client";
+
+const supabase = getSupabaseClient();
+const supabaseAdmin = getSupabaseAdminClient();;
 
 // Private instance to ensure singleton pattern
 class ProductDataService {

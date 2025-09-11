@@ -20,7 +20,10 @@ import { Level4RuntimeModal } from "../level4/Level4RuntimeModal";
 import { productDataService } from '@/services/productDataService';
 import QuoteFieldsSection from './QuoteFieldsSection';
 
-import { supabase } from '@/integrations/supabase/client';
+import { getSupabaseClient, getSupabaseAdminClient, isAdminAvailable } from "@/integrations/supabase/client";
+
+const supabase = getSupabaseClient();
+const supabaseAdmin = getSupabaseAdminClient();;
 import { toast } from '@/components/ui/use-toast';
 import QTMSConfigurationEditor from './QTMSConfigurationEditor';
 import { consolidateQTMSConfiguration, createQTMSBOMItem, ConsolidatedQTMS, QTMSConfiguration } from '@/utils/qtmsConsolidation';

@@ -19,7 +19,10 @@ import {
   Edit,
   Trash2
 } from "lucide-react";
-import { supabase, supabaseAdmin, isAdminAvailable } from "@/integrations/supabase/client";
+import { getSupabaseClient, getSupabaseAdminClient, isAdminAvailable } from "@/integrations/supabase/client";
+
+const supabase = getSupabaseClient();
+const supabaseAdmin = getSupabaseAdminClient();;
 import { toast } from "@/hooks/use-toast";
 import UserEditDialog from "./UserEditDialog";
 import UserRequestsTab from "./UserRequestsTab";

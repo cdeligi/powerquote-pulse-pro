@@ -1,5 +1,7 @@
-import { createContext, useContext, useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { createContext, useContext, useEffect, useState, useCallback } from "react";
+import { getSupabaseClient } from "@/integrations/supabase/client";
+
+const supabase = getSupabaseClient();
 import { User, AuthError, Role } from "@/types/auth";
 
 // Helper function to map database role to app role
@@ -49,130 +51,72 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<AuthError | null>(null);
 
+  const handleAuthStateChange = useCallback(async (event: string, session: any) => {
+    console.log("[AuthProvider] Auth state change:", { event, hasSession: !!session });
+    
+    setSession(session);
+    
+    if (session?.user) {
+      try {
+        // Only fetch profile if we don't have user data or if user changed
+        if (!user || user.id !== session.user.id) {
+          await fetchProfile(session.user.id, 2000);
+          // fetchProfile will update the user state internally
+        }
+        
+        // Log session events
+        if (event === 'SIGNED_IN') {
+          logUserSession(session.user.id, 'login').catch(console.error);
+        } else if (event === 'SIGNED_OUT') {
+          setUser(null);
+        }
+      } catch (error) {
+        console.error("[AuthProvider] Error in auth state change:", error);
+      }
+    } else {
+      setUser(null);
+    }
+    
+    setLoading(false);
+  }, [user?.id]);
+  
+  // Initialize auth state
   useEffect(() => {
     console.log("[AuthProvider] Initializing auth state...");
-
-    // Force loading to false after maximum timeout
-    const maxLoadingTimeout = setTimeout(() => {
-      console.warn(
-        "[AuthProvider] Maximum loading timeout reached, forcing loading to false",
-      );
-      setLoading(false);
-    }, 8000);
-
-    // Setup auth state listener first
-    const { data: listener } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        console.log("[AuthProvider] Auth state change:", {
-          event,
-          hasSession: !!session,
-          userId: session?.user?.id,
-          userEmail: session?.user?.email,
-          userRole: user?.role,
-          loading: loading,
-        });
-
-        clearTimeout(maxLoadingTimeout);
-        setSession(session);
-        setError(null);
-
-        if (session?.user) {
-          console.log(
-            "[AuthProvider] User session found, fetching profile...",
-            {
-              userId: session.user.id,
-              userEmail: session.user.email,
-            },
-          );
-          try {
-            await fetchProfile(session.user.id, 8000);
-
-            // Log session events
-            if (event === "SIGNED_IN") {
-              await logUserSession(session.user.id, "login");
-            } else if (event === "TOKEN_REFRESHED") {
-              await logUserSession(session.user.id, "session_refresh");
-            }
-          } catch (error) {
-            console.error(
-              "[AuthProvider] Error fetching profile in auth state change:",
-              error,
-            );
-            setUser(null);
-          } finally {
-            setLoading(false);
-          }
-        } else {
-          console.log("[AuthProvider] No user session, clearing user state");
-          if (event === "SIGNED_OUT" && user) {
-            await logUserSession(user.id, "logout");
-          }
-          setUser(null);
-          setLoading(false);
-        }
-      },
-    );
-
-    // Get initial session with timeout
-    const getInitialSession = async () => {
+    let isMounted = true;
+    
+    const initializeAuth = async () => {
       try {
-        console.log("[AuthProvider] Getting initial session...");
-        const sessionPromise = supabase.auth.getSession();
-        const timeoutPromise = new Promise<never>((_, reject) => {
-          setTimeout(() => reject(new Error("Session fetch timeout")), 5000);
-        });
-
-        const {
-          data: { session },
-          error,
-        } = await Promise.race([sessionPromise, timeoutPromise]) as Awaited<
-          ReturnType<typeof supabase.auth.getSession>
-        >;
-
-        if (error) {
-          console.error("[AuthProvider] Initial session error:", {
-            errorCode: (error as any)?.code,
-            errorMessage: (error as any)?.message,
-          });
-          setError({
-            code: (error as any)?.code || "SESSION_ERROR",
-            message: (error as any)?.message || "Session error",
-            type: "session",
-          });
+        // Set up auth state listener first
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(handleAuthStateChange);
+        
+        // Check for existing session
+        const { data: { session: initialSession } } = await supabase.auth.getSession();
+        
+        if (!isMounted) return;
+        
+        if (initialSession?.user) {
+          console.log("[AuthProvider] Initial session found, loading profile...");
+          await handleAuthStateChange('INITIAL_SESSION', initialSession);
+        } else {
           setLoading(false);
-          return;
         }
-
-        console.log("[AuthProvider] Initial session check:", {
-          hasSession: !!session,
-          userId: session?.user?.id,
-          userEmail: session?.user?.email,
-        });
-        setSession(session);
-
-        if (session?.user) {
-          await fetchProfile(session.user.id, 8000);
-        }
-      } catch (err) {
-        console.error("[AuthProvider] Initial session timeout or error:", err);
-        setError({
-          code: "SESSION_ERROR",
-          message: "Failed to initialize session",
-          type: "session",
-        });
-      } finally {
-        clearTimeout(maxLoadingTimeout);
-        setLoading(false);
+        
+        return () => {
+          subscription.unsubscribe();
+        };
+      } catch (error) {
+        console.error("[AuthProvider] Error during auth initialization:", error);
+        if (isMounted) setLoading(false);
       }
     };
-
-    getInitialSession();
-
+    
+    initializeAuth();
+    
     return () => {
-      listener.subscription.unsubscribe();
-      clearTimeout(maxLoadingTimeout);
+      isMounted = false;
     };
-  }, []);
+  }, [handleAuthStateChange]);
 
   const signIn = async (email: string, password: string) => {
     try {
@@ -324,7 +268,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   // Helper to fetch profile, with optional timeout, and no 406 (uses maybeSingle)
-  const fetchProfile = async (uid: string, timeoutMs = 8000): Promise<void> => {
+  const fetchProfile = async (uid: string, timeoutMs = 8000): Promise<User | null> => {
     console.log("[AuthProvider] fetchProfile start for:", uid);
 
     try {
