@@ -9,10 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { UserRegistrationRequest } from "@/types/user-management";
 import { Shield, User, Mail, Phone, Building, FileText, ArrowLeft } from "lucide-react";
-import { getSupabaseClient, getSupabaseAdminClient, isAdminAvailable } from "@/integrations/supabase/client";
-
-const supabase = getSupabaseClient();
-const supabaseAdmin = getSupabaseAdminClient();;
+import { supabase } from "@/integrations/supabase/client";
 import LegalDocumentModal from "@/components/admin/LegalDocumentModal";
 import { departmentService, Department } from "@/services/departmentService";
 import { roleService, RoleMetadata } from "@/services/roleService";
@@ -140,15 +137,15 @@ const UserRegistrationForm = ({ onSubmit, onBack }: UserRegistrationFormProps) =
   };
 
   return (
-    <div className="min-h-screen bg-black flex items-center justify-center p-6">
-      <Card className="w-full max-w-2xl bg-gray-900 border-gray-800">
+    <div className="min-h-screen bg-gray-100 dark:bg-black flex items-center justify-center p-6">
+      <Card className="w-full max-w-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800">
         <CardHeader className="text-center">
           <div className="flex items-center justify-between mb-4">
             {onBack && (
               <Button
                 variant="ghost"
                 onClick={onBack}
-                className="text-white hover:bg-gray-800"
+                className="text-gray-700 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-800"
               >
                 <ArrowLeft className="h-4 w-4 mr-2" />
                 Back to Login
@@ -156,11 +153,11 @@ const UserRegistrationForm = ({ onSubmit, onBack }: UserRegistrationFormProps) =
             )}
             <div className="flex-1" />
           </div>
-          <CardTitle className="text-2xl font-bold text-white flex items-center justify-center">
+          <CardTitle className="text-2xl font-bold text-gray-900 dark:text-white flex items-center justify-center">
             <Shield className="mr-2 h-6 w-6 text-red-600" />
             Request Access to PowerQuotePro
           </CardTitle>
-          <CardDescription className="text-gray-400">
+          <CardDescription className="text-gray-500 dark:text-gray-400">
             Complete this form to request access to the system. Your request will be reviewed by an administrator.
           </CardDescription>
         </CardHeader>
@@ -169,8 +166,8 @@ const UserRegistrationForm = ({ onSubmit, onBack }: UserRegistrationFormProps) =
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Personal Information Section */}
             <div className="space-y-4">
-              <div className="border-b border-gray-700 pb-2">
-                <h3 className="text-white font-semibold text-lg flex items-center">
+              <div className="border-b border-gray-200 dark:border-gray-700 pb-2">
+                <h3 className="text-gray-900 dark:text-white font-semibold text-lg flex items-center">
                   <User className="mr-2 h-5 w-5 text-red-600" />
                   Personal Information
                 </h3>
@@ -178,28 +175,28 @@ const UserRegistrationForm = ({ onSubmit, onBack }: UserRegistrationFormProps) =
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="firstName" className="text-white font-medium mb-2 block">
+                  <Label htmlFor="firstName" className="text-gray-700 dark:text-white font-medium mb-2 block">
                     First Name *
                   </Label>
                   <Input
                     id="firstName"
                     value={formData.firstName}
                     onChange={(e) => handleInputChange('firstName', e.target.value)}
-                    className="bg-gray-800 border-gray-600 text-white placeholder:text-gray-400 focus:border-red-500 focus:ring-red-500"
+                    className="bg-gray-50 dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white placeholder:text-gray-500 dark:placeholder:text-gray-400 focus:border-red-500 focus:ring-red-500"
                     placeholder="Enter your first name"
                     required
                   />
                 </div>
                 
                 <div>
-                  <Label htmlFor="lastName" className="text-white font-medium mb-2 block">
+                  <Label htmlFor="lastName" className="text-gray-700 dark:text-white font-medium mb-2 block">
                     Last Name *
                   </Label>
                   <Input
                     id="lastName"
                     value={formData.lastName}
                     onChange={(e) => handleInputChange('lastName', e.target.value)}
-                    className="bg-gray-800 border-gray-600 text-white placeholder:text-gray-400 focus:border-red-500 focus:ring-red-500"
+                    className="bg-gray-50 dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white placeholder:text-gray-500 dark:placeholder:text-gray-400 focus:border-red-500 focus:ring-red-500"
                     placeholder="Enter your last name"
                     required
                   />
@@ -207,7 +204,7 @@ const UserRegistrationForm = ({ onSubmit, onBack }: UserRegistrationFormProps) =
               </div>
 
               <div>
-                <Label htmlFor="email" className="text-white font-medium mb-2 block">
+                <Label htmlFor="email" className="text-gray-700 dark:text-white font-medium mb-2 block">
                   Email Address *
                 </Label>
                 <Input
@@ -215,14 +212,14 @@ const UserRegistrationForm = ({ onSubmit, onBack }: UserRegistrationFormProps) =
                   type="email"
                   value={formData.email}
                   onChange={(e) => handleInputChange('email', e.target.value)}
-                  className="bg-gray-800 border-gray-600 text-white placeholder:text-gray-400 focus:border-red-500 focus:ring-red-500"
+                  className="bg-gray-50 dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white placeholder:text-gray-500 dark:placeholder:text-gray-400 focus:border-red-500 focus:ring-red-500"
                   placeholder="Enter your email address"
                   required
                 />
               </div>
 
               <div>
-                <Label htmlFor="phoneNumber" className="text-white font-medium mb-2 block">
+                <Label htmlFor="phoneNumber" className="text-gray-700 dark:text-white font-medium mb-2 block">
                   Phone Number *
                 </Label>
                 <Input
@@ -230,7 +227,7 @@ const UserRegistrationForm = ({ onSubmit, onBack }: UserRegistrationFormProps) =
                   type="tel"
                   value={formData.phoneNumber}
                   onChange={(e) => handleInputChange('phoneNumber', e.target.value)}
-                  className="bg-gray-800 border-gray-600 text-white placeholder:text-gray-400 focus:border-red-500 focus:ring-red-500"
+                  className="bg-gray-50 dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white placeholder:text-gray-500 dark:placeholder:text-gray-400 focus:border-red-500 focus:ring-red-500"
                   placeholder="Enter your phone number"
                   required
                 />
@@ -239,22 +236,22 @@ const UserRegistrationForm = ({ onSubmit, onBack }: UserRegistrationFormProps) =
 
             {/* Company Information Section */}
             <div className="space-y-4">
-              <div className="border-b border-gray-700 pb-2">
-                <h3 className="text-white font-semibold text-lg flex items-center">
+              <div className="border-b border-gray-200 dark:border-gray-700 pb-2">
+                <h3 className="text-gray-900 dark:text-white font-semibold text-lg flex items-center">
                   <Building className="mr-2 h-5 w-5 text-red-600" />
                   Company Information
                 </h3>
               </div>
 
               <div>
-                <Label htmlFor="companyName" className="text-white font-medium mb-2 block">
+                <Label htmlFor="companyName" className="text-gray-700 dark:text-white font-medium mb-2 block">
                   Company Name *
                 </Label>
                 <Input
                   id="companyName"
                   value={formData.companyName}
                   onChange={(e) => handleInputChange('companyName', e.target.value)}
-                  className="bg-gray-800 border-gray-600 text-white placeholder:text-gray-400 focus:border-red-500 focus:ring-red-500"
+                  className="bg-gray-50 dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white placeholder:text-gray-500 dark:placeholder:text-gray-400 focus:border-red-500 focus:ring-red-500"
                   placeholder="Enter your company name"
                   required
                 />
@@ -262,7 +259,7 @@ const UserRegistrationForm = ({ onSubmit, onBack }: UserRegistrationFormProps) =
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="department" className="text-white font-medium mb-2 block">
+                  <Label htmlFor="department" className="text-gray-700 dark:text-white font-medium mb-2 block">
                     Department *
                   </Label>
                   <Select
@@ -270,12 +267,12 @@ const UserRegistrationForm = ({ onSubmit, onBack }: UserRegistrationFormProps) =
                     onValueChange={(value: string) => handleInputChange('department', value)}
                     required
                   >
-                    <SelectTrigger className="bg-gray-800 border-gray-600 text-white focus:border-red-500 focus:ring-red-500">
+                    <SelectTrigger className="bg-gray-50 dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white focus:border-red-500 focus:ring-red-500">
                       <SelectValue placeholder="Select a department" />
                     </SelectTrigger>
-                    <SelectContent className="bg-gray-800 border-gray-600 z-50">
+                    <SelectContent className="bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 z-50">
                       {departments.map((dept) => (
-                        <SelectItem key={dept.id} value={dept.name}>
+                        <SelectItem key={dept.id} value={dept.name} className="text-gray-900 dark:text-white">
                           {dept.name}
                         </SelectItem>
                       ))}
@@ -284,14 +281,14 @@ const UserRegistrationForm = ({ onSubmit, onBack }: UserRegistrationFormProps) =
                 </div>
                 
                 <div>
-                  <Label htmlFor="jobTitle" className="text-white font-medium mb-2 block">
+                  <Label htmlFor="jobTitle" className="text-gray-700 dark:text-white font-medium mb-2 block">
                     Job Title *
                   </Label>
                   <Input
                     id="jobTitle"
                     value={formData.jobTitle}
                     onChange={(e) => handleInputChange('jobTitle', e.target.value)}
-                    className="bg-gray-800 border-gray-600 text-white placeholder:text-gray-400 focus:border-red-500 focus:ring-red-500"
+                    className="bg-gray-50 dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white placeholder:text-gray-500 dark:placeholder:text-gray-400 focus:border-red-500 focus:ring-red-500"
                     placeholder="Enter your job title"
                     required
                   />
@@ -299,7 +296,7 @@ const UserRegistrationForm = ({ onSubmit, onBack }: UserRegistrationFormProps) =
               </div>
 
               <div>
-                <Label htmlFor="managerEmail" className="text-white font-medium mb-2 block">
+                <Label htmlFor="managerEmail" className="text-gray-700 dark:text-white font-medium mb-2 block">
                   Manager Email *
                 </Label>
                 <Input
@@ -307,7 +304,7 @@ const UserRegistrationForm = ({ onSubmit, onBack }: UserRegistrationFormProps) =
                   type="email"
                   value={formData.managerEmail}
                   onChange={(e) => handleInputChange('managerEmail', e.target.value)}
-                  className="bg-gray-800 border-gray-600 text-white placeholder:text-gray-400 focus:border-red-500 focus:ring-red-500"
+                  className="bg-gray-50 dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white placeholder:text-gray-500 dark:placeholder:text-gray-400 focus:border-red-500 focus:ring-red-500"
                   placeholder="Enter your manager's email"
                   required
                 />
@@ -316,43 +313,43 @@ const UserRegistrationForm = ({ onSubmit, onBack }: UserRegistrationFormProps) =
 
             {/* Access Request Section */}
             <div className="space-y-4">
-              <div className="border-b border-gray-700 pb-2">
-                <h3 className="text-white font-semibold text-lg flex items-center">
+              <div className="border-b border-gray-200 dark:border-gray-700 pb-2">
+                <h3 className="text-gray-900 dark:text-white font-semibold text-lg flex items-center">
                   <FileText className="mr-2 h-5 w-5 text-red-600" />
                   Access Request Details
                 </h3>
               </div>
 
               <div>
-                <Label htmlFor="requestedRole" className="text-white font-medium mb-2 block">
+                <Label htmlFor="requestedRole" className="text-gray-700 dark:text-white font-medium mb-2 block">
                   Requested Access Level *
                 </Label>
                 <Select value={formData.requestedRole} onValueChange={(value: 'LEVEL_1' | 'LEVEL_2' | 'LEVEL_3' | 'ADMIN' | 'FINANCE') => handleInputChange('requestedRole', value)}>
-                  <SelectTrigger className="bg-gray-800 border-gray-600 text-white focus:border-red-500 focus:ring-red-500">
+                  <SelectTrigger className="bg-gray-50 dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white focus:border-red-500 focus:ring-red-500">
                     <SelectValue placeholder="Select access level" />
                   </SelectTrigger>
-                  <SelectContent className="bg-gray-800 border-gray-600 z-50">
+                  <SelectContent className="bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 z-50">
                     {rolesMetadata.map((role) => (
-                      <SelectItem key={role.role_name} value={role.role_name} className="text-white hover:bg-gray-700 focus:bg-gray-700">
+                      <SelectItem key={role.role_name} value={role.role_name} className="text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700 focus:bg-gray-100 dark:focus:bg-gray-700">
                         {role.display_name}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-                <p className="text-gray-400 text-sm mt-1">
+                <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">
                   Select the appropriate access level based on your role and responsibilities.
                 </p>
               </div>
 
               <div>
-                <Label htmlFor="businessJustification" className="text-white font-medium mb-2 block">
+                <Label htmlFor="businessJustification" className="text-gray-700 dark:text-white font-medium mb-2 block">
                   Business Justification *
                 </Label>
                 <Textarea
                   id="businessJustification"
                   value={formData.businessJustification}
                   onChange={(e) => handleInputChange('businessJustification', e.target.value)}
-                  className="bg-gray-800 border-gray-600 text-white placeholder:text-gray-400 focus:border-red-500 focus:ring-red-500 min-h-[100px]"
+                  className="bg-gray-50 dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white placeholder:text-gray-500 dark:placeholder:text-gray-400 focus:border-red-500 focus:ring-red-500 min-h-[100px]"
                   placeholder="Please explain why you need access to this system and how you plan to use it..."
                   required
                 />
@@ -361,8 +358,8 @@ const UserRegistrationForm = ({ onSubmit, onBack }: UserRegistrationFormProps) =
 
             {/* Terms and Conditions */}
             <div className="space-y-4">
-              <div className="border-b border-gray-700 pb-2">
-                <h3 className="text-white font-semibold text-lg">Terms and Conditions</h3>
+              <div className="border-b border-gray-200 dark:border-gray-700 pb-2">
+                <h3 className="text-gray-900 dark:text-white font-semibold text-lg">Terms and Conditions</h3>
               </div>
 
               <div className="space-y-3">
@@ -371,9 +368,9 @@ const UserRegistrationForm = ({ onSubmit, onBack }: UserRegistrationFormProps) =
                     id="terms"
                     checked={formData.agreedToTerms}
                     onCheckedChange={(checked) => handleInputChange('agreedToTerms', checked as boolean)}
-                    className="border-gray-600 data-[state=checked]:bg-red-600 data-[state=checked]:border-red-600"
+                    className="border-gray-300 dark:border-gray-600 data-[state=checked]:bg-red-600 data-[state=checked]:border-red-600"
                   />
-                  <Label htmlFor="terms" className="text-white text-sm leading-relaxed">
+                  <Label htmlFor="terms" className="text-gray-700 dark:text-white text-sm leading-relaxed">
                     I agree to the <button type="button" onClick={() => setShowTerms(true)} className="text-red-400 hover:text-red-300 underline">Terms of Service</button> and understand that this system is for authorized business use only. 
                     I acknowledge that all activities may be monitored and logged for security purposes.
                   </Label>
@@ -384,9 +381,9 @@ const UserRegistrationForm = ({ onSubmit, onBack }: UserRegistrationFormProps) =
                     id="privacy"
                     checked={formData.agreedToPrivacyPolicy}
                     onCheckedChange={(checked) => handleInputChange('agreedToPrivacyPolicy', checked as boolean)}
-                    className="border-gray-600 data-[state=checked]:bg-red-600 data-[state=checked]:border-red-600"
+                    className="border-gray-300 dark:border-gray-600 data-[state=checked]:bg-red-600 data-[state=checked]:border-red-600"
                   />
-                  <Label htmlFor="privacy" className="text-white text-sm leading-relaxed">
+                  <Label htmlFor="privacy" className="text-gray-700 dark:text-white text-sm leading-relaxed">
                     I agree to the <button type="button" onClick={() => setShowPrivacy(true)} className="text-red-400 hover:text-red-300 underline">Privacy Policy</button> and understand how my personal information will be collected, 
                     used, and protected in accordance with applicable privacy laws.
                   </Label>
@@ -399,12 +396,12 @@ const UserRegistrationForm = ({ onSubmit, onBack }: UserRegistrationFormProps) =
               <Button
                 type="submit"
                 disabled={!isFormValid() || isSubmitting}
-                className="w-full bg-red-600 hover:bg-red-700 text-white disabled:bg-gray-600 disabled:text-gray-400 disabled:cursor-not-allowed"
+                className="w-full bg-red-600 hover:bg-red-700 text-white disabled:bg-gray-400 dark:disabled:bg-gray-600 disabled:text-gray-200 dark:disabled:text-gray-400 disabled:cursor-not-allowed"
               >
                 {isSubmitting ? 'Submitting Request...' : 'Request Access'}
               </Button>
               
-              <p className="text-gray-400 text-sm text-center mt-3">
+              <p className="text-gray-500 dark:text-gray-400 text-sm text-center mt-3">
                 Your request will be reviewed by an administrator. You will receive an email notification once your request has been processed.
               </p>
             </div>
