@@ -5,8 +5,10 @@ import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Trash2, GripVertical, Copy, Plus, Save, Loader2 } from 'lucide-react';
+import { Trash2, GripVertical, Copy, Plus, Save, Loader2, Eye } from 'lucide-react';
 import { toast } from 'sonner';
+import { Level4PreviewModal } from './Level4PreviewModal';
+import { Level4Configuration } from '@/types/level4';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -63,6 +65,7 @@ export default function Level4ConfiguratorAdmin({
 }: Level4ConfiguratorAdminProps) {
   const [editingOption, setEditingOption] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
   const sensors = useSensors(
     useSensor(PointerSensor),
     useSensor(KeyboardSensor, {
@@ -175,6 +178,38 @@ export default function Level4ConfiguratorAdmin({
         setIsSaving(false);
       }
     }
+  };
+
+  // Convert admin config to runtime format for preview
+  const convertToPreviewConfig = (): Level4Configuration => {
+    return {
+      id: 'preview-' + Date.now().toString(),
+      level3_product_id: 'preview',
+      template_type: value.mode === 'fixed' ? 'OPTION_2' : 'OPTION_1',
+      field_label: value.fieldLabel,
+      max_inputs: value.mode === 'variable' ? value.variable?.maxInputs : null,
+      fixed_inputs: value.mode === 'fixed' ? value.fixed?.numberOfInputs : null,
+      options: value.options.map((opt, index) => ({
+        id: opt.id,
+        level4_configuration_id: 'preview',
+        label: opt.name,
+        value: opt.id,
+        display_order: index,
+        is_default: index === 0,
+        info_url: opt.url || null
+      }))
+    };
+  };
+
+  const handlePreview = () => {
+    const errors = validateConfig(value);
+    if (errors.length > 0) {
+      toast.error("Cannot preview invalid configuration", {
+        description: "Please fix validation errors first"
+      });
+      return;
+    }
+    setShowPreview(true);
   };
 
   return (
@@ -367,17 +402,34 @@ export default function Level4ConfiguratorAdmin({
         </CardContent>
       </Card>
 
-      {/* Save Button */}
-      {onSave && !readOnly && (
-        <div className="flex justify-end">
+      {/* Action Buttons */}
+      <div className="flex justify-between">
+        <Button 
+          variant="outline" 
+          onClick={handlePreview} 
+          disabled={value.options.length === 0}
+        >
+          <Eye className="h-4 w-4 mr-2" />
+          Preview Configuration
+        </Button>
+        
+        {onSave && !readOnly && (
           <Button onClick={handleSave} disabled={isSaving}>
             {isSaving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
             {!isSaving && <Save className="h-4 w-4 mr-2" />}
             Save Configuration
           </Button>
-        </div>
-      )}
+        )}
       </div>
+      </div>
+
+      {/* Preview Modal */}
+      {showPreview && (
+        <Level4PreviewModal
+          configuration={convertToPreviewConfig()}
+          onClose={() => setShowPreview(false)}
+        />
+      )}
     </DndContext>
   );
 }
