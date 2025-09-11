@@ -189,7 +189,7 @@ class ProductDataService {
         partNumber: product.part_number,
         image: product.image_url,
         productInfoUrl: product.product_info_url,
-        has_level4: product.has_level4 || false,
+        has_level4: product.has_level4 === true,
         specifications: product.specifications || {}
       }));
 
@@ -401,7 +401,7 @@ class ProductDataService {
             product_level: 3,
             parent_product_id: productData.parentProductId,
             category: productData.type || 'standard',
-            has_level4: (productData as any).has_level4 || false,
+            has_level4: (productData as any).has_level4 === true,
             specifications: productData.specifications || {}
           }
         ])
@@ -422,7 +422,7 @@ class ProductDataService {
         price: data.price || 0,
         cost: data.cost || 0,
         enabled: data.enabled !== false,
-        has_level4: data.has_level4 || false,
+        has_level4: data.has_level4 === true,
         specifications: data.specifications || {}
       };
 
@@ -908,7 +908,7 @@ class ProductDataService {
           partNumber: data.part_number,
           image: data.image_url,
           productInfoUrl: data.product_info_url,
-          has_level4: data.has_level4 || false,
+          has_level4: data.has_level4 === true,
           sku: data.sku,
           specifications: data.specifications || {}
         } as Level3Product;
