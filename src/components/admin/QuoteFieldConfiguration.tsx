@@ -22,7 +22,10 @@ import {
 } from "lucide-react";
 import { User } from "@/types/auth";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
+import { getSupabaseClient, getSupabaseAdminClient, isAdminAvailable } from "@/integrations/supabase/client";
+
+const supabase = getSupabaseClient();
+const supabaseAdmin = getSupabaseAdminClient();;
 
 interface QuoteField {
   id: string;

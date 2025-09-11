@@ -8,7 +8,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { CheckCircle, XCircle, Eye, Clock } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
+import { getSupabaseClient, getSupabaseAdminClient, isAdminAvailable } from "@/integrations/supabase/client";
+
+const supabase = getSupabaseClient();
+const supabaseAdmin = getSupabaseAdminClient();;
 
 interface UserRequest {
   id: string;

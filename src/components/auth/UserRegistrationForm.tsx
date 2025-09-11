@@ -9,7 +9,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { UserRegistrationRequest } from "@/types/user-management";
 import { Shield, User, Mail, Phone, Building, FileText, ArrowLeft } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { getSupabaseClient, getSupabaseAdminClient, isAdminAvailable } from "@/integrations/supabase/client";
+
+const supabase = getSupabaseClient();
+const supabaseAdmin = getSupabaseAdminClient();;
 import LegalDocumentModal from "@/components/admin/LegalDocumentModal";
 import { departmentService, Department } from "@/services/departmentService";
 import { roleService, RoleMetadata } from "@/services/roleService";

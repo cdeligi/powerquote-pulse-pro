@@ -86,53 +86,53 @@ const LoginForm = ({ onLogin }: LoginFormProps) => {
     <div className="w-full max-w-md space-y-8">
       <div className="text-center">
         <div className="flex justify-center mb-6">
-          <div className="flex items-center space-x-2 text-white">
+          <div className="flex items-center space-x-2">
             <Shield className="h-8 w-8 text-red-600" />
             <Zap className="h-8 w-8 text-red-600" />
           </div>
         </div>
-        <h2 className="text-3xl font-bold text-white">PowerQuotePro</h2>
-        <p className="mt-2 text-gray-400">Qualitrol Transformer Solutions</p>
+        <h2 className="text-3xl font-bold text-gray-900 dark:text-white">PowerQuotePro</h2>
+        <p className="mt-2 text-gray-500 dark:text-gray-400">Qualitrol Transformer Solutions</p>
       </div>
 
-      <Card className="bg-gray-900 border-gray-800">
+      <Card className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800">
         <CardHeader>
-          <CardTitle className="text-white">Sign In</CardTitle>
-          <CardDescription className="text-gray-400">
+          <CardTitle className="text-gray-900 dark:text-white">Sign In</CardTitle>
+          <CardDescription className="text-gray-500 dark:text-gray-400">
             Access your quoting dashboard
           </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             {error && (
-              <Alert className="bg-red-900/20 border-red-600">
+              <Alert variant="destructive" className="bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-600">
                 <AlertCircle className="h-4 w-4" />
-                <AlertDescription className="text-red-400">
+                <AlertDescription className="text-red-800 dark:text-red-400">
                   {error}
                 </AlertDescription>
               </Alert>
             )}
             
             <div>
-              <Label htmlFor="email" className="text-white">Email</Label>
+              <Label htmlFor="email" className="text-gray-700 dark:text-white">Email</Label>
               <Input
                 id="email"
                 type="email"
                 value={credentials.email}
                 onChange={(e) => setCredentials(prev => ({ ...prev, email: e.target.value }))}
-                className="bg-gray-800 border-gray-700 text-white"
+                className="bg-gray-50 dark:bg-gray-800 border-gray-300 dark:border-gray-700 text-gray-900 dark:text-white"
                 placeholder="Enter your email"
                 required
               />
             </div>
             <div>
-              <Label htmlFor="password" className="text-white">Password</Label>
+              <Label htmlFor="password" className="text-gray-700 dark:text-white">Password</Label>
               <Input
                 id="password"
                 type="password"
                 value={credentials.password}
                 onChange={(e) => setCredentials(prev => ({ ...prev, password: e.target.value }))}
-                className="bg-gray-800 border-gray-700 text-white"
+                className="bg-gray-50 dark:bg-gray-800 border-gray-300 dark:border-gray-700 text-gray-900 dark:text-white"
                 placeholder="Enter your password"
                 required
               />
@@ -150,17 +150,17 @@ const LoginForm = ({ onLogin }: LoginFormProps) => {
             <Button
               variant="outline"
               onClick={() => setShowRegistration(true)}
-              className="w-full border-gray-600 text-gray-300 hover:bg-gray-800 hover:text-white bg-gray-900"
+              className="w-full border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white bg-transparent dark:bg-gray-900"
             >
               Request Account Access
             </Button>
           </div>
           
-          <div className="mt-6 text-sm text-gray-400">
+          <div className="mt-6 text-sm text-gray-500 dark:text-gray-400">
             <p className="mb-2">Admin Account:</p>
             <div className="space-y-1 text-xs">
               <p>Email: cdeligi@qualitrolcorp.com</p>
-              <p className="text-gray-500">Use your assigned password</p>
+              <p className="text-gray-400 dark:text-gray-500">Use your assigned password</p>
             </div>
           </div>
         </CardContent>

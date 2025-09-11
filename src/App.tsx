@@ -46,7 +46,12 @@ const App = () => {
           }>
             <Toaster />
             <Sonner />
-            <BrowserRouter>
+            <BrowserRouter 
+              future={{
+                v7_startTransition: true,
+                v7_relativeSplatPath: true
+              }}
+            >
               <Routes>
                 {/* This makes the Index component the entry point for all routes,
                     allowing it to handle auth and render the Dashboard, which in turn

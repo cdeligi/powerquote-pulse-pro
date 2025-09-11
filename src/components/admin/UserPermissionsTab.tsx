@@ -5,7 +5,10 @@ import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, RotateCcw } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+import { getSupabaseClient, getSupabaseAdminClient, isAdminAvailable } from "@/integrations/supabase/client";
+
+const supabase = getSupabaseClient();
+const supabaseAdmin = getSupabaseAdminClient();;
 import { toast } from '@/hooks/use-toast';
 import { Role, Feature, UserFeatureOverride } from '@/types/auth';
 

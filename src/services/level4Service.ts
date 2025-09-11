@@ -1,4 +1,7 @@
-import { supabase } from "@/integrations/supabase/client";
+import { getSupabaseClient, getSupabaseAdminClient, isAdminAvailable } from "@/integrations/supabase/client";
+
+const supabase = getSupabaseClient();
+const supabaseAdmin = getSupabaseAdminClient();;
 import type { Level4Config } from "@/components/level4/Level4ConfigTypes";
 import { Level4BOMValue, Level4RuntimePayload } from "@/types/level4";
 

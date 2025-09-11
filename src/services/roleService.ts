@@ -1,4 +1,7 @@
-import { supabase } from "@/integrations/supabase/client";
+import { getSupabaseClient, getSupabaseAdminClient, isAdminAvailable } from "@/integrations/supabase/client";
+
+const supabase = getSupabaseClient();
+const supabaseAdmin = getSupabaseAdminClient();;
 import { Role } from "@/types/auth";
 
 export interface RoleMetadata {

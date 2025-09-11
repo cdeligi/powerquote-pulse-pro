@@ -4,7 +4,10 @@
  */
 
 import { useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { getSupabaseClient, getSupabaseAdminClient, isAdminAvailable } from "@/integrations/supabase/client";
+
+const supabase = getSupabaseClient();
+const supabaseAdmin = getSupabaseAdminClient();;
 import { BOMItem, Level3Customization } from "@/types/product/interfaces";
 import { productDataService } from "@/services/productDataService";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";

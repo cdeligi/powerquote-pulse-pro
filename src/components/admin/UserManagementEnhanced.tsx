@@ -32,7 +32,10 @@ import {
   Shield,
   Edit
 } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { getSupabaseClient, getSupabaseAdminClient, isAdminAvailable } from "@/integrations/supabase/client";
+
+const supabase = getSupabaseClient();
+const supabaseAdmin = getSupabaseAdminClient();;
 import { toast } from "@/components/ui/use-toast";
 import UserPermissionsTab from "./UserPermissionsTab";
 import UserEditDialog from "./UserEditDialog";
