@@ -234,10 +234,16 @@ const handleCardSelect = (card: any) => {
     // For non-bushing cards, just assign to the selected slot
     onCardSelect(cardWithDisplay, slot);
   }
+  
+  // Close the selector dialog
+  onClose();
 };
 
 const needsConfiguration = (card: any) => {
-  return card.name.toLowerCase().includes('analog') || card.name.toLowerCase().includes('bushing');
+  return card.name.toLowerCase().includes('analog') || 
+         card.name.toLowerCase().includes('bushing') ||
+         card.has_level4 || 
+         card.requires_level4_config;
 };
 
   // Show error message for bushing cards that can't be placed
