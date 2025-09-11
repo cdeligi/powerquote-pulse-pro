@@ -195,7 +195,7 @@ export const Level4RuntimeView: React.FC<Level4RuntimeViewProps> = ({
                 </div>
                 
                 <Select
-                  value={entry.value}
+                  value={entry.value || undefined}
                   onValueChange={(value) => handleEntryChange(entry.index, value)}
                   disabled={isReadOnly}
                 >
