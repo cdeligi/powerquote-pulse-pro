@@ -176,7 +176,10 @@ export const Level4RuntimeView: React.FC<Level4RuntimeViewProps> = ({
         "border rounded-lg p-4 space-y-4",
         isReadOnly && "bg-muted/10"
       )}>
-        {entries.map((entry, idx) => (
+        {entries.map((entry, idx) => {
+          const selectedOption = configuration.options.find(opt => opt.value === entry.value);
+          const optionHasInfo = selectedOption?.info_url && isValidUrl(selectedOption.info_url);
+          return (
           <div key={`${entry.index}-${idx}`} className="space-y-2">
             <div className="flex items-center gap-2">
               <div className="flex-1 space-y-2">
@@ -192,11 +195,11 @@ export const Level4RuntimeView: React.FC<Level4RuntimeViewProps> = ({
                 </div>
                 
                 <Select
-                  value={entry.value}
+                  value={entry.value || undefined}
                   onValueChange={(value) => handleEntryChange(entry.index, value)}
                   disabled={isReadOnly}
                 >
-                  <SelectTrigger 
+                  <SelectTrigger
                     id={`entry-${entry.index}`}
                     className={cn(
                       validationErrors[entry.index] && "border-destructive focus:ring-destructive"
@@ -208,7 +211,11 @@ export const Level4RuntimeView: React.FC<Level4RuntimeViewProps> = ({
                     {configuration.options
                       .sort((a, b) => a.display_order - b.display_order)
                       .map(option => (
-                        <SelectItem key={option.id} value={option.value}>
+                        <SelectItem
+                          key={option.id}
+                          value={option.value}
+                          className="text-foreground"
+                        >
                           {option.label}
                           {option.is_default && isReadOnly && (
                             <span className="ml-2 text-xs text-muted-foreground">(default)</span>
@@ -218,6 +225,24 @@ export const Level4RuntimeView: React.FC<Level4RuntimeViewProps> = ({
                   </SelectContent>
                 </Select>
               </div>
+              {optionHasInfo && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 w-8 p-0"
+                  asChild
+                >
+                  <a
+                    href={normalizeUrl(selectedOption!.info_url!)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label="Option information"
+                  >
+                    <Info className="h-4 w-4" />
+                  </a>
+                </Button>
+              )}
 
               {/* Add/Remove buttons for variable inputs */}
               {allowInteractions && configuration.template_type === 'OPTION_1' && (
@@ -246,7 +271,7 @@ export const Level4RuntimeView: React.FC<Level4RuntimeViewProps> = ({
               )}
             </div>
           </div>
-        ))}
+        );})}
 
         {/* Add more button for variable inputs */}
         {allowInteractions && 
