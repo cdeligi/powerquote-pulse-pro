@@ -22,9 +22,9 @@ const QuoteTable = ({ quotes, loading, onQuoteSelect, isAdmin = false }: QuoteTa
 
   if (loading) {
     return (
-      <Card className="bg-gray-900 border-gray-800">
+      <Card>
         <CardContent className="p-6">
-          <div className="text-white text-center">Loading quotes...</div>
+          <div className="text-center">Loading quotes...</div>
         </CardContent>
       </Card>
     );
@@ -32,9 +32,9 @@ const QuoteTable = ({ quotes, loading, onQuoteSelect, isAdmin = false }: QuoteTa
 
   if (quotes.length === 0) {
     return (
-      <Card className="bg-gray-900 border-gray-800">
+      <Card>
         <CardContent className="p-6">
-          <div className="text-gray-400 text-center">No quotes found.</div>
+          <div className="text-muted-foreground text-center">No quotes found.</div>
         </CardContent>
       </Card>
     );
@@ -71,9 +71,9 @@ const QuoteTable = ({ quotes, loading, onQuoteSelect, isAdmin = false }: QuoteTa
   };
 
   return (
-    <Card className="bg-gray-900 border-gray-800">
+    <Card>
       <CardHeader>
-        <CardTitle className="text-white">Quotes ({quotes.length})</CardTitle>
+        <CardTitle>Quotes ({quotes.length})</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         {quotes.map((quote) => {
@@ -81,19 +81,19 @@ const QuoteTable = ({ quotes, loading, onQuoteSelect, isAdmin = false }: QuoteTa
           return (
             <div
               key={quote.id}
-              className="p-4 bg-gray-800 rounded-lg border border-gray-700 hover:border-red-500 transition-colors"
+              className="p-4 bg-muted/50 rounded-lg border border-border hover:border-red-500 transition-colors"
             >
               <div className="flex justify-between items-start mb-2">
                 <div>
-                  <h4 className="text-white font-medium">{quote.id}</h4>
-                  <p className="text-gray-400 text-sm">{quote.customer_name}</p>
+                  <h4 className="text-foreground font-medium">{quote.id}</h4>
+                  <p className="text-muted-foreground text-sm">{quote.customer_name}</p>
                 </div>
                 <div className="text-right">
-                  <p className="text-white font-medium">
+                  <p className="text-foreground font-medium">
                     {quote.currency} {quote.discounted_value.toLocaleString()}
                   </p>
                   {isAdmin && (
-                    <p className="text-gray-400 text-xs">
+                    <p className="text-muted-foreground text-xs">
                       {quote.discounted_margin.toFixed(1)}% margin
                     </p>
                   )}
@@ -127,43 +127,43 @@ const QuoteTable = ({ quotes, loading, onQuoteSelect, isAdmin = false }: QuoteTa
 
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm mb-3">
                     <div>
-                      <span className="text-gray-400">Original Value:</span>
-                      <span className="text-white ml-2">
+                      <span className="text-muted-foreground">Original Value:</span>
+                      <span className="text-foreground ml-2">
                         {quote.currency} {quote.original_quote_value.toLocaleString()}
                       </span>
                     </div>
                     <div>
-                      <span className="text-gray-400">After Discount:</span>
-                      <span className="text-white ml-2">
+                      <span className="text-muted-foreground">After Discount:</span>
+                      <span className="text-foreground ml-2">
                         {quote.currency} {quote.discounted_value.toLocaleString()}
                       </span>
                     </div>
                     {isAdmin && (
                       <>
                         <div>
-                          <span className="text-gray-400">Total Cost:</span>
-                          <span className="text-white ml-2">
+                          <span className="text-muted-foreground">Total Cost:</span>
+                          <span className="text-foreground ml-2">
                             {quote.currency} {quote.total_cost.toLocaleString()}
                           </span>
                         </div>
                         <div>
-                          <span className="text-gray-400">Gross Margin:</span>
-                          <span className="text-white ml-2">
+                          <span className="text-muted-foreground">Gross Margin:</span>
+                          <span className="text-foreground ml-2">
                             {quote.discounted_margin.toFixed(1)}%
                           </span>
                         </div>
                       </>
                     )}
                     <div>
-                      <span className="text-gray-400">BOM Items:</span>
-                      <span className="text-white ml-2">{quote.bom_items?.length || 0}</span>
+                      <span className="text-muted-foreground">BOM Items:</span>
+                      <span className="text-foreground ml-2">{quote.bom_items?.length || 0}</span>
                     </div>
                   </div>
 
                   {quote.discount_justification && (
                     <div className="mb-3">
-                      <p className="text-gray-400 text-xs mb-1">Discount Justification:</p>
-                      <p className="text-gray-300 text-sm bg-gray-700 p-2 rounded">
+                      <p className="text-muted-foreground text-xs mb-1">Discount Justification:</p>
+                      <p className="text-foreground text-sm bg-muted p-2 rounded">
                         {quote.discount_justification}
                       </p>
                     </div>

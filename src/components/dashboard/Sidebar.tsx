@@ -39,18 +39,18 @@ const Sidebar = ({ user, activeView, onViewChange, onLogout }: SidebarProps) => 
   const badge = getRoleBadge(user.role);
 
   return (
-    <div className="fixed left-0 top-0 h-screen w-64 bg-gray-900 border-r border-gray-800 flex flex-col">
+    <div className="fixed left-0 top-0 h-screen w-64 bg-gray-50 dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 flex flex-col">
       {/* Header */}
-      <div className="p-6 border-b border-gray-800">
+      <div className="p-6 border-b border-gray-200 dark:border-gray-800">
         <div className="flex items-center space-x-2 mb-4">
           <Shield className="h-6 w-6 text-red-600" />
           <Zap className="h-6 w-6 text-red-600" />
-          <span className="text-white font-bold text-lg">PowerQuote</span>
+          <span className="text-gray-900 dark:text-white font-bold text-lg">PowerQuote</span>
         </div>
         
         <div className="space-y-2">
-          <p className="text-white font-medium">{user.name}</p>
-          <p className="text-gray-400 text-sm">{user.email}</p>
+          <p className="text-gray-900 dark:text-white font-medium">{user.name}</p>
+          <p className="text-gray-500 dark:text-gray-400 text-sm">{user.email}</p>
           <span className={`inline-block px-2 py-1 rounded-full text-xs text-white ${badge.color}`}>
             {badge.text}
           </span>
@@ -70,8 +70,8 @@ const Sidebar = ({ user, activeView, onViewChange, onLogout }: SidebarProps) => 
                   variant={isActive ? "secondary" : "ghost"}
                   className={`w-full justify-start text-left ${
                     isActive 
-                      ? 'bg-red-600 text-white hover:bg-red-700' 
-                      : 'text-gray-300 hover:text-white hover:bg-gray-800'
+                      ? 'bg-red-600 text-white hover:bg-red-700 dark:bg-red-600 dark:hover:bg-red-700' 
+                      : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-200 dark:hover:bg-gray-800'
                   }`}
                   onClick={() => onViewChange(item.id as any)}
                 >
@@ -85,7 +85,7 @@ const Sidebar = ({ user, activeView, onViewChange, onLogout }: SidebarProps) => 
       </nav>
 
       {/* Footer */}
-      <div className="p-4 border-t border-gray-800 space-y-4">
+      <div className="p-4 border-t border-gray-200 dark:border-gray-800 space-y-4">
         {/* Qualitrol Logo */}
         <div className="flex justify-center">
           <img 
@@ -97,7 +97,7 @@ const Sidebar = ({ user, activeView, onViewChange, onLogout }: SidebarProps) => 
         
         <Button
           variant="ghost"
-          className="w-full justify-start text-gray-300 hover:text-white hover:bg-gray-800"
+          className="w-full justify-start text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-200 dark:hover:bg-gray-800"
           onClick={onLogout}
         >
           <LogOut className="mr-3 h-4 w-4" />

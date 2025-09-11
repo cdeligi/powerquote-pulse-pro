@@ -122,28 +122,28 @@ const QuoteSearch = ({ user }: QuoteSearchProps) => {
       <Input
         type="text"
         placeholder="Search quotes by customer or quote ID..."
-        className="bg-gray-800 border-gray-700 text-white"
+        className="bg-background border-border text-foreground"
         value={searchQuery}
         onChange={(e) => setSearchQuery(e.target.value)}
       />
 
       <Table>
         <TableHeader>
-          <TableRow>
-            <TableHead className="text-white">Quote ID</TableHead>
-            <TableHead className="text-white">Customer</TableHead>
-            <TableHead className="text-white">Total</TableHead>
-            <TableHead className="text-white">Status</TableHead>
-            <TableHead className="text-white">Priority</TableHead>
-            <TableHead className="text-white">Date</TableHead>
+          <TableRow className="border-b-gray-200 dark:border-b-gray-800">
+            <TableHead>Quote ID</TableHead>
+            <TableHead>Customer</TableHead>
+            <TableHead>Total</TableHead>
+            <TableHead>Status</TableHead>
+            <TableHead>Priority</TableHead>
+            <TableHead>Date</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {filteredQuotes.map(quote => (
-            <TableRow key={quote.id}>
-              <TableCell className="text-gray-400">{quote.id}</TableCell>
-              <TableCell className="text-white">{quote.customerName}</TableCell>
-              <TableCell className="text-white">
+            <TableRow key={quote.id} className="border-b-gray-200 dark:border-b-gray-800">
+              <TableCell className="text-muted-foreground">{quote.id}</TableCell>
+              <TableCell className="text-foreground">{quote.customerName}</TableCell>
+              <TableCell className="text-foreground">
                 {currencySymbols[quote.currency] || '$'}
                 {quote.total.toLocaleString()}
               </TableCell>
@@ -153,7 +153,7 @@ const QuoteSearch = ({ user }: QuoteSearchProps) => {
               <TableCell>
                 <span className={getPriorityColor(quote.priority)}>{quote.priority}</span>
               </TableCell>
-              <TableCell className="text-gray-400">{quote.createdAt}</TableCell>
+              <TableCell className="text-muted-foreground">{quote.createdAt}</TableCell>
             </TableRow>
           ))}
         </TableBody>

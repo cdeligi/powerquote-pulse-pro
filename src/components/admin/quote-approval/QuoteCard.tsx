@@ -37,11 +37,11 @@ export const QuoteCard = ({ quote, onReviewClick, onQuickApprove }: QuoteCardPro
   };
 
   return (
-    <Card className="bg-gray-900 border-gray-800 hover:border-red-500 transition-colors">
+    <Card className="hover:border-red-500 transition-colors">
       <CardHeader>
         <div className="flex justify-between items-start">
           <div>
-            <CardTitle className="text-white flex items-center">
+            <CardTitle className="flex items-center">
               {quote.id} - {quote.customer_name}
               <Badge 
                 variant="outline" 
@@ -56,7 +56,7 @@ export const QuoteCard = ({ quote, onReviewClick, onQuickApprove }: QuoteCardPro
                 {quote.status.charAt(0).toUpperCase() + quote.status.slice(1).replace('-', ' ')}
               </Badge>
             </CardTitle>
-            <CardDescription className="text-gray-400 mt-2">
+            <CardDescription className="mt-2">
               <div className="flex items-center space-x-4">
                 <span>Oracle: {quote.oracle_customer_id}</span>
                 <span>SFDC: {quote.sfdc_opportunity}</span>
@@ -65,10 +65,10 @@ export const QuoteCard = ({ quote, onReviewClick, onQuickApprove }: QuoteCardPro
             </CardDescription>
           </div>
           <div className="text-right">
-            <div className="text-2xl font-bold text-white">
+            <div className="text-2xl font-bold text-foreground">
               {quote.currency} {quote.original_quote_value.toLocaleString()}
             </div>
-            <div className="text-sm text-gray-400">
+            <div className="text-sm text-muted-foreground">
               {quote.requested_discount}% discount • {quote.discounted_margin.toFixed(1)}% margin
             </div>
             {quote.discounted_margin < 25 && (
@@ -83,27 +83,27 @@ export const QuoteCard = ({ quote, onReviewClick, onQuickApprove }: QuoteCardPro
       <CardContent>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm mb-4">
           <div>
-            <p className="text-gray-400">Original Value</p>
-            <p className="text-white font-medium">{quote.currency} {quote.original_quote_value.toLocaleString()}</p>
+            <p className="text-muted-foreground">Original Value</p>
+            <p className="text-foreground font-medium">{quote.currency} {quote.original_quote_value.toLocaleString()}</p>
           </div>
           <div>
-            <p className="text-gray-400">After Discount</p>
-            <p className="text-white font-medium">{quote.currency} {quote.discounted_value.toLocaleString()}</p>
+            <p className="text-muted-foreground">After Discount</p>
+            <p className="text-foreground font-medium">{quote.currency} {quote.discounted_value.toLocaleString()}</p>
           </div>
           <div>
-            <p className="text-gray-400">Total Cost</p>
+            <p className="text-muted-foreground">Total Cost</p>
             <p className="text-orange-400 font-medium">{quote.currency} {quote.total_cost.toLocaleString()}</p>
           </div>
           <div>
-            <p className="text-gray-400">Gross Profit</p>
+            <p className="text-muted-foreground">Gross Profit</p>
             <p className="text-green-400 font-medium">{quote.currency} {quote.gross_profit.toLocaleString()}</p>
           </div>
         </div>
         
         {quote.discount_justification && (
           <div className="mb-4">
-            <p className="text-gray-400 text-xs mb-1">Discount Justification:</p>
-            <p className="text-gray-300 text-sm bg-gray-800 p-2 rounded">{quote.discount_justification}</p>
+            <p className="text-muted-foreground text-xs mb-1">Discount Justification:</p>
+            <p className="text-foreground text-sm bg-muted p-2 rounded">{quote.discount_justification}</p>
           </div>
         )}
 

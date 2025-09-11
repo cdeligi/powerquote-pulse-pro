@@ -71,9 +71,9 @@ export const QuoteDetailsDialog = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="bg-gray-900 border-gray-800 max-w-6xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-white flex items-center">
+          <DialogTitle className="flex items-center">
             <FileText className="mr-2 h-5 w-5" />
             Enhanced Quote Review - {quote.id || 'Unknown'}
           </DialogTitle>
@@ -114,7 +114,7 @@ export const QuoteDetailsDialog = ({
           )}
 
           {!isFullQuote && (
-            <div className="bg-gray-800 border-gray-700 rounded-md p-4 text-gray-400 text-center">
+            <div className="bg-muted border-border rounded-md p-4 text-muted-foreground text-center">
               Quote data is incomplete. Please ensure all required fields are available.
             </div>
           )}

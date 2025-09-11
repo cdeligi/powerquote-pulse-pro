@@ -98,12 +98,12 @@ const QuoteRequestView = ({
   return (
     <div className="space-y-6">
       {/* Quote Header */}
-      <Card className="bg-gray-900 border-gray-800">
+      <Card>
         <CardHeader>
           <div className="flex justify-between items-start">
             <div>
-              <CardTitle className="text-white text-xl">Quote Request #{quote.id}</CardTitle>
-              <p className="text-gray-400">Submitted: {new Date(quote.created_at).toLocaleDateString()}</p>
+              <CardTitle className="text-xl">Quote Request #{quote.id}</CardTitle>
+              <p className="text-muted-foreground">Submitted: {new Date(quote.created_at).toLocaleDateString()}</p>
             </div>
             <div className="flex space-x-2">
               <Badge 
@@ -128,72 +128,72 @@ const QuoteRequestView = ({
 
       {/* Customer & Quote Information */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card className="bg-gray-900 border-gray-800">
+        <Card>
           <CardHeader>
-            <CardTitle className="text-white">Customer Information</CardTitle>
+            <CardTitle>Customer Information</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             <div>
-              <Label className="text-gray-400">Customer Name</Label>
-              <p className="text-white font-medium">{quote.customer_name}</p>
+              <Label className="text-muted-foreground">Customer Name</Label>
+              <p className="text-foreground font-medium">{quote.customer_name}</p>
             </div>
             <div>
-              <Label className="text-gray-400">Oracle Customer ID</Label>
-              <p className="text-white font-medium">{quote.oracle_customer_id}</p>
+              <Label className="text-muted-foreground">Oracle Customer ID</Label>
+              <p className="text-foreground font-medium">{quote.oracle_customer_id}</p>
             </div>
             <div>
-              <Label className="text-gray-400">SFDC Opportunity</Label>
-              <p className="text-white font-medium">{quote.sfdc_opportunity}</p>
+              <Label className="text-muted-foreground">SFDC Opportunity</Label>
+              <p className="text-foreground font-medium">{quote.sfdc_opportunity}</p>
             </div>
             <div>
-              <Label className="text-gray-400">Rep Involved</Label>
-              <p className="text-white font-medium">{quote.is_rep_involved ? 'Yes' : 'No'}</p>
+              <Label className="text-muted-foreground">Rep Involved</Label>
+              <p className="text-foreground font-medium">{quote.is_rep_involved ? 'Yes' : 'No'}</p>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="bg-gray-900 border-gray-800">
+        <Card>
           <CardHeader>
-            <CardTitle className="text-white">Terms & Pricing</CardTitle>
+            <CardTitle>Terms & Pricing</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             <div>
-              <Label className="text-gray-400">Currency</Label>
-              <p className="text-white font-medium">{quote.currency}</p>
+              <Label className="text-muted-foreground">Currency</Label>
+              <p className="text-foreground font-medium">{quote.currency}</p>
             </div>
             <div>
-              <Label className="text-gray-400">Shipping Terms</Label>
-              <p className="text-white font-medium">{quote.shipping_terms}</p>
+              <Label className="text-muted-foreground">Shipping Terms</Label>
+              <p className="text-foreground font-medium">{quote.shipping_terms}</p>
             </div>
             <div>
-              <Label className="text-gray-400">Payment Terms</Label>
-              <p className="text-white font-medium">{quote.payment_terms}</p>
+              <Label className="text-muted-foreground">Payment Terms</Label>
+              <p className="text-foreground font-medium">{quote.payment_terms}</p>
             </div>
           </CardContent>
         </Card>
       </div>
 
       {/* Financial Summary with Real-time Margin Analysis */}
-      <Card className="bg-gray-900 border-gray-800">
+      <Card>
         <CardHeader>
-          <CardTitle className="text-white">Financial Analysis</CardTitle>
+          <CardTitle>Financial Analysis</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="text-center p-4 bg-gray-800 rounded">
-              <p className="text-gray-400 text-sm">Total Revenue</p>
-              <p className="text-white text-xl font-bold">${totalRevenue.toLocaleString()}</p>
+            <div className="text-center p-4 bg-muted/50 rounded">
+              <p className="text-muted-foreground text-sm">Total Revenue</p>
+              <p className="text-foreground text-xl font-bold">${totalRevenue.toLocaleString()}</p>
             </div>
-            <div className="text-center p-4 bg-gray-800 rounded">
-              <p className="text-gray-400 text-sm">Total Cost</p>
+            <div className="text-center p-4 bg-muted/50 rounded">
+              <p className="text-muted-foreground text-sm">Total Cost</p>
               <p className="text-orange-400 text-xl font-bold">${totalCost.toLocaleString()}</p>
             </div>
-            <div className="text-center p-4 bg-gray-800 rounded">
-              <p className="text-gray-400 text-sm">Gross Margin</p>
+            <div className="text-center p-4 bg-muted/50 rounded">
+              <p className="text-muted-foreground text-sm">Gross Margin</p>
               <p className="text-green-400 text-xl font-bold">{marginPercentage.toFixed(1)}%</p>
             </div>
-            <div className="text-center p-4 bg-gray-800 rounded">
-              <p className="text-gray-400 text-sm">Gross Profit</p>
+            <div className="text-center p-4 bg-muted/50 rounded">
+              <p className="text-muted-foreground text-sm">Gross Profit</p>
               <p className="text-green-400 text-xl font-bold">${grossProfit.toLocaleString()}</p>
             </div>
           </div>
@@ -201,40 +201,40 @@ const QuoteRequestView = ({
       </Card>
 
       {/* BOM Details with Cost and Margin */}
-      <Card className="bg-gray-900 border-gray-800">
+      <Card>
         <CardHeader>
-          <CardTitle className="text-white">Bill of Materials</CardTitle>
+          <CardTitle>Bill of Materials</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
-                <tr className="border-b border-gray-700">
-                  <th className="text-left text-gray-400 pb-2">Item</th>
-                  <th className="text-left text-gray-400 pb-2">Part Number</th>
-                  <th className="text-left text-gray-400 pb-2">Qty</th>
-                  <th className="text-left text-gray-400 pb-2">Unit Price</th>
-                  <th className="text-left text-gray-400 pb-2">Unit Cost</th>
-                  <th className="text-left text-gray-400 pb-2">Margin</th>
-                  <th className="text-left text-gray-400 pb-2">Total</th>
+                <tr className="border-b border-border">
+                  <th className="text-left text-muted-foreground pb-2">Item</th>
+                  <th className="text-left text-muted-foreground pb-2">Part Number</th>
+                  <th className="text-left text-muted-foreground pb-2">Qty</th>
+                  <th className="text-left text-muted-foreground pb-2">Unit Price</th>
+                  <th className="text-left text-muted-foreground pb-2">Unit Cost</th>
+                  <th className="text-left text-muted-foreground pb-2">Margin</th>
+                  <th className="text-left text-muted-foreground pb-2">Total</th>
                 </tr>
               </thead>
               <tbody>
                 {bomItems.filter(item => item.enabled).map((item, index) => (
-                  <tr key={index} className="border-b border-gray-800">
-                    <td className="py-3 text-white">
+                  <tr key={index} className="border-b border-border/50">
+                    <td className="py-3 text-foreground">
                       <div>
                         <p className="font-medium">{item.product.name}</p>
-                        <p className="text-sm text-gray-400">{item.product.description}</p>
-                        {item.slot && <p className="text-xs text-gray-500">Slot {item.slot}</p>}
+                        <p className="text-sm text-muted-foreground">{item.product.description}</p>
+                        {item.slot && <p className="text-xs text-muted-foreground/80">Slot {item.slot}</p>}
                       </div>
                     </td>
-                    <td className="py-3 text-white font-mono text-sm break-all">{item.partNumber}</td>
-                    <td className="py-3 text-white">{item.quantity}</td>
-                    <td className="py-3 text-white">${item.product.price.toLocaleString()}</td>
+                    <td className="py-3 text-foreground font-mono text-sm break-all">{item.partNumber}</td>
+                    <td className="py-3 text-foreground">{item.quantity}</td>
+                    <td className="py-3 text-foreground">${item.product.price.toLocaleString()}</td>
                     <td className="py-3 text-orange-400">${calculateItemCost(item).toLocaleString()}</td>
                     <td className="py-3 text-green-400">{calculateItemMargin(item).toFixed(1)}%</td>
-                    <td className="py-3 text-white font-bold">${calculateItemRevenue(item).toLocaleString()}</td>
+                    <td className="py-3 text-foreground font-bold">${calculateItemRevenue(item).toLocaleString()}</td>
                   </tr>
                 ))}
               </tbody>
@@ -245,40 +245,40 @@ const QuoteRequestView = ({
 
       {/* Counter Offer Section with Real-time Margin Impact */}
       {showCounterOffer && (
-        <Card className="bg-gray-900 border-gray-800">
+        <Card>
           <CardHeader>
-            <CardTitle className="text-white flex items-center">
+            <CardTitle className="flex items-center">
               <Percent className="mr-2 h-5 w-5" />
               Counter Offer - Real-time Margin Impact
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
-              <Label className="text-white">Discount Percentage</Label>
+              <Label>Discount Percentage</Label>
               <Input
                 type="number"
                 value={discountPercentage}
                 onChange={(e) => setDiscountPercentage(Number(e.target.value))}
-                className="bg-gray-800 border-gray-600 text-white"
+                className="bg-background"
                 placeholder="Enter discount %"
                 min="0"
                 max="50"
               />
             </div>
             {discountPercentage > 0 && (
-              <div className="grid grid-cols-3 gap-4 p-4 bg-gray-800 rounded">
+              <div className="grid grid-cols-3 gap-4 p-4 bg-muted/50 rounded">
                 <div className="text-center">
-                  <p className="text-gray-400 text-sm">New Total</p>
-                  <p className="text-white text-lg font-bold">${discountedRevenue.toLocaleString()}</p>
+                  <p className="text-muted-foreground text-sm">New Total</p>
+                  <p className="text-foreground text-lg font-bold">${discountedRevenue.toLocaleString()}</p>
                 </div>
                 <div className="text-center">
-                  <p className="text-gray-400 text-sm">New Margin</p>
+                  <p className="text-muted-foreground text-sm">New Margin</p>
                   <p className={`text-lg font-bold ${discountedMargin > 20 ? 'text-green-400' : discountedMargin > 10 ? 'text-yellow-400' : 'text-red-400'}`}>
                     {discountedMargin.toFixed(1)}%
                   </p>
                 </div>
                 <div className="text-center">
-                  <p className="text-gray-400 text-sm">Discount Amount</p>
+                  <p className="text-muted-foreground text-sm">Discount Amount</p>
                   <p className="text-red-400 text-lg font-bold">-${discountAmount.toLocaleString()}</p>
                 </div>
               </div>
@@ -297,15 +297,15 @@ const QuoteRequestView = ({
 
       {/* Rejection Form */}
       {showRejectForm && (
-        <Card className="bg-gray-900 border-gray-800">
+        <Card>
           <CardHeader>
-            <CardTitle className="text-white">Rejection Reason</CardTitle>
+            <CardTitle>Rejection Reason</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <Textarea
               value={rejectionReason}
               onChange={(e) => setRejectionReason(e.target.value)}
-              className="bg-gray-800 border-gray-600 text-white"
+              className="bg-background"
               placeholder="Please provide a reason for rejecting this quote..."
               rows={4}
             />
@@ -326,7 +326,7 @@ const QuoteRequestView = ({
       )}
 
       {/* Action Buttons */}
-      <Card className="bg-gray-900 border-gray-800">
+      <Card>
         <CardContent className="pt-6">
           <div className="flex flex-wrap gap-3">
             <Button 
