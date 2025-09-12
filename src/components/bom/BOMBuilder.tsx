@@ -454,7 +454,7 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
     });
   };
 
-  const handleCardSelect = (card: any, slot: number) => {
+  const handleCardSelect = async (card: any, slot: number) => {
     const updatedAssignments = { ...slotAssignments };
     const displayName = (card as any).displayName || card.name;
     
@@ -503,16 +503,65 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
     
     if ((card as any).has_level4 || (card as any).requires_level4_config) {
       console.log('Triggering Level 4 modal for:', card.name);
-      const newItem: BOMItem = {
-        id: crypto.randomUUID(),
-        product: cardWithDisplayName,
-        quantity: 1,
-        enabled: true,
-        partNumber: card.partNumber,
-        displayName: displayName,
-        slot: slot
-      };
-      setConfiguringLevel4Item(newItem);
+      
+      try {
+        // Create BOM item in database first
+        const newItem: BOMItem = {
+          id: crypto.randomUUID(),
+          product: cardWithDisplayName,
+          quantity: 1,
+          enabled: true,
+          partNumber: card.partNumber,
+          displayName: displayName,
+          slot: slot,
+          unit_price: card.price || 0,
+          total_price: card.price || 0,
+          unit_cost: card.cost || 0,
+          margin: card.price && card.cost ? ((card.price - card.cost) / card.price) * 100 : 0
+        };
+
+        // Create a temporary quote ID for Level 4 configuration
+        const tempQuoteId = 'temp-' + Date.now();
+
+        // Save to database immediately
+        const { error } = await supabase
+          .from('bom_items')
+          .insert({
+            id: newItem.id,
+            quote_id: tempQuoteId,
+            product_id: card.id,
+            name: card.name,
+            part_number: newItem.partNumber,
+            quantity: newItem.quantity,
+            unit_price: newItem.unit_price,
+            total_price: newItem.total_price,
+            unit_cost: newItem.unit_cost,
+            total_cost: newItem.unit_cost || 0,
+            margin: newItem.margin || 0
+          });
+
+        if (error) {
+          console.error('Error creating BOM item:', error);
+          toast({
+            title: 'Error',
+            description: 'Failed to create BOM item. Please try again.',
+            variant: 'destructive',
+          });
+          return;
+        }
+
+        console.log('BOM item created in database:', newItem.id);
+        // Store the temp quote ID for cleanup later
+        (newItem as any).tempQuoteId = tempQuoteId;
+        setConfiguringLevel4Item(newItem);
+      } catch (error) {
+        console.error('Error in handleCardSelect Level 4 flow:', error);
+        toast({
+          title: 'Error',
+          description: 'Failed to prepare Level 4 configuration. Please try again.',
+          variant: 'destructive',
+        });
+      }
     } else {
       // Removed the call to updateBOMItems here
     }
@@ -543,39 +592,68 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
   };
 
 
-  const handleLevel4Save = (payload: Level4RuntimePayload) => {
+  const handleLevel4Save = async (payload: Level4RuntimePayload) => {
     console.log('Saving Level 4 configuration:', payload);
 
     if (configuringLevel4Item) {
-      const updatedItem: BOMItem = {
-        ...configuringLevel4Item,
-        level4Config: payload,
-        product: {
-          ...configuringLevel4Item.product,
+      try {
+        const updatedItem: BOMItem = {
+          ...configuringLevel4Item,
+          level4Config: payload,
+          product: {
+            ...configuringLevel4Item.product,
+            displayName: (configuringLevel4Item as any).displayName || configuringLevel4Item.product.name
+          },
           displayName: (configuringLevel4Item as any).displayName || configuringLevel4Item.product.name
-        },
-        displayName: (configuringLevel4Item as any).displayName || configuringLevel4Item.product.name
-      };
+        };
 
-      const existingIndex = bomItems.findIndex(item => item.id === configuringLevel4Item.id);
-      const updatedItems = existingIndex >= 0
-        ? bomItems.map(item => (item.id === payload.bomItemId ? updatedItem : item))
-        : [...bomItems, updatedItem];
+        // Update the BOM item in the database with a real quote ID when the quote is saved
+        // For now, just update the local state
+        const existingIndex = bomItems.findIndex(item => item.id === configuringLevel4Item.id);
+        const updatedItems = existingIndex >= 0
+          ? bomItems.map(item => (item.id === configuringLevel4Item.id ? updatedItem : item))
+          : [...bomItems, updatedItem];
 
-      setBomItems(updatedItems);
-      onBOMUpdate(updatedItems);
+        setBomItems(updatedItems);
+        onBOMUpdate(updatedItems);
 
-      toast({
-        title: 'Configuration Saved',
-        description: `Level 4 configuration for ${configuringLevel4Item.product.name} has been saved.`,
-      });
+        toast({
+          title: 'Configuration Saved',
+          description: `Level 4 configuration for ${configuringLevel4Item.product.name} has been saved.`,
+        });
+      } catch (error) {
+        console.error('Error saving Level 4 configuration:', error);
+        toast({
+          title: 'Error',
+          description: 'Failed to save Level 4 configuration. Please try again.',
+          variant: 'destructive',
+        });
+      }
     }
 
     setConfiguringLevel4Item(null);
     setSelectedSlot(null);
   };
 
-  const handleLevel4Cancel = () => {
+  const handleLevel4Cancel = async () => {
+    // Clean up the temporary BOM item if Level 4 configuration is cancelled
+    if (configuringLevel4Item && (configuringLevel4Item as any).tempQuoteId?.startsWith('temp-')) {
+      try {
+        const { error } = await supabase
+          .from('bom_items')
+          .delete()
+          .eq('id', configuringLevel4Item.id);
+        
+        if (error) {
+          console.error('Error cleaning up temporary BOM item:', error);
+        } else {
+          console.log('Cleaned up temporary BOM item:', configuringLevel4Item.id);
+        }
+      } catch (error) {
+        console.error('Error in cleanup:', error);
+      }
+    }
+    
     setConfiguringLevel4Item(null);
     setSelectedSlot(null);
   };

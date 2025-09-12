@@ -113,6 +113,22 @@ export class Level4Service {
     try {
       console.log('Saving Level 4 BOM value:', { bomItemId, payload });
       
+      // First check if BOM item exists
+      const { data: bomItem, error: bomError } = await supabase
+        .from('bom_items')
+        .select('id')
+        .eq('id', bomItemId)
+        .single();
+
+      if (bomError && bomError.code !== 'PGRST116') {
+        console.error('Error checking BOM item:', bomError);
+        throw bomError;
+      }
+
+      if (!bomItem) {
+        throw new Error('BOM item not found in database. Please refresh and try again.');
+      }
+      
       const { error } = await supabase
         .from('bom_level4_values')
         .upsert({
