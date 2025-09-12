@@ -111,17 +111,22 @@ export class Level4Service {
    */
   static async saveBOMLevel4Value(bomItemId: string, payload: Level4RuntimePayload): Promise<void> {
     try {
+      console.log('Saving Level 4 BOM value:', { bomItemId, payload });
+      
       const { error } = await supabase
         .from('bom_level4_values')
         .upsert({
           bom_item_id: bomItemId,
-          // Keep in sync with DB + option mapping
-          level4_configuration_id: payload.configuration_id,
-          template_type: payload.template_type,
+          level4_config_id: payload.level4_config_id,
           entries: payload.entries
         });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error saving Level 4 BOM value:', error);
+        throw error;
+      }
+      
+      console.log('Level 4 BOM value saved successfully');
     } catch (error) {
       console.error('Level4Service.saveBOMLevel4Value error:', error);
       throw error;
