@@ -36,7 +36,7 @@ export interface Level4SelectionEntry {
 export interface Level4BOMValue {
   id: string;
   bom_item_id: string;
-  level4_configuration_id: string;
+  level4_config_id: string;
   template_type: Level4TemplateType;
   entries: Level4SelectionEntry[]; // final user choices
   created_at?: string;
