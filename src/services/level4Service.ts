@@ -1,6 +1,17 @@
 import { supabase } from '@/integrations/supabase/client';
 import type { Level4Configuration, Level4BOMValue, Level4RuntimePayload } from '@/types/level4';
-import type { Level4Config } from '@/components/level4/Level4ConfigTypes';
+import type { Level4Config, DropdownOption } from '@/components/level4/Level4ConfigTypes';
+import type { Level3Product } from '@/types/product/interfaces';
+
+interface Level4ConfigRow {
+  id: string;
+  product_id: string;
+  field_label: string;
+  mode: 'fixed' | 'variable';
+  fixed_number_of_inputs?: number | null;
+  variable_max_inputs?: number | null;
+  options: DropdownOption[];
+}
 
 export class Level4Service {
   /**
@@ -9,7 +20,7 @@ export class Level4Service {
   static async getLevel4Configuration(level3ProductId: string): Promise<Level4Config | null> {
     try {
       console.log('Fetching Level 4 config for product:', level3ProductId);
-      
+
       const { data, error } = await supabase
         .from('level4_configs')
         .select('*')
@@ -24,8 +35,23 @@ export class Level4Service {
         throw error;
       }
 
-      console.log('Found Level 4 config:', data);
-      return data;
+      if (!data) {
+        return null;
+      }
+
+      const row = data as Level4ConfigRow;
+
+      const mapped: Level4Config = {
+        id: row.id,
+        fieldLabel: row.field_label,
+        mode: row.mode,
+        fixed: row.fixed_number_of_inputs != null ? { numberOfInputs: row.fixed_number_of_inputs } : undefined,
+        variable: row.variable_max_inputs != null ? { maxInputs: row.variable_max_inputs } : undefined,
+        options: Array.isArray(row.options) ? row.options : [],
+      };
+
+      console.log('Found Level 4 config:', mapped);
+      return mapped;
     } catch (error) {
       console.error('Level4Service.getLevel4Configuration error:', error);
       throw error;
@@ -35,25 +61,25 @@ export class Level4Service {
   /**
    * Convert admin Level4Config to runtime Level4Configuration format
    */
-  static convertToRuntimeConfiguration(adminConfig: Level4Config): Level4Configuration {
-    const options = Array.isArray(adminConfig.options) ? adminConfig.options : [];
-    
+  static convertToRuntimeConfiguration(adminConfig: Level4Config, level3ProductId?: string): Level4Configuration {
+    const options: DropdownOption[] = Array.isArray(adminConfig.options) ? adminConfig.options : [];
+
     return {
       id: adminConfig.id,
-      level3_product_id: adminConfig.id, // Using config ID as reference
+      level3_product_id: level3ProductId ?? adminConfig.id,
       template_type: adminConfig.mode === 'fixed' ? 'OPTION_2' : 'OPTION_1',
       field_label: adminConfig.fieldLabel,
       max_inputs: adminConfig.mode === 'variable' ? adminConfig.variable?.maxInputs : null,
       fixed_inputs: adminConfig.mode === 'fixed' ? adminConfig.fixed?.numberOfInputs : null,
-      options: options.map((opt: any, index: number) => ({
+      options: options.map((opt, index) => ({
         id: opt.id,
         level4_configuration_id: adminConfig.id,
         label: opt.name,
         value: opt.id,
         display_order: index,
         is_default: index === 0,
-        info_url: opt.url || null
-      }))
+        info_url: opt.url || null,
+      })),
     };
   }
 
@@ -91,7 +117,8 @@ export class Level4Service {
         .from('bom_level4_values')
         .upsert({
           bom_item_id: bomItemId,
-          level4_config_id: payload.configuration_id,
+          level4_config_id: payload.level4_config_id,
+          template_type: payload.template_type,
           entries: payload.entries
         });
 
@@ -162,19 +189,20 @@ export class Level4Service {
   /**
    * Get Level 3 products with Level 4 configurations (for admin panel)
    */
-  static async getLevel3ProductsWithLevel4(): Promise<any[]> {
+  static async getLevel3ProductsWithLevel4(): Promise<Level3Product[]> {
     try {
       const { data, error } = await supabase
         .from('products')
         .select('*')
         .eq('product_level', 3)
-        .eq('enabled', true);
+        .eq('enabled', true)
+        .eq('has_level4', true);
 
       if (error) {
         throw error;
       }
 
-      return data || [];
+      return (data as Level3Product[]) || [];
     } catch (error) {
       console.error('Level4Service.getLevel3ProductsWithLevel4 error:', error);
       throw error;

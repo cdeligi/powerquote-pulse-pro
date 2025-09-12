@@ -49,7 +49,7 @@ export const Level4RuntimeModal: React.FC<Level4RuntimeModalProps> = ({
         setAdminConfig(config);
         
         // Convert to runtime format
-        const runtime = Level4Service.convertToRuntimeConfiguration(config);
+        const runtime = Level4Service.convertToRuntimeConfiguration(config, level3ProductId);
         console.log('Converted to runtime config:', runtime);
         setRuntimeConfig(runtime);
 
@@ -131,7 +131,7 @@ export const Level4RuntimeModal: React.FC<Level4RuntimeModalProps> = ({
       
       const payload: Level4RuntimePayload = {
         bomItemId: bomItem.id,
-        configuration_id: adminConfig.id,
+        level4_config_id: adminConfig.id,
         template_type: runtimeConfig.template_type,
         entries: entries
       };
