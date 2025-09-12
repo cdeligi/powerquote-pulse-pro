@@ -29,15 +29,13 @@ export class Level4Service {
 
       if (error) {
         console.error('Error fetching Level 4 config:', error);
-        if (error.code === 'PGRST116') {
+        if ((error as any)?.code === 'PGRST116') {
           return null; // No configuration found
         }
         throw error;
       }
 
-      if (!data) {
-        return null;
-      }
+      if (!data) return null;
 
       const row = data as Level4ConfigRow;
 
@@ -95,13 +93,13 @@ export class Level4Service {
         .single();
 
       if (error) {
-        if (error.code === 'PGRST116') {
+        if ((error as any)?.code === 'PGRST116') {
           return null; // No existing value
         }
         throw error;
       }
 
-      return data;
+      return data as Level4BOMValue;
     } catch (error) {
       console.error('Level4Service.getBOMLevel4Value error:', error);
       return null;
@@ -117,14 +115,13 @@ export class Level4Service {
         .from('bom_level4_values')
         .upsert({
           bom_item_id: bomItemId,
+          // RESOLVED: keep this column name consistent with db & option mapping
           level4_configuration_id: payload.configuration_id,
           template_type: payload.template_type,
           entries: payload.entries
         });
 
-      if (error) {
-        throw error;
-      }
+      if (error) throw error;
     } catch (error) {
       console.error('Level4Service.saveBOMLevel4Value error:', error);
       throw error;
@@ -147,7 +144,7 @@ export class Level4Service {
         return false;
       }
 
-      return data && data.length > 0;
+      return !!(data && data.length > 0);
     } catch (error) {
       console.error('Level4Service.hasLevel4Configuration error:', error);
       return false;
@@ -175,11 +172,8 @@ export class Level4Service {
         .select()
         .single();
 
-      if (error) {
-        throw error;
-      }
-      
-      return config; // Return the original config
+      if (error) throw error;
+      return config; // return original shape used by admin UI
     } catch (error) {
       console.error('Level4Service.saveLevel4Configuration error:', error);
       throw error;
@@ -198,10 +192,7 @@ export class Level4Service {
         .eq('enabled', true)
         .eq('has_level4', true);
 
-      if (error) {
-        throw error;
-      }
-
+    if (error) throw error;
       return (data as Level3Product[]) || [];
     } catch (error) {
       console.error('Level4Service.getLevel3ProductsWithLevel4 error:', error);

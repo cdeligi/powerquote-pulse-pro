@@ -504,7 +504,7 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
     if ((card as any).has_level4 || (card as any).requires_level4_config) {
       console.log('Triggering Level 4 modal for:', card.name);
       const newItem: BOMItem = {
-        id: `item-${Date.now()}`,
+        id: crypto.randomUUID(),
         product: cardWithDisplayName,
         quantity: 1,
         enabled: true,
