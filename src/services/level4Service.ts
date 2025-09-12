@@ -117,7 +117,8 @@ export class Level4Service {
         .from('bom_level4_values')
         .upsert({
           bom_item_id: bomItemId,
-          level4_config_id: payload.configuration_id,
+          level4_configuration_id: payload.configuration_id,
+          template_type: payload.template_type,
           entries: payload.entries
         });
 
