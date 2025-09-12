@@ -37,7 +37,7 @@ export const BOMProvider: React.FC<BOMProviderProps> = ({ children }) => {
   const [level4Values, setLevel4Values] = useState<Record<string, Level4BOMValue>>({});
 
   const addBOMItem = (item: BOMItem) => {
-    setBomItems(prev => [...prev, { ...item, id: item.id || `item-${Date.now()}` }]);
+    setBomItems(prev => [...prev, { ...item, id: item.id || crypto.randomUUID() }]);
   };
 
   const updateBOMItem = (id: string, updates: Partial<BOMItem>) => {
