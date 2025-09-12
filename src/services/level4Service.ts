@@ -115,7 +115,7 @@ export class Level4Service {
         .from('bom_level4_values')
         .upsert({
           bom_item_id: bomItemId,
-          // RESOLVED: keep this column name consistent with db & option mapping
+          // Keep in sync with DB + option mapping
           level4_configuration_id: payload.configuration_id,
           template_type: payload.template_type,
           entries: payload.entries
@@ -192,7 +192,7 @@ export class Level4Service {
         .eq('enabled', true)
         .eq('has_level4', true);
 
-    if (error) throw error;
+      if (error) throw error;
       return (data as Level3Product[]) || [];
     } catch (error) {
       console.error('Level4Service.getLevel3ProductsWithLevel4 error:', error);
