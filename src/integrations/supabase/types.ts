@@ -186,7 +186,7 @@ export type Database = {
           created_at: string
           entries: Json
           id: string
-          level4_configuration_id: string
+          level4_config_id: string
           template_type: string
           updated_at: string
         }
@@ -195,7 +195,7 @@ export type Database = {
           created_at?: string
           entries: Json
           id?: string
-          level4_configuration_id: string
+          level4_config_id: string
           template_type: string
           updated_at?: string
         }
@@ -204,7 +204,7 @@ export type Database = {
           created_at?: string
           entries?: Json
           id?: string
-          level4_configuration_id?: string
+          level4_config_id?: string
           template_type?: string
           updated_at?: string
         }
@@ -217,10 +217,10 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "bom_level4_values_level4_configuration_id_fkey"
-            columns: ["level4_configuration_id"]
+            foreignKeyName: "bom_level4_values_level4_config_id_fkey"
+            columns: ["level4_config_id"]
             isOneToOne: false
-            referencedRelation: "level4_configurations"
+            referencedRelation: "level4_configs"
             referencedColumns: ["id"]
           },
         ]
