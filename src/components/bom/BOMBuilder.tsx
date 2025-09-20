@@ -561,7 +561,7 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
       }
       
       // Create temporary quote and BOM item in database
-      const { bomItemId, tempQuoteId } = await Level4Service.createBOMItemForLevel4Config(newItem, user.id);
+      const { bomItemId, tempQuoteId } = await Level4Service.createBOMItemForLevel4Config(newItem);
       
       // Update the item with database ID
       const itemWithDbId: BOMItem = {

@@ -110,13 +110,18 @@ export class Level4Service {
   /**
    * Create a temporary quote to enable Level 4 configuration
    */
-  static async createTemporaryQuote(userId: string): Promise<string> {
+  static async createTemporaryQuote(): Promise<string> {
     try {
+      // Check if user is authenticated
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError || !user) {
+        throw new Error('User must be authenticated to create temporary quote');
+      }
+
       const tempQuoteId = `TEMP-L4-${crypto.randomUUID()}`;
       
       const tempQuoteData = {
         id: tempQuoteId,
-        user_id: userId,
         customer_name: 'Temporary Level 4 Configuration',
         oracle_customer_id: 'TEMP',
         sfdc_opportunity: 'TEMP',
@@ -135,7 +140,7 @@ export class Level4Service {
         is_rep_involved: false
       };
 
-      console.log('Creating temporary quote:', tempQuoteData);
+      console.log('Creating temporary quote for user:', user.id, tempQuoteData);
 
       const { error } = await supabase
         .from('quotes')
@@ -202,7 +207,7 @@ export class Level4Service {
   /**
    * Create a BOM item in the database to enable Level 4 configuration
    */
-  static async createBOMItemForLevel4Config(bomItem: any, userId: string): Promise<{ bomItemId: string; tempQuoteId: string }> {
+  static async createBOMItemForLevel4Config(bomItem: any): Promise<{ bomItemId: string; tempQuoteId: string }> {
     try {
       console.log('Creating BOM item for Level 4 config:', bomItem);
       
@@ -211,12 +216,8 @@ export class Level4Service {
         throw new Error('Product ID is required for BOM item creation');
       }
 
-      if (!userId) {
-        throw new Error('User ID is required for temporary quote creation');
-      }
-
-      // Create temporary quote first
-      const tempQuoteId = await this.createTemporaryQuote(userId);
+      // Create temporary quote first (authentication is handled internally)
+      const tempQuoteId = await this.createTemporaryQuote();
 
       const insertData = {
         quote_id: tempQuoteId,
