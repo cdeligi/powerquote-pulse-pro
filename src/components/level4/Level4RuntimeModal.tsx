@@ -136,6 +136,11 @@ export const Level4RuntimeModal: React.FC<Level4RuntimeModalProps> = ({
         entries: entries
       };
 
+      console.log('Saving Level 4 payload:', payload);
+      console.log('BOM Item ID:', bomItem.id);
+      console.log('Admin Config ID:', adminConfig.id);
+      console.log('Runtime Config:', runtimeConfig);
+
       // Save the configuration
       await Level4Service.saveBOMLevel4Value(bomItem.id, payload);
       
@@ -146,8 +151,8 @@ export const Level4RuntimeModal: React.FC<Level4RuntimeModalProps> = ({
     } catch (error) {
       console.error('Error saving Level 4 configuration:', error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to save configuration';
-      setError(errorMessage);
-      toast.error(errorMessage);
+      setError(`Configuration Error: ${errorMessage}`);
+      toast.error(`Configuration Error: ${errorMessage}`);
     } finally {
       setIsLoading(false);
     }

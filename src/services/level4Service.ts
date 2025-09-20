@@ -38,6 +38,7 @@ export class Level4Service {
       if (!data) return null;
 
       const row = data as Level4ConfigRow;
+      console.log('Raw Level 4 config from database:', row);
 
       const mapped: Level4Config = {
         id: row.id,
@@ -48,7 +49,7 @@ export class Level4Service {
         options: Array.isArray(row.options) ? row.options : [],
       };
 
-      console.log('Found Level 4 config:', mapped);
+      console.log('Mapped Level 4 config:', mapped);
       return mapped;
     } catch (error) {
       console.error('Level4Service.getLevel4Configuration error:', error);
@@ -116,31 +117,40 @@ export class Level4Service {
       // Use a temporary quote ID if none provided
       const tempQuoteId = quoteId || `temp-${crypto.randomUUID()}`;
       
+      // Ensure required fields are present
+      if (!bomItem.product?.id) {
+        throw new Error('Product ID is required for BOM item creation');
+      }
+
+      const insertData = {
+        quote_id: tempQuoteId,
+        product_id: bomItem.product.id,
+        name: bomItem.product.name || bomItem.product.displayName || 'Unnamed Product',
+        description: bomItem.product.description || '',
+        part_number: bomItem.partNumber || bomItem.product.partNumber || '',
+        quantity: bomItem.quantity || 1,
+        unit_price: bomItem.product.price || 0,
+        unit_cost: bomItem.product.cost || 0,
+        total_price: (bomItem.product.price || 0) * (bomItem.quantity || 1),
+        total_cost: (bomItem.product.cost || 0) * (bomItem.quantity || 1),
+        margin: 0,
+        original_unit_price: bomItem.product.price || 0,
+        approved_unit_price: bomItem.product.price || 0,
+        product_type: 'standard',
+        configuration_data: bomItem.slot ? { slot: bomItem.slot } : null
+      };
+
+      console.log('Inserting BOM item data:', insertData);
+
       const { data, error } = await supabase
         .from('bom_items')
-        .insert({
-          quote_id: tempQuoteId,
-          product_id: bomItem.product.id,
-          name: bomItem.product.name || bomItem.product.displayName,
-          description: bomItem.product.description || '',
-          part_number: bomItem.partNumber || bomItem.product.partNumber || '',
-          quantity: bomItem.quantity || 1,
-          unit_price: bomItem.product.price || 0,
-          unit_cost: bomItem.product.cost || 0,
-          total_price: (bomItem.product.price || 0) * (bomItem.quantity || 1),
-          total_cost: (bomItem.product.cost || 0) * (bomItem.quantity || 1),
-          margin: 0,
-          original_unit_price: bomItem.product.price || 0,
-          approved_unit_price: bomItem.product.price || 0,
-          product_type: 'standard',
-          configuration_data: bomItem.slot ? { slot: bomItem.slot } : null
-        })
+        .insert(insertData)
         .select('id')
         .single();
 
       if (error) {
         console.error('Error creating BOM item:', error);
-        throw error;
+        throw new Error(`Failed to create BOM item: ${error.message}`);
       }
 
       console.log('BOM item created successfully with ID:', data.id);
@@ -189,6 +199,31 @@ export class Level4Service {
     try {
       console.log('Saving Level 4 BOM value:', { bomItemId, payload });
       
+      // First verify the BOM item exists
+      const { data: bomItem, error: bomError } = await supabase
+        .from('bom_items')
+        .select('id')
+        .eq('id', bomItemId)
+        .single();
+
+      if (bomError) {
+        console.error('BOM item not found:', bomError);
+        throw new Error(`BOM item with ID ${bomItemId} not found: ${bomError.message}`);
+      }
+
+      // Verify the Level 4 config exists
+      const { data: configData, error: configError } = await supabase
+        .from('level4_configs')
+        .select('id')
+        .eq('id', payload.level4_config_id)
+        .single();
+
+      if (configError) {
+        console.error('Level 4 config not found:', configError);
+        throw new Error(`Level 4 config with ID ${payload.level4_config_id} not found: ${configError.message}`);
+      }
+
+      // Now save the Level 4 value
       const { error } = await supabase
         .from('bom_level4_values')
         .upsert({
@@ -199,7 +234,7 @@ export class Level4Service {
 
       if (error) {
         console.error('Error saving Level 4 BOM value:', error);
-        throw error;
+        throw new Error(`Failed to save Level 4 configuration: ${error.message}`);
       }
       
       console.log('Level 4 BOM value saved successfully');
