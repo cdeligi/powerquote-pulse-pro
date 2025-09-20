@@ -1,4 +1,5 @@
 import { getSupabaseClient } from '@/integrations/supabase/client';
+import { v4 as uuidv4 } from 'uuid';
 import type { Level4Configuration, Level4BOMValue, Level4RuntimePayload } from '@/types/level4';
 import type { Level4Config, DropdownOption } from '@/components/level4/Level4ConfigTypes';
 import type { Level3Product } from '@/types/product/interfaces';
@@ -148,7 +149,12 @@ export class Level4Service {
 
       console.log('Creating temporary quote for user:', sanitizedUserId);
 
-      const tempQuoteId = `TEMP-L4-${crypto.randomUUID()}`;
+      const uniqueId =
+        typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+          ? crypto.randomUUID()
+          : uuidv4();
+
+      const tempQuoteId = `TEMP-L4-${uniqueId}`;
 
       const tempQuoteData = {
         id: tempQuoteId,
