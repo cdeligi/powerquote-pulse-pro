@@ -108,19 +108,115 @@ export class Level4Service {
   }
 
   /**
+   * Create a temporary quote to enable Level 4 configuration
+   */
+  static async createTemporaryQuote(userId: string): Promise<string> {
+    try {
+      const tempQuoteId = `TEMP-L4-${crypto.randomUUID()}`;
+      
+      const tempQuoteData = {
+        id: tempQuoteId,
+        user_id: userId,
+        customer_name: 'Temporary Level 4 Configuration',
+        oracle_customer_id: 'TEMP',
+        sfdc_opportunity: 'TEMP',
+        status: 'draft',
+        original_quote_value: 0,
+        requested_discount: 0,
+        discounted_value: 0,
+        total_cost: 0,
+        original_margin: 0,
+        discounted_margin: 0,
+        gross_profit: 0,
+        priority: 'Medium',
+        payment_terms: 'TBD',
+        shipping_terms: 'TBD',
+        currency: 'USD',
+        is_rep_involved: false
+      };
+
+      console.log('Creating temporary quote:', tempQuoteData);
+
+      const { error } = await supabase
+        .from('quotes')
+        .insert(tempQuoteData);
+
+      if (error) {
+        console.error('Error creating temporary quote:', error);
+        throw new Error(`Failed to create temporary quote: ${error.message}`);
+      }
+
+      console.log('Temporary quote created successfully with ID:', tempQuoteId);
+      return tempQuoteId;
+    } catch (error) {
+      console.error('Level4Service.createTemporaryQuote error:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Delete a temporary quote and all associated BOM items
+   */
+  static async deleteTemporaryQuote(quoteId: string): Promise<void> {
+    try {
+      console.log('Deleting temporary quote and associated data:', quoteId);
+      
+      // First delete any Level 4 values for BOM items in this quote
+      const { data: bomItemIds } = await supabase
+        .from('bom_items')
+        .select('id')
+        .eq('quote_id', quoteId);
+
+      if (bomItemIds && bomItemIds.length > 0) {
+        const ids = bomItemIds.map(item => item.id);
+        await supabase
+          .from('bom_level4_values')
+          .delete()
+          .in('bom_item_id', ids);
+      }
+      
+      // Then delete BOM items
+      await supabase
+        .from('bom_items')
+        .delete()
+        .eq('quote_id', quoteId);
+      
+      // Finally delete the quote
+      const { error } = await supabase
+        .from('quotes')
+        .delete()
+        .eq('id', quoteId);
+
+      if (error) {
+        console.error('Error deleting temporary quote:', error);
+        // Don't throw - cleanup failures shouldn't block the UI
+      } else {
+        console.log('Temporary quote deleted successfully');
+      }
+    } catch (error) {
+      console.error('Level4Service.deleteTemporaryQuote error:', error);
+      // Don't throw - cleanup failures shouldn't block the UI
+    }
+  }
+
+  /**
    * Create a BOM item in the database to enable Level 4 configuration
    */
-  static async createBOMItemForLevel4Config(bomItem: any, quoteId?: string): Promise<string> {
+  static async createBOMItemForLevel4Config(bomItem: any, userId: string): Promise<{ bomItemId: string; tempQuoteId: string }> {
     try {
       console.log('Creating BOM item for Level 4 config:', bomItem);
-      
-      // Use a temporary quote ID if none provided
-      const tempQuoteId = quoteId || `temp-${crypto.randomUUID()}`;
       
       // Ensure required fields are present
       if (!bomItem.product?.id) {
         throw new Error('Product ID is required for BOM item creation');
       }
+
+      if (!userId) {
+        throw new Error('User ID is required for temporary quote creation');
+      }
+
+      // Create temporary quote first
+      const tempQuoteId = await this.createTemporaryQuote(userId);
 
       const insertData = {
         quote_id: tempQuoteId,
@@ -150,11 +246,13 @@ export class Level4Service {
 
       if (error) {
         console.error('Error creating BOM item:', error);
+        // Clean up the temporary quote on failure
+        await this.deleteTemporaryQuote(tempQuoteId);
         throw new Error(`Failed to create BOM item: ${error.message}`);
       }
 
       console.log('BOM item created successfully with ID:', data.id);
-      return data.id;
+      return { bomItemId: data.id, tempQuoteId };
     } catch (error) {
       console.error('Level4Service.createBOMItemForLevel4Config error:', error);
       throw error;
@@ -162,30 +260,45 @@ export class Level4Service {
   }
 
   /**
-   * Delete a temporary BOM item (cleanup after cancelled Level 4 configuration)
+   * Delete a temporary BOM item and its quote if it's temporary
    */
   static async deleteTempBOMItem(bomItemId: string): Promise<void> {
     try {
       console.log('Deleting temporary BOM item:', bomItemId);
       
-      // First delete any Level 4 values
-      await supabase
-        .from('bom_level4_values')
-        .delete()
-        .eq('bom_item_id', bomItemId);
-      
-      // Then delete the BOM item
-      const { error } = await supabase
+      // Get the BOM item to check if it's part of a temporary quote
+      const { data: bomItem, error: bomError } = await supabase
         .from('bom_items')
-        .delete()
-        .eq('id', bomItemId);
+        .select('quote_id')
+        .eq('id', bomItemId)
+        .single();
 
-      if (error) {
-        console.error('Error deleting temp BOM item:', error);
-        throw error;
+      if (bomError) {
+        console.error('Error fetching BOM item for cleanup:', bomError);
+        return;
       }
-      
-      console.log('Temporary BOM item deleted successfully');
+
+      // If this is a temporary quote, delete the entire quote (which will cascade)
+      if (bomItem.quote_id.startsWith('TEMP-L4-')) {
+        await this.deleteTemporaryQuote(bomItem.quote_id);
+      } else {
+        // Otherwise, just delete the BOM item and its Level 4 values
+        await supabase
+          .from('bom_level4_values')
+          .delete()
+          .eq('bom_item_id', bomItemId);
+        
+        const { error } = await supabase
+          .from('bom_items')
+          .delete()
+          .eq('id', bomItemId);
+
+        if (error) {
+          console.error('Error deleting temp BOM item:', error);
+        } else {
+          console.log('Temporary BOM item deleted successfully');
+        }
+      }
     } catch (error) {
       console.error('Level4Service.deleteTempBOMItem error:', error);
       // Don't throw - cleanup failures shouldn't block the UI

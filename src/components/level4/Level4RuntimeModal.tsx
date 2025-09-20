@@ -158,11 +158,26 @@ export const Level4RuntimeModal: React.FC<Level4RuntimeModalProps> = ({
     }
   };
 
+  const handleCancel = async () => {
+    try {
+      // Clean up temporary BOM item and quote if created
+      if (bomItem?.id && (bomItem as any).tempQuoteId) {
+        console.log('Cleaning up temporary Level 4 data...');
+        await Level4Service.deleteTempBOMItem(bomItem.id);
+      }
+    } catch (error) {
+      console.error('Error during Level 4 cleanup:', error);
+      // Don't block cancellation
+    }
+    
+    onCancel();
+  };
+
   // Handle keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
-        onCancel();
+        handleCancel();
       } else if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
         handleSave();
       }
@@ -170,11 +185,11 @@ export const Level4RuntimeModal: React.FC<Level4RuntimeModalProps> = ({
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [onCancel, handleSave]);
+  }, [handleSave]); // Removed onCancel from dependencies since we now use handleCancel
 
   if (isLoading) {
     return (
-      <Dialog open={true} onOpenChange={() => onCancel()}>
+      <Dialog open={true} onOpenChange={() => handleCancel()}>
         <DialogContent className="sm:max-w-[525px]">
           <DialogHeader>
             <DialogTitle>Loading Configuration...</DialogTitle>
@@ -190,7 +205,7 @@ export const Level4RuntimeModal: React.FC<Level4RuntimeModalProps> = ({
 
   if (error || !runtimeConfig) {
     return (
-      <Dialog open={true} onOpenChange={() => onCancel()}>
+      <Dialog open={true} onOpenChange={() => handleCancel()}>
         <DialogContent className="sm:max-w-[525px]">
           <DialogHeader>
             <DialogTitle>Configuration Error</DialogTitle>
@@ -199,7 +214,7 @@ export const Level4RuntimeModal: React.FC<Level4RuntimeModalProps> = ({
             <p className="text-destructive">{error || 'Configuration not found'}</p>
           </div>
           <DialogFooter>
-            <Button onClick={onCancel}>Close</Button>
+            <Button onClick={handleCancel}>Close</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -207,7 +222,7 @@ export const Level4RuntimeModal: React.FC<Level4RuntimeModalProps> = ({
   }
 
   return (
-    <Dialog open={true} onOpenChange={() => onCancel()}>
+    <Dialog open={true} onOpenChange={() => handleCancel()}>
       <DialogContent className="max-w-3xl w-full max-h-[90vh] overflow-hidden flex flex-col">
         <DialogHeader className="shrink-0">
           <DialogTitle>Configure: {bomItem.product.name}</DialogTitle>
@@ -226,7 +241,7 @@ export const Level4RuntimeModal: React.FC<Level4RuntimeModalProps> = ({
         </div>
 
         <DialogFooter className="shrink-0">
-          <Button variant="outline" onClick={onCancel}>
+          <Button variant="outline" onClick={handleCancel}>
             Cancel
           </Button>
           <Button onClick={handleSave}>

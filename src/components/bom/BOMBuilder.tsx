@@ -555,14 +555,22 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
       // Import Level4Service dynamically to avoid circular imports
       const { Level4Service } = await import('@/services/level4Service');
       
-      // Create BOM item in database first
-      const databaseId = await Level4Service.createBOMItemForLevel4Config(newItem);
+      // Ensure we have a user ID
+      if (!user?.id) {
+        throw new Error('User authentication required');
+      }
+      
+      // Create temporary quote and BOM item in database
+      const { bomItemId, tempQuoteId } = await Level4Service.createBOMItemForLevel4Config(newItem, user.id);
       
       // Update the item with database ID
       const itemWithDbId: BOMItem = {
         ...newItem,
-        id: databaseId
+        id: bomItemId
       };
+      
+      // Store temp quote ID separately for cleanup
+      (itemWithDbId as any).tempQuoteId = tempQuoteId;
       
       setConfiguringLevel4Item(itemWithDbId);
       
