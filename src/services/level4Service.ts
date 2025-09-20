@@ -112,28 +112,51 @@ export class Level4Service {
   /**
    * Create a temporary quote to enable Level 4 configuration
    */
-  static async createTemporaryQuote(): Promise<string> {
+  static async createTemporaryQuote(userId?: string): Promise<string> {
     try {
       const supabase = getSupabaseClient();
-      
-      // Check if user is authenticated
-      const { data: { user }, error: authError } = await supabase.auth.getUser();
-      if (authError || !user) {
-        console.error('Authentication error:', authError);
+
+      let authenticatedUserId = userId;
+
+      if (!authenticatedUserId) {
+        // Prefer the current session since it resolves immediately when cached locally
+        const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+
+        if (sessionError) {
+          console.error('Session lookup error:', sessionError);
+        }
+
+        authenticatedUserId = sessionData?.session?.user?.id ?? undefined;
+      }
+
+      if (!authenticatedUserId) {
+        // Fall back to a network request for the user record if session lookup failed
+        const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+        if (authError) {
+          console.error('Authentication error:', authError);
+        }
+
+        authenticatedUserId = user?.id ?? undefined;
+      }
+
+      const sanitizedUserId = authenticatedUserId?.trim();
+
+      if (!sanitizedUserId) {
         throw new Error('User must be authenticated to create temporary quote');
       }
 
-      console.log('Creating temporary quote for user:', user.id);
+      console.log('Creating temporary quote for user:', sanitizedUserId);
 
       const tempQuoteId = `TEMP-L4-${crypto.randomUUID()}`;
-      
+
       const tempQuoteData = {
         id: tempQuoteId,
-        user_id: user.id, // Critical: Set the user_id field
+        user_id: sanitizedUserId, // Critical: Set the user_id field
         customer_name: 'Temporary Level 4 Configuration',
         oracle_customer_id: 'TEMP',
         sfdc_opportunity: 'TEMP',
-        status: 'draft',
+        status: 'pending',
         original_quote_value: 0,
         requested_discount: 0,
         discounted_value: 0,
@@ -216,17 +239,17 @@ export class Level4Service {
   /**
    * Create a BOM item in the database to enable Level 4 configuration
    */
-  static async createBOMItemForLevel4Config(bomItem: any): Promise<{ bomItemId: string; tempQuoteId: string }> {
+  static async createBOMItemForLevel4Config(bomItem: any, userId: string): Promise<{ bomItemId: string; tempQuoteId: string }> {
     try {
       console.log('Creating BOM item for Level 4 config:', bomItem);
-      
+
       // Ensure required fields are present
       if (!bomItem.product?.id) {
         throw new Error('Product ID is required for BOM item creation');
       }
 
       // Create temporary quote first (authentication is handled internally)
-      const tempQuoteId = await this.createTemporaryQuote();
+      const tempQuoteId = await this.createTemporaryQuote(userId);
 
       const insertData = {
         quote_id: tempQuoteId,

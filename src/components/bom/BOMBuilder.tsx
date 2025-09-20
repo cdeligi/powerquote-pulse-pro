@@ -41,7 +41,7 @@ interface BOMBuilderProps {
 
 const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuilderProps) => {
   // ALL HOOKS MUST BE AT THE TOP - NO CONDITIONAL RETURNS BEFORE HOOKS
-  const { user, loading } = useAuth();
+  const { user, session, loading } = useAuth();
   const { has } = usePermissions();
 
   // Compute permissions
@@ -556,14 +556,16 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
       const { Level4Service } = await import('@/services/level4Service');
       
       // Verify user authentication
-      if (!user?.id) {
+      const activeUserId = session?.user?.id ?? user?.id;
+
+      if (!activeUserId) {
         throw new Error('User authentication required for Level 4 configuration');
       }
 
-      console.log('Setting up Level 4 config for user:', user.id);
-      
+      console.log('Setting up Level 4 config for user:', activeUserId);
+
       // Create temporary quote and BOM item in database
-      const { bomItemId, tempQuoteId } = await Level4Service.createBOMItemForLevel4Config(newItem);
+      const { bomItemId, tempQuoteId } = await Level4Service.createBOMItemForLevel4Config(newItem, activeUserId);
       
       // Update the item with database ID
       const itemWithDbId: BOMItem = {
