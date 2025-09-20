@@ -11,7 +11,7 @@ import type { Level4Config } from './Level4ConfigTypes';
 interface Level4RuntimeModalProps {
   bomItem: BOMItem;
   level3ProductId: string;
-  onSave: (payload: Level4RuntimePayload) => void;
+  onSave: (payload: Level4RuntimePayload, context?: { bomItemId: string; tempQuoteId?: string }) => void;
   onCancel: () => void;
 }
 
@@ -142,11 +142,16 @@ export const Level4RuntimeModal: React.FC<Level4RuntimeModalProps> = ({
       console.log('Runtime Config:', runtimeConfig);
 
       // Save the configuration
-      await Level4Service.saveBOMLevel4Value(bomItem.id, payload);
-      
+      const result = await Level4Service.saveBOMLevel4Value(bomItem, payload);
+
+      const resolvedPayload: Level4RuntimePayload = {
+        ...payload,
+        bomItemId: result.bomItemId,
+      };
+
       // Notify parent component
-      onSave(payload);
-      
+      onSave(resolvedPayload, result);
+
       toast.success('Level 4 configuration saved successfully');
     } catch (error) {
       console.error('Error saving Level 4 configuration:', error);

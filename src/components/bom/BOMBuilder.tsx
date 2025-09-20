@@ -590,12 +590,18 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
     }
   };
 
-  const handleLevel4Save = (payload: Level4RuntimePayload) => {
+  const handleLevel4Save = (
+    payload: Level4RuntimePayload,
+    context?: { bomItemId: string; tempQuoteId?: string }
+  ) => {
     console.log('Saving Level 4 configuration:', payload);
 
     if (configuringLevel4Item) {
+      const resolvedBomItemId = context?.bomItemId ?? payload.bomItemId ?? configuringLevel4Item.id;
+
       const updatedItem: BOMItem = {
         ...configuringLevel4Item,
+        id: resolvedBomItemId,
         level4Config: payload,
         product: {
           ...configuringLevel4Item.product,
@@ -604,9 +610,19 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
         displayName: (configuringLevel4Item as any).displayName || configuringLevel4Item.product.name
       };
 
-      const existingIndex = bomItems.findIndex(item => item.id === configuringLevel4Item.id);
+      if (context?.tempQuoteId) {
+        (updatedItem as any).tempQuoteId = context.tempQuoteId;
+      }
+
+      const existingIndex = bomItems.findIndex(
+        item => item.id === configuringLevel4Item.id || item.id === resolvedBomItemId
+      );
       const updatedItems = existingIndex >= 0
-        ? bomItems.map(item => (item.id === payload.bomItemId ? updatedItem : item))
+        ? bomItems.map(item =>
+            item.id === configuringLevel4Item.id || item.id === resolvedBomItemId
+              ? updatedItem
+              : item
+          )
         : [...bomItems, updatedItem];
 
       setBomItems(updatedItems);

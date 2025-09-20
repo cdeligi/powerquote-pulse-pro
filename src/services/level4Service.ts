@@ -3,6 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import type { Level4Configuration, Level4BOMValue, Level4RuntimePayload } from '@/types/level4';
 import type { Level4Config, DropdownOption } from '@/components/level4/Level4ConfigTypes';
 import type { Level3Product } from '@/types/product/interfaces';
+import type { BOMItem } from '@/types/product';
 
 interface Level4ConfigRow {
   id: string;
@@ -15,6 +16,48 @@ interface Level4ConfigRow {
 }
 
 export class Level4Service {
+  private static async resolveActiveUserId(explicitUserId?: string, client = getSupabaseClient()): Promise<string> {
+    const directId = explicitUserId?.trim();
+
+    if (directId) {
+      return directId;
+    }
+
+    try {
+      const { data: sessionData, error: sessionError } = await client.auth.getSession();
+
+      if (sessionError) {
+        console.error('Session lookup error:', sessionError);
+      }
+
+      const sessionUserId = sessionData?.session?.user?.id?.trim();
+
+      if (sessionUserId) {
+        return sessionUserId;
+      }
+    } catch (sessionLookupError) {
+      console.error('Unexpected error resolving session user ID:', sessionLookupError);
+    }
+
+    try {
+      const { data: { user }, error: authError } = await client.auth.getUser();
+
+      if (authError) {
+        console.error('Authentication error:', authError);
+      }
+
+      const fetchedId = user?.id?.trim();
+
+      if (fetchedId) {
+        return fetchedId;
+      }
+    } catch (userLookupError) {
+      console.error('Unexpected error resolving authenticated user ID:', userLookupError);
+    }
+
+    throw new Error('User must be authenticated to perform this action');
+  }
+
   /**
    * Fetch Level 4 configuration for a product from the admin configs table
    */
@@ -117,35 +160,7 @@ export class Level4Service {
     try {
       const supabase = getSupabaseClient();
 
-      let authenticatedUserId = userId;
-
-      if (!authenticatedUserId) {
-        // Prefer the current session since it resolves immediately when cached locally
-        const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-
-        if (sessionError) {
-          console.error('Session lookup error:', sessionError);
-        }
-
-        authenticatedUserId = sessionData?.session?.user?.id ?? undefined;
-      }
-
-      if (!authenticatedUserId) {
-        // Fall back to a network request for the user record if session lookup failed
-        const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-        if (authError) {
-          console.error('Authentication error:', authError);
-        }
-
-        authenticatedUserId = user?.id ?? undefined;
-      }
-
-      const sanitizedUserId = authenticatedUserId?.trim();
-
-      if (!sanitizedUserId) {
-        throw new Error('User must be authenticated to create temporary quote');
-      }
+      const sanitizedUserId = await this.resolveActiveUserId(userId, supabase);
 
       console.log('Creating temporary quote for user:', sanitizedUserId);
 
@@ -245,7 +260,7 @@ export class Level4Service {
   /**
    * Create a BOM item in the database to enable Level 4 configuration
    */
-  static async createBOMItemForLevel4Config(bomItem: any, userId: string): Promise<{ bomItemId: string; tempQuoteId: string }> {
+  static async createBOMItemForLevel4Config(bomItem: any, userId?: string): Promise<{ bomItemId: string; tempQuoteId: string }> {
     try {
       console.log('Creating BOM item for Level 4 config:', bomItem);
 
@@ -254,8 +269,27 @@ export class Level4Service {
         throw new Error('Product ID is required for BOM item creation');
       }
 
-      // Create temporary quote first (authentication is handled internally)
-      const tempQuoteId = await this.createTemporaryQuote(userId);
+      const supabase = getSupabaseClient();
+
+      let tempQuoteId: string | undefined = (bomItem as any)?.tempQuoteId;
+
+      if (tempQuoteId) {
+        const { error: quoteLookupError } = await supabase
+          .from('quotes')
+          .select('id')
+          .eq('id', tempQuoteId)
+          .single();
+
+        if (quoteLookupError) {
+          console.warn('Existing temporary quote not found, creating a new one:', quoteLookupError);
+          tempQuoteId = undefined;
+        }
+      }
+
+      if (!tempQuoteId) {
+        // Create temporary quote first (authentication is handled internally)
+        tempQuoteId = await this.createTemporaryQuote(userId);
+      }
 
       const insertData = {
         quote_id: tempQuoteId,
@@ -277,7 +311,7 @@ export class Level4Service {
 
       console.log('Inserting BOM item data:', insertData);
 
-      const { data, error } = await getSupabaseClient()
+      const { data, error } = await supabase
         .from('bom_items')
         .insert(insertData)
         .select('id')
@@ -348,25 +382,40 @@ export class Level4Service {
   /**
    * Save BOM Level 4 configuration value
    */
-  static async saveBOMLevel4Value(bomItemId: string, payload: Level4RuntimePayload): Promise<void> {
+  static async saveBOMLevel4Value(
+    bomItem: BOMItem,
+    payload: Level4RuntimePayload
+  ): Promise<{ bomItemId: string; tempQuoteId?: string }> {
     try {
       const supabase = getSupabaseClient();
-      console.log('Saving Level 4 BOM value:', { bomItemId, payload });
-      
-      // First verify the BOM item exists
-      const { data: bomItem, error: bomError } = await supabase
+      console.log('Saving Level 4 BOM value:', { bomItem, payload });
+
+      let targetBomItemId = bomItem.id;
+      let associatedTempQuoteId: string | undefined = (bomItem as any)?.tempQuoteId;
+
+      const { data: existingBomItem, error: bomError } = await supabase
         .from('bom_items')
-        .select('id')
-        .eq('id', bomItemId)
+        .select('id, quote_id')
+        .eq('id', targetBomItemId)
         .single();
 
       if (bomError) {
-        console.error('BOM item not found:', bomError);
-        throw new Error(`BOM item with ID ${bomItemId} not found: ${bomError.message}`);
+        if ((bomError as any)?.code !== 'PGRST116') {
+          console.error('Error verifying BOM item before saving Level 4 value:', bomError);
+          throw new Error(`BOM item with ID ${targetBomItemId} could not be verified: ${bomError.message}`);
+        }
+
+        console.warn('BOM item missing when saving Level 4 value. Recreating item before upsert.');
+
+        const recreated = await this.createBOMItemForLevel4Config(bomItem);
+        targetBomItemId = recreated.bomItemId;
+        associatedTempQuoteId = recreated.tempQuoteId;
+      } else if (existingBomItem) {
+        associatedTempQuoteId = existingBomItem.quote_id ?? associatedTempQuoteId;
       }
 
       // Verify the Level 4 config exists
-      const { data: configData, error: configError } = await getSupabaseClient()
+      const { data: configData, error: configError } = await supabase
         .from('level4_configs')
         .select('id')
         .eq('id', payload.level4_config_id)
@@ -378,10 +427,10 @@ export class Level4Service {
       }
 
       // Now save the Level 4 value
-      const { error } = await getSupabaseClient()
+      const { error } = await supabase
         .from('bom_level4_values')
         .upsert({
-          bom_item_id: bomItemId,
+          bom_item_id: targetBomItemId,
           level4_config_id: payload.level4_config_id,
           entries: payload.entries
         });
@@ -390,8 +439,9 @@ export class Level4Service {
         console.error('Error saving Level 4 BOM value:', error);
         throw new Error(`Failed to save Level 4 configuration: ${error.message}`);
       }
-      
-      console.log('Level 4 BOM value saved successfully');
+
+      console.log('Level 4 BOM value saved successfully for BOM item:', targetBomItemId);
+      return { bomItemId: targetBomItemId, tempQuoteId: associatedTempQuoteId };
     } catch (error) {
       console.error('Level4Service.saveBOMLevel4Value error:', error);
       throw error;
