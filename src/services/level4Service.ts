@@ -143,7 +143,7 @@ export class Level4Service {
         customer_name: 'Temporary Level 4 Configuration',
         oracle_customer_id: 'TEMP',
         sfdc_opportunity: 'TEMP',
-        status: 'draft',
+        status: 'pending',
         original_quote_value: 0,
         requested_discount: 0,
         discounted_value: 0,
