@@ -503,8 +503,10 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
     
     if ((card as any).has_level4 || (card as any).requires_level4_config) {
       console.log('Triggering Level 4 modal for:', card.name);
+      
+      // Create BOM item that will be saved to database
       const newItem: BOMItem = {
-        id: crypto.randomUUID(),
+        id: crypto.randomUUID(), // Temporary ID, will be replaced with database ID
         product: cardWithDisplayName,
         quantity: 1,
         enabled: true,
@@ -512,7 +514,9 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
         displayName: displayName,
         slot: slot
       };
-      setConfiguringLevel4Item(newItem);
+      
+      // Save BOM item to database immediately to enable Level 4 configuration
+      handleLevel4Setup(newItem);
     } else {
       // Removed the call to updateBOMItems here
     }
@@ -542,6 +546,37 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
     onBOMUpdate(updatedItems);
   };
 
+
+  // Setup Level 4 configuration by creating BOM item in database first
+  const handleLevel4Setup = async (newItem: BOMItem) => {
+    try {
+      setIsLoading(true);
+      
+      // Import Level4Service dynamically to avoid circular imports
+      const { Level4Service } = await import('@/services/level4Service');
+      
+      // Create BOM item in database first
+      const databaseId = await Level4Service.createBOMItemForLevel4Config(newItem);
+      
+      // Update the item with database ID
+      const itemWithDbId: BOMItem = {
+        ...newItem,
+        id: databaseId
+      };
+      
+      setConfiguringLevel4Item(itemWithDbId);
+      
+    } catch (error) {
+      console.error('Error setting up Level 4 configuration:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to prepare Level 4 configuration. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleLevel4Save = (payload: Level4RuntimePayload) => {
     console.log('Saving Level 4 configuration:', payload);
@@ -575,7 +610,20 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
     setSelectedSlot(null);
   };
 
-  const handleLevel4Cancel = () => {
+  const handleLevel4Cancel = async () => {
+    if (configuringLevel4Item) {
+      try {
+        // Import Level4Service dynamically to avoid circular imports
+        const { Level4Service } = await import('@/services/level4Service');
+        
+        // Clean up the temporary BOM item from database
+        await Level4Service.deleteTempBOMItem(configuringLevel4Item.id);
+      } catch (error) {
+        console.error('Error cleaning up Level 4 configuration:', error);
+        // Don't block the cancel operation
+      }
+    }
+    
     setConfiguringLevel4Item(null);
     setSelectedSlot(null);
   };
