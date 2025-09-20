@@ -555,10 +555,12 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
       // Import Level4Service dynamically to avoid circular imports
       const { Level4Service } = await import('@/services/level4Service');
       
-      // Ensure we have a user ID
+      // Verify user authentication
       if (!user?.id) {
-        throw new Error('User authentication required');
+        throw new Error('User authentication required for Level 4 configuration');
       }
+
+      console.log('Setting up Level 4 config for user:', user.id);
       
       // Create temporary quote and BOM item in database
       const { bomItemId, tempQuoteId } = await Level4Service.createBOMItemForLevel4Config(newItem);
