@@ -107,6 +107,82 @@ export class Level4Service {
   }
 
   /**
+   * Create a BOM item in the database to enable Level 4 configuration
+   */
+  static async createBOMItemForLevel4Config(bomItem: any, quoteId?: string): Promise<string> {
+    try {
+      console.log('Creating BOM item for Level 4 config:', bomItem);
+      
+      // Use a temporary quote ID if none provided
+      const tempQuoteId = quoteId || `temp-${crypto.randomUUID()}`;
+      
+      const { data, error } = await supabase
+        .from('bom_items')
+        .insert({
+          quote_id: tempQuoteId,
+          product_id: bomItem.product.id,
+          name: bomItem.product.name || bomItem.product.displayName,
+          description: bomItem.product.description || '',
+          part_number: bomItem.partNumber || bomItem.product.partNumber || '',
+          quantity: bomItem.quantity || 1,
+          unit_price: bomItem.product.price || 0,
+          unit_cost: bomItem.product.cost || 0,
+          total_price: (bomItem.product.price || 0) * (bomItem.quantity || 1),
+          total_cost: (bomItem.product.cost || 0) * (bomItem.quantity || 1),
+          margin: 0,
+          original_unit_price: bomItem.product.price || 0,
+          approved_unit_price: bomItem.product.price || 0,
+          product_type: 'standard',
+          configuration_data: bomItem.slot ? { slot: bomItem.slot } : null
+        })
+        .select('id')
+        .single();
+
+      if (error) {
+        console.error('Error creating BOM item:', error);
+        throw error;
+      }
+
+      console.log('BOM item created successfully with ID:', data.id);
+      return data.id;
+    } catch (error) {
+      console.error('Level4Service.createBOMItemForLevel4Config error:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Delete a temporary BOM item (cleanup after cancelled Level 4 configuration)
+   */
+  static async deleteTempBOMItem(bomItemId: string): Promise<void> {
+    try {
+      console.log('Deleting temporary BOM item:', bomItemId);
+      
+      // First delete any Level 4 values
+      await supabase
+        .from('bom_level4_values')
+        .delete()
+        .eq('bom_item_id', bomItemId);
+      
+      // Then delete the BOM item
+      const { error } = await supabase
+        .from('bom_items')
+        .delete()
+        .eq('id', bomItemId);
+
+      if (error) {
+        console.error('Error deleting temp BOM item:', error);
+        throw error;
+      }
+      
+      console.log('Temporary BOM item deleted successfully');
+    } catch (error) {
+      console.error('Level4Service.deleteTempBOMItem error:', error);
+      // Don't throw - cleanup failures shouldn't block the UI
+    }
+  }
+
+  /**
    * Save BOM Level 4 configuration value
    */
   static async saveBOMLevel4Value(bomItemId: string, payload: Level4RuntimePayload): Promise<void> {
