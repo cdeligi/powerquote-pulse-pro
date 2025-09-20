@@ -1,4 +1,4 @@
-import { supabase } from '@/integrations/supabase/client';
+import { getSupabaseClient } from '@/integrations/supabase/client';
 import type { Level4Configuration, Level4BOMValue, Level4RuntimePayload } from '@/types/level4';
 import type { Level4Config, DropdownOption } from '@/components/level4/Level4ConfigTypes';
 import type { Level3Product } from '@/types/product/interfaces';
@@ -19,6 +19,7 @@ export class Level4Service {
    */
   static async getLevel4Configuration(level3ProductId: string): Promise<Level4Config | null> {
     try {
+      const supabase = getSupabaseClient();
       console.log('Fetching Level 4 config for product:', level3ProductId);
 
       const { data, error } = await supabase
@@ -87,6 +88,7 @@ export class Level4Service {
    */
   static async getBOMLevel4Value(bomItemId: string): Promise<Level4BOMValue | null> {
     try {
+      const supabase = getSupabaseClient();
       const { data, error } = await supabase
         .from('bom_level4_values')
         .select('*')
@@ -112,16 +114,22 @@ export class Level4Service {
    */
   static async createTemporaryQuote(): Promise<string> {
     try {
+      const supabase = getSupabaseClient();
+      
       // Check if user is authenticated
       const { data: { user }, error: authError } = await supabase.auth.getUser();
       if (authError || !user) {
+        console.error('Authentication error:', authError);
         throw new Error('User must be authenticated to create temporary quote');
       }
+
+      console.log('Creating temporary quote for user:', user.id);
 
       const tempQuoteId = `TEMP-L4-${crypto.randomUUID()}`;
       
       const tempQuoteData = {
         id: tempQuoteId,
+        user_id: user.id, // Critical: Set the user_id field
         customer_name: 'Temporary Level 4 Configuration',
         oracle_customer_id: 'TEMP',
         sfdc_opportunity: 'TEMP',
@@ -140,7 +148,7 @@ export class Level4Service {
         is_rep_involved: false
       };
 
-      console.log('Creating temporary quote for user:', user.id, tempQuoteData);
+      console.log('Creating temporary quote data:', tempQuoteData);
 
       const { error } = await supabase
         .from('quotes')
@@ -164,6 +172,7 @@ export class Level4Service {
    */
   static async deleteTemporaryQuote(quoteId: string): Promise<void> {
     try {
+      const supabase = getSupabaseClient();
       console.log('Deleting temporary quote and associated data:', quoteId);
       
       // First delete any Level 4 values for BOM items in this quote
@@ -239,7 +248,7 @@ export class Level4Service {
 
       console.log('Inserting BOM item data:', insertData);
 
-      const { data, error } = await supabase
+      const { data, error } = await getSupabaseClient()
         .from('bom_items')
         .insert(insertData)
         .select('id')
@@ -265,6 +274,7 @@ export class Level4Service {
    */
   static async deleteTempBOMItem(bomItemId: string): Promise<void> {
     try {
+      const supabase = getSupabaseClient();
       console.log('Deleting temporary BOM item:', bomItemId);
       
       // Get the BOM item to check if it's part of a temporary quote
@@ -284,12 +294,12 @@ export class Level4Service {
         await this.deleteTemporaryQuote(bomItem.quote_id);
       } else {
         // Otherwise, just delete the BOM item and its Level 4 values
-        await supabase
+        await getSupabaseClient()
           .from('bom_level4_values')
           .delete()
           .eq('bom_item_id', bomItemId);
         
-        const { error } = await supabase
+        const { error } = await getSupabaseClient()
           .from('bom_items')
           .delete()
           .eq('id', bomItemId);
@@ -311,6 +321,7 @@ export class Level4Service {
    */
   static async saveBOMLevel4Value(bomItemId: string, payload: Level4RuntimePayload): Promise<void> {
     try {
+      const supabase = getSupabaseClient();
       console.log('Saving Level 4 BOM value:', { bomItemId, payload });
       
       // First verify the BOM item exists
@@ -326,7 +337,7 @@ export class Level4Service {
       }
 
       // Verify the Level 4 config exists
-      const { data: configData, error: configError } = await supabase
+      const { data: configData, error: configError } = await getSupabaseClient()
         .from('level4_configs')
         .select('id')
         .eq('id', payload.level4_config_id)
@@ -338,7 +349,7 @@ export class Level4Service {
       }
 
       // Now save the Level 4 value
-      const { error } = await supabase
+      const { error } = await getSupabaseClient()
         .from('bom_level4_values')
         .upsert({
           bom_item_id: bomItemId,
@@ -363,6 +374,7 @@ export class Level4Service {
    */
   static async hasLevel4Configuration(level3ProductId: string): Promise<boolean> {
     try {
+      const supabase = getSupabaseClient();
       const { data, error } = await supabase
         .from('level4_configs')
         .select('id')
@@ -396,7 +408,7 @@ export class Level4Service {
         options: config.options
       };
       
-      const { data, error } = await supabase
+      const { data, error } = await getSupabaseClient()
         .from('level4_configs')
         .upsert(configToSave)
         .select()
@@ -415,6 +427,7 @@ export class Level4Service {
    */
   static async getLevel3ProductsWithLevel4(): Promise<Level3Product[]> {
     try {
+      const supabase = getSupabaseClient();
       const { data, error } = await supabase
         .from('products')
         .select('*')
