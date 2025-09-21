@@ -625,6 +625,51 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
         
         setSlotAssignments(updatedSlotAssignments);
 
+        // Regenerate part number after Level 4 configuration update
+        if (selectedChassis) {
+          const newPartNumber = buildQTMSPartNumber({ 
+            chassis: selectedChassis, 
+            slotAssignments: updatedSlotAssignments, 
+            hasRemoteDisplay, 
+            pnConfig, 
+            codeMap, 
+            includeSuffix: true 
+          });
+          
+          console.log('Regenerated part number after Level 4 save:', newPartNumber);
+          
+          // Update any existing chassis BOM item with new part number
+          const updatedBOMItems = bomItems.map(item => {
+            if (item.product.type === 'chassis' && item.slotAssignments) {
+              return {
+                ...item,
+                partNumber: newPartNumber,
+                product: {
+                  ...item.product,
+                  partNumber: newPartNumber
+                },
+                slotAssignments: updatedSlotAssignments,
+                configuration: {
+                  ...item.configuration,
+                  level4Configurations: Object.entries(updatedSlotAssignments)
+                    .filter(([_, card]) => (card as any).level4Config)
+                    .reduce((acc, [slot, card]) => {
+                      acc[slot] = (card as any).level4Config;
+                      return acc;
+                    }, {} as Record<string, any>)
+                }
+              };
+            }
+            return item;
+          });
+          
+          if (updatedBOMItems.some((item, index) => item !== bomItems[index])) {
+            setBomItems(updatedBOMItems);
+            onBOMUpdate(updatedBOMItems);
+            console.log('Updated chassis BOM item with new part number');
+          }
+        }
+
         toast({
           title: 'Configuration Saved',
           description: `Level 4 configuration for ${assignedCard.displayName || assignedCard.name} has been saved to slot ${selectedSlot}.`,
@@ -665,20 +710,30 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
   };
 
   const handleLevel4Configure = async (slot: number, product: Level3Product) => {
+    console.log('Level 4 configure triggered:', { slot, product, slotAssignments });
+    
     // Handle Level 4 configuration from rack visualizer
     setSelectedSlot(slot);
     
-    const existingConfig = (product as any).level4Config;
-    if (existingConfig) {
-      // Editing existing configuration
-      const tempBOMItem = {
-        id: existingConfig.bomItemId,
-        product: product,
+    // Get existing Level 4 configuration from slot assignments
+    const assignedCard = slotAssignments[slot];
+    const existingLevel4Config = (assignedCard as any)?.level4Config;
+    
+    if (existingLevel4Config && existingLevel4Config.bomItemId) {
+      console.log('Found existing Level 4 config, creating BOM item for editing:', existingLevel4Config);
+      
+      // Editing existing configuration - create a BOM item with existing config
+      const tempBOMItem: BOMItem = {
+        id: existingLevel4Config.bomItemId,
+        product: assignedCard,
         quantity: 1,
         enabled: true,
+        level4Config: existingLevel4Config
       };
+      
       setConfiguringLevel4Item(tempBOMItem);
     } else {
+      console.log('No existing Level 4 config found, creating new configuration');
       // Creating new configuration
       await handleLevel4Setup({ product, quantity: 1, enabled: true });
     }
