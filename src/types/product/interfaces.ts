@@ -73,6 +73,9 @@ export interface Level3Product extends Omit<BaseProduct, 'partNumber'> {
   has_level4?: boolean; // Alias for requires_level4_config
   sku?: string; // Backward compatibility
   displayName: string; // Explicitly include displayName as required
+  // Level 4 configuration support
+  level4Config?: Level4RuntimePayload;
+  hasLevel4Config?: boolean;
 }
 
 // Type unions for backward compatibility
