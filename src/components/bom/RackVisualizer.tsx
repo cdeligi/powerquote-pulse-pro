@@ -316,7 +316,7 @@ const getSlotTitle = (slot: number) => {
       <CardContent>
         <div className="space-y-4">
           <p className="text-gray-400 text-sm">
-            Click on any slot to add a card. Click the X to clear a slot. Cards with Level 4 configurations show a ⚙️ symbol - click it to edit the configuration.
+            Click on any slot to add a card. Click the X to clear a slot. Cards with Level 4 configurations show a ⚙️ symbol in the "Assigned Cards" section below - click it to edit the configuration.
           </p>
           
           {renderChassisLayout()}
@@ -371,6 +371,14 @@ const getSlotTitle = (slot: number) => {
                       <span className="text-white">
                         {(() => { 
                           const c = slotAssignments[parseInt(slot)]; 
+                          console.log('Bushing slot display debug:', {
+                            slot,
+                            card: c,
+                            displayName: (c as any)?.displayName,
+                            name: c?.name,
+                            type: c?.type,
+                            hasLevel4Config: (c as any)?.hasLevel4Config
+                          });
                           return (c as any)?.displayName || c?.name || (c?.type ? (c.type.charAt(0).toUpperCase() + c.type.slice(1)) : 'Card');
                         })()}
                       </span>
@@ -397,7 +405,17 @@ const getSlotTitle = (slot: number) => {
                       <span className="text-gray-400">Slot {slot}:</span>
                       <div className="flex items-center gap-2">
                         <span className="text-white">
-                          {(card as any)?.displayName || card?.name || (card?.type ? (card.type.charAt(0).toUpperCase() + card.type.slice(1)) : 'Card')}
+                          {(() => {
+                            console.log('Regular slot display debug:', {
+                              slot,
+                              card,
+                              displayName: (card as any)?.displayName,
+                              name: card?.name,
+                              type: card?.type,
+                              hasLevel4Config: (card as any)?.hasLevel4Config
+                            });
+                            return (card as any)?.displayName || card?.name || (card?.type ? (card.type.charAt(0).toUpperCase() + card.type.slice(1)) : 'Card');
+                          })()}
                         </span>
                         {(card as any)?.hasLevel4Config && (
                           <button

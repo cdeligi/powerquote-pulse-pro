@@ -598,20 +598,36 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
       // Store Level 4 configuration in slot assignments instead of BOM
       const assignedCard = slotAssignments[selectedSlot];
       if (assignedCard) {
+        console.log('Before Level 4 save - assigned card data:', {
+          slot: selectedSlot,
+          card: assignedCard,
+          displayName: assignedCard.displayName,
+          name: assignedCard.name
+        });
+
         const updatedSlotAssignments = {
           ...slotAssignments,
           [selectedSlot]: {
             ...assignedCard,
             level4Config: payload,
-            hasLevel4Config: true
+            hasLevel4Config: true,
+            // Ensure displayName is preserved
+            displayName: assignedCard.displayName || assignedCard.name
           }
         };
+        
+        console.log('After Level 4 save - updated slot assignment:', {
+          slot: selectedSlot,
+          card: updatedSlotAssignments[selectedSlot],
+          displayName: updatedSlotAssignments[selectedSlot].displayName,
+          hasLevel4Config: updatedSlotAssignments[selectedSlot].hasLevel4Config
+        });
         
         setSlotAssignments(updatedSlotAssignments);
 
         toast({
           title: 'Configuration Saved',
-          description: `Level 4 configuration for ${assignedCard.name} has been saved to slot ${selectedSlot}.`,
+          description: `Level 4 configuration for ${assignedCard.displayName || assignedCard.name} has been saved to slot ${selectedSlot}.`,
         });
       }
     }
