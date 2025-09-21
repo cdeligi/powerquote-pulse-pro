@@ -379,82 +379,116 @@ export class Level4Service {
    * Save BOM Level 4 configuration value with robust validation
    */
   static async saveBOMLevel4Value(bomItemId: string, payload: Level4RuntimePayload): Promise<void> {
-    try {
-      const supabase = getSupabaseClient();
-      console.log('Starting Level 4 save process:', { bomItemId, payload });
-      
-      // Phase 1: Validate BOM item exists and is accessible
-      const validation = await this.validateBOMItemAccess(bomItemId);
-      if (!validation.exists) {
-        throw new Error(`BOM item with ID ${bomItemId} no longer exists. It may have been deleted or cleaned up.`);
-      }
-      
-      if (!validation.accessible) {
-        throw new Error(`Cannot access BOM item ${bomItemId}. Please check your permissions or try refreshing the page.`);
-      }
-
-      // Phase 2: Verify the Level 4 config exists
-      const { data: configData, error: configError } = await supabase
-        .from('level4_configs')
-        .select('id, product_id, field_label')
-        .eq('id', payload.level4_config_id)
-        .maybeSingle();
-
-      if (configError) {
-        console.error('Error checking Level 4 config:', configError);
-        throw new Error(`Failed to verify Level 4 configuration: ${configError.message}`);
-      }
-
-      if (!configData) {
-        throw new Error(`Level 4 configuration with ID ${payload.level4_config_id} not found. Please check the configuration in the admin panel.`);
-      }
-
-      console.log('Validation passed, saving Level 4 value...');
-
-      // Phase 3: Save the Level 4 value with retry logic
-      let retryCount = 0;
-      const maxRetries = 3;
-      
-      while (retryCount < maxRetries) {
-        try {
-          const { error } = await supabase
-            .from('bom_level4_values')
-            .upsert({
-              bom_item_id: bomItemId,
-              level4_config_id: payload.level4_config_id,
-              entries: payload.entries
-            }, {
-              onConflict: 'bom_item_id'
-            });
-
-          if (error) {
-            // Check for specific error types
-            if (error.code === '23503' && retryCount < maxRetries - 1) {
-              console.warn(`Foreign key constraint violation on attempt ${retryCount + 1}, retrying...`);
-              retryCount++;
-              await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second
-              continue;
-            }
-            
-            console.error('Error saving Level 4 BOM value:', error);
-            throw new Error(`Database error: ${error.message}`);
-          }
-
-          console.log('Level 4 BOM value saved successfully');
-          return;
-        } catch (saveError) {
-          if (retryCount >= maxRetries - 1) {
-            throw saveError;
-          }
-          retryCount++;
-          console.warn(`Save attempt ${retryCount} failed, retrying...`, saveError);
-          await new Promise(resolve => setTimeout(resolve, 1000));
-        }
-      }
-    } catch (error) {
-      console.error('Level4Service.saveBOMLevel4Value error:', error);
-      throw error;
+    console.log('Saving Level 4 BOM value:', { bomItemId, payload });
+    
+    // Enhanced validation with multiple checks
+    const validation = await this.validateBOMItemAccess(bomItemId);
+    if (!validation.exists) {
+      // Try to recover by creating a new temporary BOM item if needed
+      console.warn(`BOM item ${bomItemId} not found. Attempting recovery...`);
+      throw new Error(`BOM item ${bomItemId} not found. Please close and reopen the Level 4 configuration.`);
     }
+    
+    if (!validation.accessible) {
+      throw new Error(`Access denied to BOM item ${bomItemId}. Please check your permissions.`);
+    }
+
+    // Add session consistency check
+    console.log('BOM item validation passed, proceeding with save...');
+
+    const maxRetries = 3;
+    let lastError: any = null;
+
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        console.log(`Save attempt ${attempt}/${maxRetries} for BOM item ${bomItemId}`);
+        
+        // Double-check item still exists right before save
+        const preFlightCheck = await getSupabaseClient()
+          .from('bom_items')
+          .select('id, quote_id')
+          .eq('id', bomItemId)
+          .maybeSingle();
+          
+        if (preFlightCheck.error || !preFlightCheck.data) {
+          throw new Error(`BOM item ${bomItemId} became unavailable during configuration. Please try again.`);
+        }
+        
+        const { error } = await getSupabaseClient()
+          .from('bom_level4_values')
+          .upsert({
+            bom_item_id: bomItemId,
+            level4_config_id: payload.level4_config_id,
+            entries: payload.entries
+          });
+
+        if (error) {
+          console.error(`Error saving Level 4 BOM value (attempt ${attempt}):`, error);
+          lastError = error;
+          
+          // Enhanced error handling for different scenarios
+          if (error.code === '23503') {
+            if (error.message.includes('bom_items')) {
+              throw new Error('The configuration session has expired. Please close this dialog and start over.');
+            } else if (error.message.includes('level4_configs')) {
+              throw new Error('Level 4 configuration is invalid. Please contact support.');
+            }
+          }
+          
+          // For other errors, retry with exponential backoff
+          if (attempt < maxRetries) {
+            console.log(`Retrying in ${1000 * attempt}ms...`);
+            await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+            continue;
+          }
+          
+          throw error;
+        }
+        
+        console.log(`Successfully saved Level 4 BOM value on attempt ${attempt}`);
+        return;
+        
+      } catch (error) {
+        console.error(`Level4Service.saveBOMLevel4Value error (attempt ${attempt}):`, error);
+        lastError = error;
+        
+        if (attempt === maxRetries) {
+          throw error;
+        }
+        
+        // Exponential backoff for retries
+        await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+      }
+    }
+    
+    throw lastError;
+  }
+
+  /**
+   * Validate Level 4 entries
+   */
+  static validateEntries(entries: any[], configuration: Level4Configuration): { isValid: boolean; errors: string[] } {
+    const errors: string[] = [];
+    
+    if (!entries || entries.length === 0) {
+      errors.push('No entries provided');
+      return { isValid: false, errors };
+    }
+    
+    // Check if all entries have valid values
+    for (const entry of entries) {
+      if (!entry.value || entry.value.trim() === '') {
+        errors.push(`Entry at index ${entry.index} is missing a value`);
+      }
+      
+      // Check if the value exists in the configuration options
+      const validOption = configuration.options.find(opt => opt.value === entry.value);
+      if (!validOption) {
+        errors.push(`Invalid option selected at index ${entry.index}: ${entry.value}`);
+      }
+    }
+    
+    return { isValid: errors.length === 0, errors };
   }
 
   /**

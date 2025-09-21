@@ -626,10 +626,19 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
         // Import Level4Service dynamically to avoid circular imports
         const { Level4Service } = await import('@/services/level4Service');
         
-        // Clean up the temporary BOM item from database
-        await Level4Service.deleteTempBOMItem(configuringLevel4Item.id);
+        console.log('Canceling Level 4 configuration for item:', configuringLevel4Item.id);
+        
+        // Delay cleanup to prevent interference with potential save operations
+        setTimeout(async () => {
+          try {
+            await Level4Service.deleteTempBOMItem(configuringLevel4Item.id);
+          } catch (error) {
+            console.error('Error cleaning up Level 4 configuration:', error);
+          }
+        }, 1000); // 1 second delay
+        
       } catch (error) {
-        console.error('Error cleaning up Level 4 configuration:', error);
+        console.error('Error preparing Level 4 cleanup:', error);
         // Don't block the cancel operation
       }
     }
