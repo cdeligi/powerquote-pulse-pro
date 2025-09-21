@@ -574,6 +574,9 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
       // Store temp quote ID separately for cleanup
       (itemWithDbId as any).tempQuoteId = tempQuoteId;
       
+      // Register the session immediately to prevent cleanup
+      Level4Service.registerActiveSession(bomItemId);
+      
       setConfiguringLevel4Item(itemWithDbId);
       
     } catch (error) {
@@ -628,14 +631,15 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
         
         console.log('Canceling Level 4 configuration for item:', configuringLevel4Item.id);
         
-        // Delay cleanup to prevent interference with potential save operations
-        setTimeout(async () => {
-          try {
-            await Level4Service.deleteTempBOMItem(configuringLevel4Item.id);
-          } catch (error) {
-            console.error('Error cleaning up Level 4 configuration:', error);
-          }
-        }, 1000); // 1 second delay
+        // Unregister the active session and force cleanup on cancel
+        Level4Service.unregisterActiveSession(configuringLevel4Item.id);
+        
+        // Clean up temporary data immediately on cancel
+        try {
+          await Level4Service.deleteTempBOMItem(configuringLevel4Item.id, true); // Force cleanup
+        } catch (error) {
+          console.error('Error cleaning up Level 4 configuration:', error);
+        }
         
       } catch (error) {
         console.error('Error preparing Level 4 cleanup:', error);

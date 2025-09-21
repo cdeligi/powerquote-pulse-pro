@@ -14,6 +14,45 @@ interface Level4ConfigRow {
 }
 
 export class Level4Service {
+  // Track active Level 4 sessions to prevent premature cleanup
+  private static activeSessions = new Map<string, { timestamp: number; bomItemId: string }>();
+  
+  /**
+   * Register an active Level 4 session to prevent cleanup
+   */
+  static registerActiveSession(bomItemId: string): void {
+    console.log('Registering active Level 4 session for BOM item:', bomItemId);
+    this.activeSessions.set(bomItemId, { 
+      timestamp: Date.now(), 
+      bomItemId 
+    });
+  }
+  
+  /**
+   * Unregister an active Level 4 session
+   */
+  static unregisterActiveSession(bomItemId: string): void {
+    console.log('Unregistering active Level 4 session for BOM item:', bomItemId);
+    this.activeSessions.delete(bomItemId);
+  }
+  
+  /**
+   * Check if a BOM item has an active Level 4 session
+   */
+  static hasActiveSession(bomItemId: string): boolean {
+    const session = this.activeSessions.get(bomItemId);
+    if (!session) return false;
+    
+    // Consider sessions older than 30 minutes as stale
+    const thirtyMinutesAgo = Date.now() - (30 * 60 * 1000);
+    if (session.timestamp < thirtyMinutesAgo) {
+      this.activeSessions.delete(bomItemId);
+      return false;
+    }
+    
+    return true;
+  }
+
   /**
    * Fetch Level 4 configuration for a product from the admin configs table
    */
@@ -280,11 +319,18 @@ export class Level4Service {
   }
 
   /**
-   * Delete a temporary BOM item and its quote if it's temporary
+   * Delete a temporary BOM item and its quote if it's temporary (with session protection)
    */
-  static async deleteTempBOMItem(bomItemId: string): Promise<void> {
+  static async deleteTempBOMItem(bomItemId: string, force: boolean = false): Promise<void> {
     try {
       const supabase = getSupabaseClient();
+      
+      // Check if there's an active Level 4 session for this BOM item
+      if (!force && this.hasActiveSession(bomItemId)) {
+        console.log('Skipping cleanup for BOM item with active Level 4 session:', bomItemId);
+        return;
+      }
+      
       console.log('Deleting temporary BOM item:', bomItemId);
       
       // Get the BOM item to check if it's part of a temporary quote
@@ -320,6 +366,9 @@ export class Level4Service {
           console.log('Temporary BOM item deleted successfully');
         }
       }
+      
+      // Unregister the session after successful cleanup
+      this.unregisterActiveSession(bomItemId);
     } catch (error) {
       console.error('Level4Service.deleteTempBOMItem error:', error);
       // Don't throw - cleanup failures shouldn't block the UI
@@ -376,92 +425,102 @@ export class Level4Service {
   }
 
   /**
-   * Save BOM Level 4 configuration value with robust validation
+   * Save BOM Level 4 configuration value with robust validation and session management
    */
   static async saveBOMLevel4Value(bomItemId: string, payload: Level4RuntimePayload): Promise<void> {
     console.log('Saving Level 4 BOM value:', { bomItemId, payload });
     
-    // Enhanced validation with multiple checks
-    const validation = await this.validateBOMItemAccess(bomItemId);
-    if (!validation.exists) {
-      // Try to recover by creating a new temporary BOM item if needed
-      console.warn(`BOM item ${bomItemId} not found. Attempting recovery...`);
-      throw new Error(`BOM item ${bomItemId} not found. Please close and reopen the Level 4 configuration.`);
-    }
+    // Ensure the session is registered to prevent cleanup during save
+    this.registerActiveSession(bomItemId);
     
-    if (!validation.accessible) {
-      throw new Error(`Access denied to BOM item ${bomItemId}. Please check your permissions.`);
-    }
+    try {
+      // Enhanced validation with multiple checks
+      const validation = await this.validateBOMItemAccess(bomItemId);
+      if (!validation.exists) {
+        console.warn(`BOM item ${bomItemId} not found. Attempting to recreate...`);
+        throw new Error(`BOM item ${bomItemId} not found. Your session has expired. Please close and reopen the Level 4 configuration.`);
+      }
+      
+      if (!validation.accessible) {
+        throw new Error(`Access denied to BOM item ${bomItemId}. Please check your permissions.`);
+      }
 
-    // Add session consistency check
-    console.log('BOM item validation passed, proceeding with save...');
+      console.log('BOM item validation passed, proceeding with save...');
 
-    const maxRetries = 3;
-    let lastError: any = null;
+      const maxRetries = 3;
+      let lastError: any = null;
 
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
-      try {
-        console.log(`Save attempt ${attempt}/${maxRetries} for BOM item ${bomItemId}`);
-        
-        // Double-check item still exists right before save
-        const preFlightCheck = await getSupabaseClient()
-          .from('bom_items')
-          .select('id, quote_id')
-          .eq('id', bomItemId)
-          .maybeSingle();
+      for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+          console.log(`Save attempt ${attempt}/${maxRetries} for BOM item ${bomItemId}`);
           
-        if (preFlightCheck.error || !preFlightCheck.data) {
-          throw new Error(`BOM item ${bomItemId} became unavailable during configuration. Please try again.`);
-        }
-        
-        const { error } = await getSupabaseClient()
-          .from('bom_level4_values')
-          .upsert({
-            bom_item_id: bomItemId,
-            level4_config_id: payload.level4_config_id,
-            entries: payload.entries
-          });
+          // Double-check item still exists right before save
+          const preFlightCheck = await getSupabaseClient()
+            .from('bom_items')
+            .select('id, quote_id')
+            .eq('id', bomItemId)
+            .maybeSingle();
+            
+          if (preFlightCheck.error || !preFlightCheck.data) {
+            throw new Error(`BOM item ${bomItemId} became unavailable during configuration. Your session may have expired.`);
+          }
+          
+          // Perform the save within a transaction-like approach
+          const { error } = await getSupabaseClient()
+            .from('bom_level4_values')
+            .upsert({
+              bom_item_id: bomItemId,
+              level4_config_id: payload.level4_config_id,
+              entries: payload.entries
+            });
 
-        if (error) {
-          console.error(`Error saving Level 4 BOM value (attempt ${attempt}):`, error);
+          if (error) {
+            console.error(`Error saving Level 4 BOM value (attempt ${attempt}):`, error);
+            lastError = error;
+            
+            // Enhanced error handling for different scenarios
+            if (error.code === '23503') {
+              if (error.message.includes('bom_items')) {
+                throw new Error('Your configuration session has expired. Please close this dialog and start over.');
+              } else if (error.message.includes('level4_configs')) {
+                throw new Error('Level 4 configuration is invalid. Please contact support.');
+              }
+            }
+            
+            // For other errors, retry with exponential backoff
+            if (attempt < maxRetries) {
+              console.log(`Retrying in ${1000 * attempt}ms...`);
+              await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+              continue;
+            }
+            
+            throw error;
+          }
+          
+          console.log(`Successfully saved Level 4 BOM value on attempt ${attempt}`);
+          return;
+          
+        } catch (error) {
+          console.error(`Level4Service.saveBOMLevel4Value error (attempt ${attempt}):`, error);
           lastError = error;
           
-          // Enhanced error handling for different scenarios
-          if (error.code === '23503') {
-            if (error.message.includes('bom_items')) {
-              throw new Error('The configuration session has expired. Please close this dialog and start over.');
-            } else if (error.message.includes('level4_configs')) {
-              throw new Error('Level 4 configuration is invalid. Please contact support.');
-            }
+          if (attempt === maxRetries) {
+            throw error;
           }
           
-          // For other errors, retry with exponential backoff
-          if (attempt < maxRetries) {
-            console.log(`Retrying in ${1000 * attempt}ms...`);
-            await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
-            continue;
-          }
-          
-          throw error;
+          // Exponential backoff for retries
+          await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
         }
-        
-        console.log(`Successfully saved Level 4 BOM value on attempt ${attempt}`);
-        return;
-        
-      } catch (error) {
-        console.error(`Level4Service.saveBOMLevel4Value error (attempt ${attempt}):`, error);
-        lastError = error;
-        
-        if (attempt === maxRetries) {
-          throw error;
-        }
-        
-        // Exponential backoff for retries
-        await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
       }
+      
+      throw lastError;
+      
+    } finally {
+      // Keep the session active for a short time after save to prevent immediate cleanup
+      setTimeout(() => {
+        this.unregisterActiveSession(bomItemId);
+      }, 5000); // 5 second grace period
     }
-    
-    throw lastError;
   }
 
   /**
