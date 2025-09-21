@@ -65,6 +65,7 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
   const [configuringChassis, setConfiguringChassis] = useState<Level2Product | null>(null);
   const [editingOriginalItem, setEditingOriginalItem] = useState<BOMItem | null>(null);
   const [configuringNonChassis, setConfiguringNonChassis] = useState<Level2Product | null>(null);
+  const [currentPartNumber, setCurrentPartNumber] = useState<string>('');
 
   // Admin-driven part number config and codes for the selected chassis
   const [pnConfig, setPnConfig] = useState<any | null>(null);
@@ -123,6 +124,37 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
       return next;
     });
   };
+
+  // Update part number whenever slot assignments or related data changes
+  useEffect(() => {
+    if (selectedChassis && Object.keys(slotAssignments).length > 0) {
+      const newPartNumber = buildQTMSPartNumber({
+        chassis: selectedChassis,
+        slotAssignments,
+        hasRemoteDisplay,
+        pnConfig,
+        codeMap,
+        includeSuffix: true
+      });
+      
+      console.log('Part number updated:', newPartNumber);
+      setCurrentPartNumber(newPartNumber);
+    } else if (selectedChassis) {
+      // Generate basic part number even with no slots assigned
+      const basicPartNumber = buildQTMSPartNumber({
+        chassis: selectedChassis,
+        slotAssignments: {},
+        hasRemoteDisplay,
+        pnConfig,
+        codeMap,
+        includeSuffix: true
+      });
+      
+      setCurrentPartNumber(basicPartNumber);
+    } else {
+      setCurrentPartNumber('');
+    }
+  }, [selectedChassis, slotAssignments, hasRemoteDisplay, pnConfig, codeMap]);
 
   // Get available quote fields for validation
   const [availableQuoteFields, setAvailableQuoteFields] = useState<any[]>([]);
@@ -637,6 +669,7 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
           });
           
           console.log('Regenerated part number after Level 4 save:', newPartNumber);
+          setCurrentPartNumber(newPartNumber);
           
           // Update any existing chassis BOM item with new part number
           const updatedBOMItems = bomItems.map(item => {
@@ -728,7 +761,10 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
         product: assignedCard,
         quantity: 1,
         enabled: true,
-        level4Config: existingLevel4Config
+        configuration: existingLevel4Config,
+        partNumber: assignedCard.partNumber,
+        displayName: assignedCard.displayName || assignedCard.name,
+        slot: slot
       };
       
       setConfiguringLevel4Item(tempBOMItem);
@@ -1341,6 +1377,7 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
                 selectedAccessories={selectedAccessories}
                 onAccessoryToggle={toggleAccessory}
                 onLevel4Configure={handleLevel4Configure}
+                partNumber={currentPartNumber}
               />
             
               {selectedSlot !== null && (
