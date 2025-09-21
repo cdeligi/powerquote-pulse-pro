@@ -26,6 +26,7 @@ export const Level4RuntimeModal: React.FC<Level4RuntimeModalProps> = ({
   const [entries, setEntries] = useState<Level4SelectionEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     const loadConfiguration = async () => {
@@ -34,6 +35,15 @@ export const Level4RuntimeModal: React.FC<Level4RuntimeModalProps> = ({
       
       try {
         console.log('Loading Level 4 config for product:', level3ProductId);
+        
+        // Register this session to prevent premature cleanup
+        Level4Service.registerActiveSession(bomItem.id);
+        
+        // Validate BOM item exists before loading configuration
+        const validation = await Level4Service.validateBOMItemAccess(bomItem.id);
+        if (!validation.exists) {
+          throw new Error('The configuration session is invalid. Please close and restart the Level 4 configuration.');
+        }
         
         // Load the Level 4 configuration
         const config = await Level4Service.getLevel4Configuration(level3ProductId);
@@ -135,10 +145,17 @@ export const Level4RuntimeModal: React.FC<Level4RuntimeModalProps> = ({
       entries
     };
 
-    setIsLoading(true);
+    setIsSaving(true);
     
     try {
       console.log('Saving Level 4 configuration with payload:', payload);
+      
+      // Re-validate BOM item access right before save
+      const validation = await Level4Service.validateBOMItemAccess(bomItem.id);
+      if (!validation.exists) {
+        throw new Error('Your configuration session has expired. Please close and restart the Level 4 configuration.');
+      }
+      
       await Level4Service.saveBOMLevel4Value(bomItem.id, payload);
       
       toast.success('Level 4 configuration has been saved successfully.');
@@ -147,29 +164,39 @@ export const Level4RuntimeModal: React.FC<Level4RuntimeModalProps> = ({
     } catch (error: any) {
       console.error('Error saving Level 4 configuration:', error);
       
-      // Enhanced error messaging
-      let errorMessage = 'Failed to save Level 4 configuration. Please try again.';
+      // Enhanced error messaging with recovery suggestions
+      let errorMessage = 'Failed to save Level 4 configuration.';
+      let recoveryAction = 'Please try again.';
       
-      if (error.message?.includes('session has expired')) {
-        errorMessage = 'Your configuration session has expired. Please close this dialog and start over.';
-      } else if (error.message?.includes('not found')) {
-        errorMessage = 'Configuration data is no longer available. Please close and restart the configuration.';
-      } else if (error.message?.includes('Access denied')) {
+      if (error.message?.includes('session has expired') || error.message?.includes('expired')) {
+        errorMessage = 'Your configuration session has expired.';
+        recoveryAction = 'Please close this dialog and start over.';
+      } else if (error.message?.includes('not found') || error.message?.includes('unavailable')) {
+        errorMessage = 'Configuration data is no longer available.';
+        recoveryAction = 'Please close and restart the configuration.';
+      } else if (error.message?.includes('Access denied') || error.message?.includes('permission')) {
         errorMessage = 'You do not have permission to save this configuration.';
+        recoveryAction = 'Please check your access rights.';
+      } else if (error.code === '23503') {
+        errorMessage = 'Database connection issue detected.';
+        recoveryAction = 'Please close this dialog and try again in a moment.';
       }
       
-      toast.error(`Save Failed: ${errorMessage}`);
+      toast.error(`${errorMessage} ${recoveryAction}`);
     } finally {
-      setIsLoading(false);
+      setIsSaving(false);
     }
   };
 
   const handleCancel = async () => {
     try {
-      // Clean up temporary BOM item and quote if created
+      // Unregister the active session
+      Level4Service.unregisterActiveSession(bomItem.id);
+      
+      // Clean up temporary BOM item and quote if created (force cleanup on cancel)
       if (bomItem?.id && (bomItem as any).tempQuoteId) {
         console.log('Cleaning up temporary Level 4 data...');
-        await Level4Service.deleteTempBOMItem(bomItem.id);
+        await Level4Service.deleteTempBOMItem(bomItem.id, true); // Force cleanup
       }
     } catch (error) {
       console.error('Error during Level 4 cleanup:', error);
@@ -247,11 +274,11 @@ export const Level4RuntimeModal: React.FC<Level4RuntimeModalProps> = ({
         </div>
 
         <DialogFooter className="shrink-0">
-          <Button variant="outline" onClick={handleCancel}>
+          <Button variant="outline" onClick={handleCancel} disabled={isSaving}>
             Cancel
           </Button>
-          <Button onClick={handleSave}>
-            Save Configuration
+          <Button onClick={handleSave} disabled={isSaving}>
+            {isSaving ? 'Saving...' : 'Save Configuration'}
           </Button>
         </DialogFooter>
       </DialogContent>
