@@ -327,52 +327,130 @@ export class Level4Service {
   }
 
   /**
-   * Save BOM Level 4 configuration value
+   * Validate BOM item exists and user has access
+   */
+  static async validateBOMItemAccess(bomItemId: string): Promise<{ exists: boolean; accessible: boolean; quote_id?: string }> {
+    try {
+      const supabase = getSupabaseClient();
+      
+      // Check if BOM item exists and get quote info
+      const { data: bomItem, error: bomError } = await supabase
+        .from('bom_items')
+        .select('id, quote_id, product_id, name')
+        .eq('id', bomItemId)
+        .maybeSingle();
+
+      if (bomError) {
+        console.error('Error checking BOM item:', bomError);
+        return { exists: false, accessible: false };
+      }
+
+      if (!bomItem) {
+        console.warn('BOM item not found:', bomItemId);
+        return { exists: false, accessible: false };
+      }
+
+      // Check if quote exists and user has access
+      const { data: quote, error: quoteError } = await supabase
+        .from('quotes')
+        .select('id, user_id, status')
+        .eq('id', bomItem.quote_id)
+        .maybeSingle();
+
+      if (quoteError) {
+        console.error('Error checking quote access:', quoteError);
+        return { exists: true, accessible: false, quote_id: bomItem.quote_id };
+      }
+
+      if (!quote) {
+        console.warn('Associated quote not found:', bomItem.quote_id);
+        return { exists: true, accessible: false, quote_id: bomItem.quote_id };
+      }
+
+      console.log('BOM item validation successful:', { bomItemId, quote_id: bomItem.quote_id, status: quote.status });
+      return { exists: true, accessible: true, quote_id: bomItem.quote_id };
+    } catch (error) {
+      console.error('Error validating BOM item access:', error);
+      return { exists: false, accessible: false };
+    }
+  }
+
+  /**
+   * Save BOM Level 4 configuration value with robust validation
    */
   static async saveBOMLevel4Value(bomItemId: string, payload: Level4RuntimePayload): Promise<void> {
     try {
       const supabase = getSupabaseClient();
-      console.log('Saving Level 4 BOM value:', { bomItemId, payload });
+      console.log('Starting Level 4 save process:', { bomItemId, payload });
       
-      // First verify the BOM item exists
-      const { data: bomItem, error: bomError } = await supabase
-        .from('bom_items')
-        .select('id')
-        .eq('id', bomItemId)
-        .single();
-
-      if (bomError) {
-        console.error('BOM item not found:', bomError);
-        throw new Error(`BOM item with ID ${bomItemId} not found: ${bomError.message}`);
+      // Phase 1: Validate BOM item exists and is accessible
+      const validation = await this.validateBOMItemAccess(bomItemId);
+      if (!validation.exists) {
+        throw new Error(`BOM item with ID ${bomItemId} no longer exists. It may have been deleted or cleaned up.`);
+      }
+      
+      if (!validation.accessible) {
+        throw new Error(`Cannot access BOM item ${bomItemId}. Please check your permissions or try refreshing the page.`);
       }
 
-      // Verify the Level 4 config exists
-      const { data: configData, error: configError } = await getSupabaseClient()
+      // Phase 2: Verify the Level 4 config exists
+      const { data: configData, error: configError } = await supabase
         .from('level4_configs')
-        .select('id')
+        .select('id, product_id, field_label')
         .eq('id', payload.level4_config_id)
-        .single();
+        .maybeSingle();
 
       if (configError) {
-        console.error('Level 4 config not found:', configError);
-        throw new Error(`Level 4 config with ID ${payload.level4_config_id} not found: ${configError.message}`);
+        console.error('Error checking Level 4 config:', configError);
+        throw new Error(`Failed to verify Level 4 configuration: ${configError.message}`);
       }
 
-      // Now save the Level 4 value
-      const { error } = await getSupabaseClient()
-        .from('bom_level4_values')
-        .upsert({
-          bom_item_id: bomItemId,
-          level4_config_id: payload.level4_config_id,
-          entries: payload.entries
-        });
-
-      if (error) {
-        console.error('Error saving Level 4 BOM value:', error);
-        throw new Error(`Failed to save Level 4 configuration: ${error.message}`);
+      if (!configData) {
+        throw new Error(`Level 4 configuration with ID ${payload.level4_config_id} not found. Please check the configuration in the admin panel.`);
       }
+
+      console.log('Validation passed, saving Level 4 value...');
+
+      // Phase 3: Save the Level 4 value with retry logic
+      let retryCount = 0;
+      const maxRetries = 3;
       
-      console.log('Level 4 BOM value saved successfully');
+      while (retryCount < maxRetries) {
+        try {
+          const { error } = await supabase
+            .from('bom_level4_values')
+            .upsert({
+              bom_item_id: bomItemId,
+              level4_config_id: payload.level4_config_id,
+              entries: payload.entries
+            }, {
+              onConflict: 'bom_item_id'
+            });
+
+          if (error) {
+            // Check for specific error types
+            if (error.code === '23503' && retryCount < maxRetries - 1) {
+              console.warn(`Foreign key constraint violation on attempt ${retryCount + 1}, retrying...`);
+              retryCount++;
+              await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second
+              continue;
+            }
+            
+            console.error('Error saving Level 4 BOM value:', error);
+            throw new Error(`Database error: ${error.message}`);
+          }
+
+          console.log('Level 4 BOM value saved successfully');
+          return;
+        } catch (saveError) {
+          if (retryCount >= maxRetries - 1) {
+            throw saveError;
+          }
+          retryCount++;
+          console.warn(`Save attempt ${retryCount} failed, retrying...`, saveError);
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+      }
     } catch (error) {
       console.error('Level4Service.saveBOMLevel4Value error:', error);
       throw error;
