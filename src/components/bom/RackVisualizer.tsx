@@ -34,6 +34,7 @@ interface RackVisualizerProps {
   onAccessoryToggle?: (id: string) => void;
   partNumber?: string;
   chassisType?: ChassisType; // Optional chassis type for custom layouts
+  onLevel4Configure?: (slot: number, product: Level3Product) => void; // Add Level 4 config handler
   
 }
 
@@ -48,6 +49,7 @@ const RackVisualizer = ({
   standardSlotHints,
   colorByProductId,
   level3Products = [],
+  onLevel4Configure,
   codeMap = {},
   selectedAccessories = new Set(),
   onAccessoryToggle,
@@ -189,6 +191,22 @@ const getSlotTitle = (slot: number) => {
           </span>
         )}
 
+        {/* Configuration indicator for Level 4 cards */}
+        {assignedCard && (assignedCard as any).hasLevel4Config && (
+          <span
+            className="absolute top-1 right-1 text-xs px-1.5 py-0.5 rounded bg-blue-600/80 border border-blue-400 text-white cursor-pointer hover:bg-blue-500/80"
+            title="Level 4 configured - Click to edit"
+            onClick={(e) => {
+              e.stopPropagation();
+              if (onLevel4Configure) {
+                onLevel4Configure(slot, assignedCard);
+              }
+            }}
+          >
+            ⚙️
+          </span>
+        )}
+
         {/* Clear button for occupied slots */}
         {assignedCard && !isSecondaryBushingSlot && (
           <Button
@@ -298,7 +316,7 @@ const getSlotTitle = (slot: number) => {
       <CardContent>
         <div className="space-y-4">
           <p className="text-gray-400 text-sm">
-            Click on any slot to add a card. Click the X to clear a slot.
+            Click on any slot to add a card. Click the X to clear a slot. Cards with Level 4 configurations show a ⚙️ symbol - click it to edit the configuration.
           </p>
           
           {renderChassisLayout()}
