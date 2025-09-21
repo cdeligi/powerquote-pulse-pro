@@ -15,18 +15,35 @@ interface Level4RuntimeModalProps {
   onCancel: () => void;
 }
 
-export const Level4RuntimeModal: React.FC<Level4RuntimeModalProps> = ({ 
-  bomItem, 
-  level3ProductId, 
-  onSave, 
-  onCancel 
+interface Level4SessionInfo {
+  bomItemId: string;
+  tempQuoteId?: string;
+}
+
+export const Level4RuntimeModal: React.FC<Level4RuntimeModalProps> = ({
+  bomItem,
+  level3ProductId,
+  onSave,
+  onCancel
 }) => {
+  const bomItemTempQuoteId = (bomItem as any)?.tempQuoteId as string | undefined;
   const [adminConfig, setAdminConfig] = useState<Level4Config | null>(null);
   const [runtimeConfig, setRuntimeConfig] = useState<Level4Configuration | null>(null);
   const [entries, setEntries] = useState<Level4SelectionEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [sessionInfo, setSessionInfo] = useState<Level4SessionInfo>({
+    bomItemId: bomItem.id,
+    tempQuoteId: bomItemTempQuoteId
+  });
+
+  useEffect(() => {
+    setSessionInfo({
+      bomItemId: bomItem.id,
+      tempQuoteId: bomItemTempQuoteId
+    });
+  }, [bomItem.id, bomItemTempQuoteId]);
 
   useEffect(() => {
     const loadConfiguration = async () => {
@@ -35,12 +52,41 @@ export const Level4RuntimeModal: React.FC<Level4RuntimeModalProps> = ({
       
       try {
         console.log('Loading Level 4 config for product:', level3ProductId);
-        
+
+        let effectiveBomItemId = sessionInfo.bomItemId;
+
+        if (!effectiveBomItemId) {
+          throw new Error('No BOM item is available for this configuration session.');
+        }
+
         // Register this session to prevent premature cleanup
-        Level4Service.registerActiveSession(bomItem.id);
-        
+        Level4Service.registerActiveSession(effectiveBomItemId);
+
         // Validate BOM item exists before loading configuration
-        const validation = await Level4Service.validateBOMItemAccess(bomItem.id);
+        let validation = await Level4Service.validateBOMItemAccess(effectiveBomItemId);
+
+        if (!validation.exists) {
+          console.warn('BOM item not found when loading configuration. Attempting to recreate session...');
+
+          if (!bomItem?.product?.id) {
+            throw new Error('The configuration session is invalid. Please close and restart the Level 4 configuration.');
+          }
+
+          try {
+            Level4Service.unregisterActiveSession(effectiveBomItemId);
+            const { bomItemId: recreatedId, tempQuoteId } = await Level4Service.createBOMItemForLevel4Config(bomItem);
+
+            effectiveBomItemId = recreatedId;
+            validation = await Level4Service.validateBOMItemAccess(effectiveBomItemId);
+
+            Level4Service.registerActiveSession(effectiveBomItemId);
+            setSessionInfo({ bomItemId: recreatedId, tempQuoteId });
+          } catch (recreateError) {
+            console.error('Failed to recreate BOM item for Level 4 session:', recreateError);
+            throw new Error('The configuration session is invalid. Please close and restart the Level 4 configuration.');
+          }
+        }
+
         if (!validation.exists) {
           throw new Error('The configuration session is invalid. Please close and restart the Level 4 configuration.');
         }
@@ -65,7 +111,7 @@ export const Level4RuntimeModal: React.FC<Level4RuntimeModalProps> = ({
 
         try {
           // Try to load existing configuration
-          const existingValue = await Level4Service.getBOMLevel4Value(bomItem.id);
+          const existingValue = await Level4Service.getBOMLevel4Value(effectiveBomItemId);
           
           if (existingValue?.entries?.length > 0) {
             // Pre-populate with existing selections
@@ -118,7 +164,7 @@ export const Level4RuntimeModal: React.FC<Level4RuntimeModalProps> = ({
     };
 
     loadConfiguration();
-  }, [level3ProductId, bomItem.id]);
+  }, [level3ProductId, sessionInfo.bomItemId]);
 
   const handleEntriesChange = (newEntries: Level4SelectionEntry[]) => {
     setEntries(newEntries);
@@ -139,7 +185,7 @@ export const Level4RuntimeModal: React.FC<Level4RuntimeModalProps> = ({
     }
 
     const payload: Level4RuntimePayload = {
-      bomItemId: bomItem.id,
+      bomItemId: sessionInfo.bomItemId,
       level4_config_id: runtimeConfig.id,
       template_type: runtimeConfig.template_type,
       entries
@@ -150,17 +196,37 @@ export const Level4RuntimeModal: React.FC<Level4RuntimeModalProps> = ({
     try {
       console.log('Saving Level 4 configuration with payload:', payload);
       
+      if (!sessionInfo.bomItemId) {
+        throw new Error('Your configuration session is no longer valid. Please close and restart the Level 4 configuration.');
+      }
+
       // Re-validate BOM item access right before save
-      const validation = await Level4Service.validateBOMItemAccess(bomItem.id);
+      const validation = await Level4Service.validateBOMItemAccess(sessionInfo.bomItemId);
       if (!validation.exists) {
         throw new Error('Your configuration session has expired. Please close and restart the Level 4 configuration.');
       }
-      
-      await Level4Service.saveBOMLevel4Value(bomItem.id, payload);
-      
+
+      const saveResult = await Level4Service.saveBOMLevel4Value(sessionInfo.bomItemId, payload, {
+        bomItemData: {
+          ...bomItem,
+          id: sessionInfo.bomItemId,
+          tempQuoteId: sessionInfo.tempQuoteId
+        }
+      });
+
+      const finalBomItemId = saveResult?.bomItemId ?? sessionInfo.bomItemId;
+      const finalTempQuoteId = saveResult?.tempQuoteId ?? sessionInfo.tempQuoteId;
+
+      if (finalBomItemId !== sessionInfo.bomItemId || finalTempQuoteId !== sessionInfo.tempQuoteId) {
+        setSessionInfo(prev => ({
+          bomItemId: finalBomItemId,
+          tempQuoteId: finalTempQuoteId ?? prev.tempQuoteId
+        }));
+      }
+
       toast.success('Level 4 configuration has been saved successfully.');
-      
-      onSave(payload);
+
+      onSave({ ...payload, bomItemId: finalBomItemId });
     } catch (error: any) {
       console.error('Error saving Level 4 configuration:', error);
       
@@ -191,12 +257,14 @@ export const Level4RuntimeModal: React.FC<Level4RuntimeModalProps> = ({
   const handleCancel = async () => {
     try {
       // Unregister the active session
-      Level4Service.unregisterActiveSession(bomItem.id);
-      
+      if (sessionInfo.bomItemId) {
+        Level4Service.unregisterActiveSession(sessionInfo.bomItemId);
+      }
+
       // Clean up temporary BOM item and quote if created (force cleanup on cancel)
-      if (bomItem?.id && (bomItem as any).tempQuoteId) {
+      if (sessionInfo.bomItemId && sessionInfo.tempQuoteId) {
         console.log('Cleaning up temporary Level 4 data...');
-        await Level4Service.deleteTempBOMItem(bomItem.id, true); // Force cleanup
+        await Level4Service.deleteTempBOMItem(sessionInfo.bomItemId, true); // Force cleanup
       }
     } catch (error) {
       console.error('Error during Level 4 cleanup:', error);

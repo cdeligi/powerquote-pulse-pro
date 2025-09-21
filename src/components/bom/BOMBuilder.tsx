@@ -597,6 +597,7 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
     if (configuringLevel4Item) {
       const updatedItem: BOMItem = {
         ...configuringLevel4Item,
+        id: payload.bomItemId,
         level4Config: payload,
         product: {
           ...configuringLevel4Item.product,
@@ -605,9 +606,17 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
         displayName: (configuringLevel4Item as any).displayName || configuringLevel4Item.product.name
       };
 
-      const existingIndex = bomItems.findIndex(item => item.id === configuringLevel4Item.id);
+      if ((configuringLevel4Item as any).tempQuoteId) {
+        (updatedItem as any).tempQuoteId = (configuringLevel4Item as any).tempQuoteId;
+      }
+
+      const existingIndex = bomItems.findIndex(item =>
+        item.id === configuringLevel4Item.id || item.id === payload.bomItemId
+      );
       const updatedItems = existingIndex >= 0
-        ? bomItems.map(item => (item.id === payload.bomItemId ? updatedItem : item))
+        ? bomItems.map(item =>
+            (item.id === configuringLevel4Item.id || item.id === payload.bomItemId) ? updatedItem : item
+          )
         : [...bomItems, updatedItem];
 
       setBomItems(updatedItems);
