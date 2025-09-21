@@ -128,6 +128,7 @@ export const Level4RuntimeModal: React.FC<Level4RuntimeModalProps> = ({
 
     try {
       setIsLoading(true);
+      setError(null);
       
       const payload: Level4RuntimePayload = {
         bomItemId: bomItem.id,
@@ -137,11 +138,13 @@ export const Level4RuntimeModal: React.FC<Level4RuntimeModalProps> = ({
       };
 
       console.log('Saving Level 4 payload:', payload);
-      console.log('BOM Item ID:', bomItem.id);
-      console.log('Admin Config ID:', adminConfig.id);
-      console.log('Runtime Config:', runtimeConfig);
+      console.log('BOM Item details:', {
+        id: bomItem.id,
+        productId: bomItem.product.id,
+        productName: bomItem.product.name
+      });
 
-      // Save the configuration
+      // Save the configuration with enhanced error handling
       await Level4Service.saveBOMLevel4Value(bomItem.id, payload);
       
       // Notify parent component
@@ -150,9 +153,22 @@ export const Level4RuntimeModal: React.FC<Level4RuntimeModalProps> = ({
       toast.success('Level 4 configuration saved successfully');
     } catch (error) {
       console.error('Error saving Level 4 configuration:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Failed to save configuration';
-      setError(`Configuration Error: ${errorMessage}`);
-      toast.error(`Configuration Error: ${errorMessage}`);
+      
+      let userMessage = 'Failed to save configuration';
+      if (error instanceof Error) {
+        if (error.message.includes('no longer exists')) {
+          userMessage = 'The configuration session has expired. Please close this dialog and try again.';
+        } else if (error.message.includes('Cannot access')) {
+          userMessage = 'Permission denied. Please refresh the page and try again.';
+        } else if (error.message.includes('Database error')) {
+          userMessage = 'Database connection issue. Please try again in a moment.';
+        } else {
+          userMessage = error.message;
+        }
+      }
+      
+      setError(`Save Error: ${userMessage}`);
+      toast.error(`Save Error: ${userMessage}`);
     } finally {
       setIsLoading(false);
     }
