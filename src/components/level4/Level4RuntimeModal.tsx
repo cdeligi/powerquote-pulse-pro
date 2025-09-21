@@ -115,60 +115,50 @@ export const Level4RuntimeModal: React.FC<Level4RuntimeModalProps> = ({
   };
 
   const handleSave = async () => {
-    if (!adminConfig || !runtimeConfig) {
-      toast.error("No Level 4 configuration found");
+    if (!runtimeConfig) {
+      console.error('No runtime configuration available for saving');
       return;
     }
 
-    // Validate all entries have selections
-    if (entries.some(entry => !entry.value)) {
-      toast.error("Please complete all required fields");
+    // Validate entries before saving
+    const validationResult = Level4Service.validateEntries(entries, runtimeConfig);
+    if (!validationResult.isValid) {
+      console.error('Validation failed:', validationResult.errors);
+      toast.error(`Configuration Invalid: ${validationResult.errors.join(', ')}`);
       return;
     }
 
+    const payload: Level4RuntimePayload = {
+      bomItemId: bomItem.id,
+      level4_config_id: runtimeConfig.id,
+      template_type: runtimeConfig.template_type,
+      entries
+    };
+
+    setIsLoading(true);
+    
     try {
-      setIsLoading(true);
-      setError(null);
-      
-      const payload: Level4RuntimePayload = {
-        bomItemId: bomItem.id,
-        level4_config_id: adminConfig.id,
-        template_type: runtimeConfig.template_type,
-        entries: entries
-      };
-
-      console.log('Saving Level 4 payload:', payload);
-      console.log('BOM Item details:', {
-        id: bomItem.id,
-        productId: bomItem.product.id,
-        productName: bomItem.product.name
-      });
-
-      // Save the configuration with enhanced error handling
+      console.log('Saving Level 4 configuration with payload:', payload);
       await Level4Service.saveBOMLevel4Value(bomItem.id, payload);
       
-      // Notify parent component
-      onSave(payload);
+      toast.success('Level 4 configuration has been saved successfully.');
       
-      toast.success('Level 4 configuration saved successfully');
-    } catch (error) {
+      onSave(payload);
+    } catch (error: any) {
       console.error('Error saving Level 4 configuration:', error);
       
-      let userMessage = 'Failed to save configuration';
-      if (error instanceof Error) {
-        if (error.message.includes('no longer exists')) {
-          userMessage = 'The configuration session has expired. Please close this dialog and try again.';
-        } else if (error.message.includes('Cannot access')) {
-          userMessage = 'Permission denied. Please refresh the page and try again.';
-        } else if (error.message.includes('Database error')) {
-          userMessage = 'Database connection issue. Please try again in a moment.';
-        } else {
-          userMessage = error.message;
-        }
+      // Enhanced error messaging
+      let errorMessage = 'Failed to save Level 4 configuration. Please try again.';
+      
+      if (error.message?.includes('session has expired')) {
+        errorMessage = 'Your configuration session has expired. Please close this dialog and start over.';
+      } else if (error.message?.includes('not found')) {
+        errorMessage = 'Configuration data is no longer available. Please close and restart the configuration.';
+      } else if (error.message?.includes('Access denied')) {
+        errorMessage = 'You do not have permission to save this configuration.';
       }
       
-      setError(`Save Error: ${userMessage}`);
-      toast.error(`Save Error: ${userMessage}`);
+      toast.error(`Save Failed: ${errorMessage}`);
     } finally {
       setIsLoading(false);
     }
