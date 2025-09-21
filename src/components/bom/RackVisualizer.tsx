@@ -365,17 +365,54 @@ const getSlotTitle = (slot: number) => {
               <h4 className="text-white font-medium mb-2">Assigned Cards:</h4>
               <div className="space-y-1">
                 {Object.entries(bushingSlots).map(([slot, slots]) => (
-                  <div key={`bushing-${slot}`} className="flex justify-between text-sm">
+                  <div key={`bushing-${slot}`} className="flex justify-between items-center text-sm">
                     <span className="text-gray-400">Slots {slots.join('-')}:</span>
-                    <span className="text-white">{(() => { const c = slotAssignments[parseInt(slot)]; const t = c?.type || ''; return t ? (t.charAt(0).toUpperCase() + t.slice(1)) : (c?.name || 'Card'); })()}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-white">
+                        {(() => { 
+                          const c = slotAssignments[parseInt(slot)]; 
+                          return (c as any)?.displayName || c?.name || (c?.type ? (c.type.charAt(0).toUpperCase() + c.type.slice(1)) : 'Card');
+                        })()}
+                      </span>
+                      {(slotAssignments[parseInt(slot)] as any)?.hasLevel4Config && (
+                        <button
+                          className="text-blue-400 hover:text-blue-300 cursor-pointer text-xs"
+                          title="Level 4 configured - Click to edit"
+                          onClick={() => {
+                            if (onLevel4Configure) {
+                              onLevel4Configure(parseInt(slot), slotAssignments[parseInt(slot)]);
+                            }
+                          }}
+                        >
+                          ⚙️
+                        </button>
+                      )}
+                    </div>
                   </div>
                 ))}
                 {Object.entries(slotAssignments)
                   .filter(([slot, card]) => !isBushingCard(card))
                   .map(([slot, card]) => (
-                    <div key={slot} className="flex justify-between text-sm">
+                    <div key={slot} className="flex justify-between items-center text-sm">
                       <span className="text-gray-400">Slot {slot}:</span>
-                      <span className="text-white">{card.type ? (card.type.charAt(0).toUpperCase() + card.type.slice(1)) : (card.name || 'Card')}</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-white">
+                          {(card as any)?.displayName || card?.name || (card?.type ? (card.type.charAt(0).toUpperCase() + card.type.slice(1)) : 'Card')}
+                        </span>
+                        {(card as any)?.hasLevel4Config && (
+                          <button
+                            className="text-blue-400 hover:text-blue-300 cursor-pointer text-xs"
+                            title="Level 4 configured - Click to edit"
+                            onClick={() => {
+                              if (onLevel4Configure) {
+                                onLevel4Configure(parseInt(slot), card);
+                              }
+                            }}
+                          >
+                            ⚙️
+                          </button>
+                        )}
+                      </div>
                     </div>
                   ))}
               </div>
