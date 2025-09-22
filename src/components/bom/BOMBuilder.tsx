@@ -39,6 +39,8 @@ interface BOMBuilderProps {
   canSeeCosts?: boolean;
 }
 
+const SLOT_LEVEL4_FLAG = '__slotLevel4Session';
+
 const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuilderProps) => {
   // ALL HOOKS MUST BE AT THE TOP - NO CONDITIONAL RETURNS BEFORE HOOKS
   const { user, loading } = useAuth();
@@ -583,15 +585,16 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
       console.log('Triggering Level 4 modal for:', card.name);
       
       // Create BOM item that will be saved to database
-      const newItem: BOMItem = {
+      const newItem = {
         id: crypto.randomUUID(), // Temporary ID, will be replaced with database ID
         product: cardWithDisplayName,
         quantity: 1,
         enabled: true,
         partNumber: card.partNumber,
         displayName: displayName,
-        slot: slot
-      };
+        slot: slot,
+        [SLOT_LEVEL4_FLAG]: true,
+      } as BOMItem & { [SLOT_LEVEL4_FLAG]: true };
       
       // Save BOM item to database immediately to enable Level 4 configuration
       handleLevel4Setup(newItem);
@@ -681,7 +684,7 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
     if (!level4BomItemId) {
       setSelectedSlot(slot);
 
-      const newItem: BOMItem = {
+      const newItem = {
         id: crypto.randomUUID(),
         product: {
           ...card,
@@ -692,7 +695,8 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
         partNumber,
         displayName,
         slot,
-      };
+        [SLOT_LEVEL4_FLAG]: true,
+      } as BOMItem & { [SLOT_LEVEL4_FLAG]: true };
 
       handleLevel4Setup(newItem);
       return;
@@ -710,7 +714,8 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
       displayName,
       slot,
       level4Config: (card as any)?.level4Config,
-    } as BOMItem & { isReconfigureSession?: boolean };
+      [SLOT_LEVEL4_FLAG]: true,
+    } as BOMItem & { isReconfigureSession?: boolean; [SLOT_LEVEL4_FLAG]: true };
 
     if (tempQuoteId) {
       (reconfigureItem as any).tempQuoteId = tempQuoteId;
@@ -725,7 +730,9 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
   const handleLevel4Save = (payload: Level4RuntimePayload) => {
     console.log('Saving Level 4 configuration:', payload);
 
-    if (configuringLevel4Item?.slot !== undefined) {
+    const isSlotLevelSession = Boolean((configuringLevel4Item as any)?.[SLOT_LEVEL4_FLAG]);
+
+    if (isSlotLevelSession) {
       const slot = configuringLevel4Item.slot;
       const tempQuoteId = (configuringLevel4Item as any)?.tempQuoteId as string | undefined;
       const displayName = (configuringLevel4Item as any).displayName || configuringLevel4Item.product.name;
@@ -758,6 +765,14 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
         }
 
         return updated;
+      });
+
+      setBomItems(prev => {
+        const filtered = prev.filter(item => item.id !== payload.bomItemId);
+        if (filtered.length !== prev.length) {
+          onBOMUpdate(filtered);
+        }
+        return filtered;
       });
 
       toast({
