@@ -1,9 +1,10 @@
-import { Chassis, Card as ProductCard, Level3Product } from "@/types/product";
+import { useMemo } from "react";
+
+import { Chassis, Level3Product } from "@/types/product";
 import { ChassisType } from "@/types/product/chassis-types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { X } from "lucide-react";
+import { Settings, X } from "lucide-react";
 import { getBushingOccupiedSlots, isBushingCard } from "@/utils/bushingValidation";
 import AccessoryList from "./AccessoryList";
 
@@ -34,14 +35,15 @@ interface RackVisualizerProps {
   onAccessoryToggle?: (id: string) => void;
   partNumber?: string;
   chassisType?: ChassisType; // Optional chassis type for custom layouts
-  
+  onSlotReconfigure?: (slot: number) => void;
+
 }
 
-const RackVisualizer = ({ 
-  chassis, 
-  slotAssignments, 
-  onSlotClick, 
-  onSlotClear, 
+const RackVisualizer = ({
+  chassis,
+  slotAssignments,
+  onSlotClick,
+  onSlotClear,
   selectedSlot,
   hasRemoteDisplay = false,
   onRemoteDisplayToggle,
@@ -53,10 +55,33 @@ const RackVisualizer = ({
   onAccessoryToggle,
   partNumber,
   chassisType,
-  
+  onSlotReconfigure,
+
 }: RackVisualizerProps) => {
-  
+
   const bushingSlots = getBushingOccupiedSlots(slotAssignments);
+
+  const getCardDisplayName = (card?: Level3Product) => {
+    if (!card) return '';
+
+    const productRecord = (card as any).product;
+    if (productRecord) {
+      return (
+        productRecord.displayName ||
+        productRecord.name ||
+        productRecord.type ||
+        'Card'
+      );
+    }
+
+    return (
+      (card as any).displayName ||
+      card.displayName ||
+      card.name ||
+      card.type ||
+      'Card'
+    );
+  };
 
   const getCardTypeColor = (cardType: string) => {
     switch (cardType) {
@@ -83,10 +108,10 @@ const getSlotColor = (slot: number) => {
       const card = slotAssignments[slot];
       if (isBushingCard(card)) {
         // Always show just the display name without slot number
-        return card.displayName || 'Bushing';
+        return getCardDisplayName(card) || 'Bushing';
       }
       // For non-bushing cards, use the existing logic
-      const displayText = (card as any).displayName || card.type || card.name || 'Card';
+      const displayText = getCardDisplayName(card);
       return displayText.charAt(0).toUpperCase() + displayText.slice(1);
     }
     // For empty slots, just show the slot number
@@ -98,17 +123,13 @@ const getSlotTitle = (slot: number) => {
     const card = slotAssignments[slot];
     if (isBushingCard(card)) {
       // For bushing cards, show only the display name
-      return card.displayName || 'Bushing';
+      return getCardDisplayName(card) || 'Bushing';
     }
-    
+
     // For non-bushing cards, use the existing logic
-    const displayText = (card as any).displayName || 
-                       (card?.type ? (card.type.charAt(0).toUpperCase() + card.type.slice(1)) : '') || 
-                       card?.name || 
-                       'Card';
-    return displayText;
+    return getCardDisplayName(card) || 'Card';
   }
-  
+
   // Empty slots - show standard hints when available
   const hints = standardSlotHints?.[slot];
   if (hints && hints.length) {
@@ -148,8 +169,8 @@ const getSlotTitle = (slot: number) => {
     const assignedCard = slotAssignments[slot];
     
     // Get display name from the card, with proper fallbacks
-    const displayName = assignedCard ? 
-      ((assignedCard as any).displayName || assignedCard.name || 'Card') : 
+    const displayName = assignedCard ?
+      (getCardDisplayName(assignedCard) || 'Card') :
       undefined;
     
     // Get the full title for the tooltip
@@ -288,6 +309,30 @@ const getSlotTitle = (slot: number) => {
     }
   };
 
+  const summaryTotalSlots = chassis.slots || chassis.specifications?.slots || 0;
+
+  const slotOrder = useMemo(() => {
+    if (summaryTotalSlots > 0) {
+      return Array.from({ length: summaryTotalSlots }, (_, index) => index + 1);
+    }
+
+    return Object.keys(slotAssignments)
+      .map(Number)
+      .sort((a, b) => a - b);
+  }, [slotAssignments, summaryTotalSlots]);
+
+  const hasLevel4Metadata = (card?: Level3Product) => {
+    if (!card) return false;
+
+    return Boolean(
+      (card as any)?.hasLevel4Configuration ||
+      (card as any)?.level4BomItemId ||
+      (card as any)?.level4Config ||
+      (card as any)?.has_level4 ||
+      (card as any)?.requires_level4_config
+    );
+  };
+
   return (
     <Card className="bg-gray-900 border-gray-800">
       <CardHeader>
@@ -316,7 +361,10 @@ const getSlotTitle = (slot: number) => {
               <div className="space-y-1 text-sm">
                 {Object.entries(bushingSlots).map(([slot, occupiedSlots]) => (
                   <div key={slot} className="text-orange-300">
-                    Slots {occupiedSlots.join(', ')}: {(() => { const c = slotAssignments[parseInt(slot)]; const t = c?.type || ''; return t ? (t.charAt(0).toUpperCase() + t.slice(1)) : (c?.name || 'Card'); })()}
+                    Slots {occupiedSlots.join(', ')}: {(() => {
+                      const card = slotAssignments[parseInt(slot)];
+                      return getCardDisplayName(card) || 'Card';
+                    })()}
                     <br />
                     <span className="text-xs text-orange-200">
                       (Only one bushing card allowed per chassis)
@@ -342,24 +390,68 @@ const getSlotTitle = (slot: number) => {
           
           
           {/* Slot assignments summary */}
-          {Object.keys(slotAssignments).length > 0 && (
+          {(summaryTotalSlots || Object.keys(slotAssignments).length > 0) && (
             <div className="pt-4 border-t border-gray-700">
               <h4 className="text-white font-medium mb-2">Assigned Cards:</h4>
               <div className="space-y-1">
-                {Object.entries(bushingSlots).map(([slot, slots]) => (
-                  <div key={`bushing-${slot}`} className="flex justify-between text-sm">
-                    <span className="text-gray-400">Slots {slots.join('-')}:</span>
-                    <span className="text-white">{(() => { const c = slotAssignments[parseInt(slot)]; const t = c?.type || ''; return t ? (t.charAt(0).toUpperCase() + t.slice(1)) : (c?.name || 'Card'); })()}</span>
-                  </div>
-                ))}
-                {Object.entries(slotAssignments)
-                  .filter(([slot, card]) => !isBushingCard(card))
-                  .map(([slot, card]) => (
-                    <div key={slot} className="flex justify-between text-sm">
-                      <span className="text-gray-400">Slot {slot}:</span>
-                      <span className="text-white">{card.type ? (card.type.charAt(0).toUpperCase() + card.type.slice(1)) : (card.name || 'Card')}</span>
+                {Object.entries(bushingSlots).map(([slotKey, slots]) => {
+                  const primarySlot = parseInt(slotKey, 10);
+                  const card = slotAssignments[primarySlot];
+                  const label = getCardDisplayName(card) || 'Card';
+                  const hasExistingConfig = Boolean((card as any)?.level4BomItemId);
+                  const srLabel = `${hasExistingConfig ? 'Reconfigure' : 'Configure'} ${label}`;
+
+                  return (
+                    <div key={`bushing-${slotKey}`} className="flex items-center justify-between gap-2 text-sm">
+                      <div className="flex items-center gap-2">
+                        <span className="text-gray-400">Slots {slots.join('-')}:</span>
+                        <span className="text-white">{label}</span>
+                      </div>
+                      {hasLevel4Metadata(card) && !!onSlotReconfigure && (
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-7 w-7 border border-gray-700 text-gray-200 hover:text-white"
+                          onClick={() => onSlotReconfigure(primarySlot)}
+                          title={srLabel}
+                        >
+                          <Settings className="h-3.5 w-3.5" />
+                          <span className="sr-only">{srLabel}</span>
+                        </Button>
+                      )}
                     </div>
-                  ))}
+                  );
+                })}
+                {slotOrder.map(slot => {
+                  const card = slotAssignments[slot];
+                  const isEmpty = !card;
+                  const label = isEmpty ? 'Empty' : getCardDisplayName(card);
+                  const hasExistingConfig = Boolean((card as any)?.level4BomItemId);
+                  const srLabel = `${hasExistingConfig ? 'Reconfigure' : 'Configure'} ${label || 'card'}`;
+
+                  return (
+                    <div key={slot} className="flex items-center justify-between gap-2 text-sm">
+                      <div className="flex items-center gap-2">
+                        <span className="text-gray-400">Slot {slot}:</span>
+                        <span className={isEmpty ? 'text-gray-500 italic' : 'text-white'}>
+                          {label || 'Card'}
+                        </span>
+                      </div>
+                      {!isEmpty && !((card as any)?.isBushingSecondary) && hasLevel4Metadata(card) && !!onSlotReconfigure && (
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-7 w-7 border border-gray-700 text-gray-200 hover:text-white"
+                          onClick={() => onSlotReconfigure?.(slot)}
+                          title={srLabel}
+                        >
+                          <Settings className="h-3.5 w-3.5" />
+                          <span className="sr-only">{srLabel}</span>
+                        </Button>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}

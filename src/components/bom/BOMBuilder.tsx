@@ -39,6 +39,8 @@ interface BOMBuilderProps {
   canSeeCosts?: boolean;
 }
 
+const SLOT_LEVEL4_FLAG = '__slotLevel4Session';
+
 const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuilderProps) => {
   // ALL HOOKS MUST BE AT THE TOP - NO CONDITIONAL RETURNS BEFORE HOOKS
   const { user, loading } = useAuth();
@@ -436,32 +438,102 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
     setSelectedSlot(slot);
   };
 
+  const cleanupLevel4BomItem = async (bomItemId: string) => {
+    if (!bomItemId) return;
+
+    try {
+      const { Level4Service } = await import('@/services/level4Service');
+
+      try {
+        Level4Service.unregisterActiveSession(bomItemId);
+      } catch (error) {
+        console.warn('Failed to unregister Level 4 session during cleanup:', error);
+      }
+
+      try {
+        await Level4Service.deleteTempBOMItem(bomItemId, true);
+      } catch (error) {
+        console.warn('Failed to delete Level 4 BOM item during cleanup:', error);
+      }
+    } catch (error) {
+      console.error('Error cleaning up Level 4 BOM item:', error);
+    }
+  };
+
   const handleSlotClear = (slot: number) => {
+    const bomItemsToCleanup = new Set<string>();
+
     setSlotAssignments(prev => {
       const updated = { ...prev };
       const card = updated[slot];
-      
+
       if (card && isBushingCard(card)) {
         const bushingSlots = findExistingBushingSlots(updated);
         bushingSlots.forEach(bushingSlot => {
+          const bushingCard = updated[bushingSlot];
+          const bomItemId = (bushingCard as any)?.level4BomItemId as string | undefined;
+          if (bomItemId) {
+            bomItemsToCleanup.add(bomItemId);
+          }
           delete updated[bushingSlot];
         });
       } else {
+        const bomItemId = (card as any)?.level4BomItemId as string | undefined;
+        if (bomItemId) {
+          bomItemsToCleanup.add(bomItemId);
+        }
         delete updated[slot];
       }
-      
+
       return updated;
     });
+
+    if (bomItemsToCleanup.size > 0) {
+      bomItemsToCleanup.forEach(bomItemId => {
+        void cleanupLevel4BomItem(bomItemId);
+      });
+    }
   };
 
   const handleCardSelect = (card: any, slot: number) => {
     const updatedAssignments = { ...slotAssignments };
     const displayName = (card as any).displayName || card.name;
-    
+
+    const bomItemsToCleanup = new Set<string>();
+
+    const removeExistingAssignment = (targetSlot: number) => {
+      const existing = updatedAssignments[targetSlot];
+      if (!existing) return;
+
+      const existingBomId = (existing as any)?.level4BomItemId as string | undefined;
+      if (existingBomId) {
+        bomItemsToCleanup.add(existingBomId);
+      }
+
+      delete updatedAssignments[targetSlot];
+    };
+
+    const existingAtSlot = updatedAssignments[slot];
+    if (existingAtSlot) {
+      if (isBushingCard(existingAtSlot)) {
+        const pairSlot = (existingAtSlot as any)?.bushingPairSlot as number | undefined;
+        if (pairSlot) {
+          removeExistingAssignment(pairSlot);
+        }
+      }
+      removeExistingAssignment(slot);
+    }
+
     // Create card with display name
+    const requiresLevel4Configuration = Boolean(
+      (card as any).has_level4 ||
+      (card as any).requires_level4_config
+    );
+
     const cardWithDisplayName = {
       ...card,
-      displayName: displayName
+      displayName: displayName,
+      hasLevel4Configuration: requiresLevel4Configuration
     };
     
     // Handle bushing cards
@@ -476,24 +548,32 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
         ...cardWithDisplayName,
         isBushingPrimary: true,
         bushingPairSlot: secondarySlot,
-        displayName: displayName // Use the display name from level 3 config
+        displayName: displayName, // Use the display name from level 3 config
+        hasLevel4Configuration: requiresLevel4Configuration
       };
-      
+
       // Assign to secondary slot
       updatedAssignments[secondarySlot] = {
         ...cardWithDisplayName,
         isBushingSecondary: true,
         bushingPairSlot: primarySlot,
-        displayName: displayName // Use the same display name as primary slot
+        displayName: displayName, // Use the same display name as primary slot
+        hasLevel4Configuration: requiresLevel4Configuration
       };
     } else {
       // Regular card assignment
       updatedAssignments[slot] = cardWithDisplayName;
     }
-    
+
     // Only set state once after all updates
     setSlotAssignments(updatedAssignments);
-    
+
+    if (bomItemsToCleanup.size > 0) {
+      bomItemsToCleanup.forEach(id => {
+        void cleanupLevel4BomItem(id);
+      });
+    }
+
     // Check if this card requires level 4 configuration
     console.log('Card level 4 check:', {
       card: card.name,
@@ -505,15 +585,16 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
       console.log('Triggering Level 4 modal for:', card.name);
       
       // Create BOM item that will be saved to database
-      const newItem: BOMItem = {
+      const newItem = {
         id: crypto.randomUUID(), // Temporary ID, will be replaced with database ID
         product: cardWithDisplayName,
         quantity: 1,
         enabled: true,
         partNumber: card.partNumber,
         displayName: displayName,
-        slot: slot
-      };
+        slot: slot,
+        [SLOT_LEVEL4_FLAG]: true,
+      } as BOMItem & { [SLOT_LEVEL4_FLAG]: true };
       
       // Save BOM item to database immediately to enable Level 4 configuration
       handleLevel4Setup(newItem);
@@ -551,7 +632,7 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
   const handleLevel4Setup = async (newItem: BOMItem) => {
     try {
       setIsLoading(true);
-      
+
       // Import Level4Service dynamically to avoid circular imports
       const { Level4Service } = await import('@/services/level4Service');
       
@@ -591,8 +672,118 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
     }
   };
 
+  const handleSlotLevel4Reconfigure = (slot: number) => {
+    const card = slotAssignments[slot];
+    if (!card) return;
+
+    const displayName = (card as any).displayName || card.name;
+    const partNumber = (card as any).partNumber || card.partNumber || '';
+    const level4BomItemId = (card as any)?.level4BomItemId as string | undefined;
+    const tempQuoteId = (card as any)?.level4TempQuoteId as string | undefined;
+
+    if (!level4BomItemId) {
+      setSelectedSlot(slot);
+
+      const newItem = {
+        id: crypto.randomUUID(),
+        product: {
+          ...card,
+          displayName,
+        },
+        quantity: 1,
+        enabled: true,
+        partNumber,
+        displayName,
+        slot,
+        [SLOT_LEVEL4_FLAG]: true,
+      } as BOMItem & { [SLOT_LEVEL4_FLAG]: true };
+
+      handleLevel4Setup(newItem);
+      return;
+    }
+
+    const reconfigureItem = {
+      id: level4BomItemId,
+      product: {
+        ...card,
+        displayName,
+      },
+      quantity: 1,
+      enabled: true,
+      partNumber,
+      displayName,
+      slot,
+      level4Config: (card as any)?.level4Config,
+      [SLOT_LEVEL4_FLAG]: true,
+    } as BOMItem & { isReconfigureSession?: boolean; [SLOT_LEVEL4_FLAG]: true };
+
+    if (tempQuoteId) {
+      (reconfigureItem as any).tempQuoteId = tempQuoteId;
+    }
+
+    reconfigureItem.isReconfigureSession = true;
+
+    setConfiguringLevel4Item(reconfigureItem);
+    setSelectedSlot(slot);
+  };
+
   const handleLevel4Save = (payload: Level4RuntimePayload) => {
     console.log('Saving Level 4 configuration:', payload);
+
+    const isSlotLevelSession = Boolean((configuringLevel4Item as any)?.[SLOT_LEVEL4_FLAG]);
+
+    if (isSlotLevelSession) {
+      const slot = configuringLevel4Item.slot;
+      const tempQuoteId = (configuringLevel4Item as any)?.tempQuoteId as string | undefined;
+      const displayName = (configuringLevel4Item as any).displayName || configuringLevel4Item.product.name;
+
+      setSlotAssignments(prev => {
+        const updated = { ...prev };
+
+        const applyUpdate = (targetSlot: number) => {
+          const existingCard = updated[targetSlot];
+          if (!existingCard) return;
+
+          updated[targetSlot] = {
+            ...existingCard,
+            displayName: (existingCard as any).displayName || existingCard.name,
+            level4Config: payload,
+            level4BomItemId: payload.bomItemId,
+            level4TempQuoteId: tempQuoteId,
+            hasLevel4Configuration: true
+          } as Level3Product;
+        };
+
+        applyUpdate(slot);
+
+        const primaryCard = updated[slot];
+        if (primaryCard && isBushingCard(primaryCard)) {
+          const pairedSlot = (primaryCard as any)?.bushingPairSlot as number | undefined;
+          if (pairedSlot) {
+            applyUpdate(pairedSlot);
+          }
+        }
+
+        return updated;
+      });
+
+      setBomItems(prev => {
+        const filtered = prev.filter(item => item.id !== payload.bomItemId);
+        if (filtered.length !== prev.length) {
+          onBOMUpdate(filtered);
+        }
+        return filtered;
+      });
+
+      toast({
+        title: 'Configuration Saved',
+        description: `${displayName} configuration has been saved.`,
+      });
+
+      setConfiguringLevel4Item(null);
+      setSelectedSlot(null);
+      return;
+    }
 
     if (configuringLevel4Item) {
       const updatedItem: BOMItem = {
@@ -637,19 +828,23 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
       try {
         // Import Level4Service dynamically to avoid circular imports
         const { Level4Service } = await import('@/services/level4Service');
-        
+
         console.log('Canceling Level 4 configuration for item:', configuringLevel4Item.id);
-        
+
         // Unregister the active session and force cleanup on cancel
         Level4Service.unregisterActiveSession(configuringLevel4Item.id);
-        
-        // Clean up temporary data immediately on cancel
-        try {
-          await Level4Service.deleteTempBOMItem(configuringLevel4Item.id, true); // Force cleanup
-        } catch (error) {
-          console.error('Error cleaning up Level 4 configuration:', error);
+
+        const isReconfigureSession = Boolean((configuringLevel4Item as any)?.isReconfigureSession);
+
+        // Clean up temporary data immediately on cancel when this is a new configuration session
+        if (!isReconfigureSession) {
+          try {
+            await Level4Service.deleteTempBOMItem(configuringLevel4Item.id, true); // Force cleanup
+          } catch (error) {
+            console.error('Error cleaning up Level 4 configuration:', error);
+          }
         }
-        
+
       } catch (error) {
         console.error('Error preparing Level 4 cleanup:', error);
         // Don't block the cancel operation
@@ -1169,7 +1364,8 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
             selectedAccessories={selectedAccessories}
             onAccessoryToggle={toggleAccessory}
             partNumber={buildQTMSPartNumber({ chassis: configuringChassis, slotAssignments, hasRemoteDisplay, pnConfig, codeMap, includeSuffix: false })}
-            
+            onSlotReconfigure={handleSlotLevel4Reconfigure}
+
           />
           
           {selectedSlot !== null && (
@@ -1256,6 +1452,7 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
                 selectedAccessories={selectedAccessories}
                 onAccessoryToggle={toggleAccessory}
                 partNumber={buildQTMSPartNumber({ chassis: selectedChassis, slotAssignments, hasRemoteDisplay, pnConfig, codeMap, includeSuffix: false })}
+                onSlotReconfigure={handleSlotLevel4Reconfigure}
               />
             
               {selectedSlot !== null && (
