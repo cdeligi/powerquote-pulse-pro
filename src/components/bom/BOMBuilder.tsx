@@ -65,7 +65,6 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
   const [configuringChassis, setConfiguringChassis] = useState<Level2Product | null>(null);
   const [editingOriginalItem, setEditingOriginalItem] = useState<BOMItem | null>(null);
   const [configuringNonChassis, setConfiguringNonChassis] = useState<Level2Product | null>(null);
-  const [currentPartNumber, setCurrentPartNumber] = useState<string>('');
 
   // Admin-driven part number config and codes for the selected chassis
   const [pnConfig, setPnConfig] = useState<any | null>(null);
@@ -124,37 +123,6 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
       return next;
     });
   };
-
-  // Update part number whenever slot assignments or related data changes
-  useEffect(() => {
-    if (selectedChassis && Object.keys(slotAssignments).length > 0) {
-      const newPartNumber = buildQTMSPartNumber({
-        chassis: selectedChassis,
-        slotAssignments,
-        hasRemoteDisplay,
-        pnConfig,
-        codeMap,
-        includeSuffix: true
-      });
-      
-      console.log('Part number updated:', newPartNumber);
-      setCurrentPartNumber(newPartNumber);
-    } else if (selectedChassis) {
-      // Generate basic part number even with no slots assigned
-      const basicPartNumber = buildQTMSPartNumber({
-        chassis: selectedChassis,
-        slotAssignments: {},
-        hasRemoteDisplay,
-        pnConfig,
-        codeMap,
-        includeSuffix: true
-      });
-      
-      setCurrentPartNumber(basicPartNumber);
-    } else {
-      setCurrentPartNumber('');
-    }
-  }, [selectedChassis, slotAssignments, hasRemoteDisplay, pnConfig, codeMap]);
 
   // Get available quote fields for validation
   const [availableQuoteFields, setAvailableQuoteFields] = useState<any[]>([]);
@@ -626,88 +594,38 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
   const handleLevel4Save = (payload: Level4RuntimePayload) => {
     console.log('Saving Level 4 configuration:', payload);
 
-    if (configuringLevel4Item && selectedSlot !== null) {
-      // Store Level 4 configuration in slot assignments instead of BOM
-      const assignedCard = slotAssignments[selectedSlot];
-      if (assignedCard) {
-        console.log('Before Level 4 save - assigned card data:', {
-          slot: selectedSlot,
-          card: assignedCard,
-          displayName: assignedCard.displayName,
-          name: assignedCard.name
-        });
+    if (configuringLevel4Item) {
+      const updatedItem: BOMItem = {
+        ...configuringLevel4Item,
+        id: payload.bomItemId,
+        level4Config: payload,
+        product: {
+          ...configuringLevel4Item.product,
+          displayName: (configuringLevel4Item as any).displayName || configuringLevel4Item.product.name
+        },
+        displayName: (configuringLevel4Item as any).displayName || configuringLevel4Item.product.name
+      };
 
-        const updatedSlotAssignments = {
-          ...slotAssignments,
-          [selectedSlot]: {
-            ...assignedCard,
-            level4Config: payload,
-            hasLevel4Config: true,
-            // Ensure displayName is preserved
-            displayName: assignedCard.displayName || assignedCard.name
-          }
-        };
-        
-        console.log('After Level 4 save - updated slot assignment:', {
-          slot: selectedSlot,
-          card: updatedSlotAssignments[selectedSlot],
-          displayName: updatedSlotAssignments[selectedSlot].displayName,
-          hasLevel4Config: updatedSlotAssignments[selectedSlot].hasLevel4Config
-        });
-        
-        setSlotAssignments(updatedSlotAssignments);
-
-        // Regenerate part number after Level 4 configuration update
-        if (selectedChassis) {
-          const newPartNumber = buildQTMSPartNumber({ 
-            chassis: selectedChassis, 
-            slotAssignments: updatedSlotAssignments, 
-            hasRemoteDisplay, 
-            pnConfig, 
-            codeMap, 
-            includeSuffix: true 
-          });
-          
-          console.log('Regenerated part number after Level 4 save:', newPartNumber);
-          setCurrentPartNumber(newPartNumber);
-          
-          // Update any existing chassis BOM item with new part number
-          const updatedBOMItems = bomItems.map(item => {
-            if (item.product.type === 'chassis' && item.slotAssignments) {
-              return {
-                ...item,
-                partNumber: newPartNumber,
-                product: {
-                  ...item.product,
-                  partNumber: newPartNumber
-                },
-                slotAssignments: updatedSlotAssignments,
-                configuration: {
-                  ...item.configuration,
-                  level4Configurations: Object.entries(updatedSlotAssignments)
-                    .filter(([_, card]) => (card as any).level4Config)
-                    .reduce((acc, [slot, card]) => {
-                      acc[slot] = (card as any).level4Config;
-                      return acc;
-                    }, {} as Record<string, any>)
-                }
-              };
-            }
-            return item;
-          });
-          
-          if (updatedBOMItems.some((item, index) => item !== bomItems[index])) {
-            setBomItems(updatedBOMItems);
-            onBOMUpdate(updatedBOMItems);
-            console.log('Updated chassis BOM item with new part number');
-          }
-        }
-
-        toast({
-          title: 'Configuration Saved',
-          description: `Level 4 configuration for ${assignedCard.displayName || assignedCard.name} has been saved to slot ${selectedSlot}.`,
-        });
+      if ((configuringLevel4Item as any).tempQuoteId) {
+        (updatedItem as any).tempQuoteId = (configuringLevel4Item as any).tempQuoteId;
       }
+
+      const existingIndex = bomItems.findIndex(item =>
+        item.id === configuringLevel4Item.id || item.id === payload.bomItemId
+      );
+      const updatedItems = existingIndex >= 0
+        ? bomItems.map(item =>
+            (item.id === configuringLevel4Item.id || item.id === payload.bomItemId) ? updatedItem : item
+          )
+        : [...bomItems, updatedItem];
+
+      setBomItems(updatedItems);
+      onBOMUpdate(updatedItems);
+
+      toast({
+        title: 'Configuration Saved',
+        description: `Level 4 configuration for ${configuringLevel4Item.product.name} has been saved.`,
+      });
     }
 
     setConfiguringLevel4Item(null);
@@ -740,39 +658,6 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
     
     setConfiguringLevel4Item(null);
     setSelectedSlot(null);
-  };
-
-  const handleLevel4Configure = async (slot: number, product: Level3Product) => {
-    console.log('Level 4 configure triggered:', { slot, product, slotAssignments });
-    
-    // Handle Level 4 configuration from rack visualizer
-    setSelectedSlot(slot);
-    
-    // Get existing Level 4 configuration from slot assignments
-    const assignedCard = slotAssignments[slot];
-    const existingLevel4Config = (assignedCard as any)?.level4Config;
-    
-    if (existingLevel4Config && existingLevel4Config.bomItemId) {
-      console.log('Found existing Level 4 config, creating BOM item for editing:', existingLevel4Config);
-      
-      // Editing existing configuration - create a BOM item with existing config
-      const tempBOMItem: BOMItem = {
-        id: existingLevel4Config.bomItemId,
-        product: assignedCard,
-        quantity: 1,
-        enabled: true,
-        configuration: existingLevel4Config,
-        partNumber: assignedCard.partNumber,
-        displayName: assignedCard.displayName || assignedCard.name,
-        slot: slot
-      };
-      
-      setConfiguringLevel4Item(tempBOMItem);
-    } else {
-      console.log('No existing Level 4 config found, creating new configuration');
-      // Creating new configuration
-      await handleLevel4Setup({ product, quantity: 1, enabled: true });
-    }
   };
 
   const handleRemoteDisplayToggle = (enabled: boolean) => {
@@ -811,12 +696,6 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
       slotAssignments: { ...slotAssignments },
       configuration: {
         hasRemoteDisplay,
-        level4Configurations: Object.entries(slotAssignments)
-          .filter(([_, card]) => (card as any).level4Config)
-          .reduce((acc, [slot, card]) => {
-            acc[slot] = (card as any).level4Config;
-            return acc;
-          }, {} as Record<string, any>)
       }
     };
 
@@ -1289,7 +1168,7 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
             codeMap={codeMap}
             selectedAccessories={selectedAccessories}
             onAccessoryToggle={toggleAccessory}
-            onLevel4Configure={handleLevel4Configure}
+            partNumber={buildQTMSPartNumber({ chassis: configuringChassis, slotAssignments, hasRemoteDisplay, pnConfig, codeMap, includeSuffix: false })}
             
           />
           
@@ -1376,8 +1255,7 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
                 codeMap={codeMap}
                 selectedAccessories={selectedAccessories}
                 onAccessoryToggle={toggleAccessory}
-                onLevel4Configure={handleLevel4Configure}
-                partNumber={currentPartNumber}
+                partNumber={buildQTMSPartNumber({ chassis: selectedChassis, slotAssignments, hasRemoteDisplay, pnConfig, codeMap, includeSuffix: false })}
               />
             
               {selectedSlot !== null && (

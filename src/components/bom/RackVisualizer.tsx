@@ -3,7 +3,7 @@ import { ChassisType } from "@/types/product/chassis-types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { X, Settings } from "lucide-react";
+import { X } from "lucide-react";
 import { getBushingOccupiedSlots, isBushingCard } from "@/utils/bushingValidation";
 import AccessoryList from "./AccessoryList";
 
@@ -34,7 +34,6 @@ interface RackVisualizerProps {
   onAccessoryToggle?: (id: string) => void;
   partNumber?: string;
   chassisType?: ChassisType; // Optional chassis type for custom layouts
-  onLevel4Configure?: (slot: number, product: Level3Product) => void; // Add Level 4 config handler
   
 }
 
@@ -49,7 +48,6 @@ const RackVisualizer = ({
   standardSlotHints,
   colorByProductId,
   level3Products = [],
-  onLevel4Configure,
   codeMap = {},
   selectedAccessories = new Set(),
   onAccessoryToggle,
@@ -191,22 +189,6 @@ const getSlotTitle = (slot: number) => {
           </span>
         )}
 
-        {/* Configuration indicator for Level 4 cards */}
-        {assignedCard && (assignedCard as any).hasLevel4Config && (
-          <span
-            className="absolute top-1 right-1 text-xs px-1.5 py-0.5 rounded bg-blue-600/80 border border-blue-400 text-white cursor-pointer hover:bg-blue-500/80"
-            title="Level 4 configured - Click to edit"
-            onClick={(e) => {
-              e.stopPropagation();
-              if (onLevel4Configure) {
-                onLevel4Configure(slot, assignedCard);
-              }
-            }}
-          >
-            <Settings className="w-3 h-3" />
-          </span>
-        )}
-
         {/* Clear button for occupied slots */}
         {assignedCard && !isSecondaryBushingSlot && (
           <Button
@@ -316,7 +298,7 @@ const getSlotTitle = (slot: number) => {
       <CardContent>
         <div className="space-y-4">
           <p className="text-gray-400 text-sm">
-            Click on any slot to add a card. Click the X to clear a slot. Cards with Level 4 configurations show a <Settings className="inline w-3 h-3" /> symbol in the "Assigned Cards" section below - click it to edit the configuration.
+            Click on any slot to add a card. Click the X to clear a slot.
           </p>
           
           {renderChassisLayout()}
@@ -365,74 +347,17 @@ const getSlotTitle = (slot: number) => {
               <h4 className="text-white font-medium mb-2">Assigned Cards:</h4>
               <div className="space-y-1">
                 {Object.entries(bushingSlots).map(([slot, slots]) => (
-                  <div key={`bushing-${slot}`} className="flex justify-between items-center text-sm">
+                  <div key={`bushing-${slot}`} className="flex justify-between text-sm">
                     <span className="text-gray-400">Slots {slots.join('-')}:</span>
-                    <div className="flex items-center gap-2">
-                      <span className="text-white">
-                        {(() => { 
-                          const c = slotAssignments[parseInt(slot)]; 
-                          console.log('Bushing slot display debug:', {
-                            slot,
-                            card: c,
-                            displayName: (c as any)?.displayName,
-                            name: c?.name,
-                            type: c?.type,
-                            hasLevel4Config: (c as any)?.hasLevel4Config
-                          });
-                          return (c as any)?.displayName || c?.name || (c?.type ? (c.type.charAt(0).toUpperCase() + c.type.slice(1)) : 'Card');
-                        })()}
-                      </span>
-                      {(slotAssignments[parseInt(slot)] as any)?.hasLevel4Config && (
-                        <button
-                          className="text-blue-400 hover:text-blue-300 transition-colors p-1 rounded hover:bg-blue-400/10"
-                          title="Level 4 configured - Click to edit"
-                          onClick={() => {
-                            console.log('Level 4 configure clicked (bushing):', { slot, product: slotAssignments[parseInt(slot)] });
-                            if (onLevel4Configure) {
-                              onLevel4Configure(parseInt(slot), slotAssignments[parseInt(slot)]);
-                            }
-                          }}
-                        >
-                          <Settings className="w-3 h-3" />
-                        </button>
-                      )}
-                    </div>
+                    <span className="text-white">{(() => { const c = slotAssignments[parseInt(slot)]; const t = c?.type || ''; return t ? (t.charAt(0).toUpperCase() + t.slice(1)) : (c?.name || 'Card'); })()}</span>
                   </div>
                 ))}
                 {Object.entries(slotAssignments)
                   .filter(([slot, card]) => !isBushingCard(card))
                   .map(([slot, card]) => (
-                    <div key={slot} className="flex justify-between items-center text-sm">
+                    <div key={slot} className="flex justify-between text-sm">
                       <span className="text-gray-400">Slot {slot}:</span>
-                      <div className="flex items-center gap-2">
-                        <span className="text-white">
-                          {(() => {
-                            console.log('Regular slot display debug:', {
-                              slot,
-                              card,
-                              displayName: (card as any)?.displayName,
-                              name: card?.name,
-                              type: card?.type,
-                              hasLevel4Config: (card as any)?.hasLevel4Config
-                            });
-                            return (card as any)?.displayName || card?.name || (card?.type ? (card.type.charAt(0).toUpperCase() + card.type.slice(1)) : 'Card');
-                          })()}
-                        </span>
-                        {(card as any)?.hasLevel4Config && (
-                          <button
-                            className="text-blue-400 hover:text-blue-300 transition-colors p-1 rounded hover:bg-blue-400/10"
-                            title="Level 4 configured - Click to edit"
-                            onClick={() => {
-                              console.log('Level 4 configure clicked (regular):', { slot, product: card });
-                              if (onLevel4Configure) {
-                                onLevel4Configure(parseInt(slot), card);
-                              }
-                            }}
-                          >
-                            <Settings className="w-3 h-3" />
-                          </button>
-                        )}
-                      </div>
+                      <span className="text-white">{card.type ? (card.type.charAt(0).toUpperCase() + card.type.slice(1)) : (card.name || 'Card')}</span>
                     </div>
                   ))}
               </div>
