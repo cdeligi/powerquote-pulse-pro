@@ -424,7 +424,8 @@ const getSlotTitle = (slot: number) => {
                       (card as any)?.requires_level4_config
                     );
                     const hasExistingConfig = Boolean((card as any)?.level4BomItemId);
-                    const showReconfigureButton = !isEmpty && !isSecondaryBushing && !!onSlotReconfigure && hasLevel4Config;
+                    const isSharedConfig = Boolean((card as any)?.isSharedLevel4Config);
+                    const showReconfigureButton = !isEmpty && !isSecondaryBushing && !isSharedConfig && !!onSlotReconfigure && hasLevel4Config;
                     const srLabel = `${hasExistingConfig ? 'Reconfigure' : 'Configure'} ${label || 'card'}`;
 
                     return (

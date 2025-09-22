@@ -110,8 +110,20 @@ export const Level4RuntimeModal: React.FC<Level4RuntimeModalProps> = ({
         setRuntimeConfig(runtime);
 
         try {
-          // Try to load existing configuration
-          const existingValue = await Level4Service.getBOMLevel4Value(effectiveBomItemId);
+          // Try to load existing configuration - first by BOM item ID
+          let existingValue = await Level4Service.getBOMLevel4Value(effectiveBomItemId);
+          
+          // If not found and we have slot information, try to find by product and slot
+          if (!existingValue && bomItem?.slot) {
+            console.log('No direct BOM item match, searching by product and slot:', { level3ProductId, slot: bomItem.slot });
+            existingValue = await Level4Service.findExistingLevel4ConfigByProduct(level3ProductId, bomItem.slot);
+          }
+          
+          // If still not found, try to find any existing config for this product
+          if (!existingValue) {
+            console.log('No slot-specific match, searching for any existing config for product:', level3ProductId);
+            existingValue = await Level4Service.findExistingLevel4ConfigByProduct(level3ProductId);
+          }
           
           if (existingValue?.entries?.length > 0) {
             // Pre-populate with existing selections
@@ -119,6 +131,7 @@ export const Level4RuntimeModal: React.FC<Level4RuntimeModalProps> = ({
               .filter(entry => config.options.some(opt => opt.id === entry.value));
               
             if (validSelections.length > 0) {
+              console.log('Loading existing Level 4 configuration:', validSelections);
               setEntries(validSelections);
               return;
             }

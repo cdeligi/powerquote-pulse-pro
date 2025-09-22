@@ -133,6 +133,8 @@ export class Level4Service {
   static async getBOMLevel4Value(bomItemId: string): Promise<Level4BOMValue | null> {
     try {
       const supabase = getSupabaseClient();
+      console.log('Fetching existing Level 4 value for BOM item:', bomItemId);
+      
       const { data, error } = await supabase
         .from('bom_level4_values')
         .select('*')
@@ -141,14 +143,75 @@ export class Level4Service {
 
       if (error) {
         if ((error as any)?.code === 'PGRST116') {
+          console.log('No existing Level 4 value found for BOM item:', bomItemId);
           return null; // No existing value
         }
+        console.error('Error fetching Level 4 value:', error);
         throw error;
       }
 
+      console.log('Found existing Level 4 value:', data);
       return data as Level4BOMValue;
     } catch (error) {
       console.error('Level4Service.getBOMLevel4Value error:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Find existing Level 4 configuration by Level 3 product and slot (for slot-based configurations)
+   */
+  static async findExistingLevel4ConfigByProduct(level3ProductId: string, slot?: number): Promise<Level4BOMValue | null> {
+    try {
+      const supabase = getSupabaseClient();
+      console.log('Searching for existing Level 4 config by product:', { level3ProductId, slot });
+      
+      // Query BOM items with Level 4 values for this product
+      const query = supabase
+        .from('bom_items')
+        .select(`
+          id,
+          configuration_data,
+          bom_level4_values (*)
+        `)
+        .eq('product_id', level3ProductId)
+        .not('bom_level4_values', 'is', null);
+
+      const { data, error } = await query;
+
+      if (error) {
+        console.error('Error searching for existing Level 4 config:', error);
+        return null;
+      }
+
+      if (!data || data.length === 0) {
+        console.log('No existing Level 4 configurations found for product:', level3ProductId);
+        return null;
+      }
+
+      // If slot is specified, try to find a configuration for that specific slot
+      if (slot !== undefined) {
+        const slotMatch = data.find(item => {
+          const configData = item.configuration_data as any;
+          return configData?.slot === slot && item.bom_level4_values?.length > 0;
+        });
+        
+        if (slotMatch && slotMatch.bom_level4_values?.[0]) {
+          console.log('Found existing Level 4 config for slot:', slot, slotMatch.bom_level4_values[0]);
+          return slotMatch.bom_level4_values[0] as Level4BOMValue;
+        }
+      }
+
+      // Return the first available configuration if no slot-specific match
+      const firstConfig = data.find(item => item.bom_level4_values?.length > 0);
+      if (firstConfig && firstConfig.bom_level4_values?.[0]) {
+        console.log('Found existing Level 4 config (fallback):', firstConfig.bom_level4_values[0]);
+        return firstConfig.bom_level4_values[0] as Level4BOMValue;
+      }
+
+      return null;
+    } catch (error) {
+      console.error('Level4Service.findExistingLevel4ConfigByProduct error:', error);
       return null;
     }
   }
