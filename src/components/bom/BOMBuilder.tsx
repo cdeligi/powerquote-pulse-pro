@@ -684,7 +684,15 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
     if (!level4BomItemId) {
       setSelectedSlot(slot);
 
+      codex/fix-bom-item-addition-and-display-names-eburrr
       const newItem = {
+
+      codex/fix-bom-item-addition-and-display-names-lfhkqt
+      const newItem = {
+
+      const newItem: BOMItem = {
+        main
+        main
         id: crypto.randomUUID(),
         product: {
           ...card,
@@ -695,9 +703,19 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
         partNumber,
         displayName,
         slot,
+        codex/fix-bom-item-addition-and-display-names-eburrr
         [SLOT_LEVEL4_FLAG]: true,
       } as BOMItem & { [SLOT_LEVEL4_FLAG]: true };
 
+
+        codex/fix-bom-item-addition-and-display-names-lfhkqt
+        [SLOT_LEVEL4_FLAG]: true,
+      } as BOMItem & { [SLOT_LEVEL4_FLAG]: true };
+
+      };
+        main
+
+        main
       handleLevel4Setup(newItem);
       return;
     }
@@ -714,9 +732,19 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
       displayName,
       slot,
       level4Config: (card as any)?.level4Config,
+      codex/fix-bom-item-addition-and-display-names-eburrr
       [SLOT_LEVEL4_FLAG]: true,
     } as BOMItem & { isReconfigureSession?: boolean; [SLOT_LEVEL4_FLAG]: true };
 
+
+      codex/fix-bom-item-addition-and-display-names-lfhkqt
+      [SLOT_LEVEL4_FLAG]: true,
+    } as BOMItem & { isReconfigureSession?: boolean; [SLOT_LEVEL4_FLAG]: true };
+
+    } as BOMItem & { isReconfigureSession?: boolean };
+      main
+
+      main
     if (tempQuoteId) {
       (reconfigureItem as any).tempQuoteId = tempQuoteId;
     }
@@ -730,9 +758,19 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
   const handleLevel4Save = (payload: Level4RuntimePayload) => {
     console.log('Saving Level 4 configuration:', payload);
 
+    codex/fix-bom-item-addition-and-display-names-eburrr
     const isSlotLevelSession = Boolean((configuringLevel4Item as any)?.[SLOT_LEVEL4_FLAG]);
 
     if (isSlotLevelSession) {
+
+    codex/fix-bom-item-addition-and-display-names-lfhkqt
+    const isSlotLevelSession = Boolean((configuringLevel4Item as any)?.[SLOT_LEVEL4_FLAG]);
+
+    if (isSlotLevelSession) {
+
+    if (configuringLevel4Item?.slot !== undefined) {
+      main
+      main
       const slot = configuringLevel4Item.slot;
       const tempQuoteId = (configuringLevel4Item as any)?.tempQuoteId as string | undefined;
       const displayName = (configuringLevel4Item as any).displayName || configuringLevel4Item.product.name;
@@ -750,7 +788,14 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
             level4Config: payload,
             level4BomItemId: payload.bomItemId,
             level4TempQuoteId: tempQuoteId,
+        codex/fix-bom-item-addition-and-display-names-eburrr
             hasLevel4Configuration: true
+
+            codex/fix-bom-item-addition-and-display-names-lfhkqt
+            hasLevel4Configuration: true
+
+         main
+        main
           } as Level3Product;
         };
 
@@ -767,6 +812,10 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
         return updated;
       });
 
+        codex/fix-bom-item-addition-and-display-names-eburrr
+
+      codex/fix-bom-item-addition-and-display-names-lfhkqt
+        main
       setBomItems(prev => {
         const filtered = prev.filter(item => item.id !== payload.bomItemId);
         if (filtered.length !== prev.length) {
@@ -775,6 +824,11 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
         return filtered;
       });
 
+        codex/fix-bom-item-addition-and-display-names-eburrr
+
+
+      main
+      main
       toast({
         title: 'Configuration Saved',
         description: `${displayName} configuration has been saved.`,
