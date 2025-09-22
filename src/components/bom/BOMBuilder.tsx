@@ -372,6 +372,16 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
   };
 
   // Auto-save draft every 30 seconds
+  useEffect(() => {
+    if (!currentQuoteId || !isDraftMode) return;
+    
+    const autoSaveInterval = setInterval(() => {
+      saveDraftQuote(true);
+    }, 30000); // 30 seconds
+    
+    return () => clearInterval(autoSaveInterval);
+  }, [currentQuoteId, isDraftMode, bomItems, quoteFields]);
+
   // Use quote validation hook
   const { validation, validateFields } = useQuoteValidation(quoteFields, availableQuoteFields);
 
@@ -1943,18 +1953,6 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
         </div>
       </div>
 
-      
-
-      {/* Submit Button */}
-      <div className="flex justify-end">
-        <Button
-          onClick={submitQuoteRequest}
-          disabled={isSubmitting || bomItems.length === 0}
-          size="lg"
-        >
-          {isSubmitting ? 'Submitting...' : 'Submit Quote Request'}
-        </Button>
-      </div>
 
       {configuringLevel4Item && (
         <Level4RuntimeModal

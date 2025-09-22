@@ -259,8 +259,8 @@ export const EnhancedBOMDisplay = ({
               {onSaveDraft && (
                 <Button
                   onClick={onSaveDraft}
-                  variant="outline"
-                  className="w-full border-gray-600 text-gray-300 hover:bg-gray-800 hover:text-white"
+                  variant="secondary"
+                  className="w-full bg-gray-700 hover:bg-gray-600 text-white border-gray-600"
                   disabled={isSubmitting}
                 >
                   <Save className="mr-2 h-4 w-4" />
@@ -275,7 +275,7 @@ export const EnhancedBOMDisplay = ({
                 disabled={isSubmitting}
               >
                 <Send className="mr-2 h-4 w-4" />
-                {isSubmitting ? 'Submitting...' : isDraftMode ? 'Submit for Approval' : 'Submit Quote Request'}
+                {isSubmitting ? 'Submitting...' : 'Submit'}
               </Button>
             </div>
           </>

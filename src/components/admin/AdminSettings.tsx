@@ -12,6 +12,7 @@ const supabase = getSupabaseClient();
 const supabaseAdmin = getSupabaseAdminClient();;
 import { toast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
+import { UserSharingManager } from './UserSharingManager';
 
 const AdminSettings = () => {
   const { user } = useAuth();
@@ -156,12 +157,15 @@ const AdminSettings = () => {
       </div>
 
       <Tabs defaultValue="general" className="w-full">
-        <TabsList className="grid w-full grid-cols-3 bg-gray-800">
+        <TabsList className="grid w-full grid-cols-4 bg-gray-800">
           <TabsTrigger value="general" className="text-white data-[state=active]:bg-red-600">
             General
           </TabsTrigger>
           <TabsTrigger value="quotes" className="text-white data-[state=active]:bg-red-600">
             Quote Management
+          </TabsTrigger>
+          <TabsTrigger value="sharing" className="text-white data-[state=active]:bg-red-600">
+            User Sharing
           </TabsTrigger>
           <TabsTrigger value="legal" className="text-white data-[state=active]:bg-red-600">
             Legal
@@ -239,6 +243,17 @@ const AdminSettings = () => {
                   Quote IDs will be generated as: <span className="font-mono bg-gray-700 px-2 py-1 rounded">{quotePrefix}-{quoteCounter}</span>, <span className="font-mono bg-gray-700 px-2 py-1 rounded">{quotePrefix}-{quoteCounter + 1}</span>, etc.
                 </p>
               </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="sharing">
+          <Card className="bg-gray-900 border-gray-800">
+            <CardHeader>
+              <CardTitle className="text-white">User Sharing & Permissions</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <UserSharingManager />
             </CardContent>
           </Card>
         </TabsContent>
