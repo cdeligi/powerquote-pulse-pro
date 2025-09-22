@@ -39,6 +39,8 @@ interface BOMBuilderProps {
   canSeeCosts?: boolean;
 }
 
+const SLOT_LEVEL4_FLAG = '__slotLevel4Session';
+
 const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuilderProps) => {
   // ALL HOOKS MUST BE AT THE TOP - NO CONDITIONAL RETURNS BEFORE HOOKS
   const { user, loading } = useAuth();
@@ -523,9 +525,15 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
     }
 
     // Create card with display name
+    const requiresLevel4Configuration = Boolean(
+      (card as any).has_level4 ||
+      (card as any).requires_level4_config
+    );
+
     const cardWithDisplayName = {
       ...card,
-      displayName: displayName
+      displayName: displayName,
+      hasLevel4Configuration: requiresLevel4Configuration
     };
     
     // Handle bushing cards
@@ -540,15 +548,17 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
         ...cardWithDisplayName,
         isBushingPrimary: true,
         bushingPairSlot: secondarySlot,
-        displayName: displayName // Use the display name from level 3 config
+        displayName: displayName, // Use the display name from level 3 config
+        hasLevel4Configuration: requiresLevel4Configuration
       };
-      
+
       // Assign to secondary slot
       updatedAssignments[secondarySlot] = {
         ...cardWithDisplayName,
         isBushingSecondary: true,
         bushingPairSlot: primarySlot,
-        displayName: displayName // Use the same display name as primary slot
+        displayName: displayName, // Use the same display name as primary slot
+        hasLevel4Configuration: requiresLevel4Configuration
       };
     } else {
       // Regular card assignment
@@ -575,15 +585,16 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
       console.log('Triggering Level 4 modal for:', card.name);
       
       // Create BOM item that will be saved to database
-      const newItem: BOMItem = {
+      const newItem = {
         id: crypto.randomUUID(), // Temporary ID, will be replaced with database ID
         product: cardWithDisplayName,
         quantity: 1,
         enabled: true,
         partNumber: card.partNumber,
         displayName: displayName,
-        slot: slot
-      };
+        slot: slot,
+        [SLOT_LEVEL4_FLAG]: true,
+      } as BOMItem & { [SLOT_LEVEL4_FLAG]: true };
       
       // Save BOM item to database immediately to enable Level 4 configuration
       handleLevel4Setup(newItem);
@@ -673,7 +684,11 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
     if (!level4BomItemId) {
       setSelectedSlot(slot);
 
+      codex/fix-bom-item-addition-and-display-names-lfhkqt
+      const newItem = {
+
       const newItem: BOMItem = {
+        main
         id: crypto.randomUUID(),
         product: {
           ...card,
@@ -684,7 +699,12 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
         partNumber,
         displayName,
         slot,
+        codex/fix-bom-item-addition-and-display-names-lfhkqt
+        [SLOT_LEVEL4_FLAG]: true,
+      } as BOMItem & { [SLOT_LEVEL4_FLAG]: true };
+
       };
+        main
 
       handleLevel4Setup(newItem);
       return;
@@ -702,7 +722,12 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
       displayName,
       slot,
       level4Config: (card as any)?.level4Config,
+      codex/fix-bom-item-addition-and-display-names-lfhkqt
+      [SLOT_LEVEL4_FLAG]: true,
+    } as BOMItem & { isReconfigureSession?: boolean; [SLOT_LEVEL4_FLAG]: true };
+
     } as BOMItem & { isReconfigureSession?: boolean };
+      main
 
     if (tempQuoteId) {
       (reconfigureItem as any).tempQuoteId = tempQuoteId;
@@ -717,7 +742,13 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
   const handleLevel4Save = (payload: Level4RuntimePayload) => {
     console.log('Saving Level 4 configuration:', payload);
 
+    codex/fix-bom-item-addition-and-display-names-lfhkqt
+    const isSlotLevelSession = Boolean((configuringLevel4Item as any)?.[SLOT_LEVEL4_FLAG]);
+
+    if (isSlotLevelSession) {
+
     if (configuringLevel4Item?.slot !== undefined) {
+      main
       const slot = configuringLevel4Item.slot;
       const tempQuoteId = (configuringLevel4Item as any)?.tempQuoteId as string | undefined;
       const displayName = (configuringLevel4Item as any).displayName || configuringLevel4Item.product.name;
@@ -735,6 +766,10 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
             level4Config: payload,
             level4BomItemId: payload.bomItemId,
             level4TempQuoteId: tempQuoteId,
+            codex/fix-bom-item-addition-and-display-names-lfhkqt
+            hasLevel4Configuration: true
+
+         main
           } as Level3Product;
         };
 
@@ -751,6 +786,17 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
         return updated;
       });
 
+      codex/fix-bom-item-addition-and-display-names-lfhkqt
+      setBomItems(prev => {
+        const filtered = prev.filter(item => item.id !== payload.bomItemId);
+        if (filtered.length !== prev.length) {
+          onBOMUpdate(filtered);
+        }
+        return filtered;
+      });
+
+
+      main
       toast({
         title: 'Configuration Saved',
         description: `${displayName} configuration has been saved.`,
