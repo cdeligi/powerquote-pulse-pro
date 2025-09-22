@@ -1160,6 +1160,44 @@ export type Database = {
         }
         Relationships: []
       }
+      quote_shares: {
+        Row: {
+          created_at: string | null
+          expires_at: string | null
+          id: string
+          permission_level: string
+          quote_id: string
+          shared_by: string
+          shared_with: string
+        }
+        Insert: {
+          created_at?: string | null
+          expires_at?: string | null
+          id?: string
+          permission_level?: string
+          quote_id: string
+          shared_by: string
+          shared_with: string
+        }
+        Update: {
+          created_at?: string | null
+          expires_at?: string | null
+          id?: string
+          permission_level?: string
+          quote_id?: string
+          shared_by?: string
+          shared_with?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quote_shares_quote_id_fkey"
+            columns: ["quote_id"]
+            isOneToOne: false
+            referencedRelation: "quotes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       quotes: {
         Row: {
           approval_notes: string | null

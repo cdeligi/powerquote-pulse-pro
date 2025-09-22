@@ -4,10 +4,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Search, FileText, Eye, Download, ExternalLink, Edit } from "lucide-react";
+import { Search, FileText, Eye, Download, ExternalLink, Edit, Share, Plus } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useQuotes } from "@/hooks/useQuotes";
 import { toast } from "@/hooks/use-toast";
+import { QuoteShareDialog } from './QuoteShareDialog';
+import { supabase } from "@/integrations/supabase/client";
 
 interface QuoteManagerProps {
   user: User;
@@ -22,7 +24,7 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
     fetchQuotes();
   }, []);
 
-  // Filter and process quotes
+  // Filter and process quotes with real BOM item counts
   const processedQuotes = quotes.map(quote => ({
     id: quote.id,
     customer: quote.customer_name || 'Unnamed Customer',
@@ -32,79 +34,41 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
     priority: quote.priority,
     createdAt: new Date(quote.created_at).toLocaleDateString(),
     updatedAt: new Date(quote.updated_at).toLocaleDateString(),
-    items: 0, // This would need to be calculated from BOM items
+    items: bomCounts[quote.id] || 0,
     discountRequested: quote.requested_discount || 0,
     pdfUrl: quote.status === 'draft' ? null : `/quotes/${quote.id}.pdf`
   }));
 
-  // Remove the mock data array
-  const mockQuotes = [
-    {
-      id: 'Q-2024-001',
-      customer: 'ABC Power Company',
-      oracleCustomerId: 'ORD-12345',
-      value: 45250,
-      status: 'pending_approval',
-      priority: 'High',
-      createdAt: '2024-01-15',
-      updatedAt: '2024-01-15',
-      items: 5,
-      discountRequested: 10,
-      pdfUrl: '/quotes/Q-2024-001.pdf'
-    },
-    {
-      id: 'Q-2024-002',
-      customer: 'Delta Electric',
-      oracleCustomerId: 'ORD-67890',
-      value: 78900,
-      status: 'approved',
-      priority: 'Medium',
-      createdAt: '2024-01-14',
-      updatedAt: '2024-01-16',
-      items: 8,
-      discountRequested: 5,
-      pdfUrl: '/quotes/Q-2024-002.pdf'
-    },
-    {
-      id: 'Q-2024-003',
-      customer: 'Phoenix Utilities',
-      oracleCustomerId: 'ORD-11111',
-      value: 32100,
-      status: 'draft',
-      priority: 'Low',
-      createdAt: '2024-01-13',
-      updatedAt: '2024-01-13',
-      items: 3,
-      discountRequested: 0,
-      pdfUrl: null
-    },
-    {
-      id: 'Q-2024-004',
-      customer: 'Meridian Power',
-      oracleCustomerId: 'ORD-22222',
-      value: 156800,
-      status: 'finalized',
-      priority: 'High',
-      createdAt: '2024-01-10',
-      updatedAt: '2024-01-12',
-      items: 12,
-      discountRequested: 15,
-      pdfUrl: '/quotes/Q-2024-004.pdf'
-    },
-    {
-      id: 'Q-2024-005',
-      customer: 'Apex Energy',
-      oracleCustomerId: 'ORD-33333',
-      value: 24500,
-      status: 'rejected',
-      priority: 'Medium',
-      createdAt: '2024-01-08',
-      updatedAt: '2024-01-09',
-      items: 2,
-      discountRequested: 25,
-      pdfUrl: '/quotes/Q-2024-005.pdf'
-    }
-  ];
+  // Fetch BOM item count for each quote
+  const [bomCounts, setBomCounts] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    const fetchBOMCounts = async () => {
+      if (quotes.length > 0) {
+        const counts: Record<string, number> = {};
+        
+        for (const quote of quotes) {
+          try {
+            const { count, error } = await supabase
+              .from('bom_items')
+              .select('*', { count: 'exact', head: true })
+              .eq('quote_id', quote.id);
+              
+            if (!error) {
+              counts[quote.id] = count || 0;
+            }
+          } catch (err) {
+            console.error(`Error fetching BOM count for quote ${quote.id}:`, err);
+            counts[quote.id] = 0;
+          }
+        }
+        
+        setBomCounts(counts);
+      }
+    };
+
+    fetchBOMCounts();
+  }, [quotes]);
 
   const getStatusBadge = (status: string) => {
     const statusConfig = {
@@ -160,14 +124,19 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
 
   const handleEditQuote = (quote: any) => {
     if (quote.status === 'draft') {
-      // Redirect to BOM builder to continue editing
-      window.location.href = '/#configure';
+      // Redirect to BOM builder to continue editing the specific quote
+      window.location.href = `/#configure?quoteId=${quote.id}`;
     } else {
       toast({
         title: "Info",
         description: "Only draft quotes can be edited. Submitted quotes require admin approval to modify."
       });
     }
+  };
+
+  const handleNewQuote = () => {
+    // Redirect to BOM builder for new quote
+    window.location.href = '/#configure';
   };
 
   if (loading) {
@@ -193,8 +162,11 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
           <h1 className="text-3xl font-bold text-white mb-2">Quote Manager</h1>
           <p className="text-gray-400">Manage and track your quotes</p>
         </div>
-        <Button className="bg-red-600 hover:bg-red-700 text-white">
-          <FileText className="mr-2 h-4 w-4" />
+        <Button 
+          onClick={handleNewQuote}
+          className="bg-red-600 hover:bg-red-700 text-white"
+        >
+          <Plus className="mr-2 h-4 w-4" />
           New Quote
         </Button>
       </div>
@@ -343,6 +315,19 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
                         <Edit className="h-4 w-4" />
                       </Button>
                     )}
+                    <QuoteShareDialog
+                      quoteId={quote.id}
+                      quoteName={`${quote.id} - ${quote.customer}`}
+                    >
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-cyan-400 hover:text-cyan-300 hover:bg-gray-700"
+                        title="Share Quote"
+                      >
+                        <Share className="h-4 w-4" />
+                      </Button>
+                    </QuoteShareDialog>
                     <Button
                       variant="ghost"
                       size="sm"

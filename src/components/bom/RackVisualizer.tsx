@@ -145,6 +145,32 @@ const getSlotTitle = (slot: number) => {
     return !isSecondaryBushingSlot;
   };
 
+  const shouldShowLevel4Button = (slot: number, card: Level3Product) => {
+    if (!card) return false;
+    
+    // For bushing cards, only show Level 4 button on the primary (first) slot
+    if (isBushingCard(card)) {
+      const bushingEntry = Object.entries(bushingSlots).find(([_, slots]) => 
+        slots.includes(slot)
+      );
+      if (bushingEntry) {
+        const [primarySlot, occupiedSlots] = bushingEntry;
+        return parseInt(primarySlot) === slot; // Only show on primary slot
+      }
+    }
+    
+    // For non-bushing cards, show if they have Level 4 configuration
+    const hasLevel4Config = Boolean(
+      (card as any)?.hasLevel4Configuration ||
+      (card as any)?.level4BomItemId ||
+      (card as any)?.level4Config ||
+      (card as any)?.has_level4 ||
+      (card as any)?.requires_level4_config
+    );
+    
+    return hasLevel4Config;
+  };
+
   const handleSlotClear = (slot: number) => {
     const card = slotAssignments[slot];
     if (card && isBushingCard(card)) {
@@ -372,13 +398,7 @@ const getSlotTitle = (slot: number) => {
                   const primarySlot = parseInt(slot, 10);
                   const card = slotAssignments[primarySlot];
                   const label = getCardDisplayName(card) || 'Card';
-                  const hasLevel4Config = Boolean(
-                    (card as any)?.hasLevel4Configuration ||
-                    (card as any)?.level4BomItemId ||
-                    (card as any)?.level4Config ||
-                    (card as any)?.has_level4 ||
-                    (card as any)?.requires_level4_config
-                  );
+                  const shouldShowButton = shouldShowLevel4Button(primarySlot, card);
                   const hasExistingConfig = Boolean((card as any)?.level4BomItemId);
                   const srLabel = `${hasExistingConfig ? 'Reconfigure' : 'Configure'} ${label}`;
 
@@ -388,7 +408,7 @@ const getSlotTitle = (slot: number) => {
                         <span className="text-gray-400">Slots {slots.join('-')}:</span>
                         <span className="text-white">{label}</span>
                       </div>
-                      {hasLevel4Config && !!onSlotReconfigure && (
+                      {shouldShowButton && !!onSlotReconfigure && (
                         <Button
                           size="icon"
                           variant="ghost"
@@ -416,16 +436,10 @@ const getSlotTitle = (slot: number) => {
                     const isEmpty = !card;
                     const isSecondaryBushing = Boolean((card as any)?.isBushingSecondary);
                     const label = isEmpty ? 'Empty' : getCardDisplayName(card);
-                    const hasLevel4Config = Boolean(
-                      (card as any)?.hasLevel4Configuration ||
-                      (card as any)?.level4BomItemId ||
-                      (card as any)?.level4Config ||
-                      (card as any)?.has_level4 ||
-                      (card as any)?.requires_level4_config
-                    );
+                    const shouldShowButton = !isEmpty && !isSecondaryBushing && shouldShowLevel4Button(slot, card);
                     const hasExistingConfig = Boolean((card as any)?.level4BomItemId);
                     const isSharedConfig = Boolean((card as any)?.isSharedLevel4Config);
-                    const showReconfigureButton = !isEmpty && !isSecondaryBushing && !isSharedConfig && !!onSlotReconfigure && hasLevel4Config;
+                    const showReconfigureButton = shouldShowButton && !isSharedConfig && !!onSlotReconfigure;
                     const srLabel = `${hasExistingConfig ? 'Reconfigure' : 'Configure'} ${label || 'card'}`;
 
                     return (
