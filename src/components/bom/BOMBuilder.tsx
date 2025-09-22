@@ -739,34 +739,79 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
 
       setSlotAssignments(prev => {
         const updated = { ...prev };
+        const primaryCard = updated[slot];
 
-        const applyUpdate = (targetSlot: number) => {
-          const existingCard = updated[targetSlot];
-          if (!existingCard) return;
+        // For bushing cards, only apply the Level 4 configuration to the primary slot
+        // The secondary slot will share the configuration but not have its own Level 4 BOM item
+        if (primaryCard && isBushingCard(primaryCard)) {
+          const isPrimarySlot = (primaryCard as any)?.isBushingPrimary;
+          
+          if (isPrimarySlot) {
+            // Apply to primary slot only
+            updated[slot] = {
+              ...primaryCard,
+              displayName: (primaryCard as any).displayName || primaryCard.name,
+              level4Config: payload,
+              level4BomItemId: payload.bomItemId,
+              level4TempQuoteId: tempQuoteId,
+              hasLevel4Configuration: true
+            } as Level3Product;
 
-          updated[targetSlot] = {
-            ...existingCard,
-            displayName: (existingCard as any).displayName || existingCard.name,
+            // Update the secondary slot to reference the primary's configuration but don't create a separate BOM item
+            const pairedSlot = (primaryCard as any)?.bushingPairSlot as number | undefined;
+            if (pairedSlot && updated[pairedSlot]) {
+              updated[pairedSlot] = {
+                ...updated[pairedSlot],
+                displayName: (updated[pairedSlot] as any).displayName || updated[pairedSlot].name,
+                level4Config: payload, // Share the same configuration
+                level4BomItemId: payload.bomItemId, // Reference the same BOM item
+                level4TempQuoteId: tempQuoteId,
+                hasLevel4Configuration: true,
+                isSharedLevel4Config: true // Flag to indicate this is a shared config
+              } as Level3Product;
+            }
+          } else {
+            // If this is a secondary slot being configured, find the primary and update it
+            const pairedSlot = (primaryCard as any)?.bushingPairSlot as number | undefined;
+            if (pairedSlot && updated[pairedSlot]) {
+              // Apply configuration to the primary slot
+              updated[pairedSlot] = {
+                ...updated[pairedSlot],
+                displayName: (updated[pairedSlot] as any).displayName || updated[pairedSlot].name,
+                level4Config: payload,
+                level4BomItemId: payload.bomItemId,
+                level4TempQuoteId: tempQuoteId,
+                hasLevel4Configuration: true
+              } as Level3Product;
+
+              // Update the secondary slot to reference the primary's configuration
+              updated[slot] = {
+                ...primaryCard,
+                displayName: (primaryCard as any).displayName || primaryCard.name,
+                level4Config: payload,
+                level4BomItemId: payload.bomItemId,
+                level4TempQuoteId: tempQuoteId,
+                hasLevel4Configuration: true,
+                isSharedLevel4Config: true
+              } as Level3Product;
+            }
+          }
+        } else {
+          // For non-bushing cards, apply normally
+          updated[slot] = {
+            ...primaryCard,
+            displayName: (primaryCard as any).displayName || primaryCard.name,
             level4Config: payload,
             level4BomItemId: payload.bomItemId,
             level4TempQuoteId: tempQuoteId,
             hasLevel4Configuration: true
           } as Level3Product;
-        };
-
-        applyUpdate(slot);
-
-        const primaryCard = updated[slot];
-        if (primaryCard && isBushingCard(primaryCard)) {
-          const pairedSlot = (primaryCard as any)?.bushingPairSlot as number | undefined;
-          if (pairedSlot) {
-            applyUpdate(pairedSlot);
-          }
         }
 
         return updated;
       });
 
+      // Clean up temporary BOM items - avoid duplicates by only removing the specific item
       setBomItems(prev => {
         const filtered = prev.filter(item => item.id !== payload.bomItemId);
         if (filtered.length !== prev.length) {
