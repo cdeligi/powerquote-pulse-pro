@@ -1,3 +1,8 @@
+        codex/fix-bom-item-addition-and-display-names-eburrr
+import { useMemo } from "react";
+
+
+main
 import { Chassis, Level3Product } from "@/types/product";
 import { ChassisType } from "@/types/product/chassis-types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -61,7 +66,10 @@ const RackVisualizer = ({
 
   const getCardDisplayName = (card?: Level3Product) => {
     if (!card) return '';
+        codex/fix-bom-item-addition-and-display-names-eburrr
+
     codex/fix-bom-item-addition-and-display-names-lfhkqt
+        main
 
     const productRecord = (card as any).product;
     if (productRecord) {
@@ -80,9 +88,12 @@ const RackVisualizer = ({
       card.type ||
       'Card'
     );
+        codex/fix-bom-item-addition-and-display-names-eburrr
+
 
     return (card as any).displayName || card.displayName || card.name || card.type || 'Card';
     main
+        main
   };
 
   const getCardTypeColor = (cardType: string) => {
@@ -311,6 +322,30 @@ const getSlotTitle = (slot: number) => {
     }
   };
 
+  const summaryTotalSlots = chassis.slots || chassis.specifications?.slots || 0;
+
+  const slotOrder = useMemo(() => {
+    if (summaryTotalSlots > 0) {
+      return Array.from({ length: summaryTotalSlots }, (_, index) => index + 1);
+    }
+
+    return Object.keys(slotAssignments)
+      .map(Number)
+      .sort((a, b) => a - b);
+  }, [slotAssignments, summaryTotalSlots]);
+
+  const hasLevel4Metadata = (card?: Level3Product) => {
+    if (!card) return false;
+
+    return Boolean(
+      (card as any)?.hasLevel4Configuration ||
+      (card as any)?.level4BomItemId ||
+      (card as any)?.level4Config ||
+      (card as any)?.has_level4 ||
+      (card as any)?.requires_level4_config
+    );
+  };
+
   return (
     <Card className="bg-gray-900 border-gray-800">
       <CardHeader>
@@ -368,6 +403,16 @@ const getSlotTitle = (slot: number) => {
           
           
           {/* Slot assignments summary */}
+        codex/fix-bom-item-addition-and-display-names-eburrr
+          {(summaryTotalSlots || Object.keys(slotAssignments).length > 0) && (
+            <div className="pt-4 border-t border-gray-700">
+              <h4 className="text-white font-medium mb-2">Assigned Cards:</h4>
+              <div className="space-y-1">
+                {Object.entries(bushingSlots).map(([slotKey, slots]) => {
+                  const primarySlot = parseInt(slotKey, 10);
+                  const card = slotAssignments[primarySlot];
+                  const label = getCardDisplayName(card) || 'Card';
+
           {(chassis.slots || chassis.specifications?.slots || Object.keys(slotAssignments).length > 0) && (
             <div className="pt-4 border-t border-gray-700">
               <h4 className="text-white font-medium mb-2">Assigned Cards:</h4>
@@ -384,16 +429,25 @@ const getSlotTitle = (slot: number) => {
                     (card as any)?.has_level4 ||
                     (card as any)?.requires_level4_config
                   );
+        main
                   const hasExistingConfig = Boolean((card as any)?.level4BomItemId);
                   const srLabel = `${hasExistingConfig ? 'Reconfigure' : 'Configure'} ${label}`;
 
                   return (
+        codex/fix-bom-item-addition-and-display-names-eburrr
+                    <div key={`bushing-${slotKey}`} className="flex items-center justify-between gap-2 text-sm">
+
                     <div key={`bushing-${slot}`} className="flex items-center justify-between gap-2 text-sm">
+        main
                       <div className="flex items-center gap-2">
                         <span className="text-gray-400">Slots {slots.join('-')}:</span>
                         <span className="text-white">{label}</span>
                       </div>
+        codex/fix-bom-item-addition-and-display-names-eburrr
+                      {hasLevel4Metadata(card) && !!onSlotReconfigure && (
+
                       {hasLevel4Config && !!onSlotReconfigure && (
+        main
                         <Button
                           size="icon"
                           variant="ghost"
@@ -408,6 +462,38 @@ const getSlotTitle = (slot: number) => {
                     </div>
                   );
                 })}
+        codex/fix-bom-item-addition-and-display-names-eburrr
+                {slotOrder.map(slot => {
+                  const card = slotAssignments[slot];
+                  const isEmpty = !card;
+                  const label = isEmpty ? 'Empty' : getCardDisplayName(card);
+                  const hasExistingConfig = Boolean((card as any)?.level4BomItemId);
+                  const srLabel = `${hasExistingConfig ? 'Reconfigure' : 'Configure'} ${label || 'card'}`;
+
+                  return (
+                    <div key={slot} className="flex items-center justify-between gap-2 text-sm">
+                      <div className="flex items-center gap-2">
+                        <span className="text-gray-400">Slot {slot}:</span>
+                        <span className={isEmpty ? 'text-gray-500 italic' : 'text-white'}>
+                          {label || 'Card'}
+                        </span>
+                      </div>
+                      {!isEmpty && !((card as any)?.isBushingSecondary) && hasLevel4Metadata(card) && !!onSlotReconfigure && (
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-7 w-7 border border-gray-700 text-gray-200 hover:text-white"
+                          onClick={() => onSlotReconfigure?.(slot)}
+                          title={srLabel}
+                        >
+                          <Settings className="h-3.5 w-3.5" />
+                          <span className="sr-only">{srLabel}</span>
+                        </Button>
+                      )}
+                    </div>
+                  );
+                })}
+
 
                 {Object.entries(bushingSlots).map(([slot, slots]) => (
                   <div key={`bushing-${slot}`} className="flex justify-between text-sm">
@@ -482,6 +568,7 @@ const getSlotTitle = (slot: number) => {
                     );
                   });
                 })()}
+        main
               </div>
             </div>
           )}
