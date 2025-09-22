@@ -1467,6 +1467,45 @@ export type Database = {
         }
         Relationships: []
       }
+      user_permissions: {
+        Row: {
+          created_at: string
+          enabled: boolean
+          expires_at: string | null
+          granted_by: string
+          id: string
+          permission_type: string
+          resource_id: string | null
+          resource_type: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          enabled?: boolean
+          expires_at?: string | null
+          granted_by: string
+          id?: string
+          permission_type: string
+          resource_id?: string | null
+          resource_type?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          enabled?: boolean
+          expires_at?: string | null
+          granted_by?: string
+          id?: string
+          permission_type?: string
+          resource_id?: string | null
+          resource_type?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_registration_requests: {
         Row: {
           agreed_to_privacy_policy: boolean
@@ -1871,6 +1910,15 @@ export type Database = {
       get_user_role: {
         Args: { user_id: string }
         Returns: string
+      }
+      has_permission: {
+        Args: {
+          _permission_type: string
+          _resource_id?: string
+          _resource_type?: string
+          _user_id: string
+        }
+        Returns: boolean
       }
       is_admin: {
         Args: Record<PropertyKey, never>

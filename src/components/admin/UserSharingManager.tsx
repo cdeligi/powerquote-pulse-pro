@@ -35,6 +35,7 @@ interface UserPermission {
   user_id: string;
   permission_type: 'view' | 'edit' | 'admin';
   enabled: boolean;
+  created_at: string;
   user: UserProfile;
 }
 
@@ -78,9 +79,19 @@ export const UserSharingManager: React.FC<UserSharingManagerProps> = ({ onClose 
 
   const fetchPermissions = async () => {
     try {
-      // Note: This would need a user_permissions table to be created
-      // For now, we'll use mock data structure
-      setPermissions([]);
+      const { data, error } = await supabase
+        .from('user_permissions')
+        .select(`
+          *,
+          user:profiles!user_permissions_user_id_fkey(
+            id, email, first_name, last_name, role, department
+          )
+        `)
+        .eq('resource_type', 'quotes')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setPermissions(data || []);
       setLoading(false);
     } catch (error) {
       console.error('Error fetching permissions:', error);
@@ -117,14 +128,31 @@ export const UserSharingManager: React.FC<UserSharingManagerProps> = ({ onClose 
     }
 
     try {
-      // This would need to be implemented with a proper permissions system
-      // For now, we'll show a success message
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      const permissionInserts = Array.from(selectedUsers).map(userId => ({
+        user_id: userId,
+        granted_by: user.id,
+        permission_type: selectedPermissionType,
+        resource_type: 'quotes',
+        enabled: true
+      }));
+
+      const { error } = await supabase
+        .from('user_permissions')
+        .insert(permissionInserts)
+        .select();
+
+      if (error) throw error;
+
       toast({
         title: 'Permissions Granted',
         description: `${selectedPermissionType} permissions granted to ${selectedUsers.size} user(s).`
       });
 
       setSelectedUsers(new Set());
+      await fetchPermissions();
     } catch (error) {
       console.error('Error granting permissions:', error);
       toast({
