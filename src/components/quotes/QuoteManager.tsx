@@ -4,8 +4,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Search, FileText, Eye, Download, ExternalLink } from "lucide-react";
-import { useState } from "react";
+import { Search, FileText, Eye, Download, ExternalLink, Edit } from "lucide-react";
+import { useState, useEffect } from "react";
+import { useQuotes } from "@/hooks/useQuotes";
+import { toast } from "@/hooks/use-toast";
 
 interface QuoteManagerProps {
   user: User;
@@ -13,10 +15,30 @@ interface QuoteManagerProps {
 
 const QuoteManager = ({ user }: QuoteManagerProps) => {
   const [searchTerm, setSearchTerm] = useState("");
-  const [priorityFilter, setPriorityFilter] = useState<'All' | 'High' | 'Medium' | 'Low'>('All');
+  const [priorityFilter, setPriorityFilter] = useState<'All' | 'High' | 'Medium' | 'Low' | 'Draft'>('All');
+  const { quotes, loading, error, fetchQuotes } = useQuotes();
 
-  // Mock quotes data with new fields
-  const quotes = [
+  useEffect(() => {
+    fetchQuotes();
+  }, []);
+
+  // Filter and process quotes
+  const processedQuotes = quotes.map(quote => ({
+    id: quote.id,
+    customer: quote.customer_name || 'Unnamed Customer',
+    oracleCustomerId: quote.oracle_customer_id || 'N/A',
+    value: quote.original_quote_value || 0,
+    status: quote.status,
+    priority: quote.priority,
+    createdAt: new Date(quote.created_at).toLocaleDateString(),
+    updatedAt: new Date(quote.updated_at).toLocaleDateString(),
+    items: 0, // This would need to be calculated from BOM items
+    discountRequested: quote.requested_discount || 0,
+    pdfUrl: quote.status === 'draft' ? null : `/quotes/${quote.id}.pdf`
+  }));
+
+  // Remove the mock data array
+  const mockQuotes = [
     {
       id: 'Q-2024-001',
       customer: 'ABC Power Company',
@@ -104,11 +126,13 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
     return priorityConfig[priority as keyof typeof priorityConfig] || priorityConfig.Medium;
   };
 
-  const filteredQuotes = quotes.filter(quote => {
+  const filteredQuotes = processedQuotes.filter(quote => {
     const matchesSearch = quote.customer.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          quote.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          quote.oracleCustomerId.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesPriority = priorityFilter === 'All' || quote.priority === priorityFilter;
+    const matchesPriority = priorityFilter === 'All' || 
+                           (priorityFilter === 'Draft' && quote.status === 'draft') ||
+                           (priorityFilter !== 'Draft' && quote.priority === priorityFilter);
     return matchesSearch && matchesPriority;
   });
 
@@ -134,6 +158,34 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
     }
   };
 
+  const handleEditQuote = (quote: any) => {
+    if (quote.status === 'draft') {
+      // Redirect to BOM builder to continue editing
+      window.location.href = '/#configure';
+    } else {
+      toast({
+        title: "Info",
+        description: "Only draft quotes can be edited. Submitted quotes require admin approval to modify."
+      });
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-8">
+        <div className="text-white">Loading quotes...</div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center py-8">
+        <div className="text-red-400">Error loading quotes: {error}</div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -148,9 +200,9 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
       </div>
 
       {/* Pipeline Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
         {['High', 'Medium', 'Low'].map(priority => {
-          const count = quotes.filter(q => q.priority === priority && q.status !== 'finalized' && q.status !== 'rejected').length;
+          const count = processedQuotes.filter(q => q.priority === priority && q.status !== 'approved' && q.status !== 'rejected').length;
           const badge = getPriorityBadge(priority);
           return (
             <Card key={priority} className="bg-gray-900 border-gray-800">
@@ -164,15 +216,28 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
                 </Badge>
               </CardContent>
             </Card>
-          );
+           );
         })}
+        <Card className="bg-gray-900 border-gray-800">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-white text-sm">Draft Quotes</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-white">
+              {processedQuotes.filter(q => q.status === 'draft').length}
+            </div>
+            <Badge className="bg-gray-600 text-white mt-2">
+              In Progress
+            </Badge>
+          </CardContent>
+        </Card>
         <Card className="bg-gray-900 border-gray-800">
           <CardHeader className="pb-2">
             <CardTitle className="text-white text-sm">Total Pipeline</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-white">
-              {canSeePrices ? `$${quotes.filter(q => q.status !== 'rejected').reduce((sum, q) => sum + q.value, 0).toLocaleString()}` : '—'}
+              {canSeePrices ? `$${processedQuotes.filter(q => q.status !== 'rejected').reduce((sum, q) => sum + q.value, 0).toLocaleString()}` : '—'}
             </div>
             <Badge className="bg-blue-600 text-white mt-2">
               Active Value
@@ -202,7 +267,8 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
               onChange={(e) => setPriorityFilter(e.target.value as any)}
               className="bg-gray-800 border border-gray-700 text-white rounded-md px-3 py-2"
             >
-              <option value="All">All Priorities</option>
+              <option value="All">All Quotes</option>
+              <option value="Draft">Draft Quotes</option>
               <option value="High">High Priority</option>
               <option value="Medium">Medium Priority</option>
               <option value="Low">Low Priority</option>
@@ -266,6 +332,17 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
                   </div>
                   
                   <div className="flex space-x-2 ml-4">
+                    {quote.status === 'draft' && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-orange-400 hover:text-orange-300 hover:bg-gray-700"
+                        onClick={() => handleEditQuote(quote)}
+                        title="Continue Editing"
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                    )}
                     <Button
                       variant="ghost"
                       size="sm"
@@ -275,7 +352,7 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
                     >
                       <Eye className="h-4 w-4" />
                     </Button>
-                    {(quote.status === 'finalized' || quote.status === 'approved') && quote.pdfUrl && (
+                    {(quote.status === 'approved') && quote.pdfUrl && (
                       <Button
                         variant="ghost"
                         size="sm"

@@ -187,7 +187,6 @@ export type Database = {
           entries: Json
           id: string
           level4_config_id: string
-          template_type: string
           updated_at: string
         }
         Insert: {
@@ -196,7 +195,6 @@ export type Database = {
           entries: Json
           id?: string
           level4_config_id: string
-          template_type: string
           updated_at?: string
         }
         Update: {
@@ -205,7 +203,6 @@ export type Database = {
           entries?: Json
           id?: string
           level4_config_id?: string
-          template_type?: string
           updated_at?: string
         }
         Relationships: [
@@ -346,16 +343,19 @@ export type Database = {
           created_at: string
           id: string
           name: string
+          owner_id: string | null
         }
         Insert: {
           created_at?: string
           id?: string
           name: string
+          owner_id?: string | null
         }
         Update: {
           created_at?: string
           id?: string
           name?: string
+          owner_id?: string | null
         }
         Relationships: []
       }
@@ -433,6 +433,27 @@ export type Database = {
         }
         Relationships: []
       }
+      level2: {
+        Row: {
+          created_at: string | null
+          id: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       level2_level3_relationships: {
         Row: {
           created_at: string
@@ -490,6 +511,42 @@ export type Database = {
           },
         ]
       }
+      level4_configs: {
+        Row: {
+          created_at: string
+          field_label: string
+          fixed_number_of_inputs: number | null
+          id: string
+          mode: string
+          options: Json
+          product_id: string
+          updated_at: string
+          variable_max_inputs: number | null
+        }
+        Insert: {
+          created_at?: string
+          field_label: string
+          fixed_number_of_inputs?: number | null
+          id?: string
+          mode: string
+          options?: Json
+          product_id: string
+          updated_at?: string
+          variable_max_inputs?: number | null
+        }
+        Update: {
+          created_at?: string
+          field_label?: string
+          fixed_number_of_inputs?: number | null
+          id?: string
+          mode?: string
+          options?: Json
+          product_id?: string
+          updated_at?: string
+          variable_max_inputs?: number | null
+        }
+        Relationships: []
+      }
       level4_configuration_options: {
         Row: {
           created_at: string
@@ -540,94 +597,6 @@ export type Database = {
             columns: ["level4_product_id"]
             isOneToOne: false
             referencedRelation: "level4_products"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      level4_configurations: {
-        Row: {
-          created_at: string
-          field_label: string
-          fixed_inputs: number | null
-          id: string
-          info_url: string | null
-          level3_product_id: string
-          max_inputs: number | null
-          template_type: string
-          updated_at: string
-        }
-        Insert: {
-          created_at?: string
-          field_label: string
-          fixed_inputs?: number | null
-          id?: string
-          info_url?: string | null
-          level3_product_id: string
-          max_inputs?: number | null
-          template_type: string
-          updated_at?: string
-        }
-        Update: {
-          created_at?: string
-          field_label?: string
-          fixed_inputs?: number | null
-          id?: string
-          info_url?: string | null
-          level3_product_id?: string
-          max_inputs?: number | null
-          template_type?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "level4_configurations_level3_product_id_fkey"
-            columns: ["level3_product_id"]
-            isOneToOne: true
-            referencedRelation: "products"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      level4_dropdown_options: {
-        Row: {
-          created_at: string
-          display_order: number
-          id: string
-          info_url: string | null
-          is_default: boolean
-          label: string
-          level4_configuration_id: string
-          updated_at: string
-          value: string
-        }
-        Insert: {
-          created_at?: string
-          display_order?: number
-          id?: string
-          info_url?: string | null
-          is_default?: boolean
-          label: string
-          level4_configuration_id: string
-          updated_at?: string
-          value: string
-        }
-        Update: {
-          created_at?: string
-          display_order?: number
-          id?: string
-          info_url?: string | null
-          is_default?: boolean
-          label?: string
-          level4_configuration_id?: string
-          updated_at?: string
-          value?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "level4_dropdown_options_level4_configuration_id_fkey"
-            columns: ["level4_configuration_id"]
-            isOneToOne: false
-            referencedRelation: "level4_configurations"
             referencedColumns: ["id"]
           },
         ]
@@ -1739,6 +1708,10 @@ export type Database = {
       execute_sql: {
         Args: { query: string }
         Returns: Json
+      }
+      generate_quote_id: {
+        Args: Record<PropertyKey, never>
+        Returns: string
       }
       get_admin_user_ids: {
         Args: Record<PropertyKey, never>

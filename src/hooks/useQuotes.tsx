@@ -15,7 +15,7 @@ export interface Quote {
   submitted_by_email: string;
   created_at: string;
   updated_at: string;
-  status: 'pending_approval' | 'approved' | 'rejected' | 'under-review';
+  status: 'draft' | 'pending_approval' | 'approved' | 'rejected' | 'under-review';
   original_quote_value: number;
   discounted_value: number;
   requested_discount: number;
