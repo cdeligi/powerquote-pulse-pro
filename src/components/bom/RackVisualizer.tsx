@@ -61,6 +61,7 @@ const RackVisualizer = ({
 
   const getCardDisplayName = (card?: Level3Product) => {
     if (!card) return '';
+    codex/fix-bom-item-addition-and-display-names-lfhkqt
 
     const productRecord = (card as any).product;
     if (productRecord) {
@@ -79,6 +80,9 @@ const RackVisualizer = ({
       card.type ||
       'Card'
     );
+
+    return (card as any).displayName || card.displayName || card.name || card.type || 'Card';
+    main
   };
 
   const getCardTypeColor = (cardType: string) => {
@@ -368,6 +372,7 @@ const getSlotTitle = (slot: number) => {
             <div className="pt-4 border-t border-gray-700">
               <h4 className="text-white font-medium mb-2">Assigned Cards:</h4>
               <div className="space-y-1">
+        codex/fix-bom-item-addition-and-display-names-lfhkqt
                 {Object.entries(bushingSlots).map(([slot, slots]) => {
                   const primarySlot = parseInt(slot, 10);
                   const card = slotAssignments[primarySlot];
@@ -403,6 +408,17 @@ const getSlotTitle = (slot: number) => {
                     </div>
                   );
                 })}
+
+                {Object.entries(bushingSlots).map(([slot, slots]) => (
+                  <div key={`bushing-${slot}`} className="flex justify-between text-sm">
+                    <span className="text-gray-400">Slots {slots.join('-')}:</span>
+                    <span className="text-white">{(() => {
+                      const card = slotAssignments[parseInt(slot)];
+                      return getCardDisplayName(card) || 'Card';
+                    })()}</span>
+                  </div>
+                ))}
+        main
                 {(() => {
                   const totalSlots = chassis.slots || chassis.specifications?.slots || 0;
                   const slotOrder = totalSlots > 0
@@ -416,6 +432,7 @@ const getSlotTitle = (slot: number) => {
                     const isEmpty = !card;
                     const isSecondaryBushing = Boolean((card as any)?.isBushingSecondary);
                     const label = isEmpty ? 'Empty' : getCardDisplayName(card);
+      codex/fix-bom-item-addition-and-display-names-lfhkqt
                     const hasLevel4Config = Boolean(
                       (card as any)?.hasLevel4Configuration ||
                       (card as any)?.level4BomItemId ||
@@ -427,6 +444,11 @@ const getSlotTitle = (slot: number) => {
                     const showReconfigureButton = !isEmpty && !isSecondaryBushing && !!onSlotReconfigure && hasLevel4Config;
                     const srLabel = `${hasExistingConfig ? 'Reconfigure' : 'Configure'} ${label || 'card'}`;
 
+                    const hasLevel4Config = Boolean((card as any)?.level4BomItemId || (card as any)?.level4Config || (card as any)?.has_level4 || (card as any)?.requires_level4_config);
+                    const showReconfigureButton = !isEmpty && !isSecondaryBushing && !!onSlotReconfigure && hasLevel4Config;
+                    const buttonLabel = (card as any)?.level4BomItemId ? 'Reconfigure' : 'Configure';
+        main
+
                     return (
                       <div key={slot} className="flex items-center justify-between gap-2 text-sm">
                         <div className="flex items-center gap-2">
@@ -437,6 +459,7 @@ const getSlotTitle = (slot: number) => {
                         </div>
                         {showReconfigureButton && (
                           <Button
+      codex/fix-bom-item-addition-and-display-names-lfhkqt
                             size="icon"
                             variant="ghost"
                             className="h-7 w-7 border border-gray-700 text-gray-200 hover:text-white"
@@ -445,6 +468,14 @@ const getSlotTitle = (slot: number) => {
                           >
                             <Settings className="h-3.5 w-3.5" />
                             <span className="sr-only">{srLabel}</span>
+
+                            size="xs"
+                            variant="outline"
+                            className="text-xs"
+                            onClick={() => onSlotReconfigure?.(slot)}
+                          >
+                            {buttonLabel}
+       main
                           </Button>
                         )}
                       </div>
