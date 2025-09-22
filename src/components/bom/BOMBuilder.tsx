@@ -10,6 +10,7 @@ import RackVisualizer from './RackVisualizer';
 import AccessoryList from './AccessoryList';
 import SlotCardSelector from './SlotCardSelector';
 import BOMDisplay from './BOMDisplay';
+import { EnhancedBOMDisplay } from './EnhancedBOMDisplay';
 import AnalogCardConfigurator from './AnalogCardConfigurator';
 import BushingCardConfigurator from './BushingCardConfigurator';
 import NonChassisConfigurator from './NonChassisConfigurator';
@@ -67,6 +68,10 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
   const [configuringChassis, setConfiguringChassis] = useState<Level2Product | null>(null);
   const [editingOriginalItem, setEditingOriginalItem] = useState<BOMItem | null>(null);
   const [configuringNonChassis, setConfiguringNonChassis] = useState<Level2Product | null>(null);
+  
+  // Draft quote functionality
+  const [currentQuoteId, setCurrentQuoteId] = useState<string | null>(null);
+  const [isDraftMode, setIsDraftMode] = useState(false);
 
   // Admin-driven part number config and codes for the selected chassis
   const [pnConfig, setPnConfig] = useState<any | null>(null);
@@ -148,6 +153,225 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
     fetchQuoteFields();
   }, []);
 
+  // Initialize or load draft quote on component mount
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const quoteIdFromUrl = urlParams.get('quoteId');
+    
+    if (quoteIdFromUrl) {
+      // Load existing draft quote
+      setCurrentQuoteId(quoteIdFromUrl);
+      setIsDraftMode(true);
+      loadDraftQuote(quoteIdFromUrl);
+    } else {
+      // Create new draft quote
+      createDraftQuote();
+    }
+  }, []);
+
+  const createDraftQuote = async () => {
+    if (!user?.id) return;
+    
+    try {
+      // Generate quote ID using RPC function
+      const { data: quoteId, error: idError } = await supabase
+        .rpc('generate_quote_id');
+        
+      if (idError) throw idError;
+      
+      // Create draft quote in database
+      const { error } = await supabase
+        .from('quotes')
+        .insert({
+          id: quoteId,
+          user_id: user.id,
+          customer_name: 'Draft Quote',
+          oracle_customer_id: 'DRAFT',
+          sfdc_opportunity: `DRAFT-${Date.now()}`,
+          status: 'draft',
+          original_quote_value: 0,
+          discounted_value: 0,
+          requested_discount: 0,
+          original_margin: 0,
+          discounted_margin: 0,
+          total_cost: 0,
+          gross_profit: 0,
+          priority: 'Medium',
+          is_rep_involved: false,
+          shipping_terms: 'Ex-Works',
+          payment_terms: '30 days',
+          currency: 'USD',
+          quote_fields: {},
+          submitted_by_name: user.name || user.email || 'Unknown User',
+          submitted_by_email: user.email || ''
+        });
+        
+      if (error) throw error;
+      
+      setCurrentQuoteId(quoteId);
+      setIsDraftMode(true);
+      
+      // Update URL without page reload
+      window.history.replaceState({}, '', `/#configure?quoteId=${quoteId}`);
+      
+      toast({
+        title: 'Draft Created',
+        description: `Draft quote ${quoteId} created. Your progress will be automatically saved.`
+      });
+    } catch (error) {
+      console.error('Error creating draft quote:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to create draft quote',
+        variant: 'destructive'
+      });
+    }
+  };
+
+  const loadDraftQuote = async (quoteId: string) => {
+    try {
+      // Load quote data
+      const { data: quote, error: quoteError } = await supabase
+        .from('quotes')
+        .select('*')
+        .eq('id', quoteId)
+        .eq('status', 'draft')
+        .single();
+        
+      if (quoteError) throw quoteError;
+      
+      // Load BOM items for this quote
+      const { data: bomData, error: bomError } = await supabase
+        .from('bom_items')
+        .select('*')
+        .eq('quote_id', quoteId);
+        
+      if (bomError) throw bomError;
+      
+      // Convert BOM items back to local format
+      const loadedItems: BOMItem[] = bomData.map(item => ({
+        id: item.id,
+        product: {
+          id: item.product_id,
+          name: item.name,
+          partNumber: item.part_number,
+          price: item.unit_price,
+          cost: item.unit_cost,
+          description: item.description,
+          ...item.configuration_data
+        },
+        quantity: item.quantity,
+        enabled: true,
+        partNumber: item.part_number
+      }));
+      
+      setBomItems(loadedItems);
+      
+      // Load quote fields
+      if (quote.quote_fields) {
+        setQuoteFields(quote.quote_fields);
+      }
+      
+      toast({
+        title: 'Draft Loaded',
+        description: `Loaded draft quote ${quoteId}`
+      });
+    } catch (error) {
+      console.error('Error loading draft quote:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to load draft quote',
+        variant: 'destructive'
+      });
+    }
+  };
+
+  const saveDraftQuote = async (autoSave = false) => {
+    if (!currentQuoteId || !user?.id) return;
+    
+    try {
+      // Calculate totals
+      const totalValue = bomItems.reduce((sum, item) => 
+        sum + (item.product.price * item.quantity), 0
+      );
+      
+      const totalCost = bomItems.reduce((sum, item) => 
+        sum + ((item.product.cost || 0) * item.quantity), 0
+      );
+      
+      // Update quote
+      const { error: quoteError } = await supabase
+        .from('quotes')
+        .update({
+          customer_name: quoteFields.customerName || 'Draft Quote',
+          oracle_customer_id: quoteFields.oracleCustomerId || 'DRAFT',
+          sfdc_opportunity: quoteFields.sfdcOpportunity || `DRAFT-${Date.now()}`,
+          original_quote_value: totalValue,
+          discounted_value: totalValue * (1 - discountPercentage / 100),
+          requested_discount: discountPercentage,
+          total_cost: totalCost,
+          gross_profit: totalValue - totalCost,
+          original_margin: totalCost > 0 ? ((totalValue - totalCost) / totalValue) * 100 : 100,
+          discounted_margin: totalCost > 0 ? (((totalValue * (1 - discountPercentage / 100)) - totalCost) / (totalValue * (1 - discountPercentage / 100))) * 100 : 100,
+          quote_fields: quoteFields,
+          discount_justification: discountJustification,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', currentQuoteId);
+        
+      if (quoteError) throw quoteError;
+      
+      // Clear existing BOM items and insert new ones
+      await supabase
+        .from('bom_items')
+        .delete()
+        .eq('quote_id', currentQuoteId);
+        
+      if (bomItems.length > 0) {
+        const bomInserts = bomItems.map(item => ({
+          quote_id: currentQuoteId,
+          product_id: item.product.id,
+          name: item.product.name,
+          description: item.product.description,
+          part_number: item.partNumber || item.product.partNumber,
+          quantity: item.quantity,
+          unit_price: item.product.price,
+          unit_cost: item.product.cost || 0,
+          total_price: item.product.price * item.quantity,
+          total_cost: (item.product.cost || 0) * item.quantity,
+          margin: item.product.cost && item.product.cost > 0 
+            ? ((item.product.price - item.product.cost) / item.product.price) * 100 
+            : 100,
+          configuration_data: item.product,
+          product_type: 'standard'
+        }));
+        
+        const { error: bomError } = await supabase
+          .from('bom_items')
+          .insert(bomInserts);
+          
+        if (bomError) throw bomError;
+      }
+      
+      if (!autoSave) {
+        toast({
+          title: 'Draft Saved',
+          description: 'Your quote has been saved as a draft'
+        });
+      }
+    } catch (error) {
+      console.error('Error saving draft:', error);
+      if (!autoSave) {
+        toast({
+          title: 'Error',
+          description: 'Failed to save draft',
+          variant: 'destructive'
+        });
+      }
+    }
+  };
+
+  // Auto-save draft every 30 seconds
   // Use quote validation hook
   const { validation, validateFields } = useQuoteValidation(quoteFields, availableQuoteFields);
 
@@ -1701,15 +1925,19 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
         {/* BOM Display - Right Side (1/3 width, sticky) */}
         <div className="lg:col-span-1">
           <div className="sticky top-4">
-            <BOMDisplay
+            <EnhancedBOMDisplay
               bomItems={bomItems}
               onUpdateBOM={handleBOMUpdate}
               onEditConfiguration={handleBOMConfigurationEdit}
               onSubmitQuote={submitQuoteRequest}
+              onSaveDraft={() => saveDraftQuote(false)}
               canSeePrices={canSeePrices}
               canSeeCosts={canSeeCosts}
               canEditPartNumber={canEditPN}
               productMap={productMap}
+              isSubmitting={isSubmitting}
+              isDraftMode={isDraftMode}
+              currentQuoteId={currentQuoteId}
             />
           </div>
         </div>
