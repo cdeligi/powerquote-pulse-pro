@@ -61,7 +61,24 @@ const RackVisualizer = ({
 
   const getCardDisplayName = (card?: Level3Product) => {
     if (!card) return '';
-    return (card as any).displayName || card.displayName || card.name || card.type || 'Card';
+
+    const productRecord = (card as any).product;
+    if (productRecord) {
+      return (
+        productRecord.displayName ||
+        productRecord.name ||
+        productRecord.type ||
+        'Card'
+      );
+    }
+
+    return (
+      (card as any).displayName ||
+      card.displayName ||
+      card.name ||
+      card.type ||
+      'Card'
+    );
   };
 
   const getCardTypeColor = (cardType: string) => {
