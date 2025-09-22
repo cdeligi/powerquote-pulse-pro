@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Loader2, Save } from 'lucide-react';
 import { getSupabaseClient, getSupabaseAdminClient, isAdminAvailable } from "@/integrations/supabase/client";
@@ -18,29 +19,46 @@ const AdminSettings = () => {
   const [saving, setSaving] = useState(false);
   const [termsContent, setTermsContent] = useState('');
   const [privacyContent, setPrivacyContent] = useState('');
+  const [quotePrefix, setQuotePrefix] = useState('QLT');
+  const [quoteCounter, setQuoteCounter] = useState(1);
 
   const fetchLegalContent = async () => {
     try {
       setLoading(true);
 
-      const { data, error } = await supabase
+      // Fetch legal content
+      const { data: legalData, error: legalError } = await supabase
         .from('legal_pages')
         .select('slug, content')
         .in('slug', ['terms', 'privacy']);
 
-      if (error) throw error;
+      if (legalError) throw legalError;
 
-      const termsPage = data?.find(page => page.slug === 'terms');
-      const privacyPage = data?.find(page => page.slug === 'privacy');
+      const termsPage = legalData?.find(page => page.slug === 'terms');
+      const privacyPage = legalData?.find(page => page.slug === 'privacy');
 
       setTermsContent(termsPage?.content || '');
       setPrivacyContent(privacyPage?.content || '');
 
+      // Fetch quote settings
+      const { data: settingsData, error: settingsError } = await supabase
+        .from('app_settings')
+        .select('key, value')
+        .in('key', ['quote_id_prefix', 'quote_id_counter']);
+
+      if (settingsError) throw settingsError;
+
+      const prefixSetting = settingsData?.find(s => s.key === 'quote_id_prefix');
+      const counterSetting = settingsData?.find(s => s.key === 'quote_id_counter');
+
+      setQuotePrefix(prefixSetting ? JSON.parse(prefixSetting.value) : 'QLT');
+      setQuoteCounter(counterSetting ? parseInt(counterSetting.value) : 1);
+
     } catch (error) {
-      console.error('Error fetching legal content:', error);
+      console.error('Error fetching settings:', error);
       toast({
         title: 'Error',
-        description: 'Failed to load legal content.',
+        description: 'Failed to load settings.',
         variant: 'destructive'
       });
     } finally {
@@ -83,6 +101,44 @@ const AdminSettings = () => {
     }
   };
 
+  const saveQuoteSettings = async () => {
+    try {
+      setSaving(true);
+
+      const updates = [
+        { key: 'quote_id_prefix', value: JSON.stringify(quotePrefix) },
+        { key: 'quote_id_counter', value: quoteCounter.toString() }
+      ];
+
+      for (const update of updates) {
+        const { error } = await supabase
+          .from('app_settings')
+          .upsert({
+            key: update.key,
+            value: update.value,
+            updated_by: user?.id
+          });
+
+        if (error) throw error;
+      }
+
+      toast({
+        title: 'Success',
+        description: 'Quote settings updated successfully.'
+      });
+
+    } catch (error) {
+      console.error('Error saving quote settings:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to save quote settings.',
+        variant: 'destructive'
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-8">
@@ -100,9 +156,12 @@ const AdminSettings = () => {
       </div>
 
       <Tabs defaultValue="general" className="w-full">
-        <TabsList className="grid w-full grid-cols-2 bg-gray-800">
+        <TabsList className="grid w-full grid-cols-3 bg-gray-800">
           <TabsTrigger value="general" className="text-white data-[state=active]:bg-red-600">
             General
+          </TabsTrigger>
+          <TabsTrigger value="quotes" className="text-white data-[state=active]:bg-red-600">
+            Quote Management
           </TabsTrigger>
           <TabsTrigger value="legal" className="text-white data-[state=active]:bg-red-600">
             Legal
@@ -116,6 +175,70 @@ const AdminSettings = () => {
             </CardHeader>
             <CardContent className="text-gray-400">
               <p>General system settings will be available here in future updates.</p>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="quotes">
+          <Card className="bg-gray-900 border-gray-800">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-white">Quote ID Configuration</CardTitle>
+                <Button
+                  onClick={saveQuoteSettings}
+                  disabled={saving}
+                  className="bg-red-600 hover:bg-red-700"
+                >
+                  {saving ? (
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  ) : (
+                    <Save className="h-4 w-4 mr-2" />
+                  )}
+                  Save Settings
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="quote-prefix" className="text-white">
+                    Quote ID Prefix
+                  </Label>
+                  <Input
+                    id="quote-prefix"
+                    value={quotePrefix}
+                    onChange={(e) => setQuotePrefix(e.target.value.toUpperCase())}
+                    className="bg-gray-800 border-gray-600 text-white placeholder:text-gray-400 focus:border-red-500 focus:ring-red-500"
+                    placeholder="QLT"
+                    maxLength={10}
+                  />
+                  <p className="text-sm text-gray-400">
+                    Letters/numbers only. Will be used as: {quotePrefix}-{quoteCounter}
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="quote-counter" className="text-white">
+                    Starting Number
+                  </Label>
+                  <Input
+                    id="quote-counter"
+                    type="number"
+                    value={quoteCounter}
+                    onChange={(e) => setQuoteCounter(parseInt(e.target.value) || 1)}
+                    className="bg-gray-800 border-gray-600 text-white placeholder:text-gray-400 focus:border-red-500 focus:ring-red-500"
+                    min="1"
+                  />
+                  <p className="text-sm text-gray-400">
+                    Next quote will be: {quotePrefix}-{quoteCounter}
+                  </p>
+                </div>
+              </div>
+              <div className="mt-4 p-4 bg-gray-800 rounded-lg">
+                <h4 className="text-white font-medium mb-2">Preview</h4>
+                <p className="text-gray-300">
+                  Quote IDs will be generated as: <span className="font-mono bg-gray-700 px-2 py-1 rounded">{quotePrefix}-{quoteCounter}</span>, <span className="font-mono bg-gray-700 px-2 py-1 rounded">{quotePrefix}-{quoteCounter + 1}</span>, etc.
+                </p>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
