@@ -1948,6 +1948,12 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
               isSubmitting={isSubmitting}
               isDraftMode={isDraftMode}
               currentQuoteId={currentQuoteId}
+              discountPercentage={discountPercentage}
+              discountJustification={discountJustification}
+              onDiscountChange={(percentage, justification) => {
+                setDiscountPercentage(percentage);
+                setDiscountJustification(justification);
+              }}
             />
           </div>
         </div>
