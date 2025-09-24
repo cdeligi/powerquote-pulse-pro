@@ -1512,7 +1512,34 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
     setIsSubmitting(true);
 
     try {
-      const quoteId = `Q-${Date.now()}`;
+      // Generate or finalize quote ID based on whether we're submitting a draft
+      let quoteId: string;
+      let isSubmittingExistingDraft = false;
+      
+      if (currentQuoteId && currentQuoteId.includes('-Draft')) {
+        // We're submitting an existing draft - finalize the ID
+        const { data: finalizedId, error: finalizeError } = await supabase
+          .rpc('finalize_draft_quote_id', { draft_quote_id: currentQuoteId });
+        
+        if (finalizeError) {
+          console.error('Error finalizing draft quote ID:', finalizeError);
+          throw finalizeError;
+        }
+        
+        quoteId = finalizedId;
+        isSubmittingExistingDraft = true;
+      } else {
+        // Generate new quote ID for final submission
+        const { data: newQuoteId, error: generateError } = await supabase
+          .rpc('generate_quote_id', { is_draft: false });
+        
+        if (generateError) {
+          console.error('Error generating quote ID:', generateError);
+          throw generateError;
+        }
+        
+        quoteId = newQuoteId;
+      }
 
       const originalQuoteValue = bomItems.reduce(
         (sum, item) => sum + item.product.price * item.quantity,
@@ -1528,33 +1555,65 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
       const discountedMargin =
         discountedValue > 0 ? (grossProfit / discountedValue) * 100 : 0;
 
-      const { error: quoteError } = await supabase
-        .from('quotes').insert({
-          id: quoteId,
-          customer_name: quoteFields.customerName,
-          oracle_customer_id: quoteFields.oracleCustomerId,
-          sfdc_opportunity: quoteFields.sfdcOpportunity,
-          status: 'pending_approval',
-          user_id: user!.id,
-          submitted_by_name: user!.name,
-          submitted_by_email: user!.email,
-          original_quote_value: originalQuoteValue,
-          requested_discount: discountPercentage,
-          discount_justification: discountJustification,
-          discounted_value: discountedValue,
-          total_cost: totalCost,
-          gross_profit: grossProfit,
-          original_margin:
-            originalQuoteValue > 0
-              ? ((originalQuoteValue - totalCost) / originalQuoteValue) * 100
-              : 0,
-          discounted_margin: discountedMargin,
-          quote_fields: quoteFields,
-          priority: 'Medium',
-          currency: 'USD',
-          payment_terms: 'Net 30',
-          shipping_terms: 'FOB Origin',
-        });
+      let quoteError: any = null;
+      
+      if (isSubmittingExistingDraft) {
+        // Update existing draft quote to final status
+        const { error } = await supabase
+          .from('quotes')
+          .update({
+            id: quoteId,
+            status: 'pending_approval',
+            customer_name: quoteFields.customerName,
+            oracle_customer_id: quoteFields.oracleCustomerId,
+            sfdc_opportunity: quoteFields.sfdcOpportunity,
+            original_quote_value: originalQuoteValue,
+            requested_discount: discountPercentage,
+            discount_justification: discountJustification,
+            discounted_value: discountedValue,
+            total_cost: totalCost,
+            gross_profit: grossProfit,
+            original_margin:
+              originalQuoteValue > 0
+                ? ((originalQuoteValue - totalCost) / originalQuoteValue) * 100
+                : 0,
+            discounted_margin: discountedMargin,
+            quote_fields: quoteFields,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', currentQuoteId);
+        quoteError = error;
+      } else {
+        // Insert new quote
+        const { error } = await supabase
+          .from('quotes').insert({
+            id: quoteId,
+            customer_name: quoteFields.customerName,
+            oracle_customer_id: quoteFields.oracleCustomerId,
+            sfdc_opportunity: quoteFields.sfdcOpportunity,
+            status: 'pending_approval',
+            user_id: user!.id,
+            submitted_by_name: user!.name,
+            submitted_by_email: user!.email,
+            original_quote_value: originalQuoteValue,
+            requested_discount: discountPercentage,
+            discount_justification: discountJustification,
+            discounted_value: discountedValue,
+            total_cost: totalCost,
+            gross_profit: grossProfit,
+            original_margin:
+              originalQuoteValue > 0
+                ? ((originalQuoteValue - totalCost) / originalQuoteValue) * 100
+                : 0,
+            discounted_margin: discountedMargin,
+            quote_fields: quoteFields,
+            priority: 'Medium',
+            currency: 'USD',
+            payment_terms: 'Net 30',
+            shipping_terms: 'FOB Origin',
+          });
+        quoteError = error;
+      }
 
       if (quoteError) {
         console.error('SUPABASE ERROR:', quoteError);
@@ -1568,38 +1627,57 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
         return;
       }
 
-      for (const item of bomItems) {
-        const { error: bomError } = await supabase.from('bom_items').insert({
-          quote_id: quoteId,
-          product_id: item.product.id,
-          name: item.product.name,
-          description: item.product.description || '',
-          part_number: item.product.partNumber || item.partNumber || '',
-          quantity: item.quantity,
-          unit_price: item.product.price,
-          unit_cost: item.product.cost || 0,
-          total_price: item.product.price * item.quantity,
-          total_cost: (item.product.cost || 0) * item.quantity,
-          margin:
-            item.product.price > 0
-              ? ((item.product.price - (item.product.cost || 0)) /
-                  item.product.price) *
-                100
-              : 0,
-          original_unit_price: item.product.price,
-          approved_unit_price: item.product.price,
-          configuration_data: item.configuration || {},
-          product_type: 'standard',
-        });
-
-        if (bomError) {
-          console.error('SUPABASE BOM ERROR:', bomError);
+      if (isSubmittingExistingDraft) {
+        // Update existing BOM items with new quote ID
+        const { error: updateBomError } = await supabase
+          .from('bom_items')
+          .update({ quote_id: quoteId })
+          .eq('quote_id', currentQuoteId);
+        
+        if (updateBomError) {
+          console.error('SUPABASE BOM UPDATE ERROR:', updateBomError);
           toast({
-            title: 'BOM Item Error',
-            description: bomError.message || 'Failed to create BOM item',
+            title: 'BOM Update Error',
+            description: updateBomError.message || 'Failed to update BOM items',
             variant: 'destructive',
           });
-          throw bomError;
+          throw updateBomError;
+        }
+      } else {
+        // Insert new BOM items
+        for (const item of bomItems) {
+          const { error: bomError } = await supabase.from('bom_items').insert({
+            quote_id: quoteId,
+            product_id: item.product.id,
+            name: item.product.name,
+            description: item.product.description || '',
+            part_number: item.product.partNumber || item.partNumber || '',
+            quantity: item.quantity,
+            unit_price: item.product.price,
+            unit_cost: item.product.cost || 0,
+            total_price: item.product.price * item.quantity,
+            total_cost: (item.product.cost || 0) * item.quantity,
+            margin:
+              item.product.price > 0
+                ? ((item.product.price - (item.product.cost || 0)) /
+                    item.product.price) *
+                  100
+                : 0,
+            original_unit_price: item.product.price,
+            approved_unit_price: item.product.price,
+            configuration_data: item.configuration || {},
+            product_type: 'standard',
+          });
+
+          if (bomError) {
+            console.error('SUPABASE BOM ERROR:', bomError);
+            toast({
+              title: 'BOM Item Error',
+              description: bomError.message || 'Failed to create BOM item',
+              variant: 'destructive',
+            });
+            throw bomError;
+          }
         }
       }
 
