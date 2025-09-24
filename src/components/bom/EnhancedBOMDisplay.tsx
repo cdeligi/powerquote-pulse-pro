@@ -278,10 +278,27 @@ export const EnhancedBOMDisplay = ({
                                 type="number"
                                 step="0.01"
                                 value={editingPrices[item.id] ?? item.product.price}
-                                onChange={(e) => setEditingPrices(prev => ({
-                                  ...prev,
-                                  [item.id]: parseFloat(e.target.value) || item.product.price
-                                }))}
+                                onChange={(e) => {
+                                  const newPrice = parseFloat(e.target.value) || item.product.price;
+                                  // Prevent typing values below original price
+                                  if (newPrice >= item.product.price) {
+                                    setEditingPrices(prev => ({
+                                      ...prev,
+                                      [item.id]: newPrice
+                                    }));
+                                  } else {
+                                    // Reset to original price if user tries to go below
+                                    setEditingPrices(prev => ({
+                                      ...prev,
+                                      [item.id]: item.product.price
+                                    }));
+                                    toast({
+                                      title: "Invalid Price",
+                                      description: `Price cannot be lower than $${item.product.price.toFixed(2)}`,
+                                      variant: "destructive"
+                                    });
+                                  }
+                                }}
                                 onBlur={() => {
                                   const newPrice = editingPrices[item.id];
                                   if (newPrice && newPrice !== item.product.price) {
@@ -291,12 +308,20 @@ export const EnhancedBOMDisplay = ({
                                 onKeyDown={(e) => {
                                   if (e.key === 'Enter') {
                                     const newPrice = editingPrices[item.id];
-                                    if (newPrice && newPrice !== item.product.price) {
+                                    if (newPrice && newPrice !== item.product.price && newPrice > item.product.price) {
                                       handlePriceIncrease(item.id, newPrice);
                                     }
                                   }
+                                  // Prevent typing certain keys that could lead to invalid values
+                                  if (e.key === '-' || e.key === 'e' || e.key === 'E') {
+                                    e.preventDefault();
+                                  }
                                 }}
-                                className="w-20 bg-gray-700 border border-gray-600 rounded px-2 py-1 text-white text-center"
+                                className={`w-20 bg-gray-700 border border-gray-600 rounded px-2 py-1 text-white text-center ${
+                                  editingPrices[item.id] && editingPrices[item.id] < item.product.price 
+                                    ? 'border-red-400 bg-red-900/20' 
+                                    : ''
+                                }`}
                                 min={item.original_unit_price || item.product.price}
                               />
                             </div>

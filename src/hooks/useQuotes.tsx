@@ -80,6 +80,15 @@ export const useQuotes = () => {
     setError(null);
 
     try {
+      // Check if user is authenticated
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError || !user) {
+        console.error('Authentication error:', authError);
+        throw new Error('Not authenticated. Please log in again.');
+      }
+
+      console.log('User authenticated, fetching quotes...');
+      
       const { data: quotesData, error: quotesError } = await supabase
         .from('quotes')
         .select('*')
@@ -87,6 +96,11 @@ export const useQuotes = () => {
 
       if (quotesError) {
         console.error('Error fetching quotes:', quotesError);
+        console.error('Error details:', {
+          code: quotesError.code,
+          message: quotesError.message,
+          details: quotesError.details
+        });
         throw quotesError;
       }
 
@@ -94,10 +108,11 @@ export const useQuotes = () => {
       setQuotes(quotesData || []);
     } catch (err) {
       console.error('Failed to fetch quotes:', err);
-      setError(err instanceof Error ? err.message : 'Failed to fetch quotes');
+      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch quotes';
+      setError(errorMessage);
       toast({
-        title: "Error",
-        description: "Failed to load quotes from database",
+        title: "Error Loading Quotes",
+        description: errorMessage,
         variant: "destructive"
       });
     } finally {
