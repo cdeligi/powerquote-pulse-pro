@@ -98,37 +98,40 @@ export const EnhancedBOMDisplay = ({
     const item = bomItems.find(item => item.id === itemId);
     if (!item) return;
     
-    // Only allow price increases, not decreases
-    const originalPrice = item.original_unit_price || item.product.price;
+    // Use original_unit_price if available, otherwise use current product.price as original
+    const originalPrice = item.original_unit_price || item.product.price || 0;
+    
     if (newPrice < originalPrice) {
       toast({
-        title: 'Invalid Price',
-        description: 'You can only increase prices, not decrease them.',
-        variant: 'destructive'
+        title: "Invalid Price",
+        description: `Price cannot be lower than the original price of $${originalPrice.toFixed(2)}`,
+        variant: "destructive"
       });
       return;
     }
-    
-    // Update the item with new price and track adjustment
-    const updatedItems = bomItems.map(bomItem =>
-      bomItem.id === itemId ? {
-        ...bomItem,
-        product: {
-          ...bomItem.product,
-          price: newPrice
-        },
-        original_unit_price: bomItem.original_unit_price || bomItem.product.price,
-        price_adjustment_history: [
-          ...(bomItem.price_adjustment_history || []),
-          {
-            timestamp: new Date().toISOString(),
-            oldPrice: bomItem.product.price,
-            newPrice,
-            reason: 'Manual price adjustment'
-          }
-        ]
-      } : bomItem
-    );
+
+    const updatedItems = bomItems.map(existingItem => {
+      if (existingItem.id === itemId) {
+        const priceChange = {
+          timestamp: new Date().toISOString(),
+          oldPrice: existingItem.product.price,
+          newPrice: newPrice,
+          reason: "Manual price adjustment"
+        };
+        
+        return {
+          ...existingItem,
+          // Store original price on first edit if not already stored
+          original_unit_price: existingItem.original_unit_price || existingItem.product.price,
+          product: {
+            ...existingItem.product,
+            price: newPrice
+          },
+          priceHistory: [...(existingItem.priceHistory || []), priceChange]
+        };
+      }
+      return existingItem;
+    });
     
     onUpdateBOM(updatedItems);
     
@@ -141,6 +144,42 @@ export const EnhancedBOMDisplay = ({
     toast({
       title: 'Price Updated',
       description: `Price increased to ${formatCurrency(newPrice)}`,
+    });
+  };
+
+  // Handle resetting price to original
+  const handleResetPrice = (itemId: string) => {
+    const item = bomItems.find(item => item.id === itemId);
+    if (!item) return;
+    
+    const originalPrice = item.original_unit_price || item.product.price;
+    
+    const updatedItems = bomItems.map(existingItem => {
+      if (existingItem.id === itemId) {
+        const priceChange = {
+          timestamp: new Date().toISOString(),
+          oldPrice: existingItem.product.price,
+          newPrice: originalPrice,
+          reason: "Reset to original price"
+        };
+        
+        return {
+          ...existingItem,
+          product: {
+            ...existingItem.product,
+            price: originalPrice
+          },
+          priceHistory: [...(existingItem.priceHistory || []), priceChange]
+        };
+      }
+      return existingItem;
+    });
+    
+    onUpdateBOM(updatedItems);
+    
+    toast({
+      title: 'Price Reset',
+      description: `Price reset to original value: ${formatCurrency(originalPrice)}`,
     });
   };
 
@@ -274,56 +313,63 @@ export const EnhancedBOMDisplay = ({
                           <div className="flex items-center gap-2">
                             <div className="flex items-center gap-1">
                               <span className="text-gray-400">Unit:</span>
-                              <input
-                                type="number"
-                                step="0.01"
-                                value={editingPrices[item.id] ?? item.product.price}
-                                onChange={(e) => {
-                                  const newPrice = parseFloat(e.target.value) || item.product.price;
-                                  // Prevent typing values below original price
-                                  if (newPrice >= item.product.price) {
-                                    setEditingPrices(prev => ({
-                                      ...prev,
-                                      [item.id]: newPrice
-                                    }));
-                                  } else {
-                                    // Reset to original price if user tries to go below
-                                    setEditingPrices(prev => ({
-                                      ...prev,
-                                      [item.id]: item.product.price
-                                    }));
-                                    toast({
-                                      title: "Invalid Price",
-                                      description: `Price cannot be lower than $${item.product.price.toFixed(2)}`,
-                                      variant: "destructive"
-                                    });
-                                  }
-                                }}
-                                onBlur={() => {
-                                  const newPrice = editingPrices[item.id];
-                                  if (newPrice && newPrice !== item.product.price) {
-                                    handlePriceIncrease(item.id, newPrice);
-                                  }
-                                }}
-                                onKeyDown={(e) => {
-                                  if (e.key === 'Enter') {
+                              <div className="flex gap-1 items-center">
+                                <input
+                                  type="number"
+                                  step="0.01"
+                                  value={editingPrices[item.id] ?? item.product.price}
+                                  onChange={(e) => {
+                                    const newValue = parseFloat(e.target.value) || 0;
+                                    const originalPrice = item.original_unit_price || item.product.price;
+                                    
+                                    // Real-time validation - prevent typing values below original
+                                    if (newValue >= originalPrice) {
+                                      setEditingPrices(prev => ({ ...prev, [item.id]: newValue }));
+                                    }
+                                  }}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                      const newPrice = editingPrices[item.id];
+                                      if (newPrice !== undefined) {
+                                        handlePriceIncrease(item.id, newPrice);
+                                        setEditingPrices(prev => {
+                                          const next = { ...prev };
+                                          delete next[item.id];
+                                          return next;
+                                        });
+                                      }
+                                    }
+                                  }}
+                                  onBlur={() => {
                                     const newPrice = editingPrices[item.id];
-                                    if (newPrice && newPrice !== item.product.price && newPrice > item.product.price) {
+                                    if (newPrice !== undefined && newPrice !== item.product.price) {
                                       handlePriceIncrease(item.id, newPrice);
                                     }
-                                  }
-                                  // Prevent typing certain keys that could lead to invalid values
-                                  if (e.key === '-' || e.key === 'e' || e.key === 'E') {
-                                    e.preventDefault();
-                                  }
-                                }}
-                                className={`w-20 bg-gray-700 border border-gray-600 rounded px-2 py-1 text-white text-center ${
-                                  editingPrices[item.id] && editingPrices[item.id] < item.product.price 
-                                    ? 'border-red-400 bg-red-900/20' 
-                                    : ''
-                                }`}
-                                min={item.original_unit_price || item.product.price}
-                              />
+                                    setEditingPrices(prev => {
+                                      const next = { ...prev };
+                                      delete next[item.id];
+                                      return next;
+                                    });
+                                  }}
+                                  className={`w-20 bg-gray-700 border border-gray-600 rounded px-2 py-1 text-white text-center ${
+                                    (editingPrices[item.id] || item.product.price) < (item.original_unit_price || item.product.price) 
+                                      ? 'border-red-500' 
+                                      : ''
+                                  }`}
+                                  min={item.original_unit_price || item.product.price}
+                                />
+                                {item.original_unit_price && item.product.price !== item.original_unit_price && (
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => handleResetPrice(item.id)}
+                                    className="h-6 w-6 p-0 text-gray-400 hover:text-white"
+                                    title={`Reset to original price ($${(item.original_unit_price || 0).toFixed(2)})`}
+                                  >
+                                    ↺
+                                  </Button>
+                                )}
+                              </div>
                             </div>
                             <span className="text-green-400 font-medium">
                               = {formatCurrency((editingPrices[item.id] || item.product.price) * item.quantity)}

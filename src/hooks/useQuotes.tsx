@@ -92,6 +92,7 @@ export const useQuotes = () => {
       const { data: quotesData, error: quotesError } = await supabase
         .from('quotes')
         .select('*')
+        .not('id', 'like', 'TEMP-%') // Filter out temporary L4 config quotes
         .order('created_at', { ascending: false });
 
       if (quotesError) {
@@ -105,7 +106,18 @@ export const useQuotes = () => {
       }
 
       console.log(`Fetched ${quotesData?.length || 0} quotes from database`);
-      setQuotes(quotesData || []);
+      
+      // Filter and validate quotes to prevent crashes
+      const validQuotes = (quotesData || []).filter(quote => {
+        return quote && 
+               quote.id && 
+               quote.customer_name && 
+               typeof quote.original_quote_value === 'number' &&
+               !quote.id.startsWith('TEMP-'); // Additional safety check
+      });
+
+      console.log(`Valid quotes after filtering: ${validQuotes.length}`);
+      setQuotes(validQuotes);
     } catch (err) {
       console.error('Failed to fetch quotes:', err);
       const errorMessage = err instanceof Error ? err.message : 'Failed to fetch quotes';

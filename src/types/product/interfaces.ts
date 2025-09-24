@@ -125,22 +125,28 @@ export interface BOMItem {
   enabled: boolean;
   slot?: number;
   partNumber?: string;
-  displayName?: string;  // Add displayName to BOMItem
+  displayName?: string;
   configuration?: Record<string, any>;
   level2Options?: Level2Product[];
   level3Customizations?: Level3Customization[];
   slotAssignments?: Record<number, Level3Product>;
   level4Selections?: { [fieldId: string]: string };
-  level4Config?: Level4RuntimePayload; // Add Level 4 configuration payload
-  isAccessory?: boolean; // Add isAccessory flag
+  level4Config?: Level4RuntimePayload;
+  isAccessory?: boolean;
   name?: string;
   description?: string;
   part_number?: string;
   unit_price?: number;
   unit_cost?: number;
+  original_unit_price?: number;
+  priceHistory?: Array<{
+    timestamp: string;
+    oldPrice: number;
+    newPrice: number;
+    reason: string;
+  }>;
   total_price?: number;
   margin?: number;
-  original_unit_price?: number;
   approved_unit_price?: number;
   price_adjustment_history?: any[];
 }

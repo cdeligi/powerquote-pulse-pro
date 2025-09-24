@@ -170,14 +170,40 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
   }, []);
 
   const createDraftQuote = async () => {
-    if (!user?.id) return;
+    if (!user?.id) {
+      console.error('No user ID available for draft quote creation');
+      toast({
+        title: 'Error',
+        description: 'User not authenticated. Please log in again.',
+        variant: 'destructive'
+      });
+      return;
+    }
     
     try {
-      // Generate quote ID using RPC function
-      const { data: quoteId, error: idError } = await supabase
-        .rpc('generate_quote_id');
+      console.log('Creating draft quote for user:', user.id);
+      
+      // Generate quote ID using RPC function with fallback
+      let quoteId: string;
+      
+      try {
+        const { data, error: idError } = await supabase
+          .rpc('generate_quote_id');
+          
+        if (idError) {
+          console.warn('RPC generate_quote_id failed:', idError);
+          throw idError;
+        }
         
-      if (idError) throw idError;
+        quoteId = data;
+        console.log('Generated quote ID via RPC:', quoteId);
+      } catch (rpcError) {
+        // Fallback: generate ID manually
+        const timestamp = Date.now();
+        const random = Math.random().toString(36).substr(2, 9);
+        quoteId = `Q${timestamp}-${random}`;
+        console.log('Generated fallback quote ID:', quoteId);
+      }
       
       // Create draft quote in database
       const { error } = await supabase
