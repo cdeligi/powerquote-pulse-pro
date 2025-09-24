@@ -19,6 +19,9 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [priorityFilter, setPriorityFilter] = useState<'All' | 'High' | 'Medium' | 'Low' | 'Draft'>('All');
   const { quotes, loading, error, fetchQuotes } = useQuotes();
+  
+  // Fetch BOM item count for each quote
+  const [bomCounts, setBomCounts] = useState<Record<string, number>>({});
 
   useEffect(() => {
     fetchQuotes();
@@ -38,9 +41,6 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
     discountRequested: quote.requested_discount || 0,
     pdfUrl: quote.status === 'draft' ? null : `/quotes/${quote.id}.pdf`
   }));
-
-  // Fetch BOM item count for each quote
-  const [bomCounts, setBomCounts] = useState<Record<string, number>>({});
 
   useEffect(() => {
     const fetchBOMCounts = async () => {
