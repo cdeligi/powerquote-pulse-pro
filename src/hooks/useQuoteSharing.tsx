@@ -49,9 +49,10 @@ export const useQuoteSharing = () => {
         .from('quote_shares')
         .select(`
           *,
-          profiles!quote_shares_shared_with_fkey (
+          profiles!inner (
+            id,
             email,
-            first_name,
+            first_name,  
             last_name
           )
         `)
@@ -59,6 +60,7 @@ export const useQuoteSharing = () => {
 
       if (error) throw error;
       
+      // Transform the data to match the expected structure
       const formattedShares = (data || []).map(share => ({
         ...share,
         shared_with_email: share.profiles?.email,
