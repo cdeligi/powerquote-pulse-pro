@@ -322,11 +322,11 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="text-cyan-400 hover:text-cyan-300 hover:bg-gray-700"
+                        className="text-cyan-400 hover:text-cyan-300 hover:bg-gray-700 flex items-center gap-1"
                         title="Share Quote with Team"
                       >
                         <Share className="h-4 w-4" />
-                        <span className="ml-1 text-xs">Share</span>
+                        <span className="text-xs">Share</span>
                       </Button>
                     </QuoteShareDialog>
                     <Button

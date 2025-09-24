@@ -69,6 +69,13 @@ export interface BaseBOMItem {
   slotAssignments?: Record<number, any>;
   parentProduct?: Product | null;
   customPartNumber?: string;
+  original_unit_price?: number;
+  priceHistory?: Array<{
+    timestamp: string;
+    oldPrice: number;
+    newPrice: number;
+    reason: string;
+  }>;
 }
 
 export interface ExtendedBOMItem extends BaseBOMItem {
