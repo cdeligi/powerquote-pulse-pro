@@ -1196,6 +1196,13 @@ export type Database = {
             referencedRelation: "quotes"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "quote_shares_shared_with_fkey"
+            columns: ["shared_with"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
         ]
       }
       quotes: {
@@ -1786,8 +1793,12 @@ export type Database = {
         Args: { query: string }
         Returns: Json
       }
+      finalize_draft_quote_id: {
+        Args: { draft_quote_id: string }
+        Returns: string
+      }
       generate_quote_id: {
-        Args: Record<PropertyKey, never>
+        Args: Record<PropertyKey, never> | { is_draft?: boolean }
         Returns: string
       }
       get_admin_user_ids: {

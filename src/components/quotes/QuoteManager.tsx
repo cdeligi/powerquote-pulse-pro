@@ -123,13 +123,21 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
   };
 
   const handleEditQuote = (quote: any) => {
+    console.log('Editing quote:', quote.id, 'with status:', quote.status);
+    
     if (quote.status === 'draft') {
       // Redirect to BOM builder to continue editing the specific quote
       window.location.href = `/#configure?quoteId=${quote.id}`;
-    } else {
       toast({
-        title: "Info",
-        description: "Only draft quotes can be edited. Submitted quotes require admin approval to modify."
+        title: "Continue Editing",
+        description: "Loading draft quote in editor...",
+      });
+    } else {
+      // For submitted quotes, view-only mode
+      window.location.href = `/#configure?quoteId=${quote.id}`;
+      toast({
+        title: "Viewing Quote",
+        description: "Opening quote in view mode...",
       });
     }
   };
@@ -310,9 +318,20 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
                         size="sm"
                         className="text-orange-400 hover:text-orange-300 hover:bg-gray-700"
                         onClick={() => handleEditQuote(quote)}
-                        title="Continue Editing"
+                        title="Continue Editing Draft"
                       >
                         <Edit className="h-4 w-4" />
+                      </Button>
+                    )}
+                    {quote.status !== 'draft' && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-blue-400 hover:text-blue-300 hover:bg-gray-700"
+                        onClick={() => handleEditQuote(quote)}
+                        title="View Quote"
+                      >
+                        <Eye className="h-4 w-4" />
                       </Button>
                     )}
                     <QuoteShareDialog
@@ -335,6 +354,7 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
                       className="text-blue-400 hover:text-blue-300 hover:bg-gray-700"
                       onClick={() => handleViewQuote(quote)}
                       title="View Quote PDF"
+                      disabled={!quote.pdfUrl}
                     >
                       <Eye className="h-4 w-4" />
                     </Button>

@@ -183,27 +183,21 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
     try {
       console.log('Creating draft quote for user:', user.id);
       
-      // Generate quote ID using RPC function with fallback
-      let quoteId: string;
-      
-      try {
-        const { data, error: idError } = await supabase
-          .rpc('generate_quote_id');
+      // Generate quote ID using the new RPC function for drafts
+      const { data: quoteId, error: idError } = await supabase
+        .rpc('generate_quote_id', { is_draft: true });
           
-        if (idError) {
-          console.warn('RPC generate_quote_id failed:', idError);
-          throw idError;
-        }
-        
-        quoteId = data;
-        console.log('Generated quote ID via RPC:', quoteId);
-      } catch (rpcError) {
-        // Fallback: generate ID manually
-        const timestamp = Date.now();
-        const random = Math.random().toString(36).substr(2, 9);
-        quoteId = `Q${timestamp}-${random}`;
-        console.log('Generated fallback quote ID:', quoteId);
+      if (idError || !quoteId) {
+        console.error('Error generating quote ID:', idError);
+        toast({
+          title: 'Error',
+          description: 'Failed to generate quote ID. Please try again.',
+          variant: 'destructive'
+        });
+        return;
       }
+      
+      console.log('Generated draft quote ID:', quoteId);
       
       // Create draft quote in database
       const { error } = await supabase
@@ -256,26 +250,44 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
 
   const loadDraftQuote = async (quoteId: string) => {
     try {
+      setIsLoading(true);
+      console.log('Loading draft quote:', quoteId);
+      
       // Load quote data
       const { data: quote, error: quoteError } = await supabase
         .from('quotes')
         .select('*')
         .eq('id', quoteId)
-        .eq('status', 'draft')
         .single();
         
       if (quoteError) throw quoteError;
       
-      // Load BOM items for this quote
+      if (!quote) {
+        console.log('No quote found with ID:', quoteId);
+        return;
+      }
+      
+      console.log('Loaded quote:', quote);
+      
+      // Load BOM items with Level 4 configurations
       const { data: bomData, error: bomError } = await supabase
         .from('bom_items')
-        .select('*')
+        .select(`
+          *,
+          bom_level4_values (
+            id,
+            level4_config_id,
+            entries
+          )
+        `)
         .eq('quote_id', quoteId);
         
       if (bomError) throw bomError;
       
-      // Convert BOM items back to local format
-      const loadedItems: BOMItem[] = bomData.map(item => ({
+      console.log('Loaded BOM items:', bomData);
+      
+      // Convert BOM items back to local format with proper structure
+      const loadedItems: BOMItem[] = (bomData || []).map(item => ({
         id: item.id,
         product: {
           id: item.product_id,
@@ -288,19 +300,29 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
         },
         quantity: item.quantity,
         enabled: true,
-        partNumber: item.part_number
+        partNumber: item.part_number,
+        level4Values: item.bom_level4_values || []
       }));
       
       setBomItems(loadedItems);
       
-      // Load quote fields
+      // Restore quote fields
       if (quote.quote_fields) {
         setQuoteFields(quote.quote_fields);
       }
       
+      // Restore discount settings
+      if (quote.requested_discount) {
+        setDiscountPercentage(quote.requested_discount);
+      }
+      
+      if (quote.discount_justification) {
+        setDiscountJustification(quote.discount_justification);
+      }
+      
       toast({
         title: 'Draft Loaded',
-        description: `Loaded draft quote ${quoteId}`
+        description: `Loaded draft quote ${quoteId} with ${loadedItems.length} items`
       });
     } catch (error) {
       console.error('Error loading draft quote:', error);
@@ -309,6 +331,8 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
         description: 'Failed to load draft quote',
         variant: 'destructive'
       });
+    } finally {
+      setIsLoading(false);
     }
   };
 
