@@ -318,15 +318,11 @@ export const EnhancedBOMDisplay = ({
                                   type="number"
                                   step="0.01"
                                   value={editingPrices[item.id] ?? item.product.price}
-                                  onChange={(e) => {
-                                    const newValue = parseFloat(e.target.value) || 0;
-                                    const originalPrice = item.original_unit_price || item.product.price;
-                                    
-                                    // Real-time validation - prevent typing values below original
-                                    if (newValue >= originalPrice) {
-                                      setEditingPrices(prev => ({ ...prev, [item.id]: newValue }));
-                                    }
-                                  }}
+                                   onChange={(e) => {
+                                     const newValue = parseFloat(e.target.value) || 0;
+                                     // Allow typing any value, validation happens on blur/enter
+                                     setEditingPrices(prev => ({ ...prev, [item.id]: newValue }));
+                                   }}
                                   onKeyDown={(e) => {
                                     if (e.key === 'Enter') {
                                       const newPrice = editingPrices[item.id];
