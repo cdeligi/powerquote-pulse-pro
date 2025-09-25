@@ -162,7 +162,7 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
       // Load existing draft quote
       setCurrentQuoteId(quoteIdFromUrl);
       setIsDraftMode(true);
-      loadDraftQuote(quoteIdFromUrl);
+      loadQuote(quoteIdFromUrl);
     }
     // Removed automatic draft creation - only create when user saves manually
   }, []);
@@ -246,10 +246,10 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
     }
   };
 
-  const loadDraftQuote = async (quoteId: string) => {
+  const loadQuote = async (quoteId: string) => {
     try {
       setIsLoading(true);
-      console.log('Loading draft quote:', quoteId);
+      console.log('Loading quote:', quoteId);
       
       // Load quote data
       const { data: quote, error: quoteError } = await supabase

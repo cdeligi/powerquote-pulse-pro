@@ -1513,6 +1513,41 @@ export type Database = {
         }
         Relationships: []
       }
+      user_quote_counters: {
+        Row: {
+          created_at: string
+          current_counter: number
+          id: string
+          last_finalized_counter: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          current_counter?: number
+          id?: string
+          last_finalized_counter?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          current_counter?: number
+          id?: string
+          last_finalized_counter?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_quote_counters_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_registration_requests: {
         Row: {
           agreed_to_privacy_policy: boolean
@@ -1798,10 +1833,7 @@ export type Database = {
         Returns: string
       }
       generate_quote_id: {
-        Args:
-          | Record<PropertyKey, never>
-          | { is_draft?: boolean }
-          | { is_draft?: boolean; user_email?: string }
+        Args: { is_draft?: boolean; user_email: string }
         Returns: string
       }
       get_admin_user_ids: {

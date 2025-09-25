@@ -123,23 +123,15 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
   };
 
   const handleEditQuote = (quote: any) => {
-    console.log('Editing quote:', quote.id, 'with status:', quote.status);
+    console.log('Viewing quote:', quote.id, 'with status:', quote.status);
     
-    if (quote.status === 'draft') {
-      // Redirect to BOM builder to continue editing the specific quote
-      window.location.href = `/#configure?quoteId=${quote.id}`;
-      toast({
-        title: "Continue Editing",
-        description: "Loading draft quote in editor...",
-      });
-    } else {
-      // For submitted quotes, view-only mode
-      window.location.href = `/#configure?quoteId=${quote.id}`;
-      toast({
-        title: "Viewing Quote",
-        description: "Opening quote in view mode...",
-      });
-    }
+    // Redirect to BOM builder to load the quote (works for all statuses)
+    window.location.href = `/#configure?quoteId=${quote.id}`;
+    
+    toast({
+      title: "Loading Quote",
+      description: `Loading quote ${quote.id} in the configurator...`,
+    });
   };
 
   const handleNewQuote = () => {
@@ -312,28 +304,16 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
                   </div>
                   
                   <div className="flex space-x-2 ml-4">
-                    {quote.status === 'draft' && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-orange-400 hover:text-orange-300 hover:bg-gray-700"
-                        onClick={() => handleEditQuote(quote)}
-                        title="Continue Editing Draft"
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                    )}
-                    {quote.status !== 'draft' && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-blue-400 hover:text-blue-300 hover:bg-gray-700"
-                        onClick={() => handleEditQuote(quote)}
-                        title="View Quote"
-                      >
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                    )}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-blue-400 hover:text-blue-300 hover:bg-gray-700"
+                      onClick={() => handleEditQuote(quote)}
+                      title="View Quote"
+                    >
+                      <Eye className="h-4 w-4" />
+                      <span className="text-xs ml-1">View</span>
+                    </Button>
                     <QuoteShareDialog
                       quoteId={quote.id}
                       quoteName={`${quote.id} - ${quote.customer}`}
