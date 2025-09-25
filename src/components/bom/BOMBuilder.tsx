@@ -153,18 +153,19 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
     fetchQuoteFields();
   }, []);
 
-  // Initialize or load draft quote on component mount
+  // Initialize or load quote on component mount
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const quoteIdFromUrl = urlParams.get('quoteId');
     
     if (quoteIdFromUrl) {
-      // Load existing draft quote
+      console.log('Quote ID found in URL:', quoteIdFromUrl);
+      // Load existing quote (works for draft and finalized quotes)
       setCurrentQuoteId(quoteIdFromUrl);
-      setIsDraftMode(true);
       loadQuote(quoteIdFromUrl);
+    } else {
+      console.log('No quote ID in URL, starting fresh');
     }
-    // Removed automatic draft creation - only create when user saves manually
   }, []);
 
   const createDraftQuote = async () => {
@@ -258,10 +259,18 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
         .eq('id', quoteId)
         .single();
         
-      if (quoteError) throw quoteError;
+      if (quoteError) {
+        console.error('Error loading quote:', quoteError);
+        throw quoteError;
+      }
       
       if (!quote) {
         console.log('No quote found with ID:', quoteId);
+        toast({
+          title: 'Quote Not Found',
+          description: `Quote ${quoteId} could not be found`,
+          variant: 'destructive'
+        });
         return;
       }
       
@@ -280,7 +289,10 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
         `)
         .eq('quote_id', quoteId);
         
-      if (bomError) throw bomError;
+      if (bomError) {
+        console.error('Error loading BOM items:', bomError);
+        throw bomError;
+      }
       
       console.log('Loaded BOM items:', bomData);
       
@@ -318,15 +330,22 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
         setDiscountJustification(quote.discount_justification);
       }
       
+      // Set draft mode based on quote status
+      setIsDraftMode(quote.status === 'draft');
+      
+      // Show appropriate success message
+      const statusText = quote.status === 'draft' ? 'Draft' : 'Quote';
       toast({
-        title: 'Draft Loaded',
-        description: `Loaded draft quote ${quoteId} with ${loadedItems.length} items`
+        title: `${statusText} Loaded`,
+        description: `Loaded ${statusText.toLowerCase()} ${quoteId} with ${loadedItems.length} items`
       });
+      
+      console.log('Quote loading completed successfully');
     } catch (error) {
-      console.error('Error loading draft quote:', error);
+      console.error('Error loading quote:', error);
       toast({
-        title: 'Error',
-        description: 'Failed to load draft quote',
+        title: 'Error Loading Quote',
+        description: `Failed to load quote ${quoteId}. Please try again.`,
         variant: 'destructive'
       });
     } finally {

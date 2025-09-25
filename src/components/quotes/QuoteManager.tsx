@@ -125,13 +125,16 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
   const handleEditQuote = (quote: any) => {
     console.log('Viewing quote:', quote.id, 'with status:', quote.status);
     
-    // Redirect to BOM builder to load the quote (works for all statuses)
-    window.location.href = `/#configure?quoteId=${quote.id}`;
-    
     toast({
       title: "Loading Quote",
       description: `Loading quote ${quote.id} in the configurator...`,
     });
+    
+    // Use setTimeout to ensure toast shows before navigation
+    setTimeout(() => {
+      // Redirect to BOM builder to load the quote (works for all statuses)
+      window.location.href = `/#configure?quoteId=${quote.id}`;
+    }, 100);
   };
 
   const handleNewQuote = () => {
