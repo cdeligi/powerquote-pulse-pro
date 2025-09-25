@@ -257,9 +257,21 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
   };
 
   const loadQuote = async (quoteId: string) => {
+    if (!quoteId) {
+      console.log('No quote ID provided');
+      setIsLoading(false);
+      return;
+    }
+    
     try {
       setIsLoading(true);
       console.log('Loading quote:', quoteId);
+      
+      // Show loading toast
+      toast({
+        title: "Loading Quote",
+        description: `Loading quote data for ${quoteId}...`,
+      });
       
       // Load quote data
       const { data: quote, error: quoteError } = await supabase
@@ -270,6 +282,11 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
         
       if (quoteError) {
         console.error('Error loading quote:', quoteError);
+        toast({
+          title: "Error Loading Quote",
+          description: `Failed to load quote ${quoteId}: ${quoteError.message}`,
+          variant: "destructive"
+        });
         throw quoteError;
       }
       
@@ -283,7 +300,7 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
         return;
       }
       
-      console.log('Loaded quote:', quote);
+      console.log('Successfully loaded quote:', quote);
       
       // Load BOM items with Level 4 configurations
       const { data: bomData, error: bomError } = await supabase
@@ -300,10 +317,15 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
         
       if (bomError) {
         console.error('Error loading BOM items:', bomError);
+        toast({
+          title: "Error Loading BOM Items",
+          description: `Failed to load BOM items: ${bomError.message}`,
+          variant: "destructive"
+        });
         throw bomError;
       }
       
-      console.log('Loaded BOM items:', bomData);
+      console.log(`Successfully loaded ${bomData?.length || 0} BOM items`);
       
       // Convert BOM items back to local format with proper structure
       const loadedItems: BOMItem[] = (bomData || []).map(item => ({
@@ -342,19 +364,20 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
       // Set draft mode based on quote status
       setIsDraftMode(quote.status === 'draft');
       
-      // Show appropriate success message
+      // Show success message
       const statusText = quote.status === 'draft' ? 'Draft' : 'Quote';
       toast({
-        title: `${statusText} Loaded`,
-        description: `Loaded ${statusText.toLowerCase()} ${quoteId} with ${loadedItems.length} items`
+        title: `${statusText} Loaded Successfully`,
+        description: `Loaded ${statusText.toLowerCase()} with ${loadedItems.length} items`
       });
       
       console.log('Quote loading completed successfully');
     } catch (error) {
       console.error('Error loading quote:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
       toast({
         title: 'Error Loading Quote',
-        description: `Failed to load quote ${quoteId}. Please try again.`,
+        description: `Failed to load quote ${quoteId}: ${errorMessage}`,
         variant: 'destructive'
       });
     } finally {

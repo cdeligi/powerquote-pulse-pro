@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Search, FileText, Eye, Download, ExternalLink, Edit, Share, Plus } from "lucide-react";
+import { Search, FileText, Eye, Download, ExternalLink, Edit, Share, Plus, Trash } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useQuotes } from "@/hooks/useQuotes";
 import { toast } from "@/hooks/use-toast";
@@ -99,6 +99,48 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
                            (priorityFilter !== 'Draft' && quote.priority === priorityFilter);
     return matchesSearch && matchesPriority;
   });
+
+  const handleDeleteQuote = async (quoteId: string) => {
+    const confirmDelete = window.confirm('Are you sure you want to delete this draft quote? This action cannot be undone.');
+    
+    if (!confirmDelete) return;
+    
+    try {
+      console.log('Deleting draft quote:', quoteId);
+      
+      // Delete BOM items first
+      const { error: bomError } = await supabase
+        .from('bom_items')
+        .delete()
+        .eq('quote_id', quoteId);
+        
+      if (bomError) throw bomError;
+      
+      // Delete the quote
+      const { error: quoteError } = await supabase
+        .from('quotes')
+        .delete()
+        .eq('id', quoteId)
+        .eq('status', 'draft'); // Extra safety check
+        
+      if (quoteError) throw quoteError;
+      
+      toast({
+        title: "Quote Deleted",
+        description: "Draft quote has been deleted successfully.",
+      });
+      
+      // Refresh the quote list
+      fetchQuotes();
+    } catch (error) {
+      console.error('Error deleting quote:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete quote. Please try again.",
+        variant: "destructive"
+      });
+    }
+  };
 
   const canSeePrices = user.role !== 'LEVEL_1';
 
@@ -273,7 +315,9 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
                   <div className="flex-1 grid grid-cols-1 md:grid-cols-5 gap-4">
                     <div>
                       <div className="flex items-center space-x-3">
-                        <span className="text-white font-medium">{quote.id}</span>
+                        <span className="text-white font-medium">
+                          {quote.status === 'draft' ? 'Draft' : quote.id}
+                        </span>
                         <Badge className={`${statusBadge.color} text-white`}>
                           {statusBadge.text}
                         </Badge>
@@ -306,7 +350,7 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
                     </div>
                   </div>
                   
-                  <div className="flex space-x-2 ml-4">
+                   <div className="flex space-x-2 ml-4">
                     <Button
                       variant="ghost"
                       size="sm"
@@ -317,6 +361,18 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
                       <Eye className="h-4 w-4" />
                       <span className="text-xs ml-1">View</span>
                     </Button>
+                    {quote.status === 'draft' && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-red-400 hover:text-red-300 hover:bg-gray-700"
+                        onClick={() => handleDeleteQuote(quote.id)}
+                        title="Delete Draft Quote"
+                      >
+                        <Trash className="h-4 w-4" />
+                        <span className="text-xs ml-1">Delete</span>
+                      </Button>
+                    )}
                     <QuoteShareDialog
                       quoteId={quote.id}
                       quoteName={`${quote.id} - ${quote.customer}`}
