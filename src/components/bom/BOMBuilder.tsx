@@ -506,7 +506,6 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
     const chassisType = configuringNonChassis.chassisType || 'Unknown';
 
     // Get part number config for this chassis
-    const pnConfig = pnConfig;
     const level2Id = configuringNonChassis.id;
     const level2Product = configuringNonChassis;
 
@@ -526,13 +525,30 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
     };
 
     return (
-      <NonChassisConfigurator
-        level2Product={level2Product}
-        level3Products={accessoryProducts}
-        onComplete={handleConfigurationComplete}
-        onCancel={() => setConfiguringNonChassis(null)}
-        canSeePrices={canSeePrices}
-      />
+        <NonChassisConfigurator
+          level2Product={level2Product}
+          level3Products={accessoryProducts}
+          codeMap={pnConfig}
+          partNumberPrefix={`${level2Product.name}-${level2Id}`}
+          selectedAccessories={selectedAccessories}
+          onToggleAccessory={(id) => {
+            const newSelected = new Set(selectedAccessories);
+            if (newSelected.has(id)) {
+              newSelected.delete(id);
+            } else {
+              newSelected.add(id);
+            }
+            setSelectedAccessories(newSelected);
+          }}
+          onAddToBOM={() => {
+            setConfiguringNonChassis(null);
+            toast({
+              title: 'Configuration Complete',
+              description: 'Added configuration to BOM',
+            });
+          }}
+          canOverridePartNumber={canSeePrices}
+        />
     );
   };
 
@@ -554,7 +570,7 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
     try {
       const [pnConfigData, codes, level3Data] = await Promise.all([
         productDataService.getPartNumberConfig(chassis.id),
-        productDataService.getPartNumberCodes(),
+        productDataService.getPartNumberCodesForLevel2(chassis.id),
         productDataService.getLevel3Products()
       ]);
       
@@ -582,7 +598,7 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
       // Handle non-chassis configuration
       try {
         const pnConfig = await productDataService.getPartNumberConfig(chassis.id);
-        const codes = await productDataService.getPartNumberCodes();
+        const codes = await productDataService.getPartNumberCodesForLevel2(chassis.id);
         const level3Products = await productDataService.getLevel3Products();
         setPnConfig(pnConfig);
         setCodeMap(codes);
@@ -617,25 +633,20 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
     }));
     
     // Check if this product requires Level 4 configuration
-    if (product.requiresLevel4Config) {
+    if (product.requires_level4_config) {
       console.log('Product requires Level 4 configuration');
       
       // Create a temporary BOM item for Level 4 configuration
       const tempBomItem: BOMItem = {
         id: `temp-${Date.now()}`,
         product: {
-          id: product.id,
-          name: product.name,
-          partNumber: product.partNumber,
-          price: product.price,
-          cost: product.cost,
-          description: product.description,
-          slot: slotNumber
-        },
+          ...product,
+          displayName: product.displayName || product.name,
+        } as Level3Product,
         quantity: 1,
         enabled: true,
         partNumber: product.partNumber,
-        slotNumber
+        slot: slotNumber
       };
       
       setConfiguringLevel4Item(tempBomItem);
@@ -668,11 +679,11 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
       const newBomItem: BOMItem = {
         ...updatedBomItem,
         id: `bom-${Date.now()}`,
-        level4Values
+        level4Config: level4Values as any
       };
       
       // Find slot assignments and other calculations
-      const slot = updatedBomItem.slotNumber || 0;
+      const slot = updatedBomItem.slot || 0;
       const slotAssignment = slotAssignments[slot];
       
       if (slotAssignment) {
@@ -977,9 +988,10 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
         </div>
 
         <Level2OptionsSelector
-          parentProduct={product}
-          onSelect={handleSelectChassis}
-          onAdd={handleLevel2OptionAdd}
+          level1Product={product}
+          selectedOptions={[]}
+          onOptionToggle={handleLevel2OptionAdd}
+          onChassisSelect={handleSelectChassis}
         />
 
         {/* Show chassis configuration if a chassis is selected */}
@@ -987,36 +999,40 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
           <div className="space-y-4">
             <h4 className="font-medium">Configure {configuringChassis.name}</h4>
             
-            <ChassisSelector 
+            <ChassisSelector
               selectedChassis={configuringChassis}
-              slotAssignments={slotAssignments}
-              onSlotClick={handleSlotClick}
-              selectedSlot={selectedSlot}
-              standardSlotHints={standardSlotHints}
-              colorByProductId={colorByProductId}
+              onChassisSelect={(chassis) => setConfiguringChassis(chassis)}
             />
 
             {/* Show rack visualizer for supported chassis */}
             {configuringChassis.chassisType && (
-              <RackVisualizer 
-                chassisType={configuringChassis.chassisType}
-                slotAssignments={slotAssignments}
-                onSlotClick={handleSlotClick}
-                selectedSlot={selectedSlot}
-                colorByProductId={colorByProductId}
-                standardSlotHints={standardSlotHints}
-              />
+            <RackVisualizer 
+              chassis={{ ...configuringChassis, height: '10U', slots: 8 } as any}
+              chassisType={configuringChassis.chassisType as any}
+              slotAssignments={slotAssignments}
+              onSlotClick={handleSlotClick}
+              onSlotClear={(slot) => {
+                const newAssignments = { ...slotAssignments };
+                delete newAssignments[slot];
+                setSlotAssignments(newAssignments);
+              }}
+              selectedSlot={selectedSlot}
+              colorByProductId={colorByProductId}
+              standardSlotHints={standardSlotHints}
+            />
             )}
 
             {/* Show card selector when a slot is selected */}
             {selectedSlot && (
               <SlotCardSelector
-                slotNumber={selectedSlot}
-                chassisType={configuringChassis.chassisType || ''}
-                level3Products={level3Products}
+                chassis={configuringChassis}
+                slot={selectedSlot}
                 onCardSelect={handleCardSelect}
-                codeMap={codeMap}
+                onClose={() => setSelectedSlot(null)}
                 canSeePrices={canSeePrices}
+                currentSlotAssignments={slotAssignments}
+                codeMap={codeMap}
+                pnConfig={pnConfig}
               />
             )}
           </div>
@@ -1024,11 +1040,20 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
 
         {/* Show accessory selection */}
         {selectedLevel1Product && (
-          <AccessoryList
-            parentProduct={selectedLevel1Product}
-            onAdd={handleAddToBOM}
-            canSeePrices={canSeePrices}
-          />
+        <AccessoryList
+          level3Products={level3Products.filter(p => pnConfig?.[p.id]?.outside_chassis)}
+          codeMap={pnConfig || {}}
+          selectedAccessories={selectedAccessories}
+          onToggleAccessory={(id) => {
+            const newSelected = new Set(selectedAccessories);
+            if (newSelected.has(id)) {
+              newSelected.delete(id);
+            } else {
+              newSelected.add(id);
+            }
+            setSelectedAccessories(newSelected);
+          }}
+        />
         )}
       </div>
     );
@@ -1037,8 +1062,24 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
   const handleQTMSConfigurationSave = (consolidatedQTMS: ConsolidatedQTMS) => {
     console.log('QTMS Configuration saved:', consolidatedQTMS);
     
-    if (consolidatedQTMS.configurations.length > 0) {
-      const bomItem = createQTMSBOMItem(consolidatedQTMS, canSeePrices);
+    if (consolidatedQTMS.configuration) {
+      const bomItem = {
+        id: `qtms-${Date.now()}`,
+        product: {
+          id: 'qtms-config',
+          name: consolidatedQTMS.name,
+          displayName: consolidatedQTMS.name,
+          description: 'QTMS Configuration',
+          price: 0,
+          cost: 0,
+          enabled: true,
+          parent_product_id: 'qtms',
+          product_level: 3 as const
+        },
+        quantity: 1,
+        enabled: true,
+        configuration: consolidatedQTMS.configuration
+      };
       const updatedItems = [...bomItems, bomItem];
       setBomItems(updatedItems);
       onBOMUpdate(updatedItems);
@@ -1093,8 +1134,6 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
       <QuoteFieldsSection 
         quoteFields={quoteFields}
         onFieldChange={handleQuoteFieldChange}
-        validation={validation}
-        availableFields={availableQuoteFields}
       />
 
       {/* Main BOM Builder Layout */}
@@ -1136,10 +1175,18 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
                       <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => {
                         // Handle QTMS configuration
                         const mockQTMS: ConsolidatedQTMS = {
+                          id: 'new-qtms-config',
                           name: 'New QTMS Configuration',
-                          configurations: [],
-                          totalPrice: 0,
-                          totalCost: 0
+                          description: 'QTMS Configuration',
+                          partNumber: 'QTMS-CONFIG',
+                          price: 0,
+                          cost: 0,
+                          components: [],
+                          configuration: {
+                            chassis: {} as any,
+                            slotAssignments: {},
+                            hasRemoteDisplay: false
+                          }
                         };
                         setEditingQTMS(mockQTMS);
                       }}>
@@ -1190,7 +1237,20 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
         <Level4RuntimeModal
           bomItem={configuringLevel4Item}
           level3ProductId={configuringLevel4Item.product.id}
-          onSave={handleLevel4Save}
+          onSave={(payload) => {
+            console.log('Level4 configuration saved:', payload);
+            const updatedItems = bomItems.map(item => 
+              item.id === configuringLevel4Item?.id 
+                ? {...item, level4Config: payload} 
+                : item
+            );
+            setBomItems(updatedItems);
+            setConfiguringLevel4Item(null);
+            toast({
+              title: 'Level 4 Configuration Saved',
+              description: 'Card configuration has been applied.',
+            });
+          }}
           onCancel={handleLevel4Cancel}
         />
       )}
