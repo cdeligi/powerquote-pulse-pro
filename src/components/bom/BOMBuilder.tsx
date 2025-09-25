@@ -172,8 +172,8 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
     if (!user?.id) {
       console.error('No user ID available for draft quote creation');
       toast({
-        title: 'Error',
-        description: 'User not authenticated. Please log in again.',
+        title: 'Authentication Error',
+        description: 'You must be logged in to create a quote',
         variant: 'destructive'
       });
       return;
@@ -182,50 +182,57 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
     try {
       console.log('Creating draft quote for user:', user.id);
       
-      // Generate quote ID using the new RPC function for drafts with user email
+      // Generate quote ID using the improved RPC function for drafts
       const { data: quoteId, error: idError } = await supabase
         .rpc('generate_quote_id', { user_email: user.email, is_draft: true });
           
-      if (idError || !quoteId) {
-        console.error('Error generating quote ID:', idError);
-        toast({
-          title: 'Error',
-          description: 'Failed to generate quote ID. Please try again.',
-          variant: 'destructive'
-        });
-        return;
+      if (idError) {
+        console.error('Quote ID generation error:', idError);
+        throw new Error(`Failed to generate quote ID: ${idError.message}`);
+      }
+      
+      if (!quoteId) {
+        console.error('No quote ID returned from function');
+        throw new Error('Failed to generate quote ID');
       }
       
       console.log('Generated draft quote ID:', quoteId);
       
-      // Create draft quote in database
-      const { error } = await supabase
+      // Create draft quote with proper field mapping
+      const quoteData = {
+        id: quoteId,
+        user_id: user.id,
+        customer_name: quoteFields.customer_name || 'TBD',
+        oracle_customer_id: quoteFields.oracle_customer_id || 'TBD',
+        sfdc_opportunity: quoteFields.sfdc_opportunity || 'TBD',
+        priority: (quoteFields.priority as any) || 'Medium',
+        shipping_terms: quoteFields.shipping_terms || 'TBD',
+        payment_terms: quoteFields.payment_terms || 'TBD',
+        currency: quoteFields.currency || 'USD',
+        is_rep_involved: quoteFields.is_rep_involved || false,
+        status: 'draft' as const,
+        quote_fields: quoteFields,
+        original_quote_value: 0,
+        discounted_value: 0,
+        total_cost: 0,
+        requested_discount: 0,
+        original_margin: 0,
+        discounted_margin: 0,
+        gross_profit: 0,
+        submitted_by_email: user.email || '',
+        submitted_by_name: user.email || 'Unknown User'
+      };
+
+      console.log('Inserting quote with data:', quoteData);
+      
+      const { error: createError } = await supabase
         .from('quotes')
-        .insert({
-          id: quoteId,
-          user_id: user.id,
-          customer_name: 'Draft Quote',
-          oracle_customer_id: 'DRAFT',
-          sfdc_opportunity: `DRAFT-${Date.now()}`,
-          status: 'draft',
-          original_quote_value: 0,
-          discounted_value: 0,
-          requested_discount: 0,
-          original_margin: 0,
-          discounted_margin: 0,
-          total_cost: 0,
-          gross_profit: 0,
-          priority: 'Medium',
-          is_rep_involved: false,
-          shipping_terms: 'Ex-Works',
-          payment_terms: '30 days',
-          currency: 'USD',
-          quote_fields: {},
-          submitted_by_name: user.name || user.email || 'Unknown User',
-          submitted_by_email: user.email || ''
-        });
+        .insert(quoteData);
         
-      if (error) throw error;
+      if (createError) {
+        console.error('Quote creation error:', createError);
+        throw new Error(`Failed to create quote: ${createError.message}`);
+      }
       
       setCurrentQuoteId(quoteId);
       setIsDraftMode(true);
@@ -235,13 +242,15 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
       
       toast({
         title: 'Draft Created',
-        description: `Draft quote ${quoteId} created. Your progress will be automatically saved.`
+        description: `Draft quote ${quoteId} created successfully. Your progress will be automatically saved.`
       });
+      
+      console.log('Draft quote created successfully:', quoteId);
     } catch (error) {
       console.error('Error creating draft quote:', error);
       toast({
-        title: 'Error',
-        description: 'Failed to create draft quote',
+        title: 'Error Creating Draft',
+        description: error instanceof Error ? error.message : 'Unknown error occurred',
         variant: 'destructive'
       });
     }
@@ -357,8 +366,8 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
   const handleSaveAsDraft = async () => {
     if (!user?.id) {
       toast({
-        title: 'Error',
-        description: 'User not authenticated. Please log in again.',
+        title: 'Authentication Error',
+        description: 'You must be logged in to save a draft',
         variant: 'destructive'
       });
       return;
@@ -369,40 +378,54 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
       
       // Create new draft if none exists
       if (!quoteId) {
+        console.log('No current quote ID, creating new draft quote');
+        
         const { data: newQuoteId, error: idError } = await supabase
           .rpc('generate_quote_id', { user_email: user.email, is_draft: true });
           
-        if (idError || !newQuoteId) {
+        if (idError) {
+          console.error('Quote ID generation error:', idError);
+          throw new Error(`Failed to generate quote ID: ${idError.message}`);
+        }
+        
+        if (!newQuoteId) {
           throw new Error('Failed to generate quote ID');
         }
         
+        console.log('Generated new draft quote ID:', newQuoteId);
+        
+        const quoteData = {
+          id: newQuoteId,
+          user_id: user.id,
+          customer_name: quoteFields.customer_name || 'TBD',
+          oracle_customer_id: quoteFields.oracle_customer_id || 'TBD',
+          sfdc_opportunity: quoteFields.sfdc_opportunity || 'TBD',
+          priority: (quoteFields.priority as any) || 'Medium',
+          shipping_terms: quoteFields.shipping_terms || 'TBD',
+          payment_terms: quoteFields.payment_terms || 'TBD',
+          currency: quoteFields.currency || 'USD',
+          is_rep_involved: quoteFields.is_rep_involved || false,
+          status: 'draft' as const,
+          quote_fields: quoteFields,
+          original_quote_value: 0,
+          discounted_value: 0,
+          total_cost: 0,
+          requested_discount: 0,
+          original_margin: 0,
+          discounted_margin: 0,
+          gross_profit: 0,
+          submitted_by_email: user.email || '',
+          submitted_by_name: user.email || 'Unknown User'
+        };
+        
         const { error: createError } = await supabase
           .from('quotes')
-          .insert({
-            id: newQuoteId,
-            user_id: user.id,
-            customer_name: quoteFields.customerName || 'Draft Quote',
-            oracle_customer_id: quoteFields.oracleCustomerId || 'DRAFT',
-            sfdc_opportunity: quoteFields.sfdcOpportunity || `DRAFT-${Date.now()}`,
-            status: 'draft',
-            original_quote_value: 0,
-            discounted_value: 0,
-            requested_discount: 0,
-            original_margin: 0,
-            discounted_margin: 0,
-            total_cost: 0,
-            gross_profit: 0,
-            priority: 'Medium',
-            is_rep_involved: false,
-            shipping_terms: 'Ex-Works',
-            payment_terms: '30 days',
-            currency: 'USD',
-            quote_fields: {},
-            submitted_by_name: user.name || user.email || 'Unknown User',
-            submitted_by_email: user.email || ''
-          });
+          .insert(quoteData);
           
-        if (createError) throw createError;
+        if (createError) {
+          console.error('Quote creation error:', createError);
+          throw new Error(`Failed to create quote: ${createError.message}`);
+        }
         
         setCurrentQuoteId(newQuoteId);
         setIsDraftMode(true);
@@ -410,15 +433,18 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
         
         // Update URL without page reload
         window.history.replaceState({}, '', `/#configure?quoteId=${quoteId}`);
+        
+        console.log('New draft quote created successfully:', quoteId);
       }
       
+      // Save the current BOM items and quote data
       await saveDraftQuote(false);
       
     } catch (error) {
       console.error('Error saving draft:', error);
       toast({
-        title: 'Error',
-        description: 'Failed to save draft quote',
+        title: 'Error Saving Draft',
+        description: error instanceof Error ? error.message : 'Unknown error occurred',
         variant: 'destructive'
       });
     }
