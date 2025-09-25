@@ -1273,7 +1273,7 @@ export type Database = {
           original_prices?: Json | null
           original_quote_value: number
           original_submitted_at?: string | null
-          payment_terms: string
+          payment_terms?: string
           price_adjustments?: Json | null
           price_override_history?: Json | null
           priority?: string
@@ -1284,7 +1284,7 @@ export type Database = {
           reviewed_at?: string | null
           reviewed_by?: string | null
           sfdc_opportunity: string
-          shipping_terms: string
+          shipping_terms?: string
           source_quote_id?: string | null
           status?: string
           submitted_at?: string | null

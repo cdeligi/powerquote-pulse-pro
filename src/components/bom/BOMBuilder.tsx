@@ -184,7 +184,7 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
       
       // Generate quote ID using the improved RPC function for drafts
       const { data: quoteId, error: idError } = await supabase
-        .rpc('generate_quote_id', { user_email: user.email, is_draft: true });
+        .rpc('generate_quote_id_simple', { user_email: user.email, is_draft: true });
           
       if (idError) {
         console.error('Quote ID generation error:', idError);
@@ -404,7 +404,7 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
         console.log('No current quote ID, creating new draft quote');
         
         const { data: newQuoteId, error: idError } = await supabase
-          .rpc('generate_quote_id', { user_email: user.email, is_draft: true });
+          .rpc('generate_quote_id_simple', { user_email: user.email, is_draft: true });
           
         if (idError) {
           console.error('Quote ID generation error:', idError);
@@ -420,14 +420,14 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
         const quoteData = {
           id: newQuoteId,
           user_id: user.id,
-          customer_name: quoteFields.customer_name || 'TBD',
-          oracle_customer_id: quoteFields.oracle_customer_id || 'TBD',
-          sfdc_opportunity: quoteFields.sfdc_opportunity || 'TBD',
+          customer_name: quoteFields.customerName || 'Draft Quote',
+          oracle_customer_id: quoteFields.oracleCustomerId || 'DRAFT',
+          sfdc_opportunity: quoteFields.sfdcOpportunity || `DRAFT-${Date.now()}`,
           priority: (quoteFields.priority as any) || 'Medium',
-          shipping_terms: quoteFields.shipping_terms || 'TBD',
-          payment_terms: quoteFields.payment_terms || 'TBD',
-          currency: quoteFields.currency || 'USD',
-          is_rep_involved: quoteFields.is_rep_involved || false,
+          shipping_terms: quoteFields.shippingTerms || 'Ex-Works',
+          payment_terms: quoteFields.paymentTerms || 'Net 30',
+          currency: quoteFields.quoteCurrency || 'USD',
+          is_rep_involved: quoteFields.isRepInvolved || false,
           status: 'draft' as const,
           quote_fields: quoteFields,
           original_quote_value: 0,
@@ -486,7 +486,38 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
         sum + ((item.product.cost || 0) * item.quantity), 0
       );
       
-      // Update quote
+      // Prepare draft BOM data
+      const draftBomData = {
+        items: bomItems.map(item => ({
+          product_id: item.product.id,
+          name: item.product.name,
+          description: item.product.description,
+          part_number: item.partNumber || item.product.partNumber,
+          quantity: item.quantity,
+          unit_price: item.product.price,
+          unit_cost: item.product.cost || 0,
+          total_price: item.product.price * item.quantity,
+          total_cost: (item.product.cost || 0) * item.quantity,
+          margin: item.product.cost && item.product.cost > 0 
+            ? ((item.product.price - item.product.cost) / item.product.price) * 100 
+            : 100,
+          configuration_data: item.product,
+          product_type: 'standard'
+        })),
+        quoteFields,
+        discountPercentage,
+        discountJustification,
+        totals: {
+          totalValue,
+          totalCost,
+          grossProfit: totalValue - totalCost,
+          originalMargin: totalCost > 0 ? ((totalValue - totalCost) / totalValue) * 100 : 100,
+          discountedValue: totalValue * (1 - discountPercentage / 100),
+          discountedMargin: totalCost > 0 ? (((totalValue * (1 - discountPercentage / 100)) - totalCost) / (totalValue * (1 - discountPercentage / 100))) * 100 : 100
+        }
+      };
+
+      // Update quote with draft BOM data
       const { error: quoteError } = await supabase
         .from('quotes')
         .update({
@@ -502,43 +533,13 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
           discounted_margin: totalCost > 0 ? (((totalValue * (1 - discountPercentage / 100)) - totalCost) / (totalValue * (1 - discountPercentage / 100))) * 100 : 100,
           quote_fields: quoteFields,
           discount_justification: discountJustification,
+          draft_bom: draftBomData,
+          status: 'draft',
           updated_at: new Date().toISOString()
         })
         .eq('id', currentQuoteId);
         
       if (quoteError) throw quoteError;
-      
-      // Clear existing BOM items and insert new ones
-      await supabase
-        .from('bom_items')
-        .delete()
-        .eq('quote_id', currentQuoteId);
-        
-      if (bomItems.length > 0) {
-        const bomInserts = bomItems.map(item => ({
-          quote_id: currentQuoteId,
-          product_id: item.product.id,
-          name: item.product.name,
-          description: item.product.description,
-          part_number: item.partNumber || item.product.partNumber,
-          quantity: item.quantity,
-          unit_price: item.product.price,
-          unit_cost: item.product.cost || 0,
-          total_price: item.product.price * item.quantity,
-          total_cost: (item.product.cost || 0) * item.quantity,
-          margin: item.product.cost && item.product.cost > 0 
-            ? ((item.product.price - item.product.cost) / item.product.price) * 100 
-            : 100,
-          configuration_data: item.product,
-          product_type: 'standard'
-        }));
-        
-        const { error: bomError } = await supabase
-          .from('bom_items')
-          .insert(bomInserts);
-          
-        if (bomError) throw bomError;
-      }
       
       if (!autoSave) {
         toast({
@@ -1668,7 +1669,7 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
       } else {
         // Generate new quote ID for final submission
         const { data: newQuoteId, error: generateError } = await supabase
-          .rpc('generate_quote_id', { user_email: user.email, is_draft: false });
+          .rpc('generate_quote_id_simple', { user_email: user.email, is_draft: false });
         
         if (generateError) {
           console.error('Error generating quote ID:', generateError);
