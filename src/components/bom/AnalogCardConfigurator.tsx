@@ -23,9 +23,10 @@ interface AnalogCardConfiguratorProps {
   bomItem: BOMItem;
   onSave: (customizations: Level3Customization[]) => void;
   onClose: () => void;
+  readOnly?: boolean;
 }
 
-const AnalogCardConfigurator = ({ bomItem, onSave, onClose }: AnalogCardConfiguratorProps) => {
+const AnalogCardConfigurator = ({ bomItem, onSave, onClose, readOnly = false }: AnalogCardConfiguratorProps) => {
   const [sensorOptions, setSensorOptions] = useState(productDataService.getAnalogSensorTypes());
   const [numberOfChannels, setNumberOfChannels] = useState(8);
   const [channelConfigs, setChannelConfigs] = useState<Record<number, string>>(() => {

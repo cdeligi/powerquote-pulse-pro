@@ -19,10 +19,11 @@ interface BOMDisplayProps {
   canSeePrices: boolean;
   canSeeCosts?: boolean;
   canEditPartNumber?: boolean;
-  productMap: Map<string, string>; // New prop: Map of product ID to display name
+  productMap: Map<string, string>;
+  readOnly?: boolean;
 }
 
-const BOMDisplay = ({ bomItems, onUpdateBOM, onEditConfiguration, onSubmitQuote, canSeePrices, canSeeCosts = false, canEditPartNumber = false }: BOMDisplayProps) => {
+const BOMDisplay = ({ bomItems, onUpdateBOM, onEditConfiguration, onSubmitQuote, canSeePrices, canSeeCosts = false, canEditPartNumber = false, readOnly = false }: BOMDisplayProps) => {
   const [editingItem, setEditingItem] = useState<string | null>(null);
   const [editQuantity, setEditQuantity] = useState<number>(1);
   const [editingPrice, setEditingPrice] = useState<string | null>(null);

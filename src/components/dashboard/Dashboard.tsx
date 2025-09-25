@@ -1,10 +1,11 @@
 import { useState, useEffect } from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation, Routes, Route, Navigate } from "react-router-dom";
 import { User } from "@/types/auth";
 import Sidebar from "./Sidebar";
 import DashboardOverview from "./DashboardOverview";
 import BOMBuilder from "../bom/BOMBuilder";
 import QuoteManager from "../quotes/QuoteManager";
+import QuoteViewer from "../bom/QuoteViewer";
 import AdminPanel from "../admin/AdminPanel";
 import AdminLevel4ConfigPage from "@/pages/admin/AdminLevel4ConfigPage";
 import { BOMItem } from "@/types/product";
@@ -25,9 +26,6 @@ const Dashboard = ({ user, onLogout }: DashboardProps) => {
   const { has } = usePermissions();
   const location = useLocation();
   
-  // Check if we're on a Level 4 configuration page
-  const isLevel4ConfigPage = location.pathname.startsWith('/admin/level4-config/');
-
   // Initialize ProductDataService when dashboard loads
   useEffect(() => {
     const initializeProducts = async () => {
@@ -50,7 +48,34 @@ const Dashboard = ({ user, onLogout }: DashboardProps) => {
   // Compute permissions for BOM
   const canSeeCosts = has(FEATURES.BOM_SHOW_PRODUCT_COST);
 
+  // Check for hash-based navigation (legacy support)
+  useEffect(() => {
+    const hash = window.location.hash;
+    if (hash === '#configure') {
+      setActiveView('bom');
+    } else if (hash === '#quotes') {
+      setActiveView('quotes');
+    } else if (hash === '#admin') {
+      setActiveView('admin');
+    } else if (hash === '#overview' || hash === '') {
+      setActiveView('overview');
+    }
+  }, [location]);
+
   const renderContent = () => {
+    // Handle React Router routes for quotes
+    if (location.pathname.startsWith('/quote/')) {
+      return <QuoteViewer />;
+    }
+    
+    // Handle Level 4 config routes
+    if (location.pathname.startsWith('/admin/level4-config/')) {
+      const match = location.pathname.match(/^\/admin\/level4-config\/([^/]+)$/);
+      const productId = match?.[1];
+      return <AdminLevel4ConfigPage productId={productId} />;
+    }
+
+    // Legacy hash-based routing
     switch (activeView) {
       case 'overview':
         return <DashboardOverview user={user} />;
@@ -73,27 +98,6 @@ const Dashboard = ({ user, onLogout }: DashboardProps) => {
     }
   };
 
-  // If we're on a Level 4 config page, render it directly
-  if (isLevel4ConfigPage) {
-    const match = location.pathname.match(/^\/admin\/level4-config\/([^/]+)$/);
-    const productId = match?.[1];
-    console.log('Level4 config route detected:', { pathname: location.pathname, productId });
-    
-    return (
-      <div className="min-h-screen bg-background text-foreground flex">
-        <Sidebar 
-          user={user}
-          activeView="admin"
-          onViewChange={setActiveView}
-          onLogout={onLogout}
-        />
-        <main className="flex-1 ml-64 p-8">
-          <AdminLevel4ConfigPage productId={productId} />
-        </main>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-background text-foreground flex">
       <Sidebar 
@@ -103,7 +107,18 @@ const Dashboard = ({ user, onLogout }: DashboardProps) => {
         onLogout={onLogout}
       />
       <main className="flex-1 ml-64 p-8">
-        {renderContent()}
+        <Routes>
+          {/* Quote viewing routes */}
+          <Route path="/quote/:id" element={<QuoteViewer />} />
+          
+          {/* Admin Level 4 config routes */}
+          <Route path="/admin/level4-config/:productId" element={
+            <AdminLevel4ConfigPage productId={location.pathname.split('/').pop()} />
+          } />
+          
+          {/* Default route - render based on activeView */}
+          <Route path="*" element={renderContent()} />
+        </Routes>
       </main>
     </div>
   );

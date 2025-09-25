@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Search, FileText, Eye, Download, ExternalLink, Edit, Share, Plus, Trash } from "lucide-react";
+import { Search, FileText, Eye, Download, ExternalLink, Edit, Share, Plus, Trash, Copy } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useQuotes } from "@/hooks/useQuotes";
 import { toast } from "@/hooks/use-toast";
@@ -144,7 +144,7 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
 
   const canSeePrices = user.role !== 'LEVEL_1';
 
-  const handleViewQuote = (quote: any) => {
+  const handleViewPDF = (quote: any) => {
     if (quote.pdfUrl) {
       // In a real implementation, this would open the actual PDF
       console.log(`Opening quote PDF: ${quote.pdfUrl}`);
@@ -164,24 +164,69 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
     }
   };
 
-  const handleEditQuote = (quote: any) => {
-    console.log('Viewing quote:', quote.id, 'with status:', quote.status);
+  const handleViewQuote = (quote: any) => {
+    console.log('Opening quote:', quote.id, 'with status:', quote.status);
     
     toast({
-      title: "Loading Quote",
-      description: `Loading quote ${quote.id} in the configurator...`,
+      title: "Opening Quote",
+      description: `Loading quote ${quote.id}...`,
     });
     
-    // Use setTimeout to ensure toast shows before navigation
+    // Use proper React Router navigation
     setTimeout(() => {
-      // Redirect to BOM builder to load the quote (works for all statuses)
-      window.location.href = `/#configure?quoteId=${quote.id}`;
+      if (quote.status === 'draft') {
+        // Draft quotes open in edit mode by default
+        window.location.href = `/quote/${quote.id}?mode=edit`;
+      } else {
+        // Non-draft quotes open in view mode
+        window.location.href = `/quote/${quote.id}?mode=view`;
+      }
     }, 100);
   };
 
+  const handleCloneQuote = async (quote: any) => {
+    if (!user?.id) {
+      toast({
+        title: 'Error',
+        description: 'Unable to clone quote. Please try again.',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    try {
+      const { data: newQuoteId, error } = await supabase
+        .rpc('clone_quote', {
+          source_quote_id: quote.id,
+          new_user_id: user.id
+        });
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      toast({
+        title: 'Quote Cloned',
+        description: `Successfully created new draft quote ${newQuoteId}`,
+      });
+
+      // Navigate to the new cloned quote in edit mode
+      setTimeout(() => {
+        window.location.href = `/quote/${newQuoteId}?mode=edit`;
+      }, 100);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to clone quote';
+      toast({
+        title: 'Clone Failed',
+        description: errorMessage,
+        variant: 'destructive'
+      });
+    }
+  };
+
   const handleNewQuote = () => {
-    // Redirect to BOM builder for new quote
-    window.location.href = '/#configure';
+    // Navigate to the new BOM builder route
+    window.location.href = '/#bom';
   };
 
   if (loading) {
@@ -351,28 +396,28 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
                   </div>
                   
                    <div className="flex space-x-2 ml-4">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="text-blue-400 hover:text-blue-300 hover:bg-gray-700"
-                      onClick={() => handleEditQuote(quote)}
-                      title="View Quote"
-                    >
-                      <Eye className="h-4 w-4" />
-                      <span className="text-xs ml-1">View</span>
-                    </Button>
-                    {quote.status === 'draft' && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-red-400 hover:text-red-300 hover:bg-gray-700"
-                        onClick={() => handleDeleteQuote(quote.id)}
-                        title="Delete Draft Quote"
-                      >
-                        <Trash className="h-4 w-4" />
-                        <span className="text-xs ml-1">Delete</span>
-                      </Button>
-                    )}
+                     <Button
+                       variant="ghost"
+                       size="sm"
+                       className="text-blue-400 hover:text-blue-300 hover:bg-gray-700"
+                       onClick={() => handleViewQuote(quote)}
+                       title="View Quote"
+                     >
+                       <Eye className="h-4 w-4" />
+                       <span className="text-xs ml-1">View</span>
+                     </Button>
+                     {quote.status !== 'draft' && (
+                       <Button
+                         variant="ghost"
+                         size="sm"
+                         className="text-green-400 hover:text-green-300 hover:bg-gray-700"
+                         onClick={() => handleCloneQuote(quote)}
+                         title="Clone Quote"
+                       >
+                         <Copy className="h-4 w-4" />
+                         <span className="text-xs ml-1">Clone</span>
+                       </Button>
+                     )}
                     <QuoteShareDialog
                       quoteId={quote.id}
                       quoteName={`${quote.id} - ${quote.customer}`}
@@ -387,16 +432,16 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
                         <span className="text-xs">Share</span>
                       </Button>
                     </QuoteShareDialog>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="text-blue-400 hover:text-blue-300 hover:bg-gray-700"
-                      onClick={() => handleViewQuote(quote)}
-                      title="View Quote PDF"
-                      disabled={!quote.pdfUrl}
-                    >
-                      <Eye className="h-4 w-4" />
-                    </Button>
+                     <Button
+                       variant="ghost"
+                       size="sm"
+                       className="text-blue-400 hover:text-blue-300 hover:bg-gray-700"
+                       onClick={() => handleViewPDF(quote)}
+                       title="View Quote PDF"
+                       disabled={!quote.pdfUrl}
+                     >
+                       <Eye className="h-4 w-4" />
+                     </Button>
                     {(quote.status === 'approved') && quote.pdfUrl && (
                       <Button
                         variant="ghost"
