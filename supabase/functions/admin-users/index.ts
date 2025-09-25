@@ -98,7 +98,7 @@ serve(async (req) => {
       .eq('id', user.id)
       .single();
 
-    if (profileError || profile?.role !== 'admin') {
+    if (profileError || !profile || (profile as any)?.role !== 'admin') {
       throw new Error('Admin access required');
     }
 
