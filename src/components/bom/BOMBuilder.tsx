@@ -163,10 +163,8 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
       setCurrentQuoteId(quoteIdFromUrl);
       setIsDraftMode(true);
       loadDraftQuote(quoteIdFromUrl);
-    } else {
-      // Create new draft quote
-      createDraftQuote();
     }
+    // Removed automatic draft creation - only create when user saves manually
   }, []);
 
   const createDraftQuote = async () => {
@@ -183,9 +181,9 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
     try {
       console.log('Creating draft quote for user:', user.id);
       
-      // Generate quote ID using the new RPC function for drafts
+      // Generate quote ID using the new RPC function for drafts with user email
       const { data: quoteId, error: idError } = await supabase
-        .rpc('generate_quote_id', { is_draft: true });
+        .rpc('generate_quote_id', { user_email: user.email, is_draft: true });
           
       if (idError || !quoteId) {
         console.error('Error generating quote ID:', idError);
@@ -336,6 +334,77 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
     }
   };
 
+  // Manual save as draft function
+  const handleSaveAsDraft = async () => {
+    if (!user?.id) {
+      toast({
+        title: 'Error',
+        description: 'User not authenticated. Please log in again.',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    try {
+      let quoteId = currentQuoteId;
+      
+      // Create new draft if none exists
+      if (!quoteId) {
+        const { data: newQuoteId, error: idError } = await supabase
+          .rpc('generate_quote_id', { user_email: user.email, is_draft: true });
+          
+        if (idError || !newQuoteId) {
+          throw new Error('Failed to generate quote ID');
+        }
+        
+        const { error: createError } = await supabase
+          .from('quotes')
+          .insert({
+            id: newQuoteId,
+            user_id: user.id,
+            customer_name: quoteFields.customerName || 'Draft Quote',
+            oracle_customer_id: quoteFields.oracleCustomerId || 'DRAFT',
+            sfdc_opportunity: quoteFields.sfdcOpportunity || `DRAFT-${Date.now()}`,
+            status: 'draft',
+            original_quote_value: 0,
+            discounted_value: 0,
+            requested_discount: 0,
+            original_margin: 0,
+            discounted_margin: 0,
+            total_cost: 0,
+            gross_profit: 0,
+            priority: 'Medium',
+            is_rep_involved: false,
+            shipping_terms: 'Ex-Works',
+            payment_terms: '30 days',
+            currency: 'USD',
+            quote_fields: {},
+            submitted_by_name: user.name || user.email || 'Unknown User',
+            submitted_by_email: user.email || ''
+          });
+          
+        if (createError) throw createError;
+        
+        setCurrentQuoteId(newQuoteId);
+        setIsDraftMode(true);
+        quoteId = newQuoteId;
+        
+        // Update URL without page reload
+        window.history.replaceState({}, '', `/#configure?quoteId=${quoteId}`);
+      }
+      
+      await saveDraftQuote(false);
+      
+    } catch (error) {
+      console.error('Error saving draft:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to save draft quote',
+        variant: 'destructive'
+      });
+    }
+  };
+
   const saveDraftQuote = async (autoSave = false) => {
     if (!currentQuoteId || !user?.id) return;
     
@@ -421,9 +490,9 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
     }
   };
 
-  // Auto-save draft every 30 seconds
+  // Auto-save draft every 30 seconds (only if draft already exists)
   useEffect(() => {
-    if (!currentQuoteId || !isDraftMode) return;
+    if (!currentQuoteId || !isDraftMode || bomItems.length === 0) return;
     
     const autoSaveInterval = setInterval(() => {
       saveDraftQuote(true);
@@ -1531,7 +1600,7 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
       } else {
         // Generate new quote ID for final submission
         const { data: newQuoteId, error: generateError } = await supabase
-          .rpc('generate_quote_id', { is_draft: false });
+          .rpc('generate_quote_id', { user_email: user.email, is_draft: false });
         
         if (generateError) {
           console.error('Error generating quote ID:', generateError);
@@ -2068,7 +2137,7 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
               onUpdateBOM={handleBOMUpdate}
               onEditConfiguration={handleBOMConfigurationEdit}
               onSubmitQuote={submitQuoteRequest}
-              onSaveDraft={() => saveDraftQuote(false)}
+              onSaveDraft={handleSaveAsDraft}
               canSeePrices={canSeePrices}
               canSeeCosts={canSeeCosts}
               canEditPartNumber={canEditPN}

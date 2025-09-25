@@ -1798,7 +1798,10 @@ export type Database = {
         Returns: string
       }
       generate_quote_id: {
-        Args: Record<PropertyKey, never> | { is_draft?: boolean }
+        Args:
+          | Record<PropertyKey, never>
+          | { is_draft?: boolean }
+          | { is_draft?: boolean; user_email?: string }
         Returns: string
       }
       get_admin_user_ids: {
