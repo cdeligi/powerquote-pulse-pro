@@ -1,0 +1,411 @@
+import React, { useState, useEffect } from 'react';
+import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { ArrowLeft, Edit, Copy, Download, FileText } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from '@/hooks/use-toast';
+import { useAuth } from '@/hooks/useAuth';
+import { BOMItem } from '@/types/product';
+import { EnhancedBOMDisplay } from './EnhancedBOMDisplay';
+
+interface Quote {
+  id: string;
+  status: string;
+  customer_name: string;
+  oracle_customer_id: string;
+  sfdc_opportunity: string;
+  priority: string;
+  shipping_terms: string;
+  payment_terms: string;
+  currency: string;
+  is_rep_involved: boolean;
+  quote_fields: Record<string, any>;
+  draft_bom: any;
+  original_quote_value: number;
+  discounted_value: number;
+  total_cost: number;
+  requested_discount: number;
+  submitted_at?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+const QuoteViewer: React.FC = () => {
+  const { id } = useParams<{ id: string }>();
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  
+  const mode = searchParams.get('mode') || 'view';
+  const [quote, setQuote] = useState<Quote | null>(null);
+  const [bomItems, setBomItems] = useState<BOMItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  
+  const isDraft = quote?.status === 'draft';
+  const isExplicitView = mode === 'view';
+  const isEditable = isDraft && !isExplicitView;
+
+  useEffect(() => {
+    if (!id) {
+      setError('No quote ID provided');
+      setLoading(false);
+      return;
+    }
+    
+    loadQuote(id);
+  }, [id]);
+
+  // Route guard - redirect non-draft quotes from edit mode to view mode
+  useEffect(() => {
+    if (!quote || loading) return;
+    
+    if (!isDraft && mode === 'edit') {
+      toast({
+        title: 'Quote Not Editable',
+        description: 'This quote is not editable. Switched to view mode. Use Clone to create an editable copy.',
+        variant: 'default'
+      });
+      navigate(`/quote/${quote.id}?mode=view`, { replace: true });
+    }
+  }, [quote, mode, isDraft, loading, navigate]);
+
+  const loadQuote = async (quoteId: string) => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      // Load quote data
+      const { data: quoteData, error: quoteError } = await supabase
+        .from('quotes')
+        .select('*')
+        .eq('id', quoteId)
+        .single();
+        
+      if (quoteError) {
+        throw new Error(`Failed to load quote: ${quoteError.message}`);
+      }
+      
+      if (!quoteData) {
+        throw new Error('Quote not found');
+      }
+      
+      setQuote(quoteData);
+      
+      // Load BOM items
+      const { data: bomData, error: bomError } = await supabase
+        .from('bom_items')
+        .select(`
+          *,
+          bom_level4_values (
+            id,
+            level4_config_id,
+            entries
+          )
+        `)
+        .eq('quote_id', quoteId);
+        
+      if (bomError) {
+        console.error('Error loading BOM items:', bomError);
+        setBomItems([]);
+      } else {
+        // Convert BOM items to local format
+        const loadedItems: BOMItem[] = (bomData || []).map(item => ({
+          id: item.id,
+          product: {
+            id: item.product_id,
+            name: item.name,
+            partNumber: item.part_number,
+            price: item.unit_price,
+            cost: item.unit_cost,
+            description: item.description,
+            ...item.configuration_data
+          },
+          quantity: item.quantity,
+          enabled: true,
+          partNumber: item.part_number,
+          level4Values: item.bom_level4_values || []
+        }));
+        
+        setBomItems(loadedItems);
+      }
+      
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';
+      setError(errorMessage);
+      toast({
+        title: 'Error Loading Quote',
+        description: errorMessage,
+        variant: 'destructive'
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCloneQuote = async () => {
+    if (!quote || !user?.id) {
+      toast({
+        title: 'Error',
+        description: 'Unable to clone quote. Please try again.',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    try {
+      const { data: newQuoteId, error } = await supabase
+        .rpc('clone_quote', {
+          source_quote_id: quote.id,
+          new_user_id: user.id
+        });
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      toast({
+        title: 'Quote Cloned',
+        description: `Successfully created new draft quote ${newQuoteId}`,
+      });
+
+      // Navigate to the new cloned quote in edit mode
+      navigate(`/quote/${newQuoteId}?mode=edit`);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to clone quote';
+      toast({
+        title: 'Clone Failed',
+        description: errorMessage,
+        variant: 'destructive'
+      });
+    }
+  };
+
+  const handleEditQuote = () => {
+    if (isDraft) {
+      navigate(`/quote/${quote!.id}?mode=edit`);
+    } else {
+      toast({
+        title: 'Quote Not Editable',
+        description: 'This quote cannot be edited. Use Clone to create an editable copy.',
+        variant: 'default'
+      });
+    }
+  };
+
+  const getStatusBadge = (status: string) => {
+    const statusConfig: Record<string, { color: string; text: string }> = {
+      draft: { color: 'bg-gray-600', text: 'Draft' },
+      submitted: { color: 'bg-blue-600', text: 'Submitted' },
+      pending_approval: { color: 'bg-yellow-600', text: 'Pending Approval' },
+      approved: { color: 'bg-green-600', text: 'Approved' },
+      rejected: { color: 'bg-red-600', text: 'Rejected' },
+      in_process: { color: 'bg-purple-600', text: 'In Process' }
+    };
+    return statusConfig[status] || statusConfig.draft;
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background text-foreground flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-xl mb-2">Loading Quote...</div>
+          <div className="text-muted-foreground">Please wait while we load the quote data</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !quote) {
+    return (
+      <div className="min-h-screen bg-background text-foreground flex items-center justify-center">
+        <div className="text-center max-w-md">
+          <div className="text-xl mb-4 text-red-400">Quote Not Found</div>
+          <div className="text-muted-foreground mb-6">{error || 'The requested quote could not be found'}</div>
+          <Button onClick={() => navigate('/quotes')} variant="outline">
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back to Quotes
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  const statusBadge = getStatusBadge(quote.status);
+
+  return (
+    <div className="min-h-screen bg-background text-foreground">
+      {/* Header */}
+      <div className="border-b border-border bg-card">
+        <div className="container mx-auto px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <Button 
+                variant="ghost" 
+                onClick={() => navigate('/quotes')}
+                className="text-muted-foreground hover:text-foreground"
+              >
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                Back to Quotes
+              </Button>
+              <div>
+                <h1 className="text-2xl font-bold text-foreground">
+                  {quote.status === 'draft' ? 'Draft Quote' : `Quote ${quote.id}`}
+                </h1>
+                <p className="text-muted-foreground">{quote.customer_name}</p>
+              </div>
+              <Badge className={`${statusBadge.color} text-white`}>
+                {statusBadge.text}
+              </Badge>
+            </div>
+            
+            <div className="flex items-center space-x-2">
+              {!isEditable && (
+                <Button onClick={handleCloneQuote} variant="outline">
+                  <Copy className="mr-2 h-4 w-4" />
+                  Clone
+                </Button>
+              )}
+              {isDraft && (
+                <Button onClick={handleEditQuote} className="bg-primary hover:bg-primary/90">
+                  <Edit className="mr-2 h-4 w-4" />
+                  Edit
+                </Button>
+              )}
+              <Button variant="outline">
+                <Download className="mr-2 h-4 w-4" />
+                Export
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* View-only banner for non-draft quotes */}
+      {!isEditable && quote.status !== 'draft' && (
+        <Alert className="m-6 border-amber-600 bg-amber-50 dark:bg-amber-950/20">
+          <FileText className="h-4 w-4" />
+          <AlertDescription className="text-amber-800 dark:text-amber-200">
+            You are viewing a {statusBadge.text.toLowerCase()} quote in read-only mode. 
+            To make changes, use the Clone button to create a new editable draft.
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {/* Content */}
+      <div className="container mx-auto px-6 py-6 space-y-6">
+        {/* Quote Information */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Quote Information</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className="text-sm font-medium text-muted-foreground">Customer</label>
+                <p className="text-foreground">{quote.customer_name}</p>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-muted-foreground">Oracle Customer ID</label>
+                <p className="text-foreground">{quote.oracle_customer_id}</p>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-muted-foreground">SFDC Opportunity</label>
+                <p className="text-foreground">{quote.sfdc_opportunity}</p>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-muted-foreground">Priority</label>
+                <p className="text-foreground">{quote.priority}</p>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-muted-foreground">Currency</label>
+                <p className="text-foreground">{quote.currency}</p>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-muted-foreground">Rep Involved</label>
+                <p className="text-foreground">{quote.is_rep_involved ? 'Yes' : 'No'}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Financial Summary */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Financial Summary</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div>
+                <label className="text-sm font-medium text-muted-foreground">Original Value</label>
+                <p className="text-xl font-bold text-foreground">
+                  ${quote.original_quote_value.toLocaleString()}
+                </p>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-muted-foreground">Discounted Value</label>
+                <p className="text-xl font-bold text-foreground">
+                  ${quote.discounted_value.toLocaleString()}
+                </p>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-muted-foreground">Total Cost</label>
+                <p className="text-xl font-bold text-foreground">
+                  ${quote.total_cost.toLocaleString()}
+                </p>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-muted-foreground">Requested Discount</label>
+                <p className="text-xl font-bold text-foreground">
+                  {quote.requested_discount}%
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* BOM Items */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Bill of Materials ({bomItems.length} items)</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {bomItems.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  No BOM items in this quote
+                </div>
+              ) : (
+                bomItems.map((item, index) => (
+                  <div key={item.id || index} className="border border-border rounded-lg p-4 bg-card">
+                    <div className="flex justify-between items-start">
+                      <div className="flex-1">
+                        <h4 className="font-medium text-foreground">{item.product.name}</h4>
+                        <p className="text-sm text-muted-foreground">{item.product.description}</p>
+                        <p className="text-sm text-muted-foreground">Part Number: {item.partNumber}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-medium">Qty: {item.quantity}</p>
+                        <p className="text-sm text-muted-foreground">
+                          ${item.product.price?.toLocaleString() || '0'}
+                        </p>
+                        <p className="text-sm font-medium">
+                          Total: ${((item.product.price || 0) * item.quantity).toLocaleString()}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+};
+
+export default QuoteViewer;

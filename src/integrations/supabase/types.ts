@@ -1207,6 +1207,7 @@ export type Database = {
       }
       quotes: {
         Row: {
+          app_version: string | null
           approval_notes: string | null
           approved_discount: number | null
           approved_prices: Json | null
@@ -1217,9 +1218,12 @@ export type Database = {
           discount_justification: string | null
           discounted_margin: number
           discounted_value: number
+          display_number: number
+          draft_bom: Json | null
           gross_profit: number
           id: string
           is_rep_involved: boolean
+          locked_at: string | null
           oracle_customer_id: string
           original_margin: number
           original_prices: Json | null
@@ -1237,7 +1241,9 @@ export type Database = {
           reviewed_by: string | null
           sfdc_opportunity: string
           shipping_terms: string
+          source_quote_id: string | null
           status: string
+          submitted_at: string | null
           submitted_by_email: string | null
           submitted_by_name: string | null
           total_cost: number
@@ -1245,6 +1251,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          app_version?: string | null
           approval_notes?: string | null
           approved_discount?: number | null
           approved_prices?: Json | null
@@ -1255,9 +1262,12 @@ export type Database = {
           discount_justification?: string | null
           discounted_margin: number
           discounted_value: number
+          display_number?: number
+          draft_bom?: Json | null
           gross_profit: number
           id: string
           is_rep_involved?: boolean
+          locked_at?: string | null
           oracle_customer_id: string
           original_margin: number
           original_prices?: Json | null
@@ -1275,7 +1285,9 @@ export type Database = {
           reviewed_by?: string | null
           sfdc_opportunity: string
           shipping_terms: string
+          source_quote_id?: string | null
           status?: string
+          submitted_at?: string | null
           submitted_by_email?: string | null
           submitted_by_name?: string | null
           total_cost: number
@@ -1283,6 +1295,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          app_version?: string | null
           approval_notes?: string | null
           approved_discount?: number | null
           approved_prices?: Json | null
@@ -1293,9 +1306,12 @@ export type Database = {
           discount_justification?: string | null
           discounted_margin?: number
           discounted_value?: number
+          display_number?: number
+          draft_bom?: Json | null
           gross_profit?: number
           id?: string
           is_rep_involved?: boolean
+          locked_at?: string | null
           oracle_customer_id?: string
           original_margin?: number
           original_prices?: Json | null
@@ -1313,7 +1329,9 @@ export type Database = {
           reviewed_by?: string | null
           sfdc_opportunity?: string
           shipping_terms?: string
+          source_quote_id?: string | null
           status?: string
+          submitted_at?: string | null
           submitted_by_email?: string | null
           submitted_by_name?: string | null
           total_cost?: number
@@ -1808,6 +1826,10 @@ export type Database = {
       calculate_bom_total_cost: {
         Args: { quote_id_param: string }
         Returns: number
+      }
+      clone_quote: {
+        Args: { new_user_id: string; source_quote_id: string }
+        Returns: string
       }
       create_user: {
         Args: {
