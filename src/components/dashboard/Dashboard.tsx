@@ -73,6 +73,11 @@ const Dashboard = ({ user, onLogout }: DashboardProps) => {
     }
   }, [location.pathname, location.hash]);
 
+  // Handle direct view changes from sidebar (bypass hash routing)
+  const handleViewChange = (view: ActiveView) => {
+    setActiveView(view);
+  };
+
   const renderContent = () => {
     // Handle React Router routes for BOM editing
     if (location.pathname.startsWith('/bom-edit/')) {
@@ -145,7 +150,7 @@ const Dashboard = ({ user, onLogout }: DashboardProps) => {
       <Sidebar 
         user={user}
         activeView={activeView}
-        onViewChange={setActiveView}
+        onViewChange={handleViewChange}
         onLogout={onLogout}
       />
       <main className="flex-1 ml-64 p-8">

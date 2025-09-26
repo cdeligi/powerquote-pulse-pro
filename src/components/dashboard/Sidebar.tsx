@@ -86,11 +86,12 @@ const Sidebar = ({ user, activeView, onViewChange, onLogout }: SidebarProps) => 
                     } else if (item.id === 'bom') {
                       navigate('/bom-new');
                     } else if (item.id === 'quotes') {
-                      // Ensure we're on the main route and set quotes hash
-                      if (location.pathname !== '/') {
-                        navigate('/');
-                      }
-                      window.location.hash = '#quotes';
+                      // Direct navigation to quotes - no hash delays
+                      navigate('/');
+                      // Set the view immediately without waiting for hash changes
+                      setTimeout(() => {
+                        onViewChange('quotes');
+                      }, 0);
                     } else if (item.id === 'admin') {
                       // Stay on admin view
                       if (!location.pathname.startsWith('/admin/') && location.pathname !== '/') {
