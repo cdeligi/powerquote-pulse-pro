@@ -225,9 +225,9 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
       // Generate unique customer name for draft
       const draftCustomerName = await generateUniqueDraftName();
       
-      // Generate quote ID using the improved RPC function for drafts
+      // Generate quote ID using the correct RPC function
       const { data: quoteId, error: idError } = await supabase
-        .rpc('generate_quote_id', { user_email: user.email, is_draft: true });
+        .rpc('generate_quote_id_simple', { user_email: user.email, is_draft: true });
           
       if (idError) {
         console.error('Quote ID generation error:', idError);

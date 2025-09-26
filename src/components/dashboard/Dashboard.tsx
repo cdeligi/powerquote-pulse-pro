@@ -45,31 +45,44 @@ const Dashboard = ({ user, onLogout }: DashboardProps) => {
     setBomItems(items);
   };
 
+  // Initialize with overview by default, but allow route-based overrides
+  useEffect(() => {
+    // Only set to overview if we're on the root path and no hash
+    if (location.pathname === '/' && !window.location.hash) {
+      setActiveView('overview');
+    }
+  }, []);  // Run once on mount
+
   // Compute permissions for BOM
   const canSeeCosts = has(FEATURES.BOM_SHOW_PRODUCT_COST);
 
-  // Check for hash-based navigation (legacy support)
+  // Sync activeView with current route only when routes change (not manual clicks)
   useEffect(() => {
+    const path = location.pathname;
     const hash = window.location.hash;
-    if (hash === '#configure') {
+    
+    // Only auto-sync for specific route patterns to ensure proper tab highlighting
+    if (path.startsWith('/bom-edit/') || path.startsWith('/bom-new') || hash === '#configure') {
       setActiveView('bom');
+    } else if (path.startsWith('/quote/')) {
+      // When viewing a quote (not editing), keep current active view or default to overview
+      // Don't force tab switching unless we're coming from an unrelated route
+      if (!['overview', 'quotes', 'bom', 'admin'].includes(activeView)) {
+        setActiveView('overview');
+      }
     } else if (hash === '#quotes') {
       setActiveView('quotes');
     } else if (hash === '#admin') {
       setActiveView('admin');
-    } else if (hash === '#overview' || hash === '') {
+    } else if ((hash === '#overview' || hash === '') && path === '/') {
       setActiveView('overview');
     }
-  }, [location]);
+  }, [location.pathname, location.hash]); // Only respond to actual route changes
 
   const renderContent = () => {
-  // Handle React Router routes for BOM editing
+    // Handle React Router routes for BOM editing
     if (location.pathname.startsWith('/bom-edit/')) {
       const quoteId = location.pathname.split('/bom-edit/')[1];
-      // Set active view to bom when editing quotes
-      if (activeView !== 'bom') {
-        setActiveView('bom');
-      }
       return (
         <BOMProvider>
           <BOMBuilder 
@@ -85,10 +98,6 @@ const Dashboard = ({ user, onLogout }: DashboardProps) => {
     
     // Handle React Router routes for new BOM
     if (location.pathname.startsWith('/bom-new')) {
-      // Set active view to bom when creating new quotes
-      if (activeView !== 'bom') {
-        setActiveView('bom');
-      }
       return (
         <BOMProvider>
           <BOMBuilder 
