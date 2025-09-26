@@ -225,25 +225,14 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
       // Generate unique customer name for draft
       const draftCustomerName = await generateUniqueDraftName();
       
-      // Generate quote ID using the correct RPC function
-      const { data: quoteId, error: idError } = await supabase
-        .rpc('generate_quote_id', { user_email: user.email, is_draft: true });
-          
-      if (idError) {
-        console.error('Quote ID generation error:', idError);
-        throw new Error(`Failed to generate quote ID: ${idError.message}`);
-      }
+      // Use simple UUID for draft quotes - no complex ID generation
+      const draftQuoteId = crypto.randomUUID();
       
-      if (!quoteId) {
-        console.error('No quote ID returned from function');
-        throw new Error('Failed to generate quote ID');
-      }
-      
-      console.log('Generated draft quote ID:', quoteId);
+      console.log('Generated simple draft quote ID:', draftQuoteId);
       
       // Create draft quote with proper field mapping
       const quoteData = {
-        id: quoteId,
+        id: draftQuoteId,
         user_id: user.id,
         customer_name: draftCustomerName,
         oracle_customer_id: quoteFields.oracle_customer_id || 'TBD',
@@ -277,18 +266,18 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
         throw new Error(`Failed to create quote: ${createError.message}`);
       }
       
-      setCurrentQuoteId(quoteId);
+      setCurrentQuoteId(draftQuoteId);
       setIsDraftMode(true);
       
       // Update URL without page reload
-      window.history.replaceState({}, '', `/#configure?quoteId=${quoteId}`);
+      window.history.replaceState({}, '', `/#configure?quoteId=${draftQuoteId}`);
       
       toast({
         title: 'Draft Created',
-        description: `Draft quote ${quoteId} created successfully. Your progress will be automatically saved.`
+        description: `${draftCustomerName} created successfully. Your progress will be automatically saved.`
       });
       
-      console.log('Draft quote created successfully:', quoteId);
+      console.log('Draft quote created successfully:', draftQuoteId);
     } catch (error) {
       console.error('Error creating draft quote:', error);
       toast({
@@ -432,6 +421,19 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
       // Set draft mode based on quote status
       setIsDraftMode(quote.status === 'draft');
       
+      // For draft quotes loaded from draft_bom, recalculate totals from loaded items
+      if (quote.status === 'draft' && loadedItems.length > 0) {
+        const totalValue = loadedItems.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
+        const totalCost = loadedItems.reduce((sum, item) => sum + ((item.product.cost || 0) * item.quantity), 0);
+        
+        console.log(`Recalculated totals - Value: ${totalValue}, Cost: ${totalCost}`);
+        
+        // Trigger BOM update to recalculate all totals
+        setTimeout(() => {
+          onBOMUpdate(loadedItems);
+        }, 100);
+      }
+      
       // Show success message
       const statusText = quote.status === 'draft' ? 'Draft' : 'Quote';
       toast({
@@ -481,17 +483,8 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
       if (!quoteId) {
         console.log('No current quote ID, creating new draft quote');
         
-        const { data: newQuoteId, error: idError } = await supabase
-          .rpc('generate_quote_id', { user_email: user.email, is_draft: true });
-          
-        if (idError) {
-          console.error('Quote ID generation error:', idError);
-          throw new Error(`Failed to generate quote ID: ${idError.message}`);
-        }
-        
-        if (!newQuoteId) {
-          throw new Error('Failed to generate quote ID');
-        }
+        // Use simple UUID for draft quotes - no complex ID generation
+        const newQuoteId = crypto.randomUUID();
         
         console.log('Generated new draft quote ID:', newQuoteId);
         
