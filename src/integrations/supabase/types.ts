@@ -386,18 +386,21 @@ export type Database = {
       legal_pages: {
         Row: {
           content: string
+          created_at: string | null
           slug: string
           updated_at: string | null
           updated_by: string | null
         }
         Insert: {
           content?: string
+          created_at?: string | null
           slug: string
           updated_at?: string | null
           updated_by?: string | null
         }
         Update: {
           content?: string
+          created_at?: string | null
           slug?: string
           updated_at?: string | null
           updated_by?: string | null

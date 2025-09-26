@@ -340,20 +340,29 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         role: mapDatabaseRoleToAppRole(profileData.role),
         department: profileData.department,
       };
-      setUser(appUser);
-    } catch (err) {
-      console.error("[AuthProvider] Profile fetch error:", err);
-      const errorMessage = err instanceof Error ? err.message : "Unknown error";
-      setError({
-        code: "PROFILE_FETCH_ERROR",
-        message: errorMessage,
-        type: "profile",
-      });
-      setUser(null);
-      return;
+        setUser(appUser);
+        return appUser;
+      } catch (err) {
+        console.error("[AuthProvider] Profile fetch error:", err);
+        const errorMessage = err instanceof Error ? err.message : "Unknown error";
+        setError({
+          code: "PROFILE_FETCH_ERROR",
+          message: errorMessage,
+          type: "profile",
+        });
+        setUser(null);
+        
+        // Wait before retrying
+        if (attempt < 3) {
+          await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+          continue;
+        }
+        
+        return null;
+      }
     }
-  };
-
+    
+    return null;
   };
 
   return (

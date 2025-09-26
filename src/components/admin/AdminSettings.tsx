@@ -20,6 +20,7 @@ const AdminSettings = () => {
   const [saving, setSaving] = useState(false);
   const [termsContent, setTermsContent] = useState('');
   const [privacyContent, setPrivacyContent] = useState('');
+  const [quoteTermsContent, setQuoteTermsContent] = useState('');
   const [quotePrefix, setQuotePrefix] = useState('QLT');
   const [quoteCounter, setQuoteCounter] = useState(1);
 
@@ -31,15 +32,17 @@ const AdminSettings = () => {
       const { data: legalData, error: legalError } = await supabase
         .from('legal_pages')
         .select('slug, content')
-        .in('slug', ['terms', 'privacy']);
+        .in('slug', ['terms', 'privacy', 'quote_terms']);
 
       if (legalError) throw legalError;
 
       const termsPage = legalData?.find(page => page.slug === 'terms');
       const privacyPage = legalData?.find(page => page.slug === 'privacy');
+      const quoteTermsPage = legalData?.find(page => page.slug === 'quote_terms');
 
       setTermsContent(termsPage?.content || '');
       setPrivacyContent(privacyPage?.content || '');
+      setQuoteTermsContent(quoteTermsPage?.content || '');
 
       // Fetch quote settings
       const { data: settingsData, error: settingsError } = await supabase
@@ -71,7 +74,7 @@ const AdminSettings = () => {
     fetchLegalContent();
   }, []);
 
-  const saveLegalContent = async (slug: 'terms' | 'privacy', content: string) => {
+  const saveLegalContent = async (slug: 'terms' | 'privacy' | 'quote_terms', content: string) => {
     try {
       setSaving(true);
 
@@ -157,12 +160,15 @@ const AdminSettings = () => {
       </div>
 
       <Tabs defaultValue="general" className="w-full">
-        <TabsList className="grid w-full grid-cols-4 bg-gray-800">
+        <TabsList className="grid w-full grid-cols-5 bg-gray-800">
           <TabsTrigger value="general" className="text-white data-[state=active]:bg-red-600">
             General
           </TabsTrigger>
           <TabsTrigger value="quotes" className="text-white data-[state=active]:bg-red-600">
             Quote Management
+          </TabsTrigger>
+          <TabsTrigger value="terms" className="text-white data-[state=active]:bg-red-600">
+            Terms & Conditions
           </TabsTrigger>
           <TabsTrigger value="sharing" className="text-white data-[state=active]:bg-red-600">
             User Sharing
@@ -241,6 +247,46 @@ const AdminSettings = () => {
                 <h4 className="text-white font-medium mb-2">Preview</h4>
                 <p className="text-gray-300">
                   Quote IDs will be generated as: <span className="font-mono bg-gray-700 px-2 py-1 rounded">{quotePrefix}-{quoteCounter}</span>, <span className="font-mono bg-gray-700 px-2 py-1 rounded">{quotePrefix}-{quoteCounter + 1}</span>, etc.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="terms">
+          <Card className="bg-gray-900 border-gray-800">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-white">Quote Terms & Conditions</CardTitle>
+                <Button
+                  onClick={() => saveLegalContent('quote_terms', quoteTermsContent)}
+                  disabled={saving}
+                  className="bg-red-600 hover:bg-red-700"
+                >
+                  {saving ? (
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  ) : (
+                    <Save className="h-4 w-4 mr-2" />
+                  )}
+                  Save Terms & Conditions
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                <Label htmlFor="quote-terms" className="text-white">
+                  Terms & Conditions Content (Will appear on all generated quote PDFs)
+                </Label>
+                <Textarea
+                  id="quote-terms"
+                  value={quoteTermsContent}
+                  onChange={(e) => setQuoteTermsContent(e.target.value)}
+                  className="bg-gray-800 border-gray-600 text-white placeholder:text-gray-400 focus:border-red-500 focus:ring-red-500 min-h-[400px] font-mono text-sm"
+                  placeholder="Enter the full Terms & Conditions text that will appear on quote PDFs..."
+                />
+                <p className="text-sm text-gray-400">
+                  This content will automatically be included on the last page of all generated quote PDFs.
+                  Use clear, professional language for your terms and conditions.
                 </p>
               </div>
             </CardContent>
