@@ -56,13 +56,23 @@ const Dashboard = ({ user, onLogout }: DashboardProps) => {
   // Compute permissions for BOM
   const canSeeCosts = has(FEATURES.BOM_SHOW_PRODUCT_COST);
 
+  // Direct view change handler for better performance
+  const handleViewChange = (view: ActiveView) => {
+    setActiveView(view);
+    // Update URL hash for bookmarking without complex routing
+    if (view !== 'overview') {
+      window.history.pushState(null, '', `#${view}`);
+    } else {
+      window.history.pushState(null, '', '/');
+    }
+  };
+
   // Simplified route synchronization - only sync when needed
-  // Sync active view with route and hash changes - no circular dependencies
   useEffect(() => {
     const path = location.pathname;
     const hash = window.location.hash;
     
-    if (path.startsWith('/bom-edit/') || path.startsWith('/bom-new') || hash === '#configure') {
+    if (path.startsWith('/bom-edit/') || path.startsWith('/bom-new')) {
       setActiveView('bom');
     } else if (hash === '#quotes') {
       setActiveView('quotes');
@@ -71,12 +81,7 @@ const Dashboard = ({ user, onLogout }: DashboardProps) => {
     } else if (hash === '#overview' || (hash === '' && path === '/')) {
       setActiveView('overview');
     }
-  }, [location.pathname, location.hash]);
-
-  // Handle direct view changes from sidebar (bypass hash routing)
-  const handleViewChange = (view: ActiveView) => {
-    setActiveView(view);
-  };
+  }, [location.pathname]);
 
   const renderContent = () => {
     // Handle React Router routes for BOM editing

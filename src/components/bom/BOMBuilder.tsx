@@ -502,6 +502,13 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
         console.log('Generated new draft quote ID:', newQuoteId);
         
         const draftName = await generateUniqueDraftName();
+        
+        // Calculate totals from BOM items
+        const totalValue = bomItems.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
+        const totalCost = bomItems.reduce((sum, item) => sum + ((item.product.cost || 0) * item.quantity), 0);
+        const grossProfit = totalValue - totalCost;
+        const originalMargin = totalValue > 0 ? ((totalValue - totalCost) / totalValue) * 100 : 0;
+
         const quoteData = {
           id: newQuoteId,
           user_id: user.id,
@@ -519,13 +526,13 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
             items: bomItems,
             lastSaved: new Date().toISOString()
           },
-          original_quote_value: 0,
-          discounted_value: 0,
-          total_cost: 0,
+          original_quote_value: totalValue,
+          discounted_value: totalValue,
+          total_cost: totalCost,
           requested_discount: 0,
-          original_margin: 0,
-          discounted_margin: 0,
-          gross_profit: 0,
+          original_margin: originalMargin,
+          discounted_margin: originalMargin,
+          gross_profit: grossProfit,
           submitted_by_email: user.email || '',
           submitted_by_name: user.email || 'Unknown User'
         };
@@ -549,7 +556,12 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
         
         console.log('Draft quote created successfully:', quoteId);
       } else {
-        // Update existing draft
+        // Update existing draft - also calculate and update totals
+        const totalValue = bomItems.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
+        const totalCost = bomItems.reduce((sum, item) => sum + ((item.product.cost || 0) * item.quantity), 0);
+        const grossProfit = totalValue - totalCost;
+        const originalMargin = totalValue > 0 ? ((totalValue - totalCost) / totalValue) * 100 : 0;
+        
         const { error: updateError } = await supabase
           .from('quotes')
           .update({
@@ -558,6 +570,12 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
               items: bomItems,
               lastSaved: new Date().toISOString()
             },
+            original_quote_value: totalValue,
+            discounted_value: totalValue,
+            total_cost: totalCost,
+            original_margin: originalMargin,
+            discounted_margin: originalMargin,
+            gross_profit: grossProfit,
             updated_at: new Date().toISOString()
           })
           .eq('id', quoteId)
@@ -573,7 +591,7 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
       
       toast({
         title: 'Draft Saved',
-        description: `Draft ${quoteId} saved successfully with ${bomItems.length} items`,
+        description: `Draft ${currentQuote?.customer_name || 'Quote'} saved successfully with ${bomItems.length} items`,
       });
       
     } catch (error) {

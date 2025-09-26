@@ -34,7 +34,11 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
     id: quote.id,
     customer: quote.customer_name || 'Unnamed Customer',
     oracleCustomerId: quote.oracle_customer_id || 'N/A',
-    value: quote.original_quote_value || 0,
+    // Calculate values from draft_bom for draft quotes, use stored values for others
+    value: quote.status === 'draft' && quote.draft_bom?.items 
+      ? quote.draft_bom.items.reduce((sum: number, item: any) => 
+          sum + ((item.product?.price || item.unit_price || 0) * (item.quantity || 1)), 0)
+      : (quote.original_quote_value || 0),
     status: quote.status,
     priority: quote.priority,
     createdAt: new Date(quote.created_at).toLocaleDateString(),
@@ -49,25 +53,40 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
       if (quotes.length > 0) {
         const counts: Record<string, number> = {};
         
-        for (const quote of quotes) {
+        // Batch process quotes for better performance
+        quotes.forEach(quote => {
           try {
             // For draft quotes, check draft_bom data first
             if (quote.status === 'draft' && quote.draft_bom && quote.draft_bom.items && Array.isArray(quote.draft_bom.items)) {
               counts[quote.id] = quote.draft_bom.items.length;
             } else {
-              // For non-draft quotes, check bom_items table
-              const { count, error } = await supabase
-                .from('bom_items')
-                .select('*', { count: 'exact', head: true })
-                .eq('quote_id', quote.id);
-                
-              if (!error) {
-                counts[quote.id] = count || 0;
-              }
+              // For non-draft quotes, we'll fetch from database
+              counts[quote.id] = 0; // Default to 0, will be updated below
             }
           } catch (err) {
-            console.error(`Error fetching BOM count for quote ${quote.id}:`, err);
+            console.error(`Error processing quote ${quote.id}:`, err);
             counts[quote.id] = 0;
+          }
+        });
+
+        // Batch fetch BOM counts for non-draft quotes
+        const nonDraftQuotes = quotes.filter(q => q.status !== 'draft');
+        if (nonDraftQuotes.length > 0) {
+          try {
+            const quoteIds = nonDraftQuotes.map(q => q.id);
+            const { data: bomData, error } = await supabase
+              .from('bom_items')
+              .select('quote_id, id')
+              .in('quote_id', quoteIds);
+
+            if (!error && bomData) {
+              // Count items per quote
+              bomData.forEach(item => {
+                counts[item.quote_id] = (counts[item.quote_id] || 0) + 1;
+              });
+            }
+          } catch (err) {
+            console.error('Error batch fetching BOM counts:', err);
           }
         }
         
