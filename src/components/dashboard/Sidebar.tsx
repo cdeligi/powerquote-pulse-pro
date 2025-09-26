@@ -9,6 +9,7 @@ import {
   Shield,
   Zap 
 } from "lucide-react";
+import { useNavigate, useLocation } from "react-router-dom";
 
 interface SidebarProps {
   user: User;
@@ -18,6 +19,8 @@ interface SidebarProps {
 }
 
 const Sidebar = ({ user, activeView, onViewChange, onLogout }: SidebarProps) => {
+  const navigate = useNavigate();
+  const location = useLocation();
   const menuItems = [
     { id: 'overview', label: 'Dashboard', icon: Home },
     { id: 'bom', label: 'BOM Builder', icon: Wrench },
@@ -73,7 +76,27 @@ const Sidebar = ({ user, activeView, onViewChange, onLogout }: SidebarProps) => 
                       ? 'bg-red-600 text-white hover:bg-red-700 dark:bg-red-600 dark:hover:bg-red-700' 
                       : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-200 dark:hover:bg-gray-800'
                   }`}
-                  onClick={() => onViewChange(item.id as any)}
+                  onClick={() => {
+                    // Handle navigation when user manually clicks tabs
+                    onViewChange(item.id as any);
+                    
+                    // Navigate to appropriate route to clear any existing routes
+                    if (item.id === 'overview') {
+                      navigate('/');
+                    } else if (item.id === 'bom') {
+                      navigate('/bom-new');
+                    } else if (item.id === 'quotes') {
+                      // Stay on quotes view, don't navigate away
+                      if (!location.pathname.startsWith('/quote/') && location.pathname !== '/') {
+                        navigate('/');
+                      }
+                    } else if (item.id === 'admin') {
+                      // Stay on admin view
+                      if (!location.pathname.startsWith('/admin/') && location.pathname !== '/') {
+                        navigate('/');
+                      }
+                    }
+                  }}
                 >
                   <Icon className="mr-3 h-4 w-4" />
                   {item.label}

@@ -174,9 +174,9 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
       description: `Loading quote ${quote.id}...`,
     });
     
-    // Use proper React Router navigation
+    // Use proper React Router navigation and ensure BOM tab is active for editable quotes
     if (quote.status === 'draft') {
-      // Draft quotes open in BOM Builder edit mode
+      // Draft quotes open in BOM Builder edit mode - this should set the BOM tab as active
       navigate(`/bom-edit/${quote.id}`);
     } else {
       // Non-draft quotes open in view mode
