@@ -86,10 +86,8 @@ const Sidebar = ({ user, activeView, onViewChange, onLogout }: SidebarProps) => 
                     } else if (item.id === 'bom') {
                       navigate('/bom-new');
                     } else if (item.id === 'quotes') {
-                      // Stay on quotes view, don't navigate away
-                      if (!location.pathname.startsWith('/quote/') && location.pathname !== '/') {
-                        navigate('/');
-                      }
+                      // Don't navigate away when clicking quotes tab - just activate the tab
+                      // The Dashboard component will handle showing the QuoteManager
                     } else if (item.id === 'admin') {
                       // Stay on admin view
                       if (!location.pathname.startsWith('/admin/') && location.pathname !== '/') {
