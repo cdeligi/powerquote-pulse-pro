@@ -22,6 +22,9 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
   const [priorityFilter, setPriorityFilter] = useState<'All' | 'High' | 'Medium' | 'Low' | 'Draft'>('All');
   const { quotes, loading, error, fetchQuotes } = useQuotes();
   
+  // Loading states for individual operations
+  const [loadingOperations, setLoadingOperations] = useState<Record<string, boolean>>({});
+  
   // Fetch BOM item count for each quote
   const [bomCounts, setBomCounts] = useState<Record<string, number>>({});
 
@@ -191,21 +194,32 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
     }
   };
 
-  const handleViewQuote = (quote: any) => {
+  const handleViewQuote = async (quote: any) => {
     console.log('Opening quote:', quote.id, 'with status:', quote.status);
+    
+    // Set loading state for this quote
+    setLoadingOperations(prev => ({ ...prev, [quote.id]: true }));
     
     toast({
       title: "Opening Quote",
       description: `Loading quote ${quote.id}...`,
     });
     
-    // All quotes open in BOM Builder mode for viewing/editing
-    if (quote.status === 'draft') {
-      // Draft quotes open in edit mode
-      navigate(`/bom-edit/${quote.id}`);
-    } else {
-      // Non-draft quotes also open in BOM Builder for viewing
-      navigate(`/bom-edit/${quote.id}`);
+    try {
+      // Add a small delay to show loading state
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // All quotes open in BOM Builder mode for viewing/editing
+      if (quote.status === 'draft') {
+        // Draft quotes open in edit mode
+        navigate(`/bom-edit/${quote.id}`);
+      } else {
+        // Non-draft quotes also open in BOM Builder for viewing
+        navigate(`/bom-edit/${quote.id}`);
+      }
+    } finally {
+      // Clear loading state
+      setLoadingOperations(prev => ({ ...prev, [quote.id]: false }));
     }
   };
 
@@ -427,9 +441,16 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
                        className="text-blue-400 hover:text-blue-300 hover:bg-gray-700"
                        onClick={() => handleViewQuote(quote)}
                        title="View Quote"
+                       disabled={loadingOperations[quote.id]}
                      >
-                       <Eye className="h-4 w-4" />
-                       <span className="text-xs ml-1">View</span>
+                       {loadingOperations[quote.id] ? (
+                         <div className="h-4 w-4 animate-spin rounded-full border-2 border-blue-400 border-t-transparent" />
+                       ) : (
+                         <Eye className="h-4 w-4" />
+                       )}
+                       <span className="text-xs ml-1">
+                         {loadingOperations[quote.id] ? 'Loading...' : 'View'}
+                       </span>
                      </Button>
                      {quote.status === 'draft' && (
                        <Button

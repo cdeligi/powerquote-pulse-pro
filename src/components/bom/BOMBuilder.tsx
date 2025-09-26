@@ -280,7 +280,7 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
       
       toast({
         title: 'Draft Created',
-        description: `${draftCustomerName} created successfully. Your progress will be automatically saved.`
+        description: `${currentQuote?.customer_name || draftCustomerName} created successfully. Your progress will be automatically saved.`
       });
       
       console.log('Draft quote created successfully:', draftQuoteId);
