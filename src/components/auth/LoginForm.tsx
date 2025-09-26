@@ -91,8 +91,8 @@ const LoginForm = ({ onLogin }: LoginFormProps) => {
             <Zap className="h-8 w-8 text-red-600" />
           </div>
         </div>
+        <p className="text-lg text-gray-600 dark:text-gray-300 mb-2">Your pipeline, powered by</p>
         <h2 className="text-3xl font-bold text-gray-900 dark:text-white">PowerQuotePro</h2>
-        <p className="mt-2 text-gray-500 dark:text-gray-400">Qualitrol Transformer Solutions</p>
       </div>
 
       <Card className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800">
@@ -142,7 +142,7 @@ const LoginForm = ({ onLogin }: LoginFormProps) => {
               className="w-full bg-red-600 hover:bg-red-700 text-white"
               disabled={isLoading}
             >
-              {isLoading ? "Signing in..." : "Sign In"}
+              {isLoading ? "Starting..." : "Start Quoting"}
             </Button>
           </form>
           

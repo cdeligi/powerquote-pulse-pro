@@ -37,7 +37,7 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
     // Calculate values from draft_bom for draft quotes, use stored values for others
     value: quote.status === 'draft' && quote.draft_bom?.items 
       ? quote.draft_bom.items.reduce((sum: number, item: any) => 
-          sum + ((item.product?.price || item.unit_price || 0) * (item.quantity || 1)), 0)
+          sum + ((item.unit_price || item.total_price || item.product?.price || 0) * (item.quantity || 1)), 0)
       : (quote.original_quote_value || 0),
     status: quote.status,
     priority: quote.priority,
