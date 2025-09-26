@@ -63,9 +63,13 @@ const Dashboard = ({ user, onLogout }: DashboardProps) => {
   }, [location]);
 
   const renderContent = () => {
-    // Handle React Router routes for BOM editing
+  // Handle React Router routes for BOM editing
     if (location.pathname.startsWith('/bom-edit/')) {
       const quoteId = location.pathname.split('/bom-edit/')[1];
+      // Set active view to bom when editing quotes
+      if (activeView !== 'bom') {
+        setActiveView('bom');
+      }
       return (
         <BOMProvider>
           <BOMBuilder 
@@ -81,6 +85,10 @@ const Dashboard = ({ user, onLogout }: DashboardProps) => {
     
     // Handle React Router routes for new BOM
     if (location.pathname.startsWith('/bom-new')) {
+      // Set active view to bom when creating new quotes
+      if (activeView !== 'bom') {
+        setActiveView('bom');
+      }
       return (
         <BOMProvider>
           <BOMBuilder 

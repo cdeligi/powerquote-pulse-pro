@@ -183,6 +183,31 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
     }
   }, [quoteId]);
 
+  // Generate unique draft name function
+  const generateUniqueDraftName = async (): Promise<string> => {
+    if (!user?.email) return 'Draft Quote';
+    
+    try {
+      // Count existing drafts for this user
+      const { count, error } = await supabase
+        .from('quotes')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .eq('status', 'draft');
+        
+      if (error) {
+        console.error('Error counting drafts:', error);
+        return 'Draft Quote';
+      }
+      
+      const draftNumber = (count || 0) + 1;
+      return draftNumber === 1 ? 'Draft Quote' : `Draft Quote ${draftNumber}`;
+    } catch (error) {
+      console.error('Error generating draft name:', error);
+      return 'Draft Quote';
+    }
+  };
+
   const createDraftQuote = async () => {
     if (!user?.id) {
       console.error('No user ID available for draft quote creation');
@@ -197,9 +222,12 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
     try {
       console.log('Creating draft quote for user:', user.id);
       
+      // Generate unique customer name for draft
+      const draftCustomerName = await generateUniqueDraftName();
+      
       // Generate quote ID using the improved RPC function for drafts
       const { data: quoteId, error: idError } = await supabase
-        .rpc('generate_quote_id_simple', { user_email: user.email, is_draft: true });
+        .rpc('generate_quote_id', { user_email: user.email, is_draft: true });
           
       if (idError) {
         console.error('Quote ID generation error:', idError);
@@ -217,7 +245,7 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
       const quoteData = {
         id: quoteId,
         user_id: user.id,
-        customer_name: quoteFields.customer_name || 'TBD',
+        customer_name: draftCustomerName,
         oracle_customer_id: quoteFields.oracle_customer_id || 'TBD',
         sfdc_opportunity: quoteFields.sfdc_opportunity || 'TBD',
         priority: (quoteFields.priority as any) || 'Medium',
