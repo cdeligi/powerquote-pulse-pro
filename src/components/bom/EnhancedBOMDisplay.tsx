@@ -20,9 +20,12 @@ import {
   Package,
   TrendingUp,
   AlertTriangle,
-  Percent
+  Percent,
+  Download,
+  Eye
 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
+import { generateQuotePDF } from '@/utils/pdfGenerator';
 
 interface EnhancedBOMDisplayProps {
   bomItems: BOMItem[];
@@ -220,6 +223,45 @@ export const EnhancedBOMDisplay = ({
       style: 'currency',
       currency: 'USD'
     }).format(amount);
+  };
+
+  const handleGeneratePDF = async (action: 'view' | 'download') => {
+    if (bomItems.length === 0) {
+      toast({
+        title: 'No Items',
+        description: 'Please add items to your BOM before generating PDF',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    try {
+      // Create quote info object from current data
+      const quoteInfo = {
+        id: currentQuoteId || 'New Quote',
+        customer_name: draftName || 'Draft Quote',
+        oracle_customer_id: 'TBD',
+        priority: 'Medium' as 'High' | 'Medium' | 'Low' | 'Urgent',
+        is_rep_involved: false,
+        currency: 'USD' as 'USD' | 'EURO' | 'GBP' | 'CAD',
+        shipping_terms: 'TBD',
+        payment_terms: 'TBD'
+      };
+
+      await generateQuotePDF(bomItems, quoteInfo, canSeePrices);
+      
+      toast({
+        title: 'PDF Generated',
+        description: `Quote PDF ${action === 'view' ? 'opened' : 'downloaded'} successfully`,
+      });
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      toast({
+        title: 'PDF Generation Failed',
+        description: 'Unable to generate PDF. Please try again.',
+        variant: 'destructive'
+      });
+    }
   };
 
   return (
@@ -552,10 +594,34 @@ export const EnhancedBOMDisplay = ({
           </>
         )}
         
-        {/* Action Buttons */}
+        {/* PDF Generation Buttons */}
         {bomItems.length > 0 && (
           <>
             <Separator className="bg-gray-700" />
+            <div className="flex gap-2 mb-2">
+              <Button
+                onClick={() => handleGeneratePDF('view')}
+                variant="outline"
+                className="flex-1 bg-gray-800 hover:bg-gray-700 text-white border-gray-600"
+              >
+                <Eye className="mr-2 h-4 w-4" />
+                View PDF
+              </Button>
+              <Button
+                onClick={() => handleGeneratePDF('download')}
+                variant="outline"
+                className="flex-1 bg-gray-800 hover:bg-gray-700 text-white border-gray-600"
+              >
+                <Download className="mr-2 h-4 w-4" />
+                Download PDF
+              </Button>
+            </div>
+          </>
+        )}
+
+        {/* Action Buttons */}
+        {bomItems.length > 0 && (
+          <>
             <div className="flex flex-col gap-2">
               {/* Save as Draft */}
               {onSaveDraft && (
