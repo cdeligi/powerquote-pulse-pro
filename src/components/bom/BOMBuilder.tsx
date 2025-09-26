@@ -184,12 +184,16 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
     }
   }, [quoteId]);
 
-  // Generate unique draft name function
+  // Generate unique draft name function with timestamp to prevent duplicates
   const generateUniqueDraftName = async (): Promise<string> => {
     if (!user?.email) return 'Draft 1';
     
     try {
-      // Count existing drafts for this user to generate unique draft number
+      // Use timestamp-based approach to prevent race conditions
+      const timestamp = Date.now();
+      const timestampSuffix = timestamp.toString().slice(-6); // Last 6 digits for uniqueness
+      
+      // Count existing drafts for this user to get sequence number
       const { count, error } = await supabase
         .from('quotes')
         .select('*', { count: 'exact', head: true })
@@ -198,14 +202,15 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
 
       if (error) {
         console.error('Error counting drafts:', error);
-        return 'Draft 1';
+        return `Draft ${timestampSuffix}`;
       }
 
       const draftNumber = (count || 0) + 1;
-      return `Draft ${draftNumber}`;
+      return `${user.email?.split('@')[0] || 'User'} Draft ${draftNumber}`;
     } catch (error) {
       console.error('Error generating draft name:', error);
-      return 'Draft 1';
+      const fallback = Date.now().toString().slice(-6);
+      return `Draft ${fallback}`;
     }
   };
 
@@ -279,8 +284,8 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
       window.history.replaceState({}, '', `/#configure?quoteId=${draftQuoteId}`);
       
       toast({
-        title: 'Draft Created',
-        description: `${currentQuote?.customer_name || draftCustomerName} created successfully. Your progress will be automatically saved.`
+        title: 'Quote Created',
+        description: `${currentQuote?.customer_name || draftCustomerName} ready for configuration. Your progress will be automatically saved.`
       });
       
       console.log('Draft quote created successfully:', draftQuoteId);

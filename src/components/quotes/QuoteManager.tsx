@@ -174,24 +174,75 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
 
   const canSeePrices = user.role !== 'LEVEL_1';
 
-  const handleViewPDF = (quote: any) => {
-    if (quote.pdfUrl) {
-      // In a real implementation, this would open the actual PDF
-      console.log(`Opening quote PDF: ${quote.pdfUrl}`);
-      // For demo purposes, we'll show an alert
-      alert(`Opening quote ${quote.id} PDF in new window. In production, this would open: ${quote.pdfUrl}`);
-      // window.open(quote.pdfUrl, '_blank');
-    } else {
-      alert('PDF not yet generated for this quote.');
+  const handleViewPDF = async (quote: any) => {
+    try {
+      // Get the actual quote data for PDF generation
+      const { data: fullQuote, error } = await supabase
+        .from('quotes')
+        .select('*')
+        .eq('id', quote.id)
+        .single();
+
+      if (error) throw error;
+
+      let bomItems: any[] = [];
+      
+      // Get BOM items
+      if (fullQuote.status === 'draft' && fullQuote.draft_bom?.items) {
+        bomItems = fullQuote.draft_bom.items.map((item: any) => ({
+          id: item.id || crypto.randomUUID(),
+          product: {
+            name: item.name || item.product?.name || 'Unknown Product',
+            description: item.description || item.product?.description || '',
+            price: item.unit_price || item.product?.price || 0
+          },
+          quantity: item.quantity || 1,
+          enabled: item.enabled !== false,
+          partNumber: item.partNumber || item.part_number || 'TBD'
+        }));
+      } else {
+        const { data: bomData, error: bomError } = await supabase
+          .from('bom_items')
+          .select('*')
+          .eq('quote_id', quote.id);
+          
+        if (bomError) throw bomError;
+        
+        bomItems = (bomData || []).map(item => ({
+          id: item.id,
+          product: {
+            name: item.name,
+            description: item.description || '',
+            price: item.unit_price
+          },
+          quantity: item.quantity,
+          enabled: true,
+          partNumber: item.part_number || 'TBD'
+        }));
+      }
+
+      // Import and use the PDF generator
+      const { generateQuotePDF } = await import('@/utils/pdfGenerator');
+      await generateQuotePDF(bomItems, fullQuote, canSeePrices);
+      
+      toast({
+        title: "PDF Generated",
+        description: `Quote PDF for ${quote.customer} opened successfully`,
+      });
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      toast({
+        title: "PDF Generation Failed",
+        description: "Unable to generate PDF. Please try again.",
+        variant: "destructive"
+      });
     }
   };
 
-  const handleDownloadQuote = (quote: any) => {
-    if (quote.pdfUrl) {
-      console.log(`Downloading quote PDF: ${quote.pdfUrl}`);
-      // In a real implementation, this would trigger a download
-      alert(`Downloading quote ${quote.id} PDF. In production, this would download: ${quote.pdfUrl}`);
-    }
+  const handleDownloadQuote = async (quote: any) => {
+    // Same as view PDF - the generateQuotePDF function opens a print dialog
+    // which allows users to save as PDF or print
+    await handleViewPDF(quote);
   };
 
   const handleViewQuote = async (quote: any) => {
