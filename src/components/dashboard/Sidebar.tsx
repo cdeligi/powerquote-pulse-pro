@@ -86,8 +86,10 @@ const Sidebar = ({ user, activeView, onViewChange, onLogout }: SidebarProps) => 
                     } else if (item.id === 'bom') {
                       navigate('/bom-new');
                     } else if (item.id === 'quotes') {
-                      // Navigate to home and set quotes view
-                      navigate('/');
+                      // Ensure we're on the main route and set quotes hash
+                      if (location.pathname !== '/') {
+                        navigate('/');
+                      }
                       window.location.hash = '#quotes';
                     } else if (item.id === 'admin') {
                       // Stay on admin view
