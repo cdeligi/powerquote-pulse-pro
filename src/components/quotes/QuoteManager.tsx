@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Search, FileText, Eye, Download, ExternalLink, Edit, Share, Plus, Trash, Copy } from "lucide-react";
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { useQuotes } from "@/hooks/useQuotes";
 import { toast } from "@/hooks/use-toast";
 import { QuoteShareDialog } from './QuoteShareDialog';
@@ -16,6 +17,7 @@ interface QuoteManagerProps {
 }
 
 const QuoteManager = ({ user }: QuoteManagerProps) => {
+  const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState("");
   const [priorityFilter, setPriorityFilter] = useState<'All' | 'High' | 'Medium' | 'Low' | 'Draft'>('All');
   const { quotes, loading, error, fetchQuotes } = useQuotes();
@@ -173,15 +175,13 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
     });
     
     // Use proper React Router navigation
-    setTimeout(() => {
-      if (quote.status === 'draft') {
-        // Draft quotes open in edit mode by default
-        window.location.href = `/quote/${quote.id}?mode=edit`;
-      } else {
-        // Non-draft quotes open in view mode
-        window.location.href = `/quote/${quote.id}?mode=view`;
-      }
-    }, 100);
+    if (quote.status === 'draft') {
+      // Draft quotes open in BOM Builder edit mode
+      navigate(`/bom-edit/${quote.id}`);
+    } else {
+      // Non-draft quotes open in view mode
+      navigate(`/quote/${quote.id}`);
+    }
   };
 
   const handleCloneQuote = async (quote: any) => {
@@ -211,9 +211,7 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
       });
 
       // Navigate to the new cloned quote in edit mode
-      setTimeout(() => {
-        window.location.href = `/quote/${newQuoteId}?mode=edit`;
-      }, 100);
+      navigate(`/bom-edit/${newQuoteId}`);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to clone quote';
       toast({
@@ -226,7 +224,7 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
 
   const handleNewQuote = () => {
     // Navigate to the new BOM builder route
-    window.location.href = '/#bom';
+    navigate('/bom-new');
   };
 
   if (loading) {

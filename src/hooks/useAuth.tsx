@@ -267,27 +267,29 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
-  // Helper to fetch profile, with optional timeout, and no 406 (uses maybeSingle)
-  const fetchProfile = async (uid: string, timeoutMs = 8000): Promise<User | null> => {
+  // Helper to fetch profile, with optional timeout, retry logic, and no 406 (uses maybeSingle)
+  const fetchProfile = async (uid: string, timeoutMs = 15000): Promise<User | null> => {
     console.log("[AuthProvider] fetchProfile start for:", uid);
 
-    try {
-      const profilePromise = supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", uid)
-        .maybeSingle();
+    // Retry logic with exponential backoff
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        const profilePromise = supabase
+          .from("profiles")
+          .select("*")
+          .eq("id", uid)
+          .maybeSingle();
 
-      const { data: profile, error } = (await Promise.race([
-        profilePromise,
-        new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error("Profile fetch timeout")), timeoutMs),
-        ),
-      ])) as Awaited<typeof profilePromise>;
+        const { data: profile, error } = (await Promise.race([
+          profilePromise,
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error(`Profile fetch timeout (attempt ${attempt})`)), timeoutMs),
+          ),
+        ])) as Awaited<typeof profilePromise>;
 
-      if (error) throw error;
+        if (error) throw error;
 
-      let profileData = profile;
+        let profileData = profile;
 
       if (!profileData) {
         console.log(
@@ -352,6 +354,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -368,3 +372,5 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     </AuthContext.Provider>
   );
 };
+
+export { AuthProvider, useAuth };

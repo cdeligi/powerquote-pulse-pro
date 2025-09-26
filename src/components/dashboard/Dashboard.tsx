@@ -63,6 +63,36 @@ const Dashboard = ({ user, onLogout }: DashboardProps) => {
   }, [location]);
 
   const renderContent = () => {
+    // Handle React Router routes for BOM editing
+    if (location.pathname.startsWith('/bom-edit/')) {
+      const quoteId = location.pathname.split('/bom-edit/')[1];
+      return (
+        <BOMProvider>
+          <BOMBuilder 
+            onBOMUpdate={handleBOMUpdate}
+            canSeePrices={true}
+            canSeeCosts={canSeeCosts}
+            quoteId={quoteId}
+            mode="edit"
+          />
+        </BOMProvider>
+      );
+    }
+    
+    // Handle React Router routes for new BOM
+    if (location.pathname.startsWith('/bom-new')) {
+      return (
+        <BOMProvider>
+          <BOMBuilder 
+            onBOMUpdate={handleBOMUpdate}
+            canSeePrices={true}
+            canSeeCosts={canSeeCosts}
+            mode="new"
+          />
+        </BOMProvider>
+      );
+    }
+
     // Handle React Router routes for quotes
     if (location.pathname.startsWith('/quote/')) {
       return <QuoteViewer />;
@@ -86,6 +116,7 @@ const Dashboard = ({ user, onLogout }: DashboardProps) => {
               onBOMUpdate={handleBOMUpdate}
               canSeePrices={true}
               canSeeCosts={canSeeCosts}
+              mode="new"
             />
           </BOMProvider>
         );
@@ -108,6 +139,10 @@ const Dashboard = ({ user, onLogout }: DashboardProps) => {
       />
       <main className="flex-1 ml-64 p-8">
         <Routes>
+          {/* BOM editing routes */}
+          <Route path="/bom-edit/:quoteId" element={renderContent()} />
+          <Route path="/bom-new" element={renderContent()} />
+          
           {/* Quote viewing routes */}
           <Route path="/quote/:id" element={<QuoteViewer />} />
           
