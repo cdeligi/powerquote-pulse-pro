@@ -52,62 +52,100 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [error, setError] = useState<AuthError | null>(null);
 
   const handleAuthStateChange = useCallback(async (event: string, session: any) => {
-    console.log("[AuthProvider] Auth state change:", { event, hasSession: !!session });
+    console.log("[AuthProvider] Auth state change:", { event, hasSession: !!session, userId: session?.user?.id });
     
-    setSession(session);
-    
-    if (session?.user) {
+    if (event === 'SIGNED_IN' && session?.user) {
+      setLoading(true);
+      setError(null);
+      setSession(session);
+      
       try {
-        // Only fetch profile if we don't have user data or if user changed
-        if (!user || user.id !== session.user.id) {
-          await fetchProfile(session.user.id, 2000);
-          // fetchProfile will update the user state internally
-        }
-        
-        // Log session events
-        if (event === 'SIGNED_IN') {
+        const profile = await fetchProfile(session.user.id);
+        if (profile) {
+          console.log("[AuthProvider] Successfully authenticated user:", profile.email);
+          // Log session events
           logUserSession(session.user.id, 'login').catch(console.error);
-        } else if (event === 'SIGNED_OUT') {
-          setUser(null);
+        } else {
+          console.error("[AuthProvider] Failed to load user profile");
+          setError({
+            code: 'PROFILE_LOAD_FAILED',
+            message: 'Failed to load user profile. Please try again.',
+            type: 'profile'
+          });
         }
       } catch (error) {
         console.error("[AuthProvider] Error in auth state change:", error);
+        setError({
+          code: 'PROFILE_ERROR', 
+          message: 'Error loading user data. Please try again.',
+          type: 'profile'
+        });
+      } finally {
+        setLoading(false);
       }
-    } else {
+    } else if (event === 'SIGNED_OUT') {
       setUser(null);
+      setSession(null);
+      setError(null);
+      setLoading(false);
+    } else if (event === 'TOKEN_REFRESHED' && session) {
+      setSession(session);
+    } else if (event === 'INITIAL_SESSION' && session?.user) {
+      setSession(session);
+      const profile = await fetchProfile(session.user.id);
+      setLoading(false);
+    } else {
+      setLoading(false);
     }
-    
-    setLoading(false);
-  }, [user?.id]);
+  }, []);
   
   // Initialize auth state
   useEffect(() => {
     console.log("[AuthProvider] Initializing auth state...");
     let isMounted = true;
+    let subscription: any;
     
     const initializeAuth = async () => {
       try {
         // Set up auth state listener first
-        const { data: { subscription } } = supabase.auth.onAuthStateChange(handleAuthStateChange);
+        const { data: { subscription: authSubscription } } = supabase.auth.onAuthStateChange(handleAuthStateChange);
+        subscription = authSubscription;
         
         // Check for existing session
-        const { data: { session: initialSession } } = await supabase.auth.getSession();
+        const { data: { session: initialSession }, error } = await supabase.auth.getSession();
+        
+        if (error) {
+          console.error("[AuthProvider] Session error:", error);
+          if (isMounted) {
+            setError({
+              code: error.message || 'SESSION_ERROR',
+              message: 'Authentication session error. Please sign in again.',
+              type: 'session'
+            });
+            setLoading(false);
+          }
+          return;
+        }
         
         if (!isMounted) return;
         
         if (initialSession?.user) {
-          console.log("[AuthProvider] Initial session found, loading profile...");
+          console.log("[AuthProvider] Initial session found for:", initialSession.user.email);
           await handleAuthStateChange('INITIAL_SESSION', initialSession);
         } else {
+          console.log("[AuthProvider] No existing session found");
           setLoading(false);
         }
-        
-        return () => {
-          subscription.unsubscribe();
-        };
       } catch (error) {
         console.error("[AuthProvider] Error during auth initialization:", error);
-        if (isMounted) setLoading(false);
+        if (isMounted) {
+          setError({
+            code: 'INIT_ERROR',
+            message: 'Failed to initialize authentication. Please refresh the page.',
+            type: 'session'
+          });
+          setLoading(false);
+        }
       }
     };
     
@@ -115,19 +153,18 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     
     return () => {
       isMounted = false;
+      if (subscription) {
+        subscription.unsubscribe();
+      }
     };
   }, [handleAuthStateChange]);
 
   const signIn = async (email: string, password: string) => {
+    console.log(`[AuthProvider] Sign in attempt for: ${email}`);
+    setLoading(true);
+    setError(null);
+
     try {
-      setLoading(true);
-      setError(null);
-
-      console.log("[AuthProvider] Attempting sign in with:", {
-        email: email,
-        timestamp: new Date().toISOString(),
-      });
-
       const {
         error: authError,
         data: { session },
@@ -146,28 +183,23 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           message: authError.message,
           type: "auth",
         });
+        setLoading(false);
         return { error: authError };
       }
 
-      console.log("[AuthProvider] Sign in successful:", {
-        userId: session?.user?.id,
-        userEmail: session?.user?.email,
-      });
-
-      // Wait for auth state change to update session and user
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
+      console.log("[AuthProvider] Sign in request successful, awaiting auth state change...");
+      // Loading will be handled by handleAuthStateChange
       return { error: null };
     } catch (err) {
-      console.error("[AuthProvider] Sign in unexpected error:", err);
+      console.error("[AuthProvider] Unexpected sign in error:", err);
+      const errorMessage = err instanceof Error ? err.message : "An unexpected error occurred";
       setError({
         code: "AUTH_ERROR",
-        message: "An unexpected error occurred during sign in",
+        message: errorMessage,
         type: "auth",
       });
-      return { error: err };
-    } finally {
       setLoading(false);
+      return { error: { message: errorMessage } };
     }
   };
 
@@ -267,102 +299,80 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
-  // Helper to fetch profile, with optional timeout, retry logic, and no 406 (uses maybeSingle)
-  const fetchProfile = async (uid: string, timeoutMs = 15000): Promise<User | null> => {
-    console.log("[AuthProvider] fetchProfile start for:", uid);
+  // Helper to fetch profile with simplified error handling
+  const fetchProfile = async (uid: string): Promise<User | null> => {
+    console.log("[AuthProvider] Fetching profile for:", uid);
 
-    // Retry logic with exponential backoff
-    for (let attempt = 1; attempt <= 3; attempt++) {
-      try {
-        const profilePromise = supabase
-          .from("profiles")
-          .select("*")
-          .eq("id", uid)
-          .maybeSingle();
+    try {
+      const { data: profile, error } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", uid)
+        .single();
 
-        const { data: profile, error } = (await Promise.race([
-          profilePromise,
-          new Promise<never>((_, reject) =>
-            setTimeout(() => reject(new Error(`Profile fetch timeout (attempt ${attempt})`)), timeoutMs),
-          ),
-        ])) as Awaited<typeof profilePromise>;
+      if (error && error.code !== 'PGRST116') {
+        console.error("[AuthProvider] Profile fetch error:", error);
+        throw error;
+      }
 
-        if (error) throw error;
-
-        let profileData = profile;
+      let profileData = profile;
 
       if (!profileData) {
-        console.log(
-          "[AuthProvider] No profile found, creating new profile for user:",
-          uid,
-        );
-        const { error: createError } = await supabase.from("profiles").insert({
-          id: uid,
-          email: session?.user?.email,
-          first_name: "",
-          last_name: "",
-          company: "",
-          phone: "",
-          role: "level1",
-          department: null,
-        });
+        console.log("[AuthProvider] No profile found, creating new profile for:", uid);
+        
+        const { data: sessionData } = await supabase.auth.getSession();
+        const userEmail = sessionData.session?.user?.email;
+        
+        if (!userEmail) {
+          throw new Error("No user email available for profile creation");
+        }
+
+        const { data: createdProfile, error: createError } = await supabase
+          .from("profiles")
+          .insert({
+            id: uid,
+            email: userEmail,
+            first_name: "",
+            last_name: "",
+            role: "level1",
+            department: null,
+          })
+          .select()
+          .single();
 
         if (createError) {
           console.error("[AuthProvider] Error creating profile:", createError);
-          setError({
-            code: (createError as any)?.code || "PROFILE_CREATE_ERROR",
-            message: (createError as any)?.message || "Failed to create user profile",
-            type: "profile",
-          });
           throw createError;
         }
-
-        const { data: createdProfile, error: fetchErr } = await supabase
-          .from("profiles")
-          .select("*")
-          .eq("id", uid)
-          .maybeSingle();
-
-        if (fetchErr) throw fetchErr;
-        profileData = createdProfile || null;
+        
+        profileData = createdProfile;
       }
 
       if (!profileData) {
-        throw new Error("Failed to fetch user profile");
+        throw new Error("Failed to load user profile");
       }
 
       console.log("[AuthProvider] Profile loaded successfully:", profileData.email);
       const appUser: User = {
         id: profileData.id,
-        name:
-          `${profileData.first_name || ""} ${profileData.last_name || ""}`.trim() || "User",
+        name: `${profileData.first_name || ""} ${profileData.last_name || ""}`.trim() || profileData.email,
         email: profileData.email,
         role: mapDatabaseRoleToAppRole(profileData.role),
         department: profileData.department,
       };
-        setUser(appUser);
-        return appUser;
-      } catch (err) {
-        console.error("[AuthProvider] Profile fetch error:", err);
-        const errorMessage = err instanceof Error ? err.message : "Unknown error";
-        setError({
-          code: "PROFILE_FETCH_ERROR",
-          message: errorMessage,
-          type: "profile",
-        });
-        setUser(null);
-        
-        // Wait before retrying
-        if (attempt < 3) {
-          await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
-          continue;
-        }
-        
-        return null;
-      }
+
+      setUser(appUser);
+      return appUser;
+    } catch (err) {
+      console.error("[AuthProvider] Profile fetch failed:", err);
+      const errorMessage = err instanceof Error ? err.message : "Unknown error";
+      setError({
+        code: "PROFILE_FETCH_ERROR",
+        message: errorMessage,
+        type: "profile",
+      });
+      return null;
     }
-    
-    return null;
   };
 
   return (
