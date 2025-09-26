@@ -5,7 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
  * Format: {email_prefix}-{quote_prefix}-{sequence}
  * Example: cdeligi-QLT-1
  */
-export const generateSubmittedQuoteId = async (userEmail: string): Promise<string> => {
+export const generateSubmittedQuoteId = async (userEmail: string, userId: string): Promise<string> => {
   try {
     // Extract email prefix (part before @)
     const emailPrefix = userEmail.split('@')[0];
@@ -23,11 +23,11 @@ export const generateSubmittedQuoteId = async (userEmail: string): Promise<strin
     
     const quotePrefix = settingData?.value || 'QLT';
     
-    // Get user's current counter from profiles or create one
+    // Get user's current counter from user_quote_counters table
     const { data: userData, error: userError } = await supabase
       .from('user_quote_counters')
       .select('current_counter')
-      .eq('user_email', userEmail)
+      .eq('user_id', userId)
       .single();
     
     let sequence = 1;
@@ -37,7 +37,7 @@ export const generateSubmittedQuoteId = async (userEmail: string): Promise<strin
       const { error: insertError } = await supabase
         .from('user_quote_counters')
         .insert({
-          user_email: userEmail,
+          user_id: userId,
           current_counter: 1,
           last_finalized_counter: 1
         });
@@ -58,7 +58,7 @@ export const generateSubmittedQuoteId = async (userEmail: string): Promise<strin
           last_finalized_counter: sequence,
           updated_at: new Date().toISOString()
         })
-        .eq('user_email', userEmail);
+        .eq('user_id', userId);
         
       if (updateError) {
         console.error('Error updating user counter:', updateError);
