@@ -26,9 +26,15 @@ const LoginForm = ({ onLogin }: LoginFormProps) => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!credentials.email || !credentials.password) {
+      setError('Please enter both email and password');
+      return;
+    }
+
     setIsLoading(true);
     setError(null);
-    
+
     try {
       const { error: authError } = await signIn(credentials.email, credentials.password);
       
@@ -55,12 +61,12 @@ const LoginForm = ({ onLogin }: LoginFormProps) => {
         }
         
         setError(errorMessage);
+        setIsLoading(false);
       }
-      // Success will be handled by the auth hook in the parent component
+      // If successful, loading state will be managed by auth provider
     } catch (error: any) {
       console.error('[LoginForm] Unexpected error:', error);
       setError('An unexpected error occurred. Please try again.');
-    } finally {
       setIsLoading(false);
     }
   };
