@@ -38,11 +38,13 @@ interface BOMBuilderProps {
   onBOMUpdate: (items: BOMItem[]) => void;
   canSeePrices: boolean;
   canSeeCosts?: boolean;
+  quoteId?: string;
+  mode?: 'new' | 'edit' | 'view';
 }
 
 const SLOT_LEVEL4_FLAG = '__slotLevel4Session';
 
-const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuilderProps) => {
+const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, mode = 'new' }: BOMBuilderProps) => {
   // ALL HOOKS MUST BE AT THE TOP - NO CONDITIONAL RETURNS BEFORE HOOKS
   const { user, loading } = useAuth();
   const { has } = usePermissions();
@@ -70,8 +72,8 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
   const [configuringNonChassis, setConfiguringNonChassis] = useState<Level2Product | null>(null);
   
   // Draft quote functionality
-  const [currentQuoteId, setCurrentQuoteId] = useState<string | null>(null);
-  const [isDraftMode, setIsDraftMode] = useState(false);
+  const [currentQuoteId, setCurrentQuoteId] = useState<string | null>(quoteId || null);
+  const [isDraftMode, setIsDraftMode] = useState(mode === 'edit' || mode === 'new');
 
   // Admin-driven part number config and codes for the selected chassis
   const [pnConfig, setPnConfig] = useState<any | null>(null);
@@ -153,20 +155,33 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
     fetchQuoteFields();
   }, []);
 
-  // Initialize or load quote on component mount
+  // Initialize or load quote on component mount  
+  useEffect(() => {
+    if (quoteId && mode === 'edit') {
+      console.log('BOMBuilder: Loading existing quote for editing:', quoteId);
+      setCurrentQuoteId(quoteId);
+      loadQuote(quoteId);
+    } else if (mode === 'new') {
+      console.log('BOMBuilder: Starting new quote');
+      setCurrentQuoteId(null);
+      setIsDraftMode(true);
+    }
+  }, [quoteId, mode]);
+
+  // Existing initialization from URL params (legacy support)
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const quoteIdFromUrl = urlParams.get('quoteId');
     
-    if (quoteIdFromUrl) {
+    // Only use URL params if no props are provided
+    if (!quoteId && quoteIdFromUrl) {
       console.log('Quote ID found in URL:', quoteIdFromUrl);
-      // Load existing quote (works for draft and finalized quotes)
       setCurrentQuoteId(quoteIdFromUrl);
       loadQuote(quoteIdFromUrl);
-    } else {
-      console.log('No quote ID in URL, starting fresh');
+    } else if (!quoteId && !quoteIdFromUrl) {
+      console.log('No quote ID provided, starting fresh');
     }
-  }, []);
+  }, [quoteId]);
 
   const createDraftQuote = async () => {
     if (!user?.id) {
@@ -385,16 +400,127 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false }: BOMBuild
     }
   };
 
-  // Manual save as draft function
+  // Manual save as draft function with better error handling and feedback
   const handleSaveAsDraft = async () => {
     if (!user?.id) {
       toast({
-        title: 'Authentication Error',
-        description: 'You must be logged in to save a draft',
+        title: 'Authentication Required',
+        description: 'Please log in to save your draft. Your work is temporarily stored locally.',
         variant: 'destructive'
       });
       return;
     }
+
+    if (bomItems.length === 0) {
+      toast({
+        title: 'Nothing to Save',
+        description: 'Add some items to your BOM before saving as draft',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    try {
+      console.log('Starting draft save process...');
+      let quoteId = currentQuoteId;
+      
+      // Create new draft if none exists
+      if (!quoteId) {
+        console.log('No current quote ID, creating new draft quote');
+        
+        const { data: newQuoteId, error: idError } = await supabase
+          .rpc('generate_quote_id_simple', { user_email: user.email, is_draft: true });
+          
+        if (idError) {
+          console.error('Quote ID generation error:', idError);
+          throw new Error(`Failed to generate quote ID: ${idError.message}`);
+        }
+        
+        if (!newQuoteId) {
+          throw new Error('Failed to generate quote ID');
+        }
+        
+        console.log('Generated new draft quote ID:', newQuoteId);
+        
+        const quoteData = {
+          id: newQuoteId,
+          user_id: user.id,
+          customer_name: quoteFields.customerName || 'Draft Quote',
+          oracle_customer_id: quoteFields.oracleCustomerId || 'DRAFT',
+          sfdc_opportunity: quoteFields.sfdcOpportunity || `DRAFT-${Date.now()}`,
+          priority: (quoteFields.priority as any) || 'Medium',
+          shipping_terms: quoteFields.shippingTerms || 'Ex-Works',
+          payment_terms: quoteFields.paymentTerms || 'Net 30',
+          currency: quoteFields.quoteCurrency || 'USD',
+          is_rep_involved: quoteFields.isRepInvolved || false,
+          status: 'draft' as const,
+          quote_fields: quoteFields,
+          draft_bom: {
+            items: bomItems,
+            lastSaved: new Date().toISOString()
+          },
+          original_quote_value: 0,
+          discounted_value: 0,
+          total_cost: 0,
+          requested_discount: 0,
+          original_margin: 0,
+          discounted_margin: 0,
+          gross_profit: 0,
+          submitted_by_email: user.email || '',
+          submitted_by_name: user.email || 'Unknown User'
+        };
+        
+        const { error: createError } = await supabase
+          .from('quotes')
+          .insert(quoteData);
+          
+        if (createError) {
+          console.error('Quote creation error:', createError);
+          throw new Error(`Failed to create quote: ${createError.message}`);
+        }
+        
+        setCurrentQuoteId(newQuoteId);
+        quoteId = newQuoteId;
+        
+        console.log('Draft quote created successfully:', quoteId);
+      } else {
+        // Update existing draft
+        const { error: updateError } = await supabase
+          .from('quotes')
+          .update({
+            quote_fields: quoteFields,
+            draft_bom: {
+              items: bomItems,
+              lastSaved: new Date().toISOString()
+            },
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', quoteId)
+          .eq('status', 'draft'); // Safety check
+          
+        if (updateError) {
+          console.error('Quote update error:', updateError);
+          throw new Error(`Failed to update draft: ${updateError.message}`);
+        }
+        
+        console.log('Draft quote updated successfully:', quoteId);
+      }
+      
+      toast({
+        title: 'Draft Saved',
+        description: `Draft ${quoteId} saved successfully with ${bomItems.length} items`,
+      });
+      
+    } catch (error) {
+      console.error('Error saving draft:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      toast({
+        title: 'Save Failed',
+        description: errorMessage,
+        variant: 'destructive'
+      });
+    }
+  };
 
     try {
       let quoteId = currentQuoteId;
