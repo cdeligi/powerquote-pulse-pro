@@ -56,28 +56,21 @@ const Dashboard = ({ user, onLogout }: DashboardProps) => {
   // Compute permissions for BOM
   const canSeeCosts = has(FEATURES.BOM_SHOW_PRODUCT_COST);
 
-  // Sync activeView with current route only when routes change (not manual clicks)
+  // Simplified route synchronization - only sync when needed
   useEffect(() => {
     const path = location.pathname;
     const hash = window.location.hash;
     
-    // Only auto-sync for specific route patterns to ensure proper tab highlighting
     if (path.startsWith('/bom-edit/') || path.startsWith('/bom-new') || hash === '#configure') {
       setActiveView('bom');
-    } else if (path.startsWith('/quote/')) {
-      // When viewing a quote (not editing), keep current active view or default to overview
-      // Don't force tab switching unless we're coming from an unrelated route
-      if (!['overview', 'quotes', 'bom', 'admin'].includes(activeView)) {
-        setActiveView('overview');
-      }
     } else if (hash === '#quotes') {
       setActiveView('quotes');
     } else if (hash === '#admin') {
       setActiveView('admin');
-    } else if ((hash === '#overview' || hash === '') && path === '/') {
+    } else if (hash === '#overview' || (hash === '' && path === '/')) {
       setActiveView('overview');
     }
-  }, [location.pathname, location.hash]); // Only respond to actual route changes
+  }, [location.pathname, location.hash]);
 
   const renderContent = () => {
     // Handle React Router routes for BOM editing

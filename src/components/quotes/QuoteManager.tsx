@@ -51,13 +51,19 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
         
         for (const quote of quotes) {
           try {
-            const { count, error } = await supabase
-              .from('bom_items')
-              .select('*', { count: 'exact', head: true })
-              .eq('quote_id', quote.id);
-              
-            if (!error) {
-              counts[quote.id] = count || 0;
+            // For draft quotes, check draft_bom data first
+            if (quote.status === 'draft' && quote.draft_bom && quote.draft_bom.items && Array.isArray(quote.draft_bom.items)) {
+              counts[quote.id] = quote.draft_bom.items.length;
+            } else {
+              // For non-draft quotes, check bom_items table
+              const { count, error } = await supabase
+                .from('bom_items')
+                .select('*', { count: 'exact', head: true })
+                .eq('quote_id', quote.id);
+                
+              if (!error) {
+                counts[quote.id] = count || 0;
+              }
             }
           } catch (err) {
             console.error(`Error fetching BOM count for quote ${quote.id}:`, err);
@@ -174,13 +180,13 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
       description: `Loading quote ${quote.id}...`,
     });
     
-    // Use proper React Router navigation and ensure BOM tab is active for editable quotes
+    // All quotes open in BOM Builder mode for viewing/editing
     if (quote.status === 'draft') {
-      // Draft quotes open in BOM Builder edit mode - this will automatically set the BOM tab as active
+      // Draft quotes open in edit mode
       navigate(`/bom-edit/${quote.id}`);
     } else {
-      // Non-draft quotes open in view mode
-      navigate(`/quote/${quote.id}`);
+      // Non-draft quotes also open in BOM Builder for viewing
+      navigate(`/bom-edit/${quote.id}`);
     }
   };
 
