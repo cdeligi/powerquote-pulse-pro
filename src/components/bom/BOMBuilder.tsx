@@ -185,7 +185,7 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
 
   // Generate unique draft name function
   const generateUniqueDraftName = async (): Promise<string> => {
-    if (!user?.email) return 'Draft Quote';
+    if (!user?.email) return 'Draft 1';
     
     try {
       // Count existing drafts for this user
@@ -197,14 +197,14 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
         
       if (error) {
         console.error('Error counting drafts:', error);
-        return 'Draft Quote';
+        return 'Draft 1';
       }
       
       const draftNumber = (count || 0) + 1;
-      return draftNumber === 1 ? 'Draft Quote' : `Draft Quote ${draftNumber}`;
+      return `Draft ${draftNumber}`;
     } catch (error) {
       console.error('Error generating draft name:', error);
-      return 'Draft Quote';
+      return 'Draft 1';
     }
   };
 
@@ -345,48 +345,73 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
       
       console.log('Successfully loaded quote:', quote);
       
-      // Load BOM items with Level 4 configurations
-      const { data: bomData, error: bomError } = await supabase
-        .from('bom_items')
-        .select(`
-          *,
-          bom_level4_values (
-            id,
-            level4_config_id,
-            entries
-          )
-        `)
-        .eq('quote_id', quoteId);
+      let loadedItems: BOMItem[] = [];
+      
+      // Check if this is a draft with data in draft_bom field
+      if (quote.status === 'draft' && quote.draft_bom && quote.draft_bom.items && Array.isArray(quote.draft_bom.items)) {
+        console.log('Loading BOM data from draft_bom field');
+        loadedItems = quote.draft_bom.items.map((item: any) => ({
+          id: item.id || crypto.randomUUID(),
+          product: item.product || {
+            id: item.productId || item.product_id,
+            name: item.name || item.product?.name,
+            partNumber: item.partNumber || item.product?.partNumber,
+            price: item.product?.price || 0,
+            cost: item.product?.cost || 0,
+            description: item.product?.description || ''
+          },
+          quantity: item.quantity || 1,
+          enabled: item.enabled !== false,
+          partNumber: item.partNumber || item.product?.partNumber,
+          level4Values: item.level4Values || []
+        }));
         
-      if (bomError) {
-        console.error('Error loading BOM items:', bomError);
-        toast({
-          title: "Error Loading BOM Items",
-          description: `Failed to load BOM items: ${bomError.message}`,
-          variant: "destructive"
-        });
-        throw bomError;
-      }
-      
-      console.log(`Successfully loaded ${bomData?.length || 0} BOM items`);
-      
-      // Convert BOM items back to local format with proper structure
-      const loadedItems: BOMItem[] = (bomData || []).map(item => ({
-        id: item.id,
-        product: {
-          id: item.product_id,
-          name: item.name,
+        console.log(`Loaded ${loadedItems.length} items from draft_bom`);
+      } else {
+        console.log('Loading BOM data from bom_items table');
+        // Load BOM items with Level 4 configurations from database table
+        const { data: bomData, error: bomError } = await supabase
+          .from('bom_items')
+          .select(`
+            *,
+            bom_level4_values (
+              id,
+              level4_config_id,
+              entries
+            )
+          `)
+          .eq('quote_id', quoteId);
+          
+        if (bomError) {
+          console.error('Error loading BOM items:', bomError);
+          toast({
+            title: "Error Loading BOM Items",
+            description: `Failed to load BOM items: ${bomError.message}`,
+            variant: "destructive"
+          });
+          throw bomError;
+        }
+        
+        console.log(`Successfully loaded ${bomData?.length || 0} BOM items from database`);
+        
+        // Convert BOM items back to local format with proper structure
+        loadedItems = (bomData || []).map(item => ({
+          id: item.id,
+          product: {
+            id: item.product_id,
+            name: item.name,
+            partNumber: item.part_number,
+            price: item.unit_price,
+            cost: item.unit_cost,
+            description: item.description,
+            ...item.configuration_data
+          },
+          quantity: item.quantity,
+          enabled: true,
           partNumber: item.part_number,
-          price: item.unit_price,
-          cost: item.unit_cost,
-          description: item.description,
-          ...item.configuration_data
-        },
-        quantity: item.quantity,
-        enabled: true,
-        partNumber: item.part_number,
-        level4Values: item.bom_level4_values || []
-      }));
+          level4Values: item.bom_level4_values || []
+        }));
+      }
       
       setBomItems(loadedItems);
       
@@ -470,10 +495,11 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
         
         console.log('Generated new draft quote ID:', newQuoteId);
         
+        const draftName = await generateUniqueDraftName();
         const quoteData = {
           id: newQuoteId,
           user_id: user.id,
-          customer_name: quoteFields.customerName || 'Draft Quote',
+          customer_name: draftName,
           oracle_customer_id: quoteFields.oracleCustomerId || 'DRAFT',
           sfdc_opportunity: quoteFields.sfdcOpportunity || `DRAFT-${Date.now()}`,
           priority: (quoteFields.priority as any) || 'Medium',
@@ -598,7 +624,7 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
       const { error: quoteError } = await supabase
         .from('quotes')
         .update({
-          customer_name: quoteFields.customerName || 'Draft Quote',
+          customer_name: quoteFields.customerName || 'Draft',
           oracle_customer_id: quoteFields.oracleCustomerId || 'DRAFT',
           sfdc_opportunity: quoteFields.sfdcOpportunity || `DRAFT-${Date.now()}`,
           original_quote_value: totalValue,
