@@ -37,6 +37,7 @@ interface EnhancedBOMDisplayProps {
   isSubmitting?: boolean;
   isDraftMode?: boolean;
   currentQuoteId?: string | null;
+  draftName?: string | null;
   discountPercentage?: number;
   discountJustification?: string;
   onDiscountChange?: (percentage: number, justification: string) => void;
@@ -55,6 +56,7 @@ export const EnhancedBOMDisplay = ({
   isSubmitting = false,
   isDraftMode = false,
   currentQuoteId,
+  draftName,
   discountPercentage = 0,
   discountJustification = '',
   onDiscountChange
@@ -123,6 +125,7 @@ export const EnhancedBOMDisplay = ({
           ...existingItem,
           // Store original price on first edit if not already stored
           original_unit_price: existingItem.original_unit_price || existingItem.product.price,
+          approved_unit_price: newPrice, // Track the approved price
           product: {
             ...existingItem.product,
             price: newPrice
@@ -228,7 +231,7 @@ export const EnhancedBOMDisplay = ({
             Bill of Materials
             {currentQuoteId && (
               <Badge variant="outline" className="text-blue-400 border-blue-400 ml-2">
-                {currentQuoteId}
+                {isDraftMode && draftName ? draftName : currentQuoteId}
               </Badge>
             )}
           </CardTitle>

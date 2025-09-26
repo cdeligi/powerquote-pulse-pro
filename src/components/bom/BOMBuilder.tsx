@@ -73,6 +73,7 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
   
   // Draft quote functionality
   const [currentQuoteId, setCurrentQuoteId] = useState<string | null>(quoteId || null);
+  const [currentQuote, setCurrentQuote] = useState<any>(null);
   const [isDraftMode, setIsDraftMode] = useState(mode === 'edit' || mode === 'new');
 
   // Admin-driven part number config and codes for the selected chassis
@@ -267,6 +268,11 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
       }
       
       setCurrentQuoteId(draftQuoteId);
+      setCurrentQuote({ 
+        id: draftQuoteId, 
+        customer_name: draftCustomerName, 
+        status: 'draft' 
+      });
       setIsDraftMode(true);
       
       // Update URL without page reload
@@ -333,6 +339,7 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
       }
       
       console.log('Successfully loaded quote:', quote);
+      setCurrentQuote(quote); // Store the loaded quote data
       
       let loadedItems: BOMItem[] = [];
       
@@ -352,7 +359,10 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
           quantity: item.quantity || 1,
           enabled: item.enabled !== false,
           partNumber: item.partNumber || item.product?.partNumber,
-          level4Values: item.level4Values || []
+          level4Values: item.level4Values || [],
+          original_unit_price: item.original_unit_price || item.product?.price || 0,
+          approved_unit_price: item.approved_unit_price || item.product?.price || 0,
+          priceHistory: item.priceHistory || []
         }));
         
         console.log(`Loaded ${loadedItems.length} items from draft_bom`);
@@ -398,7 +408,10 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
           quantity: item.quantity,
           enabled: true,
           partNumber: item.part_number,
-          level4Values: item.bom_level4_values || []
+          level4Values: item.bom_level4_values || [],
+          original_unit_price: item.original_unit_price || item.unit_price,
+          approved_unit_price: item.approved_unit_price || item.unit_price,
+          priceHistory: item.price_adjustment_history || []
         }));
       }
       
@@ -527,6 +540,11 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
         }
         
         setCurrentQuoteId(newQuoteId);
+        setCurrentQuote({ 
+          id: newQuoteId, 
+          customer_name: draftName, 
+          status: 'draft' 
+        });
         quoteId = newQuoteId;
         
         console.log('Draft quote created successfully:', quoteId);
@@ -1899,8 +1917,8 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
                     item.product.price) *
                   100
                 : 0,
-            original_unit_price: item.product.price,
-            approved_unit_price: item.product.price,
+            original_unit_price: item.original_unit_price || item.product.price,
+            approved_unit_price: item.approved_unit_price || item.product.price,
             configuration_data: item.configuration || {},
             product_type: 'standard',
           });
@@ -2312,6 +2330,7 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
               isSubmitting={isSubmitting}
               isDraftMode={isDraftMode}
               currentQuoteId={currentQuoteId}
+              draftName={currentQuote?.status === 'draft' ? currentQuote?.customer_name : null}
               discountPercentage={discountPercentage}
               discountJustification={discountJustification}
               onDiscountChange={(percentage, justification) => {
