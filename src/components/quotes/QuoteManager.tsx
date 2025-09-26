@@ -176,7 +176,7 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
     
     // Use proper React Router navigation and ensure BOM tab is active for editable quotes
     if (quote.status === 'draft') {
-      // Draft quotes open in BOM Builder edit mode - this should set the BOM tab as active
+      // Draft quotes open in BOM Builder edit mode - this will automatically set the BOM tab as active
       navigate(`/bom-edit/${quote.id}`);
     } else {
       // Non-draft quotes open in view mode
@@ -404,6 +404,18 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
                        <Eye className="h-4 w-4" />
                        <span className="text-xs ml-1">View</span>
                      </Button>
+                     {quote.status === 'draft' && (
+                       <Button
+                         variant="ghost"
+                         size="sm"
+                         className="text-red-400 hover:text-red-300 hover:bg-gray-700"
+                         onClick={() => handleDeleteQuote(quote.id)}
+                         title="Delete Draft"
+                       >
+                         <Trash className="h-4 w-4" />
+                         <span className="text-xs ml-1">Delete</span>
+                       </Button>
+                     )}
                      {quote.status !== 'draft' && (
                        <Button
                          variant="ghost"

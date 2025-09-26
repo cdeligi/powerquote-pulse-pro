@@ -227,7 +227,7 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
       
       // Generate quote ID using the correct RPC function
       const { data: quoteId, error: idError } = await supabase
-        .rpc('generate_quote_id_simple', { user_email: user.email, is_draft: true });
+        .rpc('generate_quote_id', { user_email: user.email, is_draft: true });
           
       if (idError) {
         console.error('Quote ID generation error:', idError);
@@ -457,7 +457,7 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
         console.log('No current quote ID, creating new draft quote');
         
         const { data: newQuoteId, error: idError } = await supabase
-          .rpc('generate_quote_id_simple', { user_email: user.email, is_draft: true });
+          .rpc('generate_quote_id', { user_email: user.email, is_draft: true });
           
         if (idError) {
           console.error('Quote ID generation error:', idError);
@@ -1746,7 +1746,7 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
       } else {
         // Generate new quote ID for final submission
         const { data: newQuoteId, error: generateError } = await supabase
-          .rpc('generate_quote_id_simple', { user_email: user.email, is_draft: false });
+          .rpc('generate_quote_id', { user_email: user.email, is_draft: false });
         
         if (generateError) {
           console.error('Error generating quote ID:', generateError);
