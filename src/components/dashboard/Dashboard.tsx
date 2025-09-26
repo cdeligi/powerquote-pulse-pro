@@ -57,20 +57,28 @@ const Dashboard = ({ user, onLogout }: DashboardProps) => {
   const canSeeCosts = has(FEATURES.BOM_SHOW_PRODUCT_COST);
 
   // Simplified route synchronization - only sync when needed
+  // Sync active view with route and hash changes - optimized for performance
   useEffect(() => {
     const path = location.pathname;
     const hash = window.location.hash;
     
+    let newView: ActiveView = activeView; // Start with current view to minimize changes
+    
     if (path.startsWith('/bom-edit/') || path.startsWith('/bom-new') || hash === '#configure') {
-      setActiveView('bom');
+      newView = 'bom';
     } else if (hash === '#quotes') {
-      setActiveView('quotes');
+      newView = 'quotes';
     } else if (hash === '#admin') {
-      setActiveView('admin');
+      newView = 'admin';
     } else if (hash === '#overview' || (hash === '' && path === '/')) {
-      setActiveView('overview');
+      newView = 'overview';
     }
-  }, [location.pathname, location.hash]);
+    
+    // Only update if the view actually changed
+    if (newView !== activeView) {
+      setActiveView(newView);
+    }
+  }, [location.pathname, location.hash, activeView]);
 
   const renderContent = () => {
     // Handle React Router routes for BOM editing

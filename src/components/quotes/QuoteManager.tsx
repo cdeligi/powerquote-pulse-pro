@@ -365,13 +365,15 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
                     <div>
                       <div className="flex items-center space-x-3">
                         <span className="text-white font-medium">
-                          {quote.status === 'draft' ? 'Draft' : quote.id}
+                          {quote.status === 'draft' ? quote.customer : quote.id}
                         </span>
                         <Badge className={`${statusBadge.color} text-white`}>
                           {statusBadge.text}
                         </Badge>
                       </div>
-                      <p className="text-gray-400 text-sm mt-1">{quote.customer}</p>
+                      {quote.status !== 'draft' && (
+                        <p className="text-gray-400 text-sm mt-1">{quote.customer}</p>
+                      )}
                       <p className="text-gray-500 text-xs">Oracle: {quote.oracleCustomerId}</p>
                     </div>
                     
