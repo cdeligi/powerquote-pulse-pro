@@ -188,18 +188,18 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
     if (!user?.email) return 'Draft 1';
     
     try {
-      // Count existing drafts for this user
+      // Count existing drafts for this user to generate unique draft number
       const { count, error } = await supabase
         .from('quotes')
         .select('*', { count: 'exact', head: true })
         .eq('user_id', user.id)
         .eq('status', 'draft');
-        
+
       if (error) {
         console.error('Error counting drafts:', error);
         return 'Draft 1';
       }
-      
+
       const draftNumber = (count || 0) + 1;
       return `Draft ${draftNumber}`;
     } catch (error) {
@@ -621,10 +621,12 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
       };
 
       // Update quote with draft BOM data
+      const draftCustomerName = quoteFields.customerName || await generateUniqueDraftName();
+      
       const { error: quoteError } = await supabase
         .from('quotes')
         .update({
-          customer_name: quoteFields.customerName || 'Draft',
+          customer_name: draftCustomerName,
           oracle_customer_id: quoteFields.oracleCustomerId || 'DRAFT',
           sfdc_opportunity: quoteFields.sfdcOpportunity || `DRAFT-${Date.now()}`,
           original_quote_value: totalValue,
