@@ -248,11 +248,11 @@ export const EnhancedBOMDisplay = ({
         payment_terms: 'TBD'
       };
 
-      await generateQuotePDF(bomItems, quoteInfo, canSeePrices);
+      await generateQuotePDF(bomItems, quoteInfo, canSeePrices, action);
       
       toast({
         title: 'PDF Generated',
-        description: `Quote PDF ${action === 'view' ? 'opened' : 'downloaded'} successfully`,
+        description: `Quote PDF ${action === 'view' ? 'opened' : 'ready to download'} successfully`,
       });
     } catch (error) {
       console.error('Error generating PDF:', error);
