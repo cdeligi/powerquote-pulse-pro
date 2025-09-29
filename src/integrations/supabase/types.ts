@@ -1133,6 +1133,7 @@ export type Database = {
           display_order: number | null
           enabled: boolean
           id: string
+          include_in_pdf: boolean | null
           label: string
           options: Json | null
           required: boolean
@@ -1144,6 +1145,7 @@ export type Database = {
           display_order?: number | null
           enabled?: boolean
           id: string
+          include_in_pdf?: boolean | null
           label: string
           options?: Json | null
           required?: boolean
@@ -1155,6 +1157,7 @@ export type Database = {
           display_order?: number | null
           enabled?: boolean
           id?: string
+          include_in_pdf?: boolean | null
           label?: string
           options?: Json | null
           required?: boolean
