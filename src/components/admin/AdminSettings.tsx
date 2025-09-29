@@ -23,6 +23,9 @@ const AdminSettings = () => {
   const [quoteTermsContent, setQuoteTermsContent] = useState('');
   const [quotePrefix, setQuotePrefix] = useState('QLT');
   const [quoteCounter, setQuoteCounter] = useState(1);
+  const [quoteExpiresDays, setQuoteExpiresDays] = useState(30);
+  const [companyName, setCompanyName] = useState('QUALITROL');
+  const [companyLogoUrl, setCompanyLogoUrl] = useState('');
 
   const fetchLegalContent = async () => {
     try {
@@ -48,15 +51,21 @@ const AdminSettings = () => {
       const { data: settingsData, error: settingsError } = await supabase
         .from('app_settings')
         .select('key, value')
-        .in('key', ['quote_id_prefix', 'quote_id_counter']);
+        .in('key', ['quote_id_prefix', 'quote_id_counter', 'quote_expires_days', 'company_name', 'company_logo_url']);
 
       if (settingsError) throw settingsError;
 
       const prefixSetting = settingsData?.find(s => s.key === 'quote_id_prefix');
       const counterSetting = settingsData?.find(s => s.key === 'quote_id_counter');
+      const expiresSetting = settingsData?.find(s => s.key === 'quote_expires_days');
+      const nameSetting = settingsData?.find(s => s.key === 'company_name');
+      const logoSetting = settingsData?.find(s => s.key === 'company_logo_url');
 
       setQuotePrefix(prefixSetting ? JSON.parse(prefixSetting.value) : 'QLT');
       setQuoteCounter(counterSetting ? parseInt(counterSetting.value) : 1);
+      setQuoteExpiresDays(expiresSetting ? parseInt(JSON.parse(expiresSetting.value)) : 30);
+      setCompanyName(nameSetting ? JSON.parse(nameSetting.value) : 'QUALITROL');
+      setCompanyLogoUrl(logoSetting ? JSON.parse(logoSetting.value) : '');
 
     } catch (error) {
       console.error('Error fetching settings:', error);
@@ -111,7 +120,10 @@ const AdminSettings = () => {
 
       const updates = [
         { key: 'quote_id_prefix', value: JSON.stringify(quotePrefix) },
-        { key: 'quote_id_counter', value: quoteCounter.toString() }
+        { key: 'quote_id_counter', value: quoteCounter.toString() },
+        { key: 'quote_expires_days', value: JSON.stringify(quoteExpiresDays.toString()) },
+        { key: 'company_name', value: JSON.stringify(companyName) },
+        { key: 'company_logo_url', value: JSON.stringify(companyLogoUrl) }
       ];
 
       for (const update of updates) {
@@ -160,12 +172,15 @@ const AdminSettings = () => {
       </div>
 
       <Tabs defaultValue="general" className="w-full">
-        <TabsList className="grid w-full grid-cols-5 bg-gray-800">
+        <TabsList className="grid w-full grid-cols-6 bg-gray-800">
           <TabsTrigger value="general" className="text-white data-[state=active]:bg-red-600">
             General
           </TabsTrigger>
           <TabsTrigger value="quotes" className="text-white data-[state=active]:bg-red-600">
             Quote Management
+          </TabsTrigger>
+          <TabsTrigger value="pdf-template" className="text-white data-[state=active]:bg-red-600">
+            PDF Template
           </TabsTrigger>
           <TabsTrigger value="terms" className="text-white data-[state=active]:bg-red-600">
             Terms & Conditions
@@ -209,7 +224,7 @@ const AdminSettings = () => {
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-3 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="quote-prefix" className="text-white">
                     Quote ID Prefix
@@ -242,11 +257,109 @@ const AdminSettings = () => {
                     Next quote will be: {quotePrefix}-{quoteCounter}
                   </p>
                 </div>
+                <div className="space-y-2">
+                  <Label htmlFor="quote-expires" className="text-white">
+                    Expires in (days)
+                  </Label>
+                  <Input
+                    id="quote-expires"
+                    type="number"
+                    value={quoteExpiresDays}
+                    onChange={(e) => setQuoteExpiresDays(parseInt(e.target.value) || 30)}
+                    className="bg-gray-800 border-gray-600 text-white placeholder:text-gray-400 focus:border-red-500 focus:ring-red-500"
+                    min="1"
+                  />
+                  <p className="text-sm text-gray-400">
+                    Quote validity period from creation date
+                  </p>
+                </div>
               </div>
               <div className="mt-4 p-4 bg-gray-800 rounded-lg">
                 <h4 className="text-white font-medium mb-2">Preview</h4>
                 <p className="text-gray-300">
                   Quote IDs will be generated as: <span className="font-mono bg-gray-700 px-2 py-1 rounded">{quotePrefix}-{quoteCounter}</span>, <span className="font-mono bg-gray-700 px-2 py-1 rounded">{quotePrefix}-{quoteCounter + 1}</span>, etc.
+                </p>
+                <p className="text-gray-300 mt-2">
+                  Quotes will be valid for <span className="font-semibold">{quoteExpiresDays} days</span> from creation date.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="pdf-template">
+          <Card className="bg-gray-900 border-gray-800">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-white">PDF Template Configuration</CardTitle>
+                <Button
+                  onClick={saveQuoteSettings}
+                  disabled={saving}
+                  className="bg-red-600 hover:bg-red-700"
+                >
+                  {saving ? (
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  ) : (
+                    <Save className="h-4 w-4 mr-2" />
+                  )}
+                  Save Template Settings
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="company-name" className="text-white">
+                    Company Name
+                  </Label>
+                  <Input
+                    id="company-name"
+                    value={companyName}
+                    onChange={(e) => setCompanyName(e.target.value)}
+                    className="bg-gray-800 border-gray-600 text-white placeholder:text-gray-400 focus:border-red-500 focus:ring-red-500"
+                    placeholder="Enter company name"
+                  />
+                  <p className="text-sm text-gray-400">
+                    This name will appear in the PDF header
+                  </p>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="company-logo" className="text-white">
+                    Company Logo URL
+                  </Label>
+                  <Input
+                    id="company-logo"
+                    value={companyLogoUrl}
+                    onChange={(e) => setCompanyLogoUrl(e.target.value)}
+                    className="bg-gray-800 border-gray-600 text-white placeholder:text-gray-400 focus:border-red-500 focus:ring-red-500"
+                    placeholder="https://example.com/logo.png"
+                  />
+                  <p className="text-sm text-gray-400">
+                    Upload your logo to an image hosting service and paste the URL here. Logo will appear in PDF header.
+                  </p>
+                </div>
+
+                {companyLogoUrl && (
+                  <div className="mt-4 p-4 bg-gray-800 rounded-lg">
+                    <h4 className="text-white font-medium mb-2">Logo Preview</h4>
+                    <img 
+                      src={companyLogoUrl} 
+                      alt="Company Logo" 
+                      className="max-h-20 object-contain"
+                      onError={(e) => {
+                        e.currentTarget.style.display = 'none';
+                      }}
+                    />
+                  </div>
+                )}
+              </div>
+              
+              <div className="p-4 bg-blue-900/20 border border-blue-600/30 rounded-lg">
+                <h4 className="text-blue-400 font-medium mb-2">💡 Tip: Logo Hosting</h4>
+                <p className="text-gray-300 text-sm">
+                  You can use free image hosting services like Imgur, Cloudinary, or upload to your own web server.
+                  Make sure the image URL is publicly accessible.
                 </p>
               </div>
             </CardContent>

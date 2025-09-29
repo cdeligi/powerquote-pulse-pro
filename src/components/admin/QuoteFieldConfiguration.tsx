@@ -35,6 +35,7 @@ interface QuoteField {
   enabled: boolean;
   options?: string[];
   display_order: number;
+  include_in_pdf?: boolean;
 }
 
 interface QuoteFieldConfigurationProps {
@@ -164,7 +165,8 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
         required: field.required || false,
         enabled: field.enabled || true,
         options: field.options ? (Array.isArray(field.options) ? field.options : JSON.parse(field.options)) : undefined,
-        display_order: field.display_order || 0
+        display_order: field.display_order || 0,
+        include_in_pdf: field.include_in_pdf || false
       }));
 
       // Sort fields by display_order and then by label
@@ -235,7 +237,8 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
           required: fieldData.required,
           enabled: fieldData.enabled,
           options: fieldData.options ? JSON.stringify(fieldData.options) : null,
-          display_order: fieldData.display_order
+          display_order: fieldData.display_order,
+          include_in_pdf: fieldData.include_in_pdf || false
         });
 
       if (error) throw error;
@@ -265,7 +268,8 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
           required: fieldData.required,
           enabled: fieldData.enabled,
           options: fieldData.options ? JSON.stringify(fieldData.options) : null,
-          display_order: fieldData.display_order
+          display_order: fieldData.display_order,
+          include_in_pdf: fieldData.include_in_pdf || false
         })
         .eq('id', fieldId);
 
@@ -478,12 +482,22 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
                           {field.label}
                         </CardTitle>
                       </div>
-                      <Badge 
-                        variant="outline" 
-                        className="text-xs capitalize border-gray-600 text-gray-400"
-                      >
-                        {field.type.toUpperCase()}
-                      </Badge>
+                       <div className="flex gap-1">
+                        <Badge 
+                          variant="outline" 
+                          className="text-xs capitalize border-gray-600 text-gray-400"
+                        >
+                          {field.type.toUpperCase()}
+                        </Badge>
+                        {field.include_in_pdf && (
+                          <Badge 
+                            variant="outline" 
+                            className="text-xs bg-blue-900/30 text-blue-400 border-blue-600"
+                          >
+                            PDF
+                          </Badge>
+                        )}
+                      </div>
                     </div>
                     <div className="flex-shrink-0">
                       <Switch
@@ -559,7 +573,8 @@ const QuoteFieldForm = ({ onSubmit, initialData, onCancel }: QuoteFieldFormProps
     required: initialData?.required ?? false,
     enabled: initialData?.enabled ?? true,
     options: initialData?.options || [],
-    display_order: initialData?.display_order || 1
+    display_order: initialData?.display_order || 1,
+    include_in_pdf: initialData?.include_in_pdf ?? false
   });
 
   const [optionsText, setOptionsText] = useState(
@@ -636,7 +651,7 @@ const QuoteFieldForm = ({ onSubmit, initialData, onCancel }: QuoteFieldFormProps
         </div>
       )}
 
-      <div className="flex items-center space-x-4">
+      <div className="grid grid-cols-3 gap-4">
         <div className="flex items-center space-x-2">
           <Switch
             id="required"
@@ -648,7 +663,7 @@ const QuoteFieldForm = ({ onSubmit, initialData, onCancel }: QuoteFieldFormProps
               hover:bg-gray-700
             `}
           />
-          <Label htmlFor="required" className={`${formData.required ? 'text-red-400' : 'text-white'} text-sm font-medium`}>{formData.label}</Label>
+          <Label htmlFor="required" className={`${formData.required ? 'text-red-400' : 'text-white'} text-sm font-medium`}>Required</Label>
         </div>
         <div className="flex items-center space-x-2">
           <Switch
@@ -662,6 +677,19 @@ const QuoteFieldForm = ({ onSubmit, initialData, onCancel }: QuoteFieldFormProps
             `}
           />
           <Label htmlFor="enabled" className="text-white">Enabled</Label>
+        </div>
+        <div className="flex items-center space-x-2">
+          <Switch
+            id="include_in_pdf"
+            checked={formData.include_in_pdf}
+            onCheckedChange={(include_in_pdf) => setFormData({ ...formData, include_in_pdf })}
+            className={`
+              data-[state=checked]:bg-blue-500
+              data-[state=unchecked]:bg-gray-500
+              hover:bg-gray-700
+            `}
+          />
+          <Label htmlFor="include_in_pdf" className="text-white">Include in PDF</Label>
         </div>
       </div>
 

@@ -23,6 +23,7 @@ interface QuoteField {
   required: boolean;
   enabled: boolean;
   options?: any[];
+  include_in_pdf?: boolean;
 }
 
 interface QuoteFieldsSectionProps {
@@ -217,8 +218,13 @@ const QuoteFieldsSection = ({ quoteFields, onFieldChange }: QuoteFieldsSectionPr
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {configuredFields.map((field) => (
               <div key={field.id} className="space-y-2">
-                <Label htmlFor={field.id} className="text-white flex items-center">
+                <Label htmlFor={field.id} className="text-white flex items-center gap-2">
                   {field.label}
+                  {field.include_in_pdf && (
+                    <Badge variant="outline" className="text-xs bg-blue-900/30 text-blue-400 border-blue-600">
+                      PDF
+                    </Badge>
+                  )}
                 </Label>
                 {field.type === 'checkbox' ? (
                   renderField(field)
