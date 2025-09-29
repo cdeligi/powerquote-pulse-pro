@@ -137,39 +137,53 @@ export const generateQuotePDF = async (
         <span style="color: #666;">(${expiresDays} days validity)</span>
       </div>
 
-      ${quoteFieldsForPDF.length > 0 ? `
-        <div class="quote-header-fields">
-          <h3>Quote Information</h3>
-          ${quoteFieldsForPDF.map(field => {
-            const value = quoteInfo.quote_fields?.[field.id] || 'Not specified';
-            return `
-              <div class="field-row">
-                <div class="field-label">${field.label}:</div>
-                <div class="field-value">${value}</div>
-              </div>
-            `;
-          }).join('')}
+      <div class="quote-header-fields">
+        <h3>Quote Information</h3>
+        
+        <!-- Customer Information -->
+        <div class="field-row">
+          <div class="field-label">Customer Name:</div>
+          <div class="field-value">${quoteInfo.customer_name || 'Not specified'}</div>
         </div>
-      ` : ''}
-
-      <div class="quote-info">
-        <div class="info-section">
-          <div class="info-title">Customer Information</div>
-          <p><strong>Customer Name:</strong> ${quoteInfo.customer_name || 'Not specified'}</p>
-          <p><strong>Oracle Customer ID:</strong> ${quoteInfo.oracle_customer_id || 'Not specified'}</p>
+        <div class="field-row">
+          <div class="field-label">Oracle Customer ID:</div>
+          <div class="field-value">${quoteInfo.oracle_customer_id || 'Not specified'}</div>
         </div>
-        <div class="info-section">
-          <div class="info-title">Quote Details</div>
-          <p><strong>Priority:</strong> ${quoteInfo.priority || 'Medium'}</p>
-          <p><strong>Rep Involved:</strong> ${quoteInfo.is_rep_involved ? 'Yes' : 'No'}</p>
-          <p><strong>Currency:</strong> ${quoteInfo.currency || 'USD'}</p>
+        
+        <!-- Dynamic PDF Fields -->
+        ${quoteFieldsForPDF.map(field => {
+          const value = quoteInfo.quote_fields?.[field.id] || 'Not specified';
+          return `
+            <div class="field-row">
+              <div class="field-label">${field.label}:</div>
+              <div class="field-value">${value}</div>
+            </div>
+          `;
+        }).join('')}
+        
+        <!-- Quote Details -->
+        <div class="field-row">
+          <div class="field-label">Priority:</div>
+          <div class="field-value">${quoteInfo.priority || 'Medium'}</div>
         </div>
-      </div>
-
-      <div class="info-section">
-        <div class="info-title">Terms & Conditions</div>
-        <p><strong>Shipping Terms:</strong> ${quoteInfo.shipping_terms || 'Not specified'}</p>
-        <p><strong>Payment Terms:</strong> ${quoteInfo.payment_terms || 'Not specified'}</p>
+        <div class="field-row">
+          <div class="field-label">Rep Involved:</div>
+          <div class="field-value">${quoteInfo.is_rep_involved ? 'Yes' : 'No'}</div>
+        </div>
+        
+        <!-- Terms & Conditions -->
+        <div class="field-row">
+          <div class="field-label">Shipping Terms:</div>
+          <div class="field-value">${quoteInfo.shipping_terms || 'Not specified'}</div>
+        </div>
+        <div class="field-row">
+          <div class="field-label">Payment Terms:</div>
+          <div class="field-value">${quoteInfo.payment_terms || 'Not specified'}</div>
+        </div>
+        <div class="field-row">
+          <div class="field-label">Currency:</div>
+          <div class="field-value">${quoteInfo.currency || 'USD'}</div>
+        </div>
       </div>
 
       <h2>Bill of Materials</h2>
