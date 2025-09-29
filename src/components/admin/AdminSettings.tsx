@@ -136,6 +136,8 @@ const AdminSettings = () => {
             key: update.key,
             value: update.value,
             updated_by: user?.id
+          }, {
+            onConflict: 'key'
           });
 
         if (error) {
