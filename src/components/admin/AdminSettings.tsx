@@ -26,6 +26,11 @@ const AdminSettings = () => {
   const [quoteExpiresDays, setQuoteExpiresDays] = useState(30);
   const [companyName, setCompanyName] = useState('QUALITROL');
   const [companyLogoUrl, setCompanyLogoUrl] = useState('');
+  
+  // Session management settings
+  const [sessionDurationHours, setSessionDurationHours] = useState(8);
+  const [inactivityTimeoutMinutes, setInactivityTimeoutMinutes] = useState(30);
+  const [sessionRefreshIntervalMinutes, setSessionRefreshIntervalMinutes] = useState(30);
 
   const fetchLegalContent = async () => {
     try {
@@ -51,7 +56,7 @@ const AdminSettings = () => {
       const { data: settingsData, error: settingsError } = await supabase
         .from('app_settings')
         .select('key, value')
-        .in('key', ['quote_id_prefix', 'quote_id_counter', 'quote_expires_days', 'company_name', 'company_logo_url']);
+        .in('key', ['quote_id_prefix', 'quote_id_counter', 'quote_expires_days', 'company_name', 'company_logo_url', 'session_duration_hours', 'inactivity_timeout_minutes', 'session_refresh_interval_minutes']);
 
       if (settingsError) throw settingsError;
 
@@ -60,6 +65,9 @@ const AdminSettings = () => {
       const expiresSetting = settingsData?.find(s => s.key === 'quote_expires_days');
       const nameSetting = settingsData?.find(s => s.key === 'company_name');
       const logoSetting = settingsData?.find(s => s.key === 'company_logo_url');
+      const sessionDurationSetting = settingsData?.find(s => s.key === 'session_duration_hours');
+      const inactivityTimeoutSetting = settingsData?.find(s => s.key === 'inactivity_timeout_minutes');
+      const sessionRefreshSetting = settingsData?.find(s => s.key === 'session_refresh_interval_minutes');
 
       // Parse values - they're stored as JSONB now (directly, not double-stringified)
       setQuotePrefix(prefixSetting?.value || 'QLT');
@@ -67,6 +75,9 @@ const AdminSettings = () => {
       setQuoteExpiresDays(typeof expiresSetting?.value === 'number' ? expiresSetting.value : parseInt(expiresSetting?.value || '30'));
       setCompanyName(nameSetting?.value || 'QUALITROL');
       setCompanyLogoUrl(logoSetting?.value || '');
+      setSessionDurationHours(typeof sessionDurationSetting?.value === 'number' ? sessionDurationSetting.value : parseInt(sessionDurationSetting?.value || '8'));
+      setInactivityTimeoutMinutes(typeof inactivityTimeoutSetting?.value === 'number' ? inactivityTimeoutSetting.value : parseInt(inactivityTimeoutSetting?.value || '30'));
+      setSessionRefreshIntervalMinutes(typeof sessionRefreshSetting?.value === 'number' ? sessionRefreshSetting.value : parseInt(sessionRefreshSetting?.value || '30'));
 
     } catch (error) {
       console.error('Error fetching settings:', error);
@@ -180,7 +191,7 @@ const AdminSettings = () => {
       </div>
 
       <Tabs defaultValue="general" className="w-full">
-        <TabsList className="grid w-full grid-cols-6 bg-gray-800">
+        <TabsList className="grid w-full grid-cols-7 bg-gray-800">
           <TabsTrigger value="general" className="text-white data-[state=active]:bg-red-600">
             General
           </TabsTrigger>
@@ -189,6 +200,9 @@ const AdminSettings = () => {
           </TabsTrigger>
           <TabsTrigger value="pdf-template" className="text-white data-[state=active]:bg-red-600">
             PDF Template
+          </TabsTrigger>
+          <TabsTrigger value="session" className="text-white data-[state=active]:bg-red-600">
+            Session Management
           </TabsTrigger>
           <TabsTrigger value="terms" className="text-white data-[state=active]:bg-red-600">
             Terms & Conditions
@@ -368,6 +382,158 @@ const AdminSettings = () => {
                 <p className="text-gray-300 text-sm">
                   You can use free image hosting services like Imgur, Cloudinary, or upload to your own web server.
                   Make sure the image URL is publicly accessible.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="session">
+          <Card className="bg-gray-900 border-gray-800">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-white">Session Management Configuration</CardTitle>
+                <Button
+                  onClick={async () => {
+                    try {
+                      setSaving(true);
+                      const updates = [
+                        { key: 'session_duration_hours', value: sessionDurationHours },
+                        { key: 'inactivity_timeout_minutes', value: inactivityTimeoutMinutes },
+                        { key: 'session_refresh_interval_minutes', value: sessionRefreshIntervalMinutes }
+                      ];
+
+                      for (const update of updates) {
+                        const { error } = await supabase
+                          .from('app_settings')
+                          .upsert({
+                            key: update.key,
+                            value: update.value,
+                            updated_by: user?.id
+                          }, {
+                            onConflict: 'key'
+                          });
+
+                        if (error) {
+                          console.error('Error saving session setting:', update.key, error);
+                          throw error;
+                        }
+                      }
+
+                      toast({
+                        title: 'Success',
+                        description: 'Session settings saved successfully. Changes will apply on next login.',
+                      });
+                    } catch (error) {
+                      console.error('Error saving session settings:', error);
+                      toast({
+                        title: 'Error',
+                        description: 'Failed to save session settings.',
+                        variant: 'destructive'
+                      });
+                    } finally {
+                      setSaving(false);
+                    }
+                  }}
+                  disabled={saving}
+                  className="bg-red-600 hover:bg-red-700"
+                >
+                  {saving ? (
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  ) : (
+                    <Save className="h-4 w-4 mr-2" />
+                  )}
+                  Save Session Settings
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="bg-blue-900/20 border border-blue-700/50 rounded-lg p-4 mb-4">
+                <p className="text-blue-300 text-sm">
+                  ⚠️ Session management settings control authentication behavior and security. Changes will take effect on the next user login.
+                </p>
+              </div>
+              
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="session-duration" className="text-white">
+                    Session Duration (hours)
+                  </Label>
+                  <Input
+                    id="session-duration"
+                    type="number"
+                    value={sessionDurationHours}
+                    onChange={(e) => setSessionDurationHours(parseInt(e.target.value) || 8)}
+                    className="bg-gray-800 border-gray-600 text-white placeholder:text-gray-400 focus:border-red-500 focus:ring-red-500"
+                    min="1"
+                    max="24"
+                  />
+                  <p className="text-sm text-gray-400">
+                    How long a user session remains valid without activity. Recommended: 8-24 hours.
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="inactivity-timeout" className="text-white">
+                    Inactivity Timeout (minutes)
+                  </Label>
+                  <Input
+                    id="inactivity-timeout"
+                    type="number"
+                    value={inactivityTimeoutMinutes}
+                    onChange={(e) => setInactivityTimeoutMinutes(parseInt(e.target.value) || 30)}
+                    className="bg-gray-800 border-gray-600 text-white placeholder:text-gray-400 focus:border-red-500 focus:ring-red-500"
+                    min="5"
+                    max="120"
+                  />
+                  <p className="text-sm text-gray-400">
+                    Log out users after this period of inactivity. Recommended: 30-60 minutes for security.
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="session-refresh" className="text-white">
+                    Session Refresh Interval (minutes)
+                  </Label>
+                  <Input
+                    id="session-refresh"
+                    type="number"
+                    value={sessionRefreshIntervalMinutes}
+                    onChange={(e) => setSessionRefreshIntervalMinutes(parseInt(e.target.value) || 30)}
+                    className="bg-gray-800 border-gray-600 text-white placeholder:text-gray-400 focus:border-red-500 focus:ring-red-500"
+                    min="5"
+                    max="60"
+                  />
+                  <p className="text-sm text-gray-400">
+                    How often to automatically refresh authentication tokens to maintain session. Recommended: 30 minutes.
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-6 p-4 bg-gray-800 rounded-lg border border-gray-700">
+                <h4 className="text-white font-medium mb-3">Current Configuration</h4>
+                <div className="space-y-2 text-sm">
+                  <p className="text-gray-300">
+                    • Users will stay logged in for up to <span className="font-semibold text-white">{sessionDurationHours} hours</span>
+                  </p>
+                  <p className="text-gray-300">
+                    • Automatic logout after <span className="font-semibold text-white">{inactivityTimeoutMinutes} minutes</span> of inactivity
+                  </p>
+                  <p className="text-gray-300">
+                    • Session tokens refresh every <span className="font-semibold text-white">{sessionRefreshIntervalMinutes} minutes</span>
+                  </p>
+                  <p className="text-gray-300 mt-3 pt-3 border-t border-gray-700">
+                    <span className="text-yellow-400">⚡</span> Sessions persist across tab switches and page reloads
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-4 p-4 bg-yellow-900/20 border border-yellow-700/50 rounded-lg">
+                <p className="text-yellow-300 text-sm">
+                  <strong>Security Best Practices:</strong>
+                  <br />• Shorter session durations increase security but may inconvenience users
+                  <br />• For high-security environments, use 2-4 hour sessions with 15-30 minute inactivity timeout
+                  <br />• For convenience, use 8-12 hour sessions with 60 minute inactivity timeout
                 </p>
               </div>
             </CardContent>
