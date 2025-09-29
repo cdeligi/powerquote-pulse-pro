@@ -51,7 +51,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<AuthError | null>(null);
 
-  const handleAuthStateChange = useCallback(async (event: string, session: any) => {
+  const handleAuthStateChange = useCallback((event: string, session: any) => {
     console.log("[AuthProvider] Auth state change:", { event, hasSession: !!session, userId: session?.user?.id });
     
     if (event === 'SIGNED_IN' && session?.user) {
@@ -59,30 +59,33 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setError(null);
       setSession(session);
       
-      try {
-        const profile = await fetchProfile(session.user.id);
-        if (profile) {
-          console.log("[AuthProvider] Successfully authenticated user:", profile.email);
-          // Log session events
-          logUserSession(session.user.id, 'login').catch(console.error);
-        } else {
-          console.error("[AuthProvider] Failed to load user profile");
+      // CRITICAL FIX: Defer fetchProfile to avoid deadlock
+      setTimeout(async () => {
+        try {
+          const profile = await fetchProfile(session.user.id);
+          if (profile) {
+            console.log("[AuthProvider] Successfully authenticated user:", profile.email);
+            // Log session events
+            logUserSession(session.user.id, 'login').catch(console.error);
+          } else {
+            console.error("[AuthProvider] Failed to load user profile");
+            setError({
+              code: 'PROFILE_LOAD_FAILED',
+              message: 'Failed to load user profile. Please try again.',
+              type: 'profile'
+            });
+          }
+        } catch (error) {
+          console.error("[AuthProvider] Error in auth state change:", error);
           setError({
-            code: 'PROFILE_LOAD_FAILED',
-            message: 'Failed to load user profile. Please try again.',
+            code: 'PROFILE_ERROR', 
+            message: 'Error loading user data. Please try again.',
             type: 'profile'
           });
+        } finally {
+          setLoading(false);
         }
-      } catch (error) {
-        console.error("[AuthProvider] Error in auth state change:", error);
-        setError({
-          code: 'PROFILE_ERROR', 
-          message: 'Error loading user data. Please try again.',
-          type: 'profile'
-        });
-      } finally {
-        setLoading(false);
-      }
+      }, 0);
     } else if (event === 'SIGNED_OUT') {
       setUser(null);
       setSession(null);
@@ -92,18 +95,22 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setSession(session);
     } else if (event === 'INITIAL_SESSION' && session?.user) {
       setSession(session);
-      const profile = await fetchProfile(session.user.id);
-      setLoading(false);
+      // Defer fetchProfile to avoid deadlock
+      setTimeout(async () => {
+        await fetchProfile(session.user.id);
+        setLoading(false);
+      }, 0);
     } else {
       setLoading(false);
     }
   }, []);
   
-  // Initialize auth state
+  // Initialize auth state with session refresh and tab focus validation
   useEffect(() => {
     console.log("[AuthProvider] Initializing auth state...");
     let isMounted = true;
     let subscription: any;
+    let refreshInterval: NodeJS.Timeout | null = null;
     
     const initializeAuth = async () => {
       try {
@@ -131,7 +138,16 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         
         if (initialSession?.user) {
           console.log("[AuthProvider] Initial session found for:", initialSession.user.email);
-          await handleAuthStateChange('INITIAL_SESSION', initialSession);
+          handleAuthStateChange('INITIAL_SESSION', initialSession);
+          
+          // Set up periodic session refresh every 30 minutes
+          refreshInterval = setInterval(async () => {
+            console.log("[AuthProvider] Periodic session refresh");
+            const { error: refreshError } = await supabase.auth.refreshSession();
+            if (refreshError) {
+              console.error("[AuthProvider] Periodic refresh failed:", refreshError);
+            }
+          }, 30 * 60 * 1000); // 30 minutes
         } else {
           console.log("[AuthProvider] No existing session found");
           setLoading(false);
@@ -149,6 +165,19 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
     };
     
+    // Validate session on tab focus to prevent stale sessions
+    const handleVisibilityChange = async () => {
+      if (document.visibilityState === 'visible') {
+        console.log("[AuthProvider] Tab focused, validating session");
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          // Refresh session if it exists
+          await supabase.auth.refreshSession();
+        }
+      }
+    };
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange);
     initializeAuth();
     
     return () => {
@@ -156,6 +185,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       if (subscription) {
         subscription.unsubscribe();
       }
+      if (refreshInterval) {
+        clearInterval(refreshInterval);
+      }
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [handleAuthStateChange]);
 
