@@ -61,11 +61,12 @@ const AdminSettings = () => {
       const nameSetting = settingsData?.find(s => s.key === 'company_name');
       const logoSetting = settingsData?.find(s => s.key === 'company_logo_url');
 
-      setQuotePrefix(prefixSetting ? JSON.parse(prefixSetting.value) : 'QLT');
-      setQuoteCounter(counterSetting ? parseInt(counterSetting.value) : 1);
-      setQuoteExpiresDays(expiresSetting ? parseInt(JSON.parse(expiresSetting.value)) : 30);
-      setCompanyName(nameSetting ? JSON.parse(nameSetting.value) : 'QUALITROL');
-      setCompanyLogoUrl(logoSetting ? JSON.parse(logoSetting.value) : '');
+      // Parse values - they're stored as JSONB now (directly, not double-stringified)
+      setQuotePrefix(prefixSetting?.value || 'QLT');
+      setQuoteCounter(typeof counterSetting?.value === 'number' ? counterSetting.value : parseInt(counterSetting?.value || '1'));
+      setQuoteExpiresDays(typeof expiresSetting?.value === 'number' ? expiresSetting.value : parseInt(expiresSetting?.value || '30'));
+      setCompanyName(nameSetting?.value || 'QUALITROL');
+      setCompanyLogoUrl(logoSetting?.value || '');
 
     } catch (error) {
       console.error('Error fetching settings:', error);
@@ -118,15 +119,17 @@ const AdminSettings = () => {
     try {
       setSaving(true);
 
+      // Store values directly as JSONB - no double stringify
       const updates = [
-        { key: 'quote_id_prefix', value: JSON.stringify(quotePrefix) },
-        { key: 'quote_id_counter', value: quoteCounter.toString() },
-        { key: 'quote_expires_days', value: JSON.stringify(quoteExpiresDays.toString()) },
-        { key: 'company_name', value: JSON.stringify(companyName) },
-        { key: 'company_logo_url', value: JSON.stringify(companyLogoUrl) }
+        { key: 'quote_id_prefix', value: quotePrefix },
+        { key: 'quote_id_counter', value: quoteCounter },
+        { key: 'quote_expires_days', value: quoteExpiresDays },
+        { key: 'company_name', value: companyName },
+        { key: 'company_logo_url', value: companyLogoUrl }
       ];
 
       for (const update of updates) {
+        console.log('Saving setting:', update.key, update.value);
         const { error } = await supabase
           .from('app_settings')
           .upsert({
@@ -135,7 +138,10 @@ const AdminSettings = () => {
             updated_by: user?.id
           });
 
-        if (error) throw error;
+        if (error) {
+          console.error(`Error saving ${update.key}:`, error);
+          throw error;
+        }
       }
 
       toast({

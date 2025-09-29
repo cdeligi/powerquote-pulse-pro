@@ -337,6 +337,33 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
     }
   };
 
+  const toggleIncludeInQuote = async (fieldId: string) => {
+    const field = quoteFields.find(f => f.id === fieldId);
+    if (!field) return;
+
+    try {
+      const { error } = await supabase
+        .from('quote_fields')
+        .update({ include_in_pdf: !field.include_in_pdf })
+        .eq('id', fieldId);
+
+      if (error) throw error;
+
+      await fetchQuoteFields();
+      toast({
+        title: "Success",
+        description: `Field ${!field.include_in_pdf ? 'added to' : 'removed from'} quote`,
+      });
+    } catch (error) {
+      console.error('Error toggling include in quote:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to toggle include in quote",
+        variant: "destructive"
+      });
+    }
+  };
+
   const handleCreateField = async (fieldData: Omit<QuoteField, 'id'>) => {
     await createQuoteField(fieldData);
     setDialogOpen(false);
@@ -482,7 +509,7 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
                           {field.label}
                         </CardTitle>
                       </div>
-                       <div className="flex gap-1">
+                       <div className="flex gap-1 mt-1">
                         <Badge 
                           variant="outline" 
                           className="text-xs capitalize border-gray-600 text-gray-400"
@@ -494,9 +521,20 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
                             variant="outline" 
                             className="text-xs bg-blue-900/30 text-blue-400 border-blue-600"
                           >
-                            PDF
+                            QUOTE
                           </Badge>
                         )}
+                      </div>
+                      <div className="flex items-center gap-2 mt-2">
+                        <Label htmlFor={`include-quote-${field.id}`} className="text-xs text-gray-400 cursor-pointer">
+                          Include in the Quote
+                        </Label>
+                        <Switch
+                          id={`include-quote-${field.id}`}
+                          checked={field.include_in_pdf || false}
+                          onCheckedChange={() => toggleIncludeInQuote(field.id)}
+                          className="data-[state=checked]:bg-blue-500"
+                        />
                       </div>
                     </div>
                     <div className="flex-shrink-0">
@@ -689,7 +727,7 @@ const QuoteFieldForm = ({ onSubmit, initialData, onCancel }: QuoteFieldFormProps
               hover:bg-gray-700
             `}
           />
-          <Label htmlFor="include_in_pdf" className="text-white">Include in PDF</Label>
+          <Label htmlFor="include_in_pdf" className="text-white">Include in the Quote</Label>
         </div>
       </div>
 

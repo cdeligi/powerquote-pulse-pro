@@ -6,10 +6,12 @@ import { supabase } from '@/integrations/supabase/client';
 export const generateQuotePDF = async (
   bomItems: BOMItem[],
   quoteInfo: Partial<Quote>,
-  canSeePrices: boolean = true
+  canSeePrices: boolean = true,
+  action: 'view' | 'download' = 'download'
 ): Promise<void> => {
-  // Create a new window for PDF generation
-  const printWindow = window.open('', '_blank');
+  // Create a new window for PDF generation - name it based on action
+  const windowName = action === 'view' ? 'Quote_View' : 'Quote_Download';
+  const printWindow = window.open('', windowName);
   if (!printWindow) return;
 
   const totalPrice = bomItems
@@ -45,9 +47,10 @@ export const generateQuotePDF = async (
       const logoSetting = settingsData.find(s => s.key === 'company_logo_url');
       const expiresSetting = settingsData.find(s => s.key === 'quote_expires_days');
       
-      companyName = nameSetting ? JSON.parse(nameSetting.value) : 'QUALITROL';
-      companyLogoUrl = logoSetting ? JSON.parse(logoSetting.value) : '';
-      expiresDays = expiresSetting ? parseInt(JSON.parse(expiresSetting.value)) : 30;
+      // Values are stored as JSONB directly now
+      companyName = nameSetting?.value || 'QUALITROL';
+      companyLogoUrl = logoSetting?.value || '';
+      expiresDays = typeof expiresSetting?.value === 'number' ? expiresSetting.value : parseInt(expiresSetting?.value || '30');
     }
 
     // Fetch quote fields that should be included in PDF
@@ -226,5 +229,9 @@ export const generateQuotePDF = async (
 
   printWindow.document.write(htmlContent);
   printWindow.document.close();
-  printWindow.print();
+  
+  // Only trigger print dialog if action is 'download', otherwise just show in browser
+  if (action === 'download') {
+    printWindow.print();
+  }
 };

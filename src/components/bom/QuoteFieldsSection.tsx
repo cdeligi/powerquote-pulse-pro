@@ -222,7 +222,7 @@ const QuoteFieldsSection = ({ quoteFields, onFieldChange }: QuoteFieldsSectionPr
                   {field.label}
                   {field.include_in_pdf && (
                     <Badge variant="outline" className="text-xs bg-blue-900/30 text-blue-400 border-blue-600">
-                      PDF
+                      QUOTE
                     </Badge>
                   )}
                 </Label>
