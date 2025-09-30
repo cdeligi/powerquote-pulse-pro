@@ -10,6 +10,11 @@ import { toast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { BOMItem } from '@/types/product';
 import { EnhancedBOMDisplay } from './EnhancedBOMDisplay';
+import {
+  deserializeSlotAssignments,
+  buildRackLayoutFromAssignments,
+  type SerializedSlotAssignment,
+} from '@/utils/slotAssignmentUtils';
 
 interface Quote {
   id: string;
@@ -94,43 +99,83 @@ const QuoteViewer: React.FC = () => {
       }
       
       setQuote(quoteData);
-      
-      // Load BOM items
-      const { data: bomData, error: bomError } = await supabase
-        .from('bom_items')
-        .select(`
-          *,
-          bom_level4_values (
-            id,
-            level4_config_id,
-            entries
-          )
-        `)
-        .eq('quote_id', quoteId);
-        
-      if (bomError) {
-        console.error('Error loading BOM items:', bomError);
-        setBomItems([]);
-      } else {
-        // Convert BOM items to local format
-        const loadedItems: BOMItem[] = (bomData || []).map(item => ({
-          id: item.id,
-          product: {
-            id: item.product_id,
-            name: item.name,
-            partNumber: item.part_number,
-            price: item.unit_price,
-            cost: item.unit_cost,
-            description: item.description,
-            ...item.configuration_data
-          },
-          quantity: item.quantity,
-          enabled: true,
-          partNumber: item.part_number,
-          level4Values: item.bom_level4_values || []
-        }));
-        
+
+      if (quoteData.status === 'draft' && quoteData.draft_bom?.items && Array.isArray(quoteData.draft_bom.items)) {
+        const loadedItems: BOMItem[] = quoteData.draft_bom.items.map((item: any) => {
+          const storedSlotAssignments = item.slotAssignments as SerializedSlotAssignment[] | undefined;
+          const slotAssignments = deserializeSlotAssignments(storedSlotAssignments);
+          const rackLayout = item.rackConfiguration || buildRackLayoutFromAssignments(storedSlotAssignments);
+
+          return {
+            id: item.id || crypto.randomUUID(),
+            product: {
+              id: item.productId || item.product_id || item.product?.id,
+              name: item.name || item.product?.name,
+              partNumber: item.partNumber || item.part_number || item.product?.partNumber,
+              price: item.unit_price || item.product?.price || 0,
+              cost: item.unit_cost || item.product?.cost || 0,
+              description: item.description || item.product?.description || ''
+            },
+            quantity: item.quantity || 1,
+            enabled: item.enabled !== false,
+            partNumber: item.partNumber || item.part_number || item.product?.partNumber,
+            level4Values: item.level4Values || [],
+            slotAssignments,
+            rackConfiguration: rackLayout,
+            level4Config: item.level4Config || null,
+            level4Selections: item.level4Selections || null,
+          };
+        });
+
         setBomItems(loadedItems);
+      } else {
+        // Load BOM items from persistent storage
+        const { data: bomData, error: bomError } = await supabase
+          .from('bom_items')
+          .select(`
+            *,
+            bom_level4_values (
+              id,
+              level4_config_id,
+              entries
+            )
+          `)
+          .eq('quote_id', quoteId);
+
+        if (bomError) {
+          console.error('Error loading BOM items:', bomError);
+          setBomItems([]);
+        } else {
+          const loadedItems: BOMItem[] = (bomData || []).map(item => {
+            const configData = item.configuration_data || {};
+            const storedSlotAssignments = configData.slotAssignments as SerializedSlotAssignment[] | undefined;
+            const slotAssignments = deserializeSlotAssignments(storedSlotAssignments);
+            const rackLayout = configData.rackConfiguration || buildRackLayoutFromAssignments(storedSlotAssignments);
+
+            return {
+              id: item.id,
+              product: {
+                id: item.product_id,
+                name: item.name,
+                partNumber: item.part_number,
+                price: item.unit_price,
+                cost: item.unit_cost,
+                description: item.description,
+                ...configData
+              },
+              quantity: item.quantity,
+              enabled: true,
+              partNumber: item.part_number,
+              level4Values: item.bom_level4_values || [],
+              slotAssignments,
+              rackConfiguration: rackLayout,
+              level4Config: configData.level4Config || null,
+              level4Selections: configData.level4Selections || null,
+            };
+          });
+
+          setBomItems(loadedItems);
+        }
       }
       
     } catch (err) {
