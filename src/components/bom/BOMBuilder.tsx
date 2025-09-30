@@ -1309,15 +1309,13 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
       // Import Level4Service dynamically to avoid circular imports
       const { Level4Service } = await import('@/services/level4Service');
       
-      // Verify user authentication
-      if (!user?.id) {
-        throw new Error('User authentication required for Level 4 configuration');
-      }
+      // Try to use the active user when available (the service will validate/fetch as needed)
+      const activeUserId = user?.id;
 
-      console.log('Setting up Level 4 config for user:', user.id);
+      console.log('Setting up Level 4 config for user:', activeUserId);
       
       // Create temporary quote and BOM item in database
-      const { bomItemId, tempQuoteId } = await Level4Service.createBOMItemForLevel4Config(newItem, user.id);
+      const { bomItemId, tempQuoteId } = await Level4Service.createBOMItemForLevel4Config(newItem, activeUserId);
       
       // Update the item with database ID
       const itemWithDbId: BOMItem = {
@@ -1335,9 +1333,15 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
       
     } catch (error) {
       console.error('Error setting up Level 4 configuration:', error);
+
+      let description = 'Failed to prepare Level 4 configuration. Please try again.';
+      if (error instanceof Error && error.message.includes('authenticated')) {
+        description = 'You must be signed in to configure Level 4 options. Please log in and try again.';
+      }
+
       toast({
         title: 'Error',
-        description: 'Failed to prepare Level 4 configuration. Please try again.',
+        description,
         variant: 'destructive',
       });
     } finally {
@@ -2466,6 +2470,8 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
               isDraftMode={isDraftMode}
               currentQuoteId={currentQuoteId}
               draftName={currentQuote?.status === 'draft' ? currentQuote?.customer_name : null}
+              quoteFields={quoteFields}
+              quoteMetadata={currentQuote}
               discountPercentage={discountPercentage}
               discountJustification={discountJustification}
               onDiscountChange={(percentage, justification) => {
