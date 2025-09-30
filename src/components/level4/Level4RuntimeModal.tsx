@@ -76,10 +76,17 @@ export const Level4RuntimeModal: React.FC<Level4RuntimeModalProps> = ({
             // Unregister old session
             Level4Service.unregisterActiveSession(effectiveBomItemId);
             
-            // Create a new BOM item for this configuration
+            // Create a new BOM item for this configuration with improved error handling
             const { bomItemId: recreatedId, tempQuoteId } = await Level4Service.createBOMItemForLevel4Config(bomItem);
 
+            if (!recreatedId) {
+              throw new Error('Failed to create BOM item: No ID returned');
+            }
+
             effectiveBomItemId = recreatedId;
+            
+            // Wait a moment for database propagation
+            await new Promise(resolve => setTimeout(resolve, 100));
             
             // Validate the newly created BOM item
             validation = await Level4Service.validateBOMItemAccess(effectiveBomItemId);
@@ -95,7 +102,8 @@ export const Level4RuntimeModal: React.FC<Level4RuntimeModalProps> = ({
             console.log('Successfully recreated BOM item session:', { bomItemId: recreatedId, tempQuoteId });
           } catch (recreateError) {
             console.error('Failed to recreate BOM item for Level 4 session:', recreateError);
-            throw new Error('Configuration Error: Unable to establish a valid configuration session. Please close this dialog and try again.');
+            const errorMsg = recreateError instanceof Error ? recreateError.message : 'Unknown error';
+            throw new Error(`Configuration Error: Unable to establish a valid configuration session. ${errorMsg} Please close this dialog and try again.`);
           }
         }
 
@@ -166,25 +174,48 @@ export const Level4RuntimeModal: React.FC<Level4RuntimeModalProps> = ({
         
         setEntries(initialEntries);
       } catch (err) {
-        let description = "Failed to prepare Level 4 configuration. Please try again.";
+        let description = "Error";
+        let userMessage = "Failed to prepare Level 4 configuration. Please try again.";
         
         if (err && typeof err === 'object') {
           if ('code' in err && err.code === '42P01') {
-            description = "Database Error: The database schema is out of date. Please contact your administrator.";
+            description = "Database Error";
+            userMessage = "The database schema is out of date. Please contact your administrator.";
+          } else if ('code' in err && err.code === 'PGRST116') {
+            description = "Configuration Not Found";
+            userMessage = "No Level 4 configuration found for this product. Please configure it in the admin panel first.";
           } else if ('status' in err && err.status === 406) {
-            description = "API Error: The API schema is out of date. Please refresh the page and try again.";
+            description = "API Error";
+            userMessage = "The API schema is out of date. Please refresh the page and try again.";
           } else if ('message' in err) {
             const message = err.message as string;
-            // Preserve "Configuration Error:" prefix for better user experience
-            description = message.startsWith('Configuration Error:') ? message : `Error: ${message}`;
+            if (message.includes('Configuration Error:')) {
+              // Extract just the error title and message
+              const parts = message.split(':');
+              description = parts[0] || 'Configuration Error';
+              userMessage = parts.slice(1).join(':').trim() || message;
+            } else if (message.includes('session')) {
+              description = "Session Error";
+              userMessage = message;
+            } else if (message.includes('No Level 4 configuration')) {
+              description = "Configuration Missing";
+              userMessage = message;
+            } else {
+              description = "Error";
+              userMessage = message;
+            }
           }
         } else if (err instanceof Error) {
-          description = `Error: ${err.message}`;
+          description = "Error";
+          userMessage = err.message;
         }
         
         console.error('Error loading Level 4 configuration:', err);
-        setError(description);
-        toast.error(description);
+        console.error('Error details:', { description, userMessage });
+        
+        const fullErrorMessage = `${description}\n${userMessage}`;
+        setError(fullErrorMessage);
+        toast.error(description, { description: userMessage });
       } finally {
         setIsLoading(false);
       }
