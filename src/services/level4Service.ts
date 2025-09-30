@@ -216,6 +216,44 @@ export class Level4Service {
     }
   }
 
+  private static normalizeAuthError(error: any): string {
+    if (!error) return 'Authentication is required to continue.';
+    if (typeof error === 'string') return error;
+    if (error.message) return error.message;
+    return 'Authentication is required to continue.';
+  }
+
+  private static async resolveAuthenticatedUserId(explicitUserId?: string): Promise<string | null> {
+    if (explicitUserId) {
+      return explicitUserId;
+    }
+
+    const supabase = getSupabaseClient();
+    const maxAttempts = 3;
+
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      try {
+        const { data: { user }, error } = await supabase.auth.getUser();
+
+        if (error) {
+          console.error('Authentication error when resolving user:', error);
+          // If the auth API is still initialising, allow a retry
+        }
+
+        if (user?.id) {
+          return user.id;
+        }
+      } catch (authError) {
+        console.error('Unexpected error while fetching authenticated user:', authError);
+      }
+
+      // Brief backoff before retrying to allow the auth client to hydrate
+      await new Promise(resolve => setTimeout(resolve, 200 * (attempt + 1)));
+    }
+
+    return null;
+  }
+
   /**
    * Create a temporary quote to enable Level 4 configuration
    */
@@ -223,21 +261,10 @@ export class Level4Service {
     try {
       const supabase = getSupabaseClient();
 
-      let authenticatedUserId = userId;
+      const authenticatedUserId = await this.resolveAuthenticatedUserId(userId);
 
       if (!authenticatedUserId) {
-        // Check if user is authenticated
-        const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-        if (authError) {
-          console.error('Authentication error:', authError);
-        }
-
-        authenticatedUserId = user?.id;
-      }
-
-      if (!authenticatedUserId) {
-        throw new Error('User must be authenticated to create temporary quote');
+        throw new Error('User authentication is required before configuring Level 4 options.');
       }
 
       console.log('Creating temporary quote for user:', authenticatedUserId);
@@ -273,7 +300,12 @@ export class Level4Service {
 
       if (error) {
         console.error('Error creating temporary quote:', error);
-        throw new Error(`Failed to create temporary quote: ${error.message}`);
+
+        if (error?.code === '23505') {
+          throw new Error('A temporary quote already exists for this session. Please close the dialog and try again.');
+        }
+
+        throw new Error(`Failed to create temporary quote: ${this.normalizeAuthError(error)}`);
       }
 
       console.log('Temporary quote created successfully with ID:', tempQuoteId);

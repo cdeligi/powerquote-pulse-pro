@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { BOMItem } from '@/types/product';
+import { Quote, QuotePriority, Currency, QuoteStatus } from '@/types/quote';
 import { 
   ShoppingCart, 
   FileText, 
@@ -41,6 +42,8 @@ interface EnhancedBOMDisplayProps {
   isDraftMode?: boolean;
   currentQuoteId?: string | null;
   draftName?: string | null;
+  quoteFields?: Record<string, any>;
+  quoteMetadata?: Partial<Quote> | null;
   discountPercentage?: number;
   discountJustification?: string;
   onDiscountChange?: (percentage: number, justification: string) => void;
@@ -60,6 +63,8 @@ export const EnhancedBOMDisplay = ({
   isDraftMode = false,
   currentQuoteId,
   draftName,
+  quoteFields,
+  quoteMetadata,
   discountPercentage = 0,
   discountJustification = '',
   onDiscountChange
@@ -225,6 +230,15 @@ export const EnhancedBOMDisplay = ({
     }).format(amount);
   };
 
+  const coalesce = <T,>(...values: Array<T | undefined | null>) => {
+    for (const value of values) {
+      if (value !== undefined && value !== null && value !== '') {
+        return value;
+      }
+    }
+    return undefined;
+  };
+
   const handleGeneratePDF = async (action: 'view' | 'download') => {
     if (bomItems.length === 0) {
       toast({
@@ -236,20 +250,115 @@ export const EnhancedBOMDisplay = ({
     }
 
     try {
-      // Create quote info object from current data
-      const quoteInfo = {
-        id: currentQuoteId || 'New Quote',
-        customer_name: draftName || 'Draft Quote',
-        oracle_customer_id: 'TBD',
-        priority: 'Medium' as 'High' | 'Medium' | 'Low' | 'Urgent',
-        is_rep_involved: false,
-        currency: 'USD' as 'USD' | 'EURO' | 'GBP' | 'CAD',
-        shipping_terms: 'TBD',
-        payment_terms: 'TBD'
+      const existingDraftFields = (quoteMetadata?.draft_bom as Record<string, any> | undefined)?.quoteFields;
+      const mergedQuoteFields: Record<string, any> = {
+        ...(existingDraftFields && typeof existingDraftFields === 'object' ? existingDraftFields : {}),
+        ...(quoteMetadata?.quote_fields && typeof quoteMetadata.quote_fields === 'object' ? quoteMetadata.quote_fields : {}),
+        ...(quoteFields && typeof quoteFields === 'object' ? quoteFields : {})
+      };
+
+      const normalizeKey = (value: string | undefined | null) => {
+        if (!value) return '';
+        return String(value).replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+      };
+
+      const createFieldResolver = (fields: Record<string, any>) => {
+        const normalizedMap = new Map<string, any>();
+        Object.entries(fields).forEach(([key, fieldValue]) => {
+          normalizedMap.set(normalizeKey(key), fieldValue);
+        });
+
+        return (...aliases: Array<string | undefined>) => {
+          for (const alias of aliases) {
+            if (!alias) continue;
+            const normalized = normalizeKey(alias);
+            if (normalized && normalizedMap.has(normalized)) {
+              return normalizedMap.get(normalized);
+            }
+          }
+          return undefined;
+        };
+      };
+
+      const resolveDraftField = createFieldResolver(mergedQuoteFields);
+
+      const status: QuoteStatus = isDraftMode
+        ? 'draft'
+        : (quoteMetadata?.status as QuoteStatus | undefined) || 'pending_approval';
+
+      const quoteId = coalesce(currentQuoteId, quoteMetadata?.id, 'New Quote') as string;
+      const customerName = coalesce(
+        quoteMetadata?.customer_name,
+        draftName,
+        resolveDraftField('customer_name', 'customerName', 'customer-name', 'customer'),
+        'Draft Quote'
+      ) as string;
+
+      const oracleCustomerId = coalesce(
+        quoteMetadata?.oracle_customer_id,
+        resolveDraftField('oracle_customer_id', 'oracleCustomerId', 'oracle-customer-id'),
+        'TBD'
+      ) as string;
+
+      const sfdcOpportunity = coalesce(
+        quoteMetadata?.sfdc_opportunity,
+        resolveDraftField('sfdc_opportunity', 'sfdcOpportunity', 'sfdc-opportunity'),
+        'TBD'
+      ) as string;
+
+      const priority = (coalesce(
+        quoteMetadata?.priority,
+        resolveDraftField('priority', 'quotePriority'),
+        'Medium'
+      ) || 'Medium') as QuotePriority;
+
+      const currency = (coalesce(
+        quoteMetadata?.currency,
+        resolveDraftField('currency', 'quoteCurrency'),
+        'USD'
+      ) || 'USD') as Currency;
+
+      const shippingTerms = coalesce(
+        quoteMetadata?.shipping_terms,
+        resolveDraftField('shipping_terms', 'shippingTerms', 'shipping-terms'),
+        'TBD'
+      ) as string;
+
+      const paymentTerms = coalesce(
+        quoteMetadata?.payment_terms,
+        resolveDraftField('payment_terms', 'paymentTerms', 'payment-terms'),
+        'TBD'
+      ) as string;
+
+      const isRepInvolved = Boolean(coalesce(
+        quoteMetadata?.is_rep_involved,
+        resolveDraftField('is_rep_involved', 'isRepInvolved', 'rep_involved', 'repInvolved'),
+        false
+      ));
+
+      const draftBomData = {
+        ...(quoteMetadata?.draft_bom || {}),
+        quoteFields: mergedQuoteFields
+      };
+
+      const quoteInfo: Partial<Quote> = {
+        ...quoteMetadata,
+        id: quoteId,
+        status,
+        customer_name: customerName,
+        oracle_customer_id: oracleCustomerId,
+        sfdc_opportunity: sfdcOpportunity,
+        priority,
+        is_rep_involved: isRepInvolved,
+        currency,
+        shipping_terms: shippingTerms,
+        payment_terms: paymentTerms,
+        quote_fields: mergedQuoteFields,
+        draft_bom: draftBomData
       };
 
       await generateQuotePDF(bomItems, quoteInfo, canSeePrices, action);
-      
+
       toast({
         title: 'PDF Generated',
         description: `Quote PDF ${action === 'view' ? 'opened' : 'ready to download'} successfully`,
@@ -271,9 +380,15 @@ export const EnhancedBOMDisplay = ({
           <CardTitle className="flex items-center gap-2 text-white">
             <ShoppingCart className="h-5 w-5" />
             Bill of Materials
-            {currentQuoteId && (
-              <Badge variant="outline" className="text-blue-400 border-blue-400 ml-2">
-                {isDraftMode && draftName ? draftName : currentQuoteId}
+            {(currentQuoteId || isDraftMode) && (
+              <Badge
+                variant="outline"
+                className="text-blue-400 border-blue-400 ml-2"
+                title={currentQuoteId || undefined}
+              >
+                {isDraftMode
+                  ? (draftName || 'Draft Quote')
+                  : (quoteMetadata?.customer_name || currentQuoteId)}
               </Badge>
             )}
           </CardTitle>

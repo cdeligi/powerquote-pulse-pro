@@ -1309,15 +1309,13 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
       // Import Level4Service dynamically to avoid circular imports
       const { Level4Service } = await import('@/services/level4Service');
       
-      // Verify user authentication
-      if (!user?.id) {
-        throw new Error('User authentication required for Level 4 configuration');
-      }
+      // Try to use the active user when available (the service will validate/fetch as needed)
+      const activeUserId = user?.id;
 
-      console.log('Setting up Level 4 config for user:', user.id);
+      console.log('Setting up Level 4 config for user:', activeUserId);
       
       // Create temporary quote and BOM item in database
-      const { bomItemId, tempQuoteId } = await Level4Service.createBOMItemForLevel4Config(newItem, user.id);
+      const { bomItemId, tempQuoteId } = await Level4Service.createBOMItemForLevel4Config(newItem, activeUserId);
       
       // Update the item with database ID
       const itemWithDbId: BOMItem = {
@@ -1335,9 +1333,32 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
       
     } catch (error) {
       console.error('Error setting up Level 4 configuration:', error);
+
+      const extractMessage = (err: unknown): string | undefined => {
+        if (!err) return undefined;
+        if (err instanceof Error) return err.message;
+        if (typeof err === 'object' && 'message' in err) {
+          return String((err as any).message);
+        }
+        return undefined;
+      };
+
+      let description = 'Failed to prepare Level 4 configuration. Please try again.';
+      const message = extractMessage(error);
+
+      if (message) {
+        if (/authenticated|sign\s*in|log\s*in/i.test(message)) {
+          description = 'You must be signed in to configure Level 4 options. Please log in and try again.';
+        } else if (/temporary quote already exists/i.test(message)) {
+          description = 'A previous Level 4 session is still active. Close any open configurators and try again.';
+        } else {
+          description = message;
+        }
+      }
+
       toast({
         title: 'Error',
-        description: 'Failed to prepare Level 4 configuration. Please try again.',
+        description,
         variant: 'destructive',
       });
     } finally {
@@ -2466,6 +2487,8 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
               isDraftMode={isDraftMode}
               currentQuoteId={currentQuoteId}
               draftName={currentQuote?.status === 'draft' ? currentQuote?.customer_name : null}
+              quoteFields={quoteFields}
+              quoteMetadata={currentQuote}
               discountPercentage={discountPercentage}
               discountJustification={discountJustification}
               onDiscountChange={(percentage, justification) => {

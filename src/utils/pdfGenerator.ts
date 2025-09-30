@@ -76,7 +76,26 @@ export const generateQuotePDF = async (
       ? quoteInfo.quote_fields
       : {}),
   };
-  const combinedFieldKeys = Object.keys(combinedQuoteFields);
+  const normalizeFieldKey = (value: string | undefined | null) => {
+    if (!value) return '';
+    return String(value).replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+  };
+
+  const combinedFieldLookup = new Map<string, any>();
+  Object.entries(combinedQuoteFields).forEach(([key, value]) => {
+    combinedFieldLookup.set(normalizeFieldKey(key), value);
+  });
+
+  const resolveCombinedField = (...aliases: Array<string | undefined>) => {
+    for (const alias of aliases) {
+      if (!alias) continue;
+      const normalized = normalizeFieldKey(alias);
+      if (normalized && combinedFieldLookup.has(normalized)) {
+        return combinedFieldLookup.get(normalized);
+      }
+    }
+    return undefined;
+  };
 
   const rackLayoutFallbackMap = new Map<string, any>();
   if (Array.isArray(quoteInfo?.draft_bom?.rackLayouts)) {
@@ -348,19 +367,15 @@ export const generateQuotePDF = async (
         ${quoteFieldsForPDF.map(field => {
           let value: any = 'Not specified';
 
-          if (combinedFieldKeys.length > 0) {
-            const candidates = [
-              combinedQuoteFields[field.id],
-              combinedQuoteFields[field.id?.replace(/-/g, '_')],
-              combinedQuoteFields[field.id?.replace(/_/g, '-')],
-              combinedQuoteFields[field.id?.toLowerCase?.() ?? field.id],
-              combinedQuoteFields[field.label],
-            ];
+          const resolvedValue = resolveCombinedField(
+            field.id,
+            field.id?.replace(/[_\-]/g, ''),
+            field.label,
+            field.label?.replace(/\s+/g, ''),
+          );
 
-            const found = candidates.find(candidate => candidate !== undefined && candidate !== null && candidate !== '');
-            if (found !== undefined) {
-              value = found;
-            }
+          if (resolvedValue !== undefined && resolvedValue !== null && resolvedValue !== '') {
+            value = resolvedValue;
           }
 
           if (value && typeof value === 'object') {
