@@ -2466,6 +2466,8 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
               isDraftMode={isDraftMode}
               currentQuoteId={currentQuoteId}
               draftName={currentQuote?.status === 'draft' ? currentQuote?.customer_name : null}
+              quoteFields={quoteFields}
+              quoteMetadata={currentQuote}
               discountPercentage={discountPercentage}
               discountJustification={discountJustification}
               onDiscountChange={(percentage, justification) => {
