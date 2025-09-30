@@ -126,8 +126,8 @@ export const generateQuotePDF = async (
 
       ${isDraft ? `
         <div class="draft-warning">
-          <strong>⚠️ DRAFT QUOTE - BUDGETARY PURPOSES ONLY</strong>
-          <p style="margin: 5px 0 0 0;">Draft is a budgetary quote. To allow PO generation, please request a formal offer with final configuration.</p>
+          <strong>⚠️ DRAFT</strong>
+          <p style="margin: 5px 0 0 0;">Draft is a budgetary quote, to allow PO generation, please request a formal offer with final configuration.</p>
         </div>
       ` : ''}
 
@@ -152,27 +152,38 @@ export const generateQuotePDF = async (
         
         <!-- Dynamic PDF Fields -->
         ${quoteFieldsForPDF.map(field => {
-          // Try multiple ways to access the field value with comprehensive fallbacks
           let value = 'Not specified';
+          
           if (quoteInfo.quote_fields && typeof quoteInfo.quote_fields === 'object') {
-            // Try exact field ID match first
-            value = quoteInfo.quote_fields[field.id] || 
-                    // Try camelCase version
-                    quoteInfo.quote_fields[field.id.replace(/-([a-z])/g, (g) => g[1].toUpperCase())] ||
-                    // Try with underscores
-                    quoteInfo.quote_fields[field.id.replace(/-/g, '_')] ||
-                    // Try label match
-                    quoteInfo.quote_fields[field.label] ||
-                    // Try lowercase
-                    quoteInfo.quote_fields[field.id.toLowerCase()] ||
-                    'Not specified';
+            // Debug: Log the field we're trying to match
+            console.log(`Looking for field '${field.id}' in quote_fields:`, Object.keys(quoteInfo.quote_fields));
+            
+            // Try exact field ID match first (this is most reliable)
+            if (field.id in quoteInfo.quote_fields) {
+              value = quoteInfo.quote_fields[field.id];
+            }
+            // If not found, try common variations
+            else {
+              const fieldValue = quoteInfo.quote_fields[field.id] ||
+                                quoteInfo.quote_fields[field.id.replace(/-/g, '_')] ||
+                                quoteInfo.quote_fields[field.id.replace(/_/g, '-')] ||
+                                quoteInfo.quote_fields[field.id.toLowerCase()] ||
+                                quoteInfo.quote_fields[field.label];
+              if (fieldValue !== undefined && fieldValue !== null) {
+                value = fieldValue;
+              }
+            }
           }
           
-          // Format value properly (handle objects, arrays, etc.)
-          if (typeof value === 'object' && value !== null) {
+          // Format value based on type
+          if (value && typeof value === 'object') {
+            // If it's an array or object, stringify it
             value = JSON.stringify(value);
-          } else if (value === null || value === undefined) {
+          } else if (value === null || value === undefined || value === '') {
             value = 'Not specified';
+          } else {
+            // Convert to string and escape HTML
+            value = String(value).replace(/</g, '&lt;').replace(/>/g, '&gt;');
           }
           
           return `
@@ -261,28 +272,54 @@ export const generateQuotePDF = async (
               <h3 style="color: #dc2626; margin-top: 0;">${chassisItem.product.name} - ${chassisItem.partNumber || 'TBD'}</h3>
               <div style="margin-top: 15px;">`;
           
-          if (config.slots && Array.isArray(config.slots)) {
-            rackConfigHTML += '<table style="width: 100%; border-collapse: collapse; margin-top: 10px;">';
-            rackConfigHTML += '<thead><tr style="background: #e5e7eb;"><th style="padding: 8px; border: 1px solid #d1d5db; text-align: left;">Slot</th><th style="padding: 8px; border: 1px solid #d1d5db; text-align: left;">Card Type</th><th style="padding: 8px; border: 1px solid #d1d5db; text-align: left;">Part Number</th></tr></thead>';
+          // Display rack configuration as a proper table
+          if (config.slots && Array.isArray(config.slots) && config.slots.length > 0) {
+            rackConfigHTML += '<table style="width: 100%; border-collapse: collapse; margin-top: 10px; background: white;">';
+            rackConfigHTML += '<thead><tr style="background: #dc2626; color: white;"><th style="padding: 10px; border: 1px solid #ddd; text-align: left;">Slot</th><th style="padding: 10px; border: 1px solid #ddd; text-align: left;">Card Type</th><th style="padding: 10px; border: 1px solid #ddd; text-align: left;">Part Number</th></tr></thead>';
             rackConfigHTML += '<tbody>';
             
-            config.slots.forEach((slot: any) => {
-              const slotNumber = slot.slot || slot.slotNumber || 'N/A';
-              const cardName = slot.cardName || slot.product?.name || 'Empty';
-              const partNumber = slot.partNumber || slot.product?.partNumber || '-';
+            config.slots.forEach((slot: any, idx: number) => {
+              const slotNumber = slot.slot || slot.slotNumber || slot.position || (idx + 1);
+              const cardName = slot.cardName || slot.name || slot.product?.name || 'Empty';
+              const partNumber = slot.partNumber || slot.part_number || slot.product?.partNumber || slot.product?.part_number || '-';
               
+              const rowStyle = idx % 2 === 0 ? 'background: #f9fafb;' : 'background: white;';
               rackConfigHTML += `
-                <tr>
-                  <td style="padding: 8px; border: 1px solid #d1d5db;">${slotNumber}</td>
-                  <td style="padding: 8px; border: 1px solid #d1d5db;">${cardName}</td>
-                  <td style="padding: 8px; border: 1px solid #d1d5db; font-family: monospace;">${partNumber}</td>
+                <tr style="${rowStyle}">
+                  <td style="padding: 10px; border: 1px solid #ddd; font-weight: 600;">Slot ${slotNumber}</td>
+                  <td style="padding: 10px; border: 1px solid #ddd;">${cardName}</td>
+                  <td style="padding: 10px; border: 1px solid #ddd; font-family: 'Courier New', monospace; font-size: 13px;">${partNumber}</td>
                 </tr>`;
             });
             
             rackConfigHTML += '</tbody></table>';
+          } else if (config.slotAssignments && typeof config.slotAssignments === 'object') {
+            // Alternative format: slotAssignments object
+            rackConfigHTML += '<table style="width: 100%; border-collapse: collapse; margin-top: 10px; background: white;">';
+            rackConfigHTML += '<thead><tr style="background: #dc2626; color: white;"><th style="padding: 10px; border: 1px solid #ddd; text-align: left;">Slot</th><th style="padding: 10px; border: 1px solid #ddd; text-align: left;">Card Type</th><th style="padding: 10px; border: 1px solid #ddd; text-align: left;">Part Number</th></tr></thead>';
+            rackConfigHTML += '<tbody>';
+            
+            let idx = 0;
+            Object.entries(config.slotAssignments).forEach(([slotNum, cardData]: [string, any]) => {
+              if (cardData) {
+                const rowStyle = idx % 2 === 0 ? 'background: #f9fafb;' : 'background: white;';
+                const cardName = cardData.name || cardData.displayName || 'Unnamed Card';
+                const partNumber = cardData.partNumber || cardData.part_number || '-';
+                
+                rackConfigHTML += `
+                  <tr style="${rowStyle}">
+                    <td style="padding: 10px; border: 1px solid #ddd; font-weight: 600;">Slot ${slotNum}</td>
+                    <td style="padding: 10px; border: 1px solid #ddd;">${cardName}</td>
+                    <td style="padding: 10px; border: 1px solid #ddd; font-family: 'Courier New', monospace; font-size: 13px;">${partNumber}</td>
+                  </tr>`;
+                idx++;
+              }
+            });
+            
+            rackConfigHTML += '</tbody></table>';
           } else {
-            // Fallback display if slots array is not available
-            rackConfigHTML += '<pre style="white-space: pre-wrap; font-family: monospace; font-size: 11px; background: white; padding: 10px; border-radius: 4px; overflow-x: auto;">' + JSON.stringify(config, null, 2) + '</pre>';
+            // Fallback: No rack configuration data found
+            rackConfigHTML += '<p style="color: #666; font-style: italic; padding: 15px; background: white; border-radius: 4px;">No rack configuration data available</p>';
           }
           
           rackConfigHTML += '</div></div>';
@@ -326,45 +363,83 @@ export const generateQuotePDF = async (
               <h3 style="color: #dc2626; margin-top: 0; font-size: 16px;">${item.product.name}${slotInfo}</h3>
               <div style="margin-top: 15px; padding-left: 15px;">`;
           
-          if (Array.isArray(config.entries) && config.entries.length > 0) {
+          // Cast to any for dynamic data handling in PDF generation
+          const configData = config as any;
+          
+          if (Array.isArray(configData.entries) && configData.entries.length > 0) {
             // Display entries in a formatted table
-            level4HTML += '<table style="width: 100%; border-collapse: collapse; margin-top: 10px; background: white;">';
-            level4HTML += '<thead><tr style="background: #e5e7eb;"><th style="padding: 8px; border: 1px solid #d1d5db; text-align: left;">Input</th><th style="padding: 8px; border: 1px solid #d1d5db; text-align: left;">Configuration</th></tr></thead>';
+            level4HTML += '<table style="width: 100%; border-collapse: collapse; margin-top: 10px; background: white; border: 1px solid #ddd;">';
+            level4HTML += '<thead><tr style="background: #dc2626; color: white;"><th style="padding: 10px; border: 1px solid #ddd; text-align: left; width: 30%;">Input</th><th style="padding: 10px; border: 1px solid #ddd; text-align: left;">Configuration</th></tr></thead>';
             level4HTML += '<tbody>';
             
-            config.entries.forEach((entry: any, entryIdx: number) => {
+            configData.entries.forEach((entry: any, entryIdx: number) => {
               const inputLabel = `Input #${entryIdx + 1}`;
-              const value = entry.label || entry.value || 'Not configured';
+              // Try to get the label from the entry or look it up from options
+              let displayValue = entry.label || entry.name || 'Not configured';
               
+              // If we only have a value ID, try to find the label from the config options
+              if (!entry.label && entry.value && configData.options) {
+                const option = configData.options.find((opt: any) => opt.id === entry.value || opt.value === entry.value);
+                if (option) {
+                  displayValue = option.label || option.name || entry.value;
+                }
+              } else if (!entry.label && entry.value) {
+                displayValue = entry.value;
+              }
+              
+              const rowStyle = entryIdx % 2 === 0 ? 'background: #f9fafb;' : 'background: white;';
               level4HTML += `
-                <tr>
-                  <td style="padding: 8px; border: 1px solid #d1d5db; font-weight: 600;">${inputLabel}</td>
-                  <td style="padding: 8px; border: 1px solid #d1d5db;">${value}</td>
+                <tr style="${rowStyle}">
+                  <td style="padding: 10px; border: 1px solid #ddd; font-weight: 600;">${inputLabel}</td>
+                  <td style="padding: 10px; border: 1px solid #ddd;">${displayValue}</td>
                 </tr>`;
             });
             
             level4HTML += '</tbody></table>';
-          } else if (typeof config === 'object' && Object.keys(config).length > 0) {
-            // Display as key-value pairs
-            level4HTML += '<table style="width: 100%; border-collapse: collapse; margin-top: 10px; background: white;">';
+          } else if (configData.selections && Array.isArray(configData.selections)) {
+            // Alternative format: selections array
+            level4HTML += '<table style="width: 100%; border-collapse: collapse; margin-top: 10px; background: white; border: 1px solid #ddd;">';
+            level4HTML += '<thead><tr style="background: #dc2626; color: white;"><th style="padding: 10px; border: 1px solid #ddd; text-align: left; width: 30%;">Input</th><th style="padding: 10px; border: 1px solid #ddd; text-align: left;">Configuration</th></tr></thead>';
             level4HTML += '<tbody>';
             
-            Object.entries(config).forEach(([key, value]) => {
-              if (key !== 'entries' && key !== 'id' && key !== 'level4_config_id') {
+            configData.selections.forEach((selection: any, idx: number) => {
+              const inputLabel = `Input #${idx + 1}`;
+              const displayValue = selection.label || selection.name || selection.value || 'Not configured';
+              const rowStyle = idx % 2 === 0 ? 'background: #f9fafb;' : 'background: white;';
+              
+              level4HTML += `
+                <tr style="${rowStyle}">
+                  <td style="padding: 10px; border: 1px solid #ddd; font-weight: 600;">${inputLabel}</td>
+                  <td style="padding: 10px; border: 1px solid #ddd;">${displayValue}</td>
+                </tr>`;
+            });
+            
+            level4HTML += '</tbody></table>';
+          } else if (typeof configData === 'object' && Object.keys(configData).length > 0) {
+            // Display as key-value pairs
+            level4HTML += '<table style="width: 100%; border-collapse: collapse; margin-top: 10px; background: white; border: 1px solid #ddd;">';
+            level4HTML += '<thead><tr style="background: #dc2626; color: white;"><th style="padding: 10px; border: 1px solid #ddd; text-align: left; width: 30%;">Property</th><th style="padding: 10px; border: 1px solid #ddd; text-align: left;">Value</th></tr></thead>';
+            level4HTML += '<tbody>';
+            
+            let idx = 0;
+            Object.entries(configData).forEach(([key, value]) => {
+              if (key !== 'id' && key !== 'level4_config_id' && key !== 'bom_item_id' && key !== 'created_at' && key !== 'updated_at') {
                 const displayKey = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-                const displayValue = typeof value === 'object' ? JSON.stringify(value) : value;
+                const displayValue = typeof value === 'object' ? JSON.stringify(value, null, 2) : String(value);
+                const rowStyle = idx % 2 === 0 ? 'background: #f9fafb;' : 'background: white;';
                 
                 level4HTML += `
-                  <tr>
-                    <td style="padding: 8px; border: 1px solid #d1d5db; font-weight: 600; width: 30%;">${displayKey}:</td>
-                    <td style="padding: 8px; border: 1px solid #d1d5db;">${displayValue}</td>
+                  <tr style="${rowStyle}">
+                    <td style="padding: 10px; border: 1px solid #ddd; font-weight: 600;">${displayKey}</td>
+                    <td style="padding: 10px; border: 1px solid #ddd; white-space: pre-wrap; font-family: 'Courier New', monospace; font-size: 12px;">${displayValue}</td>
                   </tr>`;
+                idx++;
               }
             });
             
             level4HTML += '</tbody></table>';
           } else {
-            level4HTML += '<p style="color: #666; font-style: italic;">No configuration details available</p>';
+            level4HTML += '<p style="color: #666; font-style: italic; padding: 15px; background: white; border-radius: 4px;">No configuration details available</p>';
           }
           
           level4HTML += '</div></div>';
