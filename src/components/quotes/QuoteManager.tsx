@@ -11,6 +11,11 @@ import { useQuotes } from "@/hooks/useQuotes";
 import { toast } from "@/hooks/use-toast";
 import { QuoteShareDialog } from './QuoteShareDialog';
 import { supabase } from "@/integrations/supabase/client";
+import {
+  deserializeSlotAssignments,
+  buildRackLayoutFromAssignments,
+  type SerializedSlotAssignment,
+} from '@/utils/slotAssignmentUtils';
 
 interface QuoteManagerProps {
   user: User;
@@ -193,36 +198,69 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
       
       // Get BOM items
       if (fullQuote.status === 'draft' && fullQuote.draft_bom?.items) {
-        bomItems = fullQuote.draft_bom.items.map((item: any) => ({
-          id: item.id || crypto.randomUUID(),
-          product: {
-            name: item.name || item.product?.name || 'Unknown Product',
-            description: item.description || item.product?.description || '',
-            price: item.unit_price || item.product?.price || 0
-          },
-          quantity: item.quantity || 1,
-          enabled: item.enabled !== false,
-          partNumber: item.partNumber || item.part_number || 'TBD'
-        }));
+        bomItems = fullQuote.draft_bom.items.map((item: any) => {
+          const productPrice = item.unit_price || item.product?.price || 0;
+          const storedSlotAssignments = item.slotAssignments as SerializedSlotAssignment[] | undefined;
+          const slotAssignments = deserializeSlotAssignments(storedSlotAssignments);
+          const rackLayout = item.rackConfiguration || buildRackLayoutFromAssignments(storedSlotAssignments);
+
+          return {
+            id: item.id || crypto.randomUUID(),
+            product: {
+              name: item.name || item.product?.name || 'Unknown Product',
+              description: item.description || item.product?.description || '',
+              price: productPrice
+            },
+            quantity: item.quantity || 1,
+            enabled: item.enabled !== false,
+            partNumber: item.partNumber || item.part_number || 'TBD',
+            slotAssignments,
+            rackConfiguration: rackLayout,
+            level4Config: item.level4Config || null,
+            level4Selections: item.level4Selections || null,
+          };
+        });
       } else {
         const { data: bomData, error: bomError } = await supabase
           .from('bom_items')
-          .select('*')
+          .select(`
+            *,
+            bom_level4_values (
+              id,
+              level4_config_id,
+              entries
+            )
+          `)
           .eq('quote_id', quote.id);
-          
+
         if (bomError) throw bomError;
-        
-        bomItems = (bomData || []).map(item => ({
-          id: item.id,
-          product: {
-            name: item.name,
-            description: item.description || '',
-            price: item.unit_price
-          },
-          quantity: item.quantity,
-          enabled: true,
-          partNumber: item.part_number || 'TBD'
-        }));
+
+        bomItems = (bomData || []).map(item => {
+          const configData = item.configuration_data || {};
+          const storedSlotAssignments = configData.slotAssignments as SerializedSlotAssignment[] | undefined;
+          const slotAssignments = deserializeSlotAssignments(storedSlotAssignments);
+          const rackLayout = configData.rackConfiguration || buildRackLayoutFromAssignments(storedSlotAssignments);
+
+          const relationLevel4 = Array.isArray(item.bom_level4_values) && item.bom_level4_values.length > 0
+            ? { entries: item.bom_level4_values[0].entries }
+            : null;
+
+          return {
+            id: item.id,
+            product: {
+              name: item.name,
+              description: item.description || '',
+              price: item.unit_price
+            },
+            quantity: item.quantity,
+            enabled: true,
+            partNumber: item.part_number || 'TBD',
+            slotAssignments,
+            rackConfiguration: rackLayout,
+            level4Config: configData.level4Config || relationLevel4,
+            level4Selections: configData.level4Selections || null,
+          };
+        });
       }
 
       // Import and use the PDF generator
@@ -458,7 +496,7 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
                     <div>
                       <div className="flex items-center space-x-3">
                         <span className="text-white font-medium">
-                          {quote.status === 'draft' ? quote.customer : quote.id}
+                          {quote.status === 'draft' ? 'Draft' : quote.id}
                         </span>
                         <Badge className={`${statusBadge.color} text-white`}>
                           {statusBadge.text}
