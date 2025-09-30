@@ -18,6 +18,8 @@ interface Level4SaveOptions {
   bomItemData?: (BOMItem & { tempQuoteId?: string });
 }
 
+const TEMPORARY_QUOTE_STATUS: 'draft' | 'pending_approval' = 'draft';
+
 export class Level4Service {
   // Track active Level 4 sessions to prevent premature cleanup
   private static activeSessions = new Map<string, { timestamp: number; bomItemId: string }>();
@@ -250,7 +252,7 @@ export class Level4Service {
         customer_name: 'Temporary Level 4 Configuration',
         oracle_customer_id: 'TEMP',
         sfdc_opportunity: 'TEMP',
-        status: 'pending',
+        status: TEMPORARY_QUOTE_STATUS,
         original_quote_value: 0,
         requested_discount: 0,
         discounted_value: 0,
@@ -482,6 +484,14 @@ export class Level4Service {
       if (!quote) {
         console.warn('Associated quote not found:', bomItem.quote_id);
         return { exists: true, accessible: false, quote_id: bomItem.quote_id };
+      }
+
+      if (bomItem.quote_id.startsWith('TEMP-L4-') && quote.status !== TEMPORARY_QUOTE_STATUS) {
+        console.warn('Temporary Level 4 quote has unexpected status:', {
+          quoteId: bomItem.quote_id,
+          expectedStatus: TEMPORARY_QUOTE_STATUS,
+          actualStatus: quote.status
+        });
       }
 
       console.log('BOM item validation successful:', { bomItemId, quote_id: bomItem.quote_id, status: quote.status });
