@@ -351,23 +351,47 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
       // Check if this is a draft with data in draft_bom field
       if (quote.status === 'draft' && quote.draft_bom && quote.draft_bom.items && Array.isArray(quote.draft_bom.items)) {
         console.log('Loading BOM data from draft_bom field');
-        loadedItems = quote.draft_bom.items.map((item: any) => ({
-          id: item.id || crypto.randomUUID(),
-          product: item.product || {
-            id: item.productId || item.product_id,
-            name: item.name || item.product?.name,
-            partNumber: item.partNumber || item.product?.partNumber,
-            price: item.product?.price || 0,
-            cost: item.product?.cost || 0,
-            description: item.product?.description || ''
-          },
-          quantity: item.quantity || 1,
-          enabled: item.enabled !== false,
-          partNumber: item.partNumber || item.product?.partNumber,
-          level4Values: item.level4Values || [],
-          original_unit_price: item.original_unit_price || item.product?.price || 0,
-          approved_unit_price: item.approved_unit_price || item.product?.price || 0,
-          priceHistory: item.priceHistory || []
+        loadedItems = await Promise.all(quote.draft_bom.items.map(async (item: any) => {
+          // Use stored values from draft_bom, fallback to unit_price/unit_cost, then fetch if needed
+          let price = item.product?.price || item.unit_price || 0;
+          let cost = item.product?.cost || item.unit_cost || 0;
+          
+          // If price or cost is 0, fetch fresh product data
+          if ((price === 0 || cost === 0) && (item.productId || item.product_id)) {
+            try {
+              const { data: productData } = await supabase
+                .from('products')
+                .select('price, cost')
+                .eq('id', item.productId || item.product_id)
+                .single();
+              
+              if (productData) {
+                if (price === 0) price = productData.price || 0;
+                if (cost === 0) cost = productData.cost || 0;
+              }
+            } catch (error) {
+              console.warn('Failed to fetch product pricing:', error);
+            }
+          }
+          
+          return {
+            id: item.id || crypto.randomUUID(),
+            product: {
+              id: item.productId || item.product_id || item.product?.id,
+              name: item.name || item.product?.name,
+              partNumber: item.partNumber || item.part_number || item.product?.partNumber,
+              price,
+              cost,
+              description: item.description || item.product?.description || ''
+            },
+            quantity: item.quantity || 1,
+            enabled: item.enabled !== false,
+            partNumber: item.partNumber || item.part_number || item.product?.partNumber,
+            level4Values: item.level4Values || [],
+            original_unit_price: item.original_unit_price || price,
+            approved_unit_price: item.approved_unit_price || price,
+            priceHistory: item.priceHistory || []
+          };
         }));
         
         console.log(`Loaded ${loadedItems.length} items from draft_bom`);
@@ -623,24 +647,38 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
         sum + ((item.product.cost || 0) * item.quantity), 0
       );
       
-      // Prepare draft BOM data
+      // Validate and prepare draft BOM data
       const draftBomData = {
-        items: bomItems.map(item => ({
-          product_id: item.product.id,
-          name: item.product.name,
-          description: item.product.description,
-          part_number: item.partNumber || item.product.partNumber,
-          quantity: item.quantity,
-          unit_price: item.product.price,
-          unit_cost: item.product.cost || 0,
-          total_price: item.product.price * item.quantity,
-          total_cost: (item.product.cost || 0) * item.quantity,
-          margin: item.product.cost && item.product.cost > 0 
-            ? ((item.product.price - item.product.cost) / item.product.price) * 100 
-            : 100,
-          configuration_data: item.product,
-          product_type: 'standard'
-        })),
+        items: bomItems.map(item => {
+          const price = item.product.price || 0;
+          const cost = item.product.cost || 0;
+          
+          // Log warning if prices are missing
+          if (price === 0) {
+            console.warn(`Item ${item.product.name} has 0 price - this may cause issues`);
+          }
+          
+          return {
+            product_id: item.product.id,
+            name: item.product.name,
+            description: item.product.description,
+            part_number: item.partNumber || item.product.partNumber,
+            quantity: item.quantity,
+            unit_price: price,
+            unit_cost: cost,
+            total_price: price * item.quantity,
+            total_cost: cost * item.quantity,
+            margin: cost > 0 
+              ? ((price - cost) / price) * 100 
+              : 100,
+            configuration_data: {
+              ...item.product,
+              price,
+              cost
+            },
+            product_type: 'standard'
+          };
+        }),
         quoteFields,
         discountPercentage,
         discountJustification,
