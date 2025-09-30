@@ -74,7 +74,7 @@ export const generateQuotePDF = async (
   expiryDate.setDate(expiryDate.getDate() + expiresDays);
 
   // Determine quote ID display
-  const isDraft = quoteInfo.id?.includes('Draft');
+  const isDraft = quoteInfo.status === 'draft';
   const quoteIdDisplay = isDraft ? 'DRAFT' : quoteInfo.id || 'New Quote';
 
   const htmlContent = `

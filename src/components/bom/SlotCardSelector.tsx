@@ -48,6 +48,7 @@ const SlotCardSelector = ({
           type: product.type,
           description: product.description,
           price: product.price,
+          cost: product.cost || 0, // Include cost
           enabled: product.enabled,
           slotRequirement: product.specifications?.slotRequirement || 1,
           compatibleChassis: product.specifications?.compatibleChassis || [chassis.type],

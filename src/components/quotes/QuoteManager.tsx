@@ -34,7 +34,8 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
 
   // Filter and process quotes with real BOM item counts
   const processedQuotes = quotes.map(quote => ({
-    id: quote.id,
+    id: quote.status === 'draft' ? 'Draft' : quote.id,
+    displayId: quote.id, // Keep original ID for operations
     customer: quote.customer_name || 'Unnamed Customer',
     oracleCustomerId: quote.oracle_customer_id || 'N/A',
     // Calculate values from draft_bom for draft quotes, use stored values for others
@@ -176,11 +177,14 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
 
   const handleViewPDF = async (quote: any) => {
     try {
+      // Use displayId which contains the actual database ID
+      const actualQuoteId = quote.displayId || quote.id;
+      
       // Get the actual quote data for PDF generation
       const { data: fullQuote, error } = await supabase
         .from('quotes')
         .select('*')
-        .eq('id', quote.id)
+        .eq('id', actualQuoteId)
         .single();
 
       if (error) throw error;
@@ -246,10 +250,12 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
   };
 
   const handleViewQuote = async (quote: any) => {
-    console.log('Opening quote:', quote.id, 'with status:', quote.status);
+    // Use displayId which contains the actual database ID
+    const actualQuoteId = quote.displayId || quote.id;
+    console.log('Opening quote:', actualQuoteId, 'with status:', quote.status);
     
     // Set loading state for this quote
-    setLoadingOperations(prev => ({ ...prev, [quote.id]: true }));
+    setLoadingOperations(prev => ({ ...prev, [actualQuoteId]: true }));
     
     toast({
       title: "Opening Quote",
@@ -263,14 +269,14 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
       // All quotes open in BOM Builder mode for viewing/editing
       if (quote.status === 'draft') {
         // Draft quotes open in edit mode
-        navigate(`/bom-edit/${quote.id}`);
+        navigate(`/bom-edit/${actualQuoteId}`);
       } else {
         // Non-draft quotes also open in BOM Builder for viewing
-        navigate(`/bom-edit/${quote.id}`);
+        navigate(`/bom-edit/${actualQuoteId}`);
       }
     } finally {
       // Clear loading state
-      setLoadingOperations(prev => ({ ...prev, [quote.id]: false }));
+      setLoadingOperations(prev => ({ ...prev, [actualQuoteId]: false }));
     }
   };
 
@@ -285,9 +291,12 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
     }
 
     try {
+      // Use displayId which contains the actual database ID
+      const actualQuoteId = quote.displayId || quote.id;
+      
       const { data: newQuoteId, error } = await supabase
         .rpc('clone_quote', {
-          source_quote_id: quote.id,
+          source_quote_id: actualQuoteId,
           new_user_id: user.id
         });
 
