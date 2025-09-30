@@ -512,18 +512,18 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
                          {loadingOperations[quote.id] ? 'Loading...' : 'View'}
                        </span>
                      </Button>
-                     {quote.status === 'draft' && (
-                       <Button
-                         variant="ghost"
-                         size="sm"
-                         className="text-red-400 hover:text-red-300 hover:bg-gray-700"
-                         onClick={() => handleDeleteQuote(quote.id)}
-                         title="Delete Draft"
-                       >
-                         <Trash className="h-4 w-4" />
-                         <span className="text-xs ml-1">Delete</span>
-                       </Button>
-                     )}
+                      {quote.status === 'draft' && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-red-400 hover:text-red-300 hover:bg-gray-700"
+                          onClick={() => handleDeleteQuote(quote.displayId)}
+                          title="Delete Draft"
+                        >
+                          <Trash className="h-4 w-4" />
+                          <span className="text-xs ml-1">Delete</span>
+                        </Button>
+                      )}
                      {quote.status !== 'draft' && (
                        <Button
                          variant="ghost"

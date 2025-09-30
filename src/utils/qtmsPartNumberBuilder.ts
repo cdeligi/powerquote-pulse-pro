@@ -75,8 +75,8 @@ export function buildQTMSPartNumber(params: PartNumberBuildParams): string {
     }
 
     const slotsStr = slotsArr.join('');
-    const remoteCode = hasRemoteDisplay ? (cfg.remote_on_code ?? 'D1') : (cfg.remote_off_code ?? '0');
-    const suffix = includeSuffix ? `${cfg.suffix_separator || '-'}${remoteCode}` : '';
+    // Only add suffix if remote display is enabled
+    const suffix = includeSuffix && hasRemoteDisplay ? `${cfg.suffix_separator || '-'}${cfg.remote_on_code ?? 'D1'}` : '';
 
     return `${cfg.prefix}${slotsStr}${suffix}`;
   } catch (e) {

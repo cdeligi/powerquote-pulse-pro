@@ -152,7 +152,15 @@ export const generateQuotePDF = async (
         
         <!-- Dynamic PDF Fields -->
         ${quoteFieldsForPDF.map(field => {
-          const value = quoteInfo.quote_fields?.[field.id] || 'Not specified';
+          // Try multiple ways to access the field value
+          let value = 'Not specified';
+          if (quoteInfo.quote_fields) {
+            // Try by field.id, field.label, or from direct property
+            value = quoteInfo.quote_fields[field.id] || 
+                    quoteInfo.quote_fields[field.label] || 
+                    quoteInfo.quote_fields[field.id.toLowerCase()] ||
+                    'Not specified';
+          }
           return `
             <div class="field-row">
               <div class="field-label">${field.label}:</div>
@@ -194,28 +202,59 @@ export const generateQuotePDF = async (
             <th>Description</th>
             <th>Part Number</th>
             <th>Qty</th>
-            <th>Slot</th>
             ${canSeePrices ? '<th>Unit Price</th><th>Total</th>' : ''}
           </tr>
         </thead>
         <tbody>
           ${bomItems
             .filter(item => item.enabled)
-            .map(item => `
-              <tr>
-                <td>${item.product.name}</td>
-                <td>${item.product.description}</td>
-                <td>${item.partNumber || 'TBD'}</td>
-                <td>${item.quantity}</td>
-                <td>${item.slot || 'N/A'}</td>
-                ${canSeePrices ? `
-                  <td>$${item.product.price.toLocaleString()}</td>
-                  <td>$${(item.product.price * item.quantity).toLocaleString()}</td>
-                ` : ''}
-              </tr>
-            `).join('')}
+            .map((item, index) => {
+              const itemRow = `
+                <tr>
+                  <td>${item.product.name}</td>
+                  <td>${item.product.description}</td>
+                  <td>${item.partNumber || 'TBD'}</td>
+                  <td>${item.quantity}</td>
+                  ${canSeePrices ? `
+                    <td>$${item.product.price.toLocaleString()}</td>
+                    <td>$${(item.product.price * item.quantity).toLocaleString()}</td>
+                  ` : ''}
+                </tr>`;
+              
+              // Add Level 4 configuration details if present
+              let configRows = '';
+              if (item.level4Config) {
+                const slotInfo = item.slot ? ` - Slot ${item.slot}` : '';
+                const configData = typeof item.level4Config === 'object' && !Array.isArray(item.level4Config) 
+                  ? item.level4Config 
+                  : {};
+                
+                if (Object.keys(configData).length > 0) {
+                  configRows = `
+                    <tr style="background-color: #f9fafb;">
+                      <td colspan="${canSeePrices ? '5' : '3'}" style="padding-left: 30px; font-size: 0.9em; color: #666;">
+                        <strong>${item.product.name}${slotInfo} Configuration:</strong><br/>
+                        ${Object.entries(configData)
+                          .map(([key, value]) => `${key}: ${typeof value === 'object' ? JSON.stringify(value) : value}`)
+                          .join('<br/>')}
+                      </td>
+                    </tr>`;
+                }
+              }
+              
+              return itemRow + configRows;
+            }).join('')}
         </tbody>
       </table>
+
+      ${quoteInfo.draft_bom?.rackConfiguration ? `
+        <div style="margin-top: 30px; margin-bottom: 30px;">
+          <h3>Rack Configuration Layout</h3>
+          <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; border: 1px solid #ddd;">
+            <pre style="white-space: pre-wrap; font-family: monospace; font-size: 12px;">${JSON.stringify(quoteInfo.draft_bom.rackConfiguration, null, 2)}</pre>
+          </div>
+        </div>
+      ` : ''}
 
       ${canSeePrices ? `
         <div class="total-section">
