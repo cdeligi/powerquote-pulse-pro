@@ -127,7 +127,7 @@ export const generateQuotePDF = async (
       ${isDraft ? `
         <div class="draft-warning">
           <strong>⚠️ DRAFT QUOTE - BUDGETARY PURPOSES ONLY</strong>
-          <p style="margin: 5px 0 0 0;">This is a budgetary quote. To place an order, make sure you have a valid and final quote with a Quotation ID.</p>
+          <p style="margin: 5px 0 0 0;">Draft is a budgetary quote. To allow PO generation, please request a formal offer with final configuration.</p>
         </div>
       ` : ''}
 
@@ -152,15 +152,29 @@ export const generateQuotePDF = async (
         
         <!-- Dynamic PDF Fields -->
         ${quoteFieldsForPDF.map(field => {
-          // Try multiple ways to access the field value
+          // Try multiple ways to access the field value with comprehensive fallbacks
           let value = 'Not specified';
-          if (quoteInfo.quote_fields) {
-            // Try by field.id, field.label, or from direct property
+          if (quoteInfo.quote_fields && typeof quoteInfo.quote_fields === 'object') {
+            // Try exact field ID match first
             value = quoteInfo.quote_fields[field.id] || 
-                    quoteInfo.quote_fields[field.label] || 
+                    // Try camelCase version
+                    quoteInfo.quote_fields[field.id.replace(/-([a-z])/g, (g) => g[1].toUpperCase())] ||
+                    // Try with underscores
+                    quoteInfo.quote_fields[field.id.replace(/-/g, '_')] ||
+                    // Try label match
+                    quoteInfo.quote_fields[field.label] ||
+                    // Try lowercase
                     quoteInfo.quote_fields[field.id.toLowerCase()] ||
                     'Not specified';
           }
+          
+          // Format value properly (handle objects, arrays, etc.)
+          if (typeof value === 'object' && value !== null) {
+            value = JSON.stringify(value);
+          } else if (value === null || value === undefined) {
+            value = 'Not specified';
+          }
+          
           return `
             <div class="field-row">
               <div class="field-label">${field.label}:</div>
@@ -208,53 +222,157 @@ export const generateQuotePDF = async (
         <tbody>
           ${bomItems
             .filter(item => item.enabled)
-            .map((item, index) => {
-              const itemRow = `
-                <tr>
-                  <td>${item.product.name}</td>
-                  <td>${item.product.description}</td>
-                  <td>${item.partNumber || 'TBD'}</td>
-                  <td>${item.quantity}</td>
-                  ${canSeePrices ? `
-                    <td>$${item.product.price.toLocaleString()}</td>
-                    <td>$${(item.product.price * item.quantity).toLocaleString()}</td>
-                  ` : ''}
-                </tr>`;
-              
-              // Add Level 4 configuration details if present
-              let configRows = '';
-              if (item.level4Config) {
-                const slotInfo = item.slot ? ` - Slot ${item.slot}` : '';
-                const configData = typeof item.level4Config === 'object' && !Array.isArray(item.level4Config) 
-                  ? item.level4Config 
-                  : {};
-                
-                if (Object.keys(configData).length > 0) {
-                  configRows = `
-                    <tr style="background-color: #f9fafb;">
-                      <td colspan="${canSeePrices ? '5' : '3'}" style="padding-left: 30px; font-size: 0.9em; color: #666;">
-                        <strong>${item.product.name}${slotInfo} Configuration:</strong><br/>
-                        ${Object.entries(configData)
-                          .map(([key, value]) => `${key}: ${typeof value === 'object' ? JSON.stringify(value) : value}`)
-                          .join('<br/>')}
-                      </td>
-                    </tr>`;
-                }
-              }
-              
-              return itemRow + configRows;
-            }).join('')}
+            .map((item, index) => `
+              <tr>
+                <td>${item.product.name}</td>
+                <td>${item.product.description}</td>
+                <td>${item.partNumber || 'TBD'}</td>
+                <td>${item.quantity}</td>
+                ${canSeePrices ? `
+                  <td>$${item.product.price.toLocaleString()}</td>
+                  <td>$${(item.product.price * item.quantity).toLocaleString()}</td>
+                ` : ''}
+              </tr>
+            `).join('')}
         </tbody>
       </table>
 
-      ${quoteInfo.draft_bom?.rackConfiguration ? `
-        <div style="margin-top: 30px; margin-bottom: 30px;">
-          <h3>Rack Configuration Layout</h3>
-          <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; border: 1px solid #ddd;">
-            <pre style="white-space: pre-wrap; font-family: monospace; font-size: 12px;">${JSON.stringify(quoteInfo.draft_bom.rackConfiguration, null, 2)}</pre>
-          </div>
-        </div>
-      ` : ''}
+      ${(() => {
+        // Check if any items have chassis configurations
+        const chassisItems = bomItems.filter(item => 
+          item.enabled && 
+          item.rackConfiguration && 
+          typeof item.rackConfiguration === 'object'
+        );
+        
+        if (chassisItems.length === 0 && !quoteInfo.draft_bom?.rackConfiguration) {
+          return '';
+        }
+
+        let rackConfigHTML = '<div style="page-break-before: always; margin-top: 40px;">';
+        rackConfigHTML += '<h2 style="color: #dc2626; border-bottom: 2px solid #dc2626; padding-bottom: 10px;">Rack Configuration Layout</h2>';
+        
+        // Process each chassis item
+        chassisItems.forEach((chassisItem, idx) => {
+          const config = chassisItem.rackConfiguration;
+          
+          rackConfigHTML += `
+            <div style="margin-top: 30px; margin-bottom: 30px; background: #f8f9fa; padding: 20px; border-radius: 8px; border: 1px solid #ddd;">
+              <h3 style="color: #dc2626; margin-top: 0;">${chassisItem.product.name} - ${chassisItem.partNumber || 'TBD'}</h3>
+              <div style="margin-top: 15px;">`;
+          
+          if (config.slots && Array.isArray(config.slots)) {
+            rackConfigHTML += '<table style="width: 100%; border-collapse: collapse; margin-top: 10px;">';
+            rackConfigHTML += '<thead><tr style="background: #e5e7eb;"><th style="padding: 8px; border: 1px solid #d1d5db; text-align: left;">Slot</th><th style="padding: 8px; border: 1px solid #d1d5db; text-align: left;">Card Type</th><th style="padding: 8px; border: 1px solid #d1d5db; text-align: left;">Part Number</th></tr></thead>';
+            rackConfigHTML += '<tbody>';
+            
+            config.slots.forEach((slot: any) => {
+              const slotNumber = slot.slot || slot.slotNumber || 'N/A';
+              const cardName = slot.cardName || slot.product?.name || 'Empty';
+              const partNumber = slot.partNumber || slot.product?.partNumber || '-';
+              
+              rackConfigHTML += `
+                <tr>
+                  <td style="padding: 8px; border: 1px solid #d1d5db;">${slotNumber}</td>
+                  <td style="padding: 8px; border: 1px solid #d1d5db;">${cardName}</td>
+                  <td style="padding: 8px; border: 1px solid #d1d5db; font-family: monospace;">${partNumber}</td>
+                </tr>`;
+            });
+            
+            rackConfigHTML += '</tbody></table>';
+          } else {
+            // Fallback display if slots array is not available
+            rackConfigHTML += '<pre style="white-space: pre-wrap; font-family: monospace; font-size: 11px; background: white; padding: 10px; border-radius: 4px; overflow-x: auto;">' + JSON.stringify(config, null, 2) + '</pre>';
+          }
+          
+          rackConfigHTML += '</div></div>';
+        });
+        
+        // Also check draft_bom for rack configurations
+        if (quoteInfo.draft_bom?.rackConfiguration) {
+          rackConfigHTML += `
+            <div style="margin-top: 30px; margin-bottom: 30px; background: #f8f9fa; padding: 20px; border-radius: 8px; border: 1px solid #ddd;">
+              <h3 style="color: #dc2626; margin-top: 0;">Draft Rack Configuration</h3>
+              <pre style="white-space: pre-wrap; font-family: monospace; font-size: 11px; background: white; padding: 10px; border-radius: 4px; overflow-x: auto;">${JSON.stringify(quoteInfo.draft_bom.rackConfiguration, null, 2)}</pre>
+            </div>`;
+        }
+        
+        rackConfigHTML += '</div>';
+        return rackConfigHTML;
+      })()}
+
+      ${(() => {
+        // Check if any items have Level 4 configurations
+        const level4Items = bomItems.filter(item => 
+          item.enabled && 
+          item.level4Config && 
+          typeof item.level4Config === 'object'
+        );
+        
+        if (level4Items.length === 0) {
+          return '';
+        }
+
+        let level4HTML = '<div style="margin-top: 40px; page-break-before: always;">';
+        level4HTML += '<h2 style="color: #dc2626; border-bottom: 2px solid #dc2626; padding-bottom: 10px;">Level 4 Configuration Details</h2>';
+        
+        // Group configurations by product and slot
+        level4Items.forEach((item, idx) => {
+          const config = item.level4Config;
+          const slotInfo = item.slot ? ` - Slot ${item.slot}` : '';
+          
+          level4HTML += `
+            <div style="margin-top: 25px; background: #f8f9fa; padding: 20px; border-radius: 8px; border-left: 4px solid #dc2626;">
+              <h3 style="color: #dc2626; margin-top: 0; font-size: 16px;">${item.product.name}${slotInfo}</h3>
+              <div style="margin-top: 15px; padding-left: 15px;">`;
+          
+          if (Array.isArray(config.entries) && config.entries.length > 0) {
+            // Display entries in a formatted table
+            level4HTML += '<table style="width: 100%; border-collapse: collapse; margin-top: 10px; background: white;">';
+            level4HTML += '<thead><tr style="background: #e5e7eb;"><th style="padding: 8px; border: 1px solid #d1d5db; text-align: left;">Input</th><th style="padding: 8px; border: 1px solid #d1d5db; text-align: left;">Configuration</th></tr></thead>';
+            level4HTML += '<tbody>';
+            
+            config.entries.forEach((entry: any, entryIdx: number) => {
+              const inputLabel = `Input #${entryIdx + 1}`;
+              const value = entry.label || entry.value || 'Not configured';
+              
+              level4HTML += `
+                <tr>
+                  <td style="padding: 8px; border: 1px solid #d1d5db; font-weight: 600;">${inputLabel}</td>
+                  <td style="padding: 8px; border: 1px solid #d1d5db;">${value}</td>
+                </tr>`;
+            });
+            
+            level4HTML += '</tbody></table>';
+          } else if (typeof config === 'object' && Object.keys(config).length > 0) {
+            // Display as key-value pairs
+            level4HTML += '<table style="width: 100%; border-collapse: collapse; margin-top: 10px; background: white;">';
+            level4HTML += '<tbody>';
+            
+            Object.entries(config).forEach(([key, value]) => {
+              if (key !== 'entries' && key !== 'id' && key !== 'level4_config_id') {
+                const displayKey = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                const displayValue = typeof value === 'object' ? JSON.stringify(value) : value;
+                
+                level4HTML += `
+                  <tr>
+                    <td style="padding: 8px; border: 1px solid #d1d5db; font-weight: 600; width: 30%;">${displayKey}:</td>
+                    <td style="padding: 8px; border: 1px solid #d1d5db;">${displayValue}</td>
+                  </tr>`;
+              }
+            });
+            
+            level4HTML += '</tbody></table>';
+          } else {
+            level4HTML += '<p style="color: #666; font-style: italic;">No configuration details available</p>';
+          }
+          
+          level4HTML += '</div></div>';
+        });
+        
+        level4HTML += '</div>';
+        return level4HTML;
+      })()}
 
       ${canSeePrices ? `
         <div class="total-section">

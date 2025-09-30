@@ -127,11 +127,31 @@ export interface BOMItem {
   partNumber?: string;
   displayName?: string;
   configuration?: Record<string, any>;
+  rackConfiguration?: {
+    slots?: Array<{
+      slot?: number;
+      slotNumber?: number;
+      cardName?: string;
+      partNumber?: string;
+      product?: {
+        name?: string;
+        partNumber?: string;
+      };
+    }>;
+    [key: string]: any;
+  };
   level2Options?: Level2Product[];
   level3Customizations?: Level3Customization[];
   slotAssignments?: Record<number, Level3Product>;
   level4Selections?: { [fieldId: string]: string };
-  level4Config?: Level4RuntimePayload;
+  level4Config?: Level4RuntimePayload | {
+    entries?: Array<{
+      index?: number;
+      value?: string;
+      label?: string;
+    }>;
+    [key: string]: any;
+  };
   isAccessory?: boolean;
   name?: string;
   description?: string;

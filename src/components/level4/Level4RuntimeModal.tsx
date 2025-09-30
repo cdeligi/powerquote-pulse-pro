@@ -65,30 +65,42 @@ export const Level4RuntimeModal: React.FC<Level4RuntimeModalProps> = ({
         // Validate BOM item exists before loading configuration
         let validation = await Level4Service.validateBOMItemAccess(effectiveBomItemId);
 
-        if (!validation.exists) {
-          console.warn('BOM item not found when loading configuration. Attempting to recreate session...');
+        if (!validation.exists || !validation.accessible) {
+          console.warn('BOM item not found or not accessible when loading configuration. Attempting to recreate session...');
 
           if (!bomItem?.product?.id) {
-            throw new Error('The configuration session is invalid. Please close and restart the Level 4 configuration.');
+            throw new Error('Configuration Error: The configuration session is invalid. Please close and restart the Level 4 configuration.');
           }
 
           try {
+            // Unregister old session
             Level4Service.unregisterActiveSession(effectiveBomItemId);
+            
+            // Create a new BOM item for this configuration
             const { bomItemId: recreatedId, tempQuoteId } = await Level4Service.createBOMItemForLevel4Config(bomItem);
 
             effectiveBomItemId = recreatedId;
+            
+            // Validate the newly created BOM item
             validation = await Level4Service.validateBOMItemAccess(effectiveBomItemId);
 
+            if (!validation.exists || !validation.accessible) {
+              throw new Error('Configuration Error: Failed to create a valid configuration session.');
+            }
+
+            // Register the new session
             Level4Service.registerActiveSession(effectiveBomItemId);
             setSessionInfo({ bomItemId: recreatedId, tempQuoteId });
+            
+            console.log('Successfully recreated BOM item session:', { bomItemId: recreatedId, tempQuoteId });
           } catch (recreateError) {
             console.error('Failed to recreate BOM item for Level 4 session:', recreateError);
-            throw new Error('The configuration session is invalid. Please close and restart the Level 4 configuration.');
+            throw new Error('Configuration Error: Unable to establish a valid configuration session. Please close this dialog and try again.');
           }
         }
 
-        if (!validation.exists) {
-          throw new Error('The configuration session is invalid. Please close and restart the Level 4 configuration.');
+        if (!validation.exists || !validation.accessible) {
+          throw new Error('Configuration Error: The configuration session is invalid. Please close and restart the Level 4 configuration.');
         }
         
         // Load the Level 4 configuration
@@ -154,18 +166,20 @@ export const Level4RuntimeModal: React.FC<Level4RuntimeModalProps> = ({
         
         setEntries(initialEntries);
       } catch (err) {
-        let description = "Failed to load configuration.";
+        let description = "Failed to prepare Level 4 configuration. Please try again.";
         
         if (err && typeof err === 'object') {
           if ('code' in err && err.code === '42P01') {
-            description = "The database schema is out of date. Please run the latest migrations.";
+            description = "Database Error: The database schema is out of date. Please contact your administrator.";
           } else if ('status' in err && err.status === 406) {
-            description = "The API schema is out of date. Please refresh the Supabase API schema.";
+            description = "API Error: The API schema is out of date. Please refresh the page and try again.";
           } else if ('message' in err) {
-            description = err.message as string;
+            const message = err.message as string;
+            // Preserve "Configuration Error:" prefix for better user experience
+            description = message.startsWith('Configuration Error:') ? message : `Error: ${message}`;
           }
         } else if (err instanceof Error) {
-          description = err.message;
+          description = `Error: ${err.message}`;
         }
         
         console.error('Error loading Level 4 configuration:', err);
