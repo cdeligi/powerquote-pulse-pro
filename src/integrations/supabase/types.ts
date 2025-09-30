@@ -2033,6 +2033,14 @@ export type Database = {
         }
         Returns: undefined
       }
+      repair_draft_bom_prices: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          items_repaired: number
+          items_with_issues: number
+          quote_id: string
+        }[]
+      }
       revoke_user_access: {
         Args: { p_reason?: string; p_target_user_id: string }
         Returns: boolean
