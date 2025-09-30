@@ -27,6 +27,10 @@ export interface Quote {
   gross_profit: number;
   discount_justification?: string;
   quote_fields?: Record<string, any>;
+  draft_bom?: {
+    items?: any[];
+    rackConfiguration?: any;
+  };
   counter_offers?: any[];
   approval_notes?: string;
   rejection_reason?: string;
