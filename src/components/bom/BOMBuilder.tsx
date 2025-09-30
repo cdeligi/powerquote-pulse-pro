@@ -33,6 +33,12 @@ import { findOptimalBushingPlacement, findExistingBushingSlots, isBushingCard } 
 import { useAuth } from '@/hooks/useAuth';
 import { useQuoteValidation } from './QuoteFieldValidation';
 import { usePermissions, FEATURES } from '@/hooks/usePermissions';
+import {
+  serializeSlotAssignments,
+  deserializeSlotAssignments,
+  buildRackLayoutFromAssignments,
+  type SerializedSlotAssignment,
+} from '@/utils/slotAssignmentUtils';
 
 interface BOMBuilderProps {
   onBOMUpdate: (items: BOMItem[]) => void;
@@ -353,8 +359,8 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
         console.log('Loading BOM data from draft_bom field');
         loadedItems = await Promise.all(quote.draft_bom.items.map(async (item: any) => {
           // Use stored values from draft_bom, fallback to unit_price/unit_cost, then fetch if needed
-          let price = item.product?.price || item.unit_price || 0;
-          let cost = item.product?.cost || item.unit_cost || 0;
+          let price = item.product?.price || item.unit_price || item.total_price || 0;
+          let cost = item.product?.cost || item.unit_cost || item.total_cost || 0;
           
           // If price or cost is 0, fetch fresh product data
           if ((price === 0 || cost === 0) && (item.productId || item.product_id)) {
@@ -374,6 +380,12 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
             }
           }
           
+          const storedSlotAssignments = item.slotAssignments as SerializedSlotAssignment[] | undefined;
+          const slotAssignmentsMap = deserializeSlotAssignments(storedSlotAssignments);
+          const rackLayout = item.rackConfiguration || buildRackLayoutFromAssignments(storedSlotAssignments);
+          const level4Config = item.level4Config ?? null;
+          const level4Selections = item.level4Selections ?? null;
+
           return {
             id: item.id || crypto.randomUUID(),
             product: {
@@ -390,7 +402,11 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
             level4Values: item.level4Values || [],
             original_unit_price: item.original_unit_price || price,
             approved_unit_price: item.approved_unit_price || price,
-            priceHistory: item.priceHistory || []
+            priceHistory: item.priceHistory || [],
+            slotAssignments: slotAssignmentsMap,
+            rackConfiguration: rackLayout,
+            level4Config: level4Config || undefined,
+            level4Selections: level4Selections || undefined,
           };
         }));
         
@@ -423,25 +439,39 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
         console.log(`Successfully loaded ${bomData?.length || 0} BOM items from database`);
         
         // Convert BOM items back to local format with proper structure
-        loadedItems = (bomData || []).map(item => ({
-          id: item.id,
-          product: {
-            id: item.product_id,
-            name: item.name,
+        loadedItems = (bomData || []).map(item => {
+          const configData = item.configuration_data || {};
+          const storedSlotAssignments = configData.slotAssignments as SerializedSlotAssignment[] | undefined;
+          const slotAssignmentsMap = deserializeSlotAssignments(storedSlotAssignments);
+          const rackLayout = configData.rackConfiguration || buildRackLayoutFromAssignments(storedSlotAssignments);
+          const directLevel4 = configData.level4Config ?? null;
+          const slotLevel4 = storedSlotAssignments?.filter(assign => assign.level4Config || assign.level4Selections) || [];
+          const mergedLevel4 = directLevel4 || (slotLevel4.length > 0 ? { slots: slotLevel4 } : null);
+
+          return {
+            id: item.id,
+            product: {
+              id: item.product_id,
+              name: item.name,
+              partNumber: item.part_number,
+              price: item.unit_price,
+              cost: item.unit_cost,
+              description: item.description,
+              ...configData
+            },
+            quantity: item.quantity,
+            enabled: true,
             partNumber: item.part_number,
-            price: item.unit_price,
-            cost: item.unit_cost,
-            description: item.description,
-            ...item.configuration_data
-          },
-          quantity: item.quantity,
-          enabled: true,
-          partNumber: item.part_number,
-          level4Values: item.bom_level4_values || [],
-          original_unit_price: item.original_unit_price || item.unit_price,
-          approved_unit_price: item.approved_unit_price || item.unit_price,
-          priceHistory: item.price_adjustment_history || []
-        }));
+            level4Values: item.bom_level4_values || [],
+            original_unit_price: item.original_unit_price || item.unit_price,
+            approved_unit_price: item.approved_unit_price || item.unit_price,
+            priceHistory: item.price_adjustment_history || [],
+            slotAssignments: slotAssignmentsMap,
+            rackConfiguration: rackLayout,
+            level4Config: mergedLevel4 || undefined,
+            level4Selections: configData.level4Selections || undefined,
+          };
+        });
       }
       
       setBomItems(loadedItems);
@@ -648,16 +678,54 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
       );
       
       // Validate and prepare draft BOM data
+      const rackLayoutSummaries: Array<Record<string, any>> = [];
+      const level4Summaries: Array<Record<string, any>> = [];
+
       const draftBomData = {
         items: bomItems.map(item => {
           const price = item.product.price || 0;
           const cost = item.product.cost || 0;
-          
+
           // Log warning if prices are missing
           if (price === 0) {
             console.warn(`Item ${item.product.name} has 0 price - this may cause issues`);
           }
-          
+
+          const serializedSlots = item.slotAssignments ? serializeSlotAssignments(item.slotAssignments) : undefined;
+          const rackLayout = item.rackConfiguration || buildRackLayoutFromAssignments(serializedSlots);
+
+          if (rackLayout?.slots && rackLayout.slots.length > 0) {
+            rackLayoutSummaries.push({
+              productId: item.product.id,
+              productName: item.product.name,
+              partNumber: item.partNumber || item.product.partNumber,
+              layout: rackLayout,
+            });
+          }
+
+          const slotLevel4 = serializedSlots?.filter(slot => slot.level4Config || slot.level4Selections) || [];
+          if (slotLevel4.length > 0) {
+            level4Summaries.push({
+              productId: item.product.id,
+              productName: item.product.name,
+              partNumber: item.partNumber || item.product.partNumber,
+              slots: slotLevel4.map(slot => ({
+                slot: slot.slot,
+                cardName: slot.displayName || slot.name,
+                configuration: slot.level4Config || slot.level4Selections,
+              })),
+            });
+          }
+
+          if (item.level4Config) {
+            level4Summaries.push({
+              productId: item.product.id,
+              productName: item.product.name,
+              partNumber: item.partNumber || item.product.partNumber,
+              configuration: item.level4Config,
+            });
+          }
+
           return {
             product_id: item.product.id,
             name: item.product.name,
@@ -668,15 +736,19 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
             unit_cost: cost,
             total_price: price * item.quantity,
             total_cost: cost * item.quantity,
-            margin: cost > 0 
-              ? ((price - cost) / price) * 100 
+            margin: cost > 0
+              ? ((price - cost) / price) * 100
               : 100,
             configuration_data: {
               ...item.product,
               price,
               cost
             },
-            product_type: 'standard'
+            product_type: 'standard',
+            slotAssignments: serializedSlots,
+            rackConfiguration: rackLayout,
+            level4Config: item.level4Config || null,
+            level4Selections: item.level4Selections || null,
           };
         }),
         quoteFields,
@@ -689,7 +761,9 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
           originalMargin: totalCost > 0 ? ((totalValue - totalCost) / totalValue) * 100 : 100,
           discountedValue: totalValue * (1 - discountPercentage / 100),
           discountedMargin: totalCost > 0 ? (((totalValue * (1 - discountPercentage / 100)) - totalCost) / (totalValue * (1 - discountPercentage / 100))) * 100 : 100
-        }
+        },
+        rackLayouts: rackLayoutSummaries,
+        level4Configurations: level4Summaries,
       };
 
       // Update quote with draft BOM data
