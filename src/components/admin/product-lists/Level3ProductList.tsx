@@ -42,7 +42,8 @@ export const Level3ProductList: React.FC<Level3ProductListProps> = ({
       price: product.price,
       cost: product.cost || 0,
       enabled: product.enabled !== false,
-      has_level4: (product as any).has_level4 || false
+      has_level4: (product as any).has_level4 || false,
+      partNumber: product.partNumber || ''
     });
   };
 
@@ -60,10 +61,15 @@ export const Level3ProductList: React.FC<Level3ProductListProps> = ({
 
   const handleEditSave = async (productId: string) => {
     if (!editingProduct) return;
-    
+
     try {
       setIsSaving(true);
-      await productDataService.updateLevel3Product(productId, editFormData);
+      await productDataService.updateLevel3Product(productId, {
+        ...editFormData,
+        partNumber: editFormData.partNumber !== undefined
+          ? editFormData.partNumber.trim()
+          : undefined
+      });
 
       onProductUpdate();
       setEditingProduct(null);
@@ -209,6 +215,16 @@ export const Level3ProductList: React.FC<Level3ProductListProps> = ({
                         className="bg-white border-gray-300 text-gray-900"
                       />
                     </div>
+                    <div>
+                      <Label htmlFor={`partNumber-${product.id}`} className="text-gray-700">Part Number</Label>
+                      <Input
+                        id={`partNumber-${product.id}`}
+                        value={editFormData.partNumber || ''}
+                        onChange={(e) => setEditFormData(prev => ({ ...prev, partNumber: e.target.value }))}
+                        placeholder="e.g., ANA-16CH-001"
+                        className="bg-white border-gray-300 text-gray-900"
+                      />
+                    </div>
                       <div className="flex items-center space-x-2">
                         <Switch
                           id={`enabled-${product.id}`}
@@ -348,6 +364,10 @@ export const Level3ProductList: React.FC<Level3ProductListProps> = ({
                     <div>
                       <span className="text-gray-500">Cost:</span>
                       <span className="text-gray-900 font-medium ml-2">${(product.cost || 0).toLocaleString()}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">Part Number:</span>
+                      <span className="text-gray-900 font-medium ml-2">{product.partNumber || '—'}</span>
                     </div>
                   </div>
                   {parentFilter !== 'all' && (
