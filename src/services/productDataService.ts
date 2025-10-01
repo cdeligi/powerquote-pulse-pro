@@ -402,7 +402,8 @@ class ProductDataService {
             parent_product_id: productData.parentProductId,
             category: productData.type || 'standard',
             has_level4: (productData as any).has_level4 === true,
-            specifications: productData.specifications || {}
+            specifications: productData.specifications || {},
+            part_number: productData.partNumber?.trim() || null
           }
         ])
         .select()
@@ -422,6 +423,7 @@ class ProductDataService {
         price: data.price || 0,
         cost: data.cost || 0,
         enabled: data.enabled !== false,
+        partNumber: data.part_number || undefined,
         has_level4: data.has_level4 === true,
         specifications: data.specifications || {}
       };
@@ -470,6 +472,11 @@ class ProductDataService {
         category: type,
       };
 
+      if (updateData.partNumber !== undefined) {
+        updateData.part_number = updateData.partNumber?.trim() || null;
+        delete updateData.partNumber;
+      }
+
       // Remove undefined properties to avoid sending them to Supabase
       Object.keys(updateData).forEach(key => updateData[key] === undefined && delete updateData[key]);
 
@@ -487,13 +494,35 @@ class ProductDataService {
 
       console.log('Update successful, response from Supabase:', JSON.stringify(data, null, 2)); // Added log
 
+      const updatedProduct: Level3Product = {
+        id: data.id,
+        name: data.name,
+        displayName: data.display_name || data.name,
+        parent_product_id: data.parent_product_id,
+        parentProductId: data.parent_product_id,
+        product_level: 3,
+        type: data.category || currentProduct.category,
+        description: data.description || '',
+        price: data.price || 0,
+        cost: data.cost || 0,
+        enabled: data.enabled !== false,
+        partNumber: data.part_number || undefined,
+        has_level4: data.has_level4 === true,
+        specifications: data.specifications || {},
+        image: data.image_url,
+        productInfoUrl: data.product_info_url,
+      };
+
       // Update the local cache
       const index = this.level3Products.findIndex(p => p.id === id);
       if (index !== -1) {
-        this.level3Products[index] = { ...this.level3Products[index], ...updateData };
+        this.level3Products[index] = {
+          ...this.level3Products[index],
+          ...updatedProduct,
+        };
       }
 
-      return data as Level3Product;
+      return updatedProduct;
     } catch (error) {
       console.error('Error in updateLevel3Product:', {
         error,
