@@ -14,7 +14,6 @@ interface CardFormProps {
 }
 
 const CardForm = ({ onSubmit, level2Products, initialData }: CardFormProps) => {
-  console.log('CardForm: initialData:', initialData); // Add this line
   const [formData, setFormData] = useState({
     name: initialData?.name || '',
     parentProductId: initialData?.parentProductId || '',
@@ -33,7 +32,6 @@ const CardForm = ({ onSubmit, level2Products, initialData }: CardFormProps) => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('CardForm: handleSubmit triggered'); // Add this line
     const newCard: Omit<Level3Product, 'id'> = {
       name: formData.name,
       displayName: formData.name,
