@@ -361,7 +361,6 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
           // Use stored values from draft_bom, fallback to unit_price/unit_cost, then fetch if needed
           let price = item.product?.price || item.unit_price || item.total_price || 0;
           let cost = item.product?.cost || item.unit_cost || item.total_cost || 0;
-
           const rawConfiguration =
             (typeof item.configuration_data === 'object' && item.configuration_data) ||
             (typeof item.configurationData === 'object' && item.configurationData) ||
@@ -402,6 +401,8 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
                   } as SerializedSlotAssignment;
                 })
               : undefined;
+          const configurationData = item.configuration_data || item.product || {};
+          main
 
           // If price or cost is 0, fetch fresh product data
           if ((price === 0 || cost === 0) && (item.productId || item.product_id)) {
