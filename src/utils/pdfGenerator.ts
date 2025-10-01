@@ -3,6 +3,44 @@ import { BOMItem } from '@/types/product';
 import { Quote } from '@/types/quote';
 import { supabase } from '@/integrations/supabase/client';
 
+type NormalizedLevel4Option = {
+  id: string;
+  value: string;
+  label: string;
+  infoUrl?: string | null;
+  partNumber?: string | null;
+};
+
+type NormalizedLevel4Payload = {
+  level4_config_id: string;
+  entries: Array<{ index: number; value: string }>;
+  template_type?: 'OPTION_1' | 'OPTION_2';
+};
+
+type Level4DisplayItem = {
+  productName: string;
+  productPartNumber?: string;
+  slotNumber?: number;
+  slotCardName?: string;
+  partNumber?: string;
+  config: any;
+};
+
+type Level4AnalyzedEntry = Level4DisplayItem & {
+  payload?: NormalizedLevel4Payload | null;
+  fieldLabel?: string;
+  templateType?: 'OPTION_1' | 'OPTION_2';
+  options: NormalizedLevel4Option[];
+  rawConfig: any;
+};
+
+type Level4ConfigDefinition = {
+  id: string;
+  fieldLabel?: string;
+  templateType?: 'OPTION_1' | 'OPTION_2';
+  options: NormalizedLevel4Option[];
+};
+
 export const generateQuotePDF = async (
   bomItems: BOMItem[],
   quoteInfo: Partial<Quote>,
@@ -95,6 +133,413 @@ export const generateQuotePDF = async (
       level4FallbackMap.set(String(key), entry);
     });
   }
+
+  const escapeHtml = (value: any): string => {
+    return String(value ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  };
+
+  const normalizeLevel4Options = (rawOptions: any): NormalizedLevel4Option[] => {
+    if (!rawOptions) return [];
+
+    let optionsArray: any[] = [];
+
+    if (typeof rawOptions === 'string') {
+      try {
+        const parsed = JSON.parse(rawOptions);
+        if (Array.isArray(parsed)) {
+          optionsArray = parsed;
+        } else if (parsed && typeof parsed === 'object') {
+          if (Array.isArray((parsed as any).options)) {
+            optionsArray = (parsed as any).options;
+          } else {
+            const firstArray = Object.values(parsed).find(value => Array.isArray(value));
+            if (Array.isArray(firstArray)) {
+              optionsArray = firstArray as any[];
+            }
+          }
+        }
+      } catch {
+        return [];
+      }
+    } else if (Array.isArray(rawOptions)) {
+      optionsArray = rawOptions;
+    } else if (rawOptions && typeof rawOptions === 'object') {
+      if (Array.isArray((rawOptions as any).options)) {
+        optionsArray = (rawOptions as any).options;
+      } else if (Array.isArray((rawOptions as any).data)) {
+        optionsArray = (rawOptions as any).data;
+      } else {
+        const firstArray = Object.values(rawOptions).find(value => Array.isArray(value));
+        if (Array.isArray(firstArray)) {
+          optionsArray = firstArray as any[];
+        }
+      }
+    }
+
+    return optionsArray.map((option, index) => {
+      const id = option?.id ?? option?.value ?? option?.option_value ?? option?.optionValue ?? option?.option_key ?? `option-${index}`;
+      const value = option?.value ?? option?.option_value ?? option?.optionValue ?? option?.id ?? id;
+      const label = option?.label ?? option?.name ?? option?.option_label ?? option?.optionValue ?? option?.option_value ?? option?.option_key ?? String(value);
+      const infoUrl = option?.url ?? option?.info_url ?? option?.infoUrl ?? option?.link ?? null;
+      const partNumber = option?.part_number ?? option?.partNumber ?? option?.metadata?.part_number ?? option?.metadata?.partNumber ?? null;
+
+      return {
+        id: String(id),
+        value: String(value),
+        label: String(label),
+        infoUrl: infoUrl ? String(infoUrl) : null,
+        partNumber: partNumber ? String(partNumber) : null,
+      };
+    });
+  };
+
+  const normalizeLevel4Entries = (entries: any): Array<{ index: number; value: string }> => {
+    if (!entries) return [];
+
+    if (Array.isArray(entries)) {
+      return entries
+        .map((entry, idx) => {
+          if (entry == null) return null;
+          const index = typeof entry.index === 'number' && !Number.isNaN(entry.index)
+            ? entry.index
+            : typeof entry.inputIndex === 'number'
+              ? entry.inputIndex
+              : idx;
+          const rawValue = entry.value ?? entry.option ?? entry.selection ?? entry.option_id ?? entry.optionId ?? entry.option_value ?? entry.optionValue ?? entry.id ?? entry.name ?? entry;
+          if (rawValue === undefined || rawValue === null || rawValue === '') return null;
+          return { index, value: String(rawValue) };
+        })
+        .filter((entry): entry is { index: number; value: string } => entry !== null);
+    }
+
+    if (typeof entries === 'object') {
+      return Object.entries(entries)
+        .map(([key, value], idx) => {
+          if (value == null) return null;
+          const candidateIndex = typeof (value as any).index === 'number' && !Number.isNaN((value as any).index)
+            ? (value as any).index
+            : Number.parseInt(key, 10);
+          const index = Number.isFinite(candidateIndex) ? Number(candidateIndex) : idx;
+          const rawValue = (value as any).value ?? (value as any).option ?? (value as any).selection ?? (value as any).option_id ?? (value as any).optionId ?? (value as any).option_value ?? (value as any).optionValue ?? (value as any).id ?? (value as any).name ?? value;
+          if (rawValue === undefined || rawValue === null || rawValue === '') return null;
+          return { index, value: String(rawValue) };
+        })
+        .filter((entry): entry is { index: number; value: string } => entry !== null);
+    }
+
+    return [];
+  };
+
+  const extractLevel4Payload = (data: any, depth = 0): NormalizedLevel4Payload | null => {
+    if (!data || depth > 6) return null;
+
+    const inspectCandidate = (candidate: any): NormalizedLevel4Payload | null => {
+      if (!candidate || typeof candidate !== 'object') return null;
+
+      const configId = candidate.level4_config_id ?? candidate.level4ConfigId ?? candidate.config_id ?? candidate.configId;
+      const rawEntries = candidate.entries ?? candidate.selections ?? candidate.values ?? candidate.inputs;
+
+      if (configId && rawEntries) {
+        const normalizedEntries = normalizeLevel4Entries(rawEntries);
+        if (normalizedEntries.length > 0) {
+          const templateTypeRaw = candidate.template_type ?? candidate.templateType ?? candidate.mode;
+          let templateType: 'OPTION_1' | 'OPTION_2' | undefined;
+          if (typeof templateTypeRaw === 'string') {
+            const normalized = templateTypeRaw.toUpperCase();
+            if (normalized === 'OPTION_2' || normalized === 'FIXED' || normalized.includes('2')) {
+              templateType = 'OPTION_2';
+            } else {
+              templateType = 'OPTION_1';
+            }
+          }
+
+          return {
+            level4_config_id: String(configId),
+            entries: normalizedEntries,
+            template_type: templateType,
+          };
+        }
+      }
+
+      return null;
+    };
+
+    const direct = inspectCandidate(data);
+    if (direct) return direct;
+
+    if (Array.isArray(data)) {
+      for (const entry of data) {
+        const found = extractLevel4Payload(entry, depth + 1);
+        if (found) return found;
+      }
+      return null;
+    }
+
+    if (typeof data === 'object') {
+      for (const value of Object.values(data)) {
+        if (!value || typeof value !== 'object') continue;
+        const found = extractLevel4Payload(value, depth + 1);
+        if (found) return found;
+      }
+    }
+
+    return null;
+  };
+
+  const extractFieldLabelFromConfig = (config: any, depth = 0): string | undefined => {
+    if (!config || typeof config !== 'object' || depth > 4) return undefined;
+
+    const candidates = [
+      (config as any).field_label,
+      (config as any).fieldLabel,
+      (config as any).label,
+      (config as any).field,
+      (config as any).configuration?.field_label,
+      (config as any).configuration?.fieldLabel,
+      (config as any).config?.field_label,
+      (config as any).config?.fieldLabel,
+    ];
+
+    for (const candidate of candidates) {
+      if (typeof candidate === 'string' && candidate.trim().length > 0) {
+        return candidate;
+      }
+    }
+
+    for (const value of Object.values(config)) {
+      if (value && typeof value === 'object') {
+        const nested = extractFieldLabelFromConfig(value, depth + 1);
+        if (nested) return nested;
+      }
+    }
+
+    return undefined;
+  };
+
+  const extractTemplateTypeFromConfig = (config: any, depth = 0): 'OPTION_1' | 'OPTION_2' | undefined => {
+    if (!config || typeof config !== 'object' || depth > 4) return undefined;
+
+    const directTemplate = (config as any).template_type ?? (config as any).templateType;
+    if (typeof directTemplate === 'string') {
+      const normalized = directTemplate.toUpperCase();
+      if (normalized === 'OPTION_2' || normalized === 'FIXED' || normalized.includes('2')) {
+        return 'OPTION_2';
+      }
+      return 'OPTION_1';
+    }
+
+    const mode = (config as any).mode ?? (config as any).configurationMode;
+    if (typeof mode === 'string') {
+      return mode.toLowerCase() === 'fixed' ? 'OPTION_2' : 'OPTION_1';
+    }
+
+    const fixedInputs = (config as any).fixed_inputs ?? (config as any).fixedInputs ?? (config as any).fixed?.numberOfInputs;
+    const variableInputs = (config as any).max_inputs ?? (config as any).maxInputs ?? (config as any).variable?.maxInputs;
+    if (fixedInputs != null) return 'OPTION_2';
+    if (variableInputs != null) return 'OPTION_1';
+
+    const nestedKeys = ['configuration', 'config', 'level4Config', 'payload', 'data'];
+    for (const key of nestedKeys) {
+      const value = (config as any)[key];
+      if (value && typeof value === 'object') {
+        const nested = extractTemplateTypeFromConfig(value, depth + 1);
+        if (nested) return nested;
+      }
+    }
+
+    return undefined;
+  };
+
+  const extractOptionsFromConfig = (config: any, visited = new Set<any>()): NormalizedLevel4Option[] => {
+    if (!config || typeof config !== 'object' || visited.has(config)) return [];
+    visited.add(config);
+
+    const candidateValues = [
+      (config as any).options,
+      (config as any).optionList,
+      (config as any).availableOptions,
+      (config as any).selectionOptions,
+      (config as any).level4Options,
+      (config as any).configuration?.options,
+      (config as any).config?.options,
+      (config as any).level4Config?.options,
+      (config as any).configuration?.config?.options,
+    ];
+
+    for (const candidate of candidateValues) {
+      const normalized = normalizeLevel4Options(candidate);
+      if (normalized.length > 0) {
+        return normalized;
+      }
+    }
+
+    const nestedKeys = ['configuration', 'config', 'level4Config', 'payload', 'data'];
+    for (const key of nestedKeys) {
+      const value = (config as any)[key];
+      if (value && typeof value === 'object') {
+        const nested = extractOptionsFromConfig(value, visited);
+        if (nested.length > 0) {
+          return nested;
+        }
+      }
+    }
+
+    return [];
+  };
+
+  const analyzeLevel4Config = (config: any) => {
+    return {
+      payload: extractLevel4Payload(config),
+      fieldLabel: extractFieldLabelFromConfig(config),
+      templateType: extractTemplateTypeFromConfig(config),
+      options: extractOptionsFromConfig(config),
+    };
+  };
+
+  const resolveLevel4Option = (options: NormalizedLevel4Option[], value: string): NormalizedLevel4Option | undefined => {
+    if (!value) return undefined;
+    const exact = options.find(option => option.value === value || option.id === value || option.label === value);
+    if (exact) return exact;
+
+    const lowerValue = value.toLowerCase?.();
+    if (!lowerValue) return undefined;
+
+    return options.find(option =>
+      option.value?.toLowerCase?.() === lowerValue ||
+      option.id?.toLowerCase?.() === lowerValue ||
+      option.label?.toLowerCase?.() === lowerValue
+    );
+  };
+
+  const buildLevel4SectionHTML = (
+    entries: Level4AnalyzedEntry[],
+    definitions: Map<string, Level4ConfigDefinition>
+  ): string => {
+    if (!entries.length) {
+      return '';
+    }
+
+    const sections = entries.map(entry => {
+      const payload = entry.payload ?? null;
+      const configId = payload?.level4_config_id;
+      const definition = configId ? definitions.get(configId) : undefined;
+
+      const options = (definition?.options && definition.options.length > 0)
+        ? definition.options
+        : entry.options;
+
+      const fieldLabel = definition?.fieldLabel || entry.fieldLabel || 'Selection';
+      const templateType = definition?.templateType || payload?.template_type || entry.templateType || 'OPTION_1';
+
+      const headingParts: string[] = [];
+      if (typeof entry.slotNumber === 'number') {
+        headingParts.push(`Slot ${entry.slotNumber}`);
+      }
+      if (entry.slotCardName) {
+        headingParts.push(entry.slotCardName);
+      }
+      if (entry.partNumber) {
+        headingParts.push(entry.partNumber);
+      }
+
+      const headingText = headingParts.length > 0
+        ? headingParts.map(part => escapeHtml(part)).join(' - ')
+        : escapeHtml(`${entry.productName}${entry.partNumber ? ` - ${entry.partNumber}` : ''}`);
+
+      const subheadingParts: string[] = [];
+      if (entry.productName) {
+        subheadingParts.push(entry.productName);
+      }
+      if (entry.productPartNumber && entry.productPartNumber !== entry.partNumber) {
+        subheadingParts.push(`Part Number: ${entry.productPartNumber}`);
+      }
+
+      const subheadingText = subheadingParts.length > 0
+        ? subheadingParts.map(part => escapeHtml(part)).join(' • ')
+        : '';
+
+      const metaParts: string[] = [];
+      if (configId) {
+        metaParts.push(`Configuration ID: ${escapeHtml(configId)}`);
+      }
+      if (!definition && configId) {
+        metaParts.push('Metadata unavailable - displaying saved selections');
+      }
+
+      const selections = payload?.entries
+        ? [...payload.entries].sort((a, b) => a.index - b.index)
+        : [];
+
+      let bodyHtml = '';
+
+      if (selections.length > 0) {
+        bodyHtml += '<table class="level4-table"><thead><tr><th>Input</th><th>Selected Option</th></tr></thead><tbody>';
+        selections.forEach((selection, idx) => {
+          const inputLabel = (selections.length > 1 || templateType === 'OPTION_2')
+            ? `${fieldLabel} #${idx + 1}`
+            : fieldLabel;
+
+          const option = resolveLevel4Option(options, selection.value);
+          const optionLabel = option ? escapeHtml(option.label) : escapeHtml(selection.value);
+
+          const detailParts: string[] = [];
+          if (option?.partNumber) {
+            detailParts.push(`Part Number: ${escapeHtml(option.partNumber)}`);
+          }
+          if (option?.infoUrl) {
+            detailParts.push(`Info: ${escapeHtml(option.infoUrl)}`);
+          }
+          if (!option) {
+            detailParts.push(`Option ID: ${escapeHtml(selection.value)}`);
+          }
+
+          bodyHtml += `
+            <tr>
+              <td>${escapeHtml(inputLabel)}</td>
+              <td>
+                <div class="level4-option-label">${optionLabel}</div>
+                ${detailParts.length > 0 ? `<div class="level4-option-meta">${detailParts.join(' • ')}</div>` : ''}
+              </td>
+            </tr>
+          `;
+        });
+        bodyHtml += '</tbody></table>';
+      } else if (payload) {
+        bodyHtml += '<p class="level4-empty">No selections recorded for this configuration.</p>';
+      } else {
+        bodyHtml += '<p class="level4-empty">Unable to parse configuration details. Saved data shown below.</p>';
+      }
+
+      if ((!payload || selections.length === 0) && entry.rawConfig) {
+        bodyHtml += `<pre class="level4-raw">${escapeHtml(JSON.stringify(entry.rawConfig, null, 2))}</pre>`;
+      }
+
+      return `
+        <div class="level4-section">
+          <h3 class="level4-heading">${headingText}</h3>
+          ${subheadingText ? `<div class="level4-subheading">${subheadingText}</div>` : ''}
+          ${metaParts.length > 0 ? `<div class="level4-meta">${metaParts.join(' • ')}</div>` : ''}
+          ${bodyHtml}
+        </div>
+      `;
+    }).join('');
+
+    if (!sections) {
+      return '';
+    }
+
+    return `
+      <div style="margin-top: 40px; page-break-before: always;">
+        <h2 style="color: #dc2626; border-bottom: 2px solid #dc2626; padding-bottom: 10px;">Level 4 Configuration Details</h2>
+        ${sections}
+      </div>
+    `;
+  };
 
   const normalizeSlotNumber = (value: any, fallbackIndex: number): number => {
     if (typeof value === 'number' && !Number.isNaN(value)) {
@@ -235,24 +680,30 @@ export const generateQuotePDF = async (
     };
   });
 
-  const level4DisplayItems = normalizedBomItems.flatMap(item => {
-    const entries: Array<{ title: string; subtitle?: string; partNumber?: string; config: any; }> = [];
+  const level4DisplayItems: Level4DisplayItem[] = normalizedBomItems.flatMap(item => {
+    const entries: Level4DisplayItem[] = [];
 
     if (hasConfigData(item.level4Config)) {
       entries.push({
-        title: item.product?.name || 'Configured Item',
-        subtitle: item.slot ? `Slot ${item.slot}` : undefined,
+        productName: item.product?.name || 'Configured Item',
+        productPartNumber: item.partNumber,
         partNumber: item.partNumber,
         config: item.level4Config,
       });
     }
 
     if (Array.isArray(item.slotLevel4) && item.slotLevel4.length > 0) {
-      item.slotLevel4.forEach(slot => {
+      item.slotLevel4.forEach((slot, index) => {
         if (!hasConfigData(slot.configuration)) return;
+        const resolvedSlotNumber = typeof slot.slot === 'number' && !Number.isNaN(slot.slot)
+          ? slot.slot
+          : normalizeSlotNumber(slot.slot, index);
+
         entries.push({
-          title: item.product?.name || 'Configured Item',
-          subtitle: slot.slot ? `Slot ${slot.slot}` : undefined,
+          productName: item.product?.name || 'Configured Item',
+          productPartNumber: item.partNumber,
+          slotNumber: resolvedSlotNumber,
+          slotCardName: slot.cardName,
           partNumber: slot.partNumber || item.partNumber,
           config: slot.configuration,
         });
@@ -261,6 +712,63 @@ export const generateQuotePDF = async (
 
     return entries;
   });
+
+  const level4EntriesAnalyzed: Level4AnalyzedEntry[] = level4DisplayItems.map(entry => {
+    const analysis = analyzeLevel4Config(entry.config);
+    return {
+      ...entry,
+      payload: analysis.payload,
+      fieldLabel: analysis.fieldLabel,
+      templateType: analysis.templateType,
+      options: analysis.options,
+      rawConfig: entry.config,
+    };
+  });
+
+  const uniqueLevel4ConfigIds = Array.from(
+    new Set(
+      level4EntriesAnalyzed
+        .map(entry => entry.payload?.level4_config_id)
+        .filter((id): id is string => Boolean(id))
+    )
+  );
+
+  const level4ConfigDefinitions = new Map<string, Level4ConfigDefinition>();
+  if (uniqueLevel4ConfigIds.length > 0) {
+    try {
+      const { data: configRows, error: configError } = await supabase
+        .from('level4_configs')
+        .select('id, field_label, mode, options, fixed_number_of_inputs, variable_max_inputs')
+        .in('id', uniqueLevel4ConfigIds);
+
+      if (configError) {
+        throw configError;
+      }
+
+      if (Array.isArray(configRows)) {
+        configRows.forEach(row => {
+          const templateType = typeof row.mode === 'string'
+            ? (row.mode.toLowerCase() === 'fixed' ? 'OPTION_2' : 'OPTION_1')
+            : row.fixed_number_of_inputs != null
+              ? 'OPTION_2'
+              : row.variable_max_inputs != null
+                ? 'OPTION_1'
+                : undefined;
+
+          level4ConfigDefinitions.set(row.id, {
+            id: row.id,
+            fieldLabel: typeof row.field_label === 'string' ? row.field_label : undefined,
+            templateType,
+            options: normalizeLevel4Options((row as any).options),
+          });
+        });
+      }
+    } catch (error) {
+      console.warn('Could not fetch Level 4 configuration metadata for PDF:', error);
+    }
+  }
+
+  const level4SectionHTML = buildLevel4SectionHTML(level4EntriesAnalyzed, level4ConfigDefinitions);
 
   // Calculate dates
   const createdDate = new Date();
@@ -302,6 +810,17 @@ export const generateQuotePDF = async (
         .bom-table tr:nth-child(even) { background-color: #f2f2f2; }
         .total-section { text-align: right; font-size: 18px; font-weight: bold; }
         .footer { margin-top: 40px; padding-top: 20px; border-top: 1px solid #ddd; font-size: 12px; color: #666; }
+        .level4-section { margin-top: 25px; background: #f8f9fa; padding: 20px; border-radius: 8px; border-left: 4px solid #dc2626; }
+        .level4-heading { margin: 0; color: #111827; font-size: 16px; font-weight: 600; }
+        .level4-subheading { margin-top: 4px; color: #6b7280; font-size: 13px; }
+        .level4-meta { margin-top: 6px; color: #6b7280; font-size: 12px; }
+        .level4-table { width: 100%; border-collapse: collapse; margin-top: 15px; background: white; border: 1px solid #e5e7eb; }
+        .level4-table th, .level4-table td { border: 1px solid #e5e7eb; padding: 10px; text-align: left; font-size: 13px; vertical-align: top; }
+        .level4-table th { background-color: #dc2626; color: white; font-weight: 600; }
+        .level4-option-label { font-weight: 600; color: #1f2937; }
+        .level4-option-meta { margin-top: 4px; color: #6b7280; font-size: 12px; }
+        .level4-empty { color: #6b7280; font-style: italic; background: white; border: 1px dashed #d1d5db; padding: 12px; border-radius: 6px; margin-top: 15px; }
+        .level4-raw { white-space: pre-wrap; font-family: 'Courier New', monospace; font-size: 12px; background: white; padding: 12px; border-radius: 6px; border: 1px solid #e5e7eb; margin-top: 15px; }
         @media print { body { margin: 0; } }
       </style>
     </head>
@@ -509,115 +1028,7 @@ export const generateQuotePDF = async (
         return rackConfigHTML;
       })()}
 
-      ${(() => {
-        if (level4DisplayItems.length === 0) {
-          return '';
-        }
-
-        const renderLevel4Config = (config: any): string => {
-          if (!hasConfigData(config)) {
-            return '<p style="color: #666; font-style: italic; padding: 15px; background: white; border-radius: 4px;">No configuration details available</p>';
-          }
-
-          const configData = config as any;
-
-          if (Array.isArray(configData?.entries) && configData.entries.length > 0) {
-            let html = '<table style="width: 100%; border-collapse: collapse; margin-top: 10px; background: white; border: 1px solid #ddd;">';
-            html += '<thead><tr style="background: #dc2626; color: white;"><th style="padding: 10px; border: 1px solid #ddd; text-align: left; width: 30%;">Input</th><th style="padding: 10px; border: 1px solid #ddd; text-align: left;">Configuration</th></tr></thead>';
-            html += '<tbody>';
-
-            configData.entries.forEach((entry: any, entryIdx: number) => {
-              const inputLabel = `Input #${entryIdx + 1}`;
-              let displayValue = entry.label || entry.name || entry.value || 'Not configured';
-
-              if (!entry.label && entry.value && configData.options) {
-                const option = configData.options.find((opt: any) => opt.id === entry.value || opt.value === entry.value);
-                if (option) {
-                  displayValue = option.label || option.name || entry.value;
-                }
-              }
-
-              const rowStyle = entryIdx % 2 === 0 ? 'background: #f9fafb;' : 'background: white;';
-              html += `
-                <tr style="${rowStyle}">
-                  <td style="padding: 10px; border: 1px solid #ddd; font-weight: 600;">${inputLabel}</td>
-                  <td style="padding: 10px; border: 1px solid #ddd;">${displayValue}</td>
-                </tr>`;
-            });
-
-            html += '</tbody></table>';
-            return html;
-          }
-
-          if (Array.isArray(configData?.selections) && configData.selections.length > 0) {
-            let html = '<table style="width: 100%; border-collapse: collapse; margin-top: 10px; background: white; border: 1px solid #ddd;">';
-            html += '<thead><tr style="background: #dc2626; color: white;"><th style="padding: 10px; border: 1px solid #ddd; text-align: left; width: 30%;">Input</th><th style="padding: 10px; border: 1px solid #ddd; text-align: left;">Configuration</th></tr></thead>';
-            html += '<tbody>';
-
-            configData.selections.forEach((selection: any, idx: number) => {
-              const inputLabel = `Input #${idx + 1}`;
-              const displayValue = selection.label || selection.name || selection.value || 'Not configured';
-              const rowStyle = idx % 2 === 0 ? 'background: #f9fafb;' : 'background: white;';
-              html += `
-                <tr style="${rowStyle}">
-                  <td style="padding: 10px; border: 1px solid #ddd; font-weight: 600;">${inputLabel}</td>
-                  <td style="padding: 10px; border: 1px solid #ddd;">${displayValue}</td>
-                </tr>`;
-            });
-
-            html += '</tbody></table>';
-            return html;
-          }
-
-          if (Array.isArray(configData)) {
-            if (configData.every((entry: any) => typeof entry === 'string' || typeof entry === 'number')) {
-              return `<ul style="margin: 10px 0 0 20px; color: #333;">${configData.map((entry: any) => `<li>${String(entry).replace(/</g, '&lt;').replace(/>/g, '&gt;')}</li>`).join('')}</ul>`;
-            }
-            return `<pre style="white-space: pre-wrap; font-family: monospace; font-size: 12px; background: white; padding: 10px; border-radius: 4px;">${JSON.stringify(configData, null, 2)}</pre>`;
-          }
-
-          if (configData && typeof configData === 'object') {
-            const entries = Object.entries(configData).filter(([key]) => !['id', 'level4_config_id', 'bom_item_id', 'created_at', 'updated_at', 'options'].includes(key));
-            if (entries.length > 0) {
-              let html = '<table style="width: 100%; border-collapse: collapse; margin-top: 10px; background: white; border: 1px solid #ddd;">';
-              html += '<thead><tr style="background: #dc2626; color: white;"><th style="padding: 10px; border: 1px solid #ddd; text-align: left; width: 30%;">Property</th><th style="padding: 10px; border: 1px solid #ddd; text-align: left;">Value</th></tr></thead>';
-              html += '<tbody>';
-
-              entries.forEach(([key, value], idx) => {
-                const displayKey = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-                const displayValue = typeof value === 'object' ? JSON.stringify(value, null, 2) : String(value);
-                const rowStyle = idx % 2 === 0 ? 'background: #f9fafb;' : 'background: white;';
-                html += `
-                  <tr style="${rowStyle}">
-                    <td style="padding: 10px; border: 1px solid #ddd; font-weight: 600;">${displayKey}</td>
-                    <td style="padding: 10px; border: 1px solid #ddd; white-space: pre-wrap; font-family: 'Courier New', monospace; font-size: 12px;">${displayValue.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</td>
-                  </tr>`;
-              });
-
-              html += '</tbody></table>';
-              return html;
-            }
-          }
-
-          return `<p style="color: #333; padding: 10px; background: white; border-radius: 4px;">${String(configData).replace(/</g, '&lt;').replace(/>/g, '&gt;')}</p>`;
-        };
-
-        let level4HTML = '<div style="margin-top: 40px; page-break-before: always;">';
-        level4HTML += '<h2 style="color: #dc2626; border-bottom: 2px solid #dc2626; padding-bottom: 10px;">Level 4 Configuration Details</h2>';
-
-        level4DisplayItems.forEach(entry => {
-          level4HTML += `
-            <div style="margin-top: 25px; background: #f8f9fa; padding: 20px; border-radius: 8px; border-left: 4px solid #dc2626;">
-              <h3 style="color: #dc2626; margin-top: 0; font-size: 16px;">${entry.title}${entry.subtitle ? ` - ${entry.subtitle}` : ''}${entry.partNumber ? ` (${entry.partNumber})` : ''}</h3>
-              <div style="margin-top: 15px; padding-left: 15px;">
-                ${renderLevel4Config(entry.config)}
-              </div>
-            </div>`;
-        });
-
-        level4HTML += '</div>';
-        return level4HTML;
-      })()}
+      ${level4SectionHTML}
 
       ${canSeePrices ? `
         <div class="total-section">
