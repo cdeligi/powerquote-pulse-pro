@@ -409,7 +409,8 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
           // Use stored values from draft_bom, fallback to unit_price/unit_cost, then fetch if needed
           let price = item.product?.price || item.unit_price || item.total_price || 0;
           let cost = item.product?.cost || item.unit_cost || item.total_cost || 0;
-
+        main
+        main
           const rawConfiguration =
             (typeof item.configuration_data === 'object' && item.configuration_data) ||
             (typeof item.configurationData === 'object' && item.configurationData) ||
@@ -418,7 +419,6 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
 
           const productSource = (typeof item.product === 'object' && item.product) || {};
           const mergedConfigurationData = { ...productSource, ...rawConfiguration };
-
           const rawSlotAssignments =
             item.slotAssignments ||
             item.slot_assignments ||
@@ -426,6 +426,16 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
             rawConfiguration.slot_assignments ||
             mergedConfigurationData.slotAssignments ||
             (mergedConfigurationData as any)?.slot_assignments;
+          const configurationData = { ...productSource, ...rawConfiguration };
+        main
+
+          const rawSlotAssignments =
+            item.slotAssignments ||
+            rawConfiguration.slotAssignments ||
+            mergedConfigurationData.slotAssignments;
+            configurationData.slotAssignments;
+        main
+        main
 
           const normalizedSlotAssignments: SerializedSlotAssignment[] | undefined = Array.isArray(rawSlotAssignments)
             ? rawSlotAssignments
@@ -453,7 +463,6 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
                   } as SerializedSlotAssignment;
                 })
               : undefined;
-
           const slotAssignmentsMap =
             deserializeSlotAssignments(normalizedSlotAssignments) ||
             convertRackLayoutToAssignments(
@@ -464,6 +473,12 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
               mergedConfigurationData.rackConfiguration ||
               (mergedConfigurationData as any)?.rack_configuration
             );
+
+          const configurationData = item.configuration_data || item.product || {};
+          main
+         main
+
+        main
           // If price or cost is 0, fetch fresh product data
           if ((price === 0 || cost === 0) && (item.productId || item.product_id)) {
             try {
@@ -489,22 +504,40 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
             (rawConfiguration as any)?.rack_configuration ||
             mergedConfigurationData.rackConfiguration ||
             (mergedConfigurationData as any)?.rack_configuration ||
+
+          const slotAssignmentsMap = deserializeSlotAssignments(normalizedSlotAssignments);
+          const rackLayout =
+            item.rackConfiguration ||
+            rawConfiguration.rackConfiguration ||
+            mergedConfigurationData.rackConfiguration ||
+            configurationData.rackConfiguration ||
+        main
+        main
             buildRackLayoutFromAssignments(normalizedSlotAssignments);
           const level4Config =
             item.level4Config ??
             rawConfiguration.level4Config ??
             mergedConfigurationData.level4Config ??
+            configurationData.level4Config ??
+        main
+        main
             null;
           const level4Selections =
             item.level4Selections ??
             rawConfiguration.level4Selections ??
             mergedConfigurationData.level4Selections ??
+            configurationData.level4Selections ??
+        main
+        main
             null;
           const configuration =
             item.configuration ??
             rawConfiguration.configuration ??
             mergedConfigurationData.configuration ??
             (item.configuration_data as any)?.configuration ??
+            configurationData.configuration ??
+        main
+        main
             null;
 
           return {
@@ -517,6 +550,13 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
               ...mergedConfigurationData,
               price: price,
               cost: cost,
+
+              description: item.description || item.product?.description || configurationData.description || '',
+              ...configurationData,
+        main
+              price,
+              cost,
+        main
             },
             quantity: item.quantity || 1,
             enabled: item.enabled !== false,
@@ -532,6 +572,10 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
             level4Selections: level4Selections || undefined,
             displayName: item.displayName || mergedConfigurationData.displayName || mergedConfigurationData.name,
             isAccessory: item.isAccessory ?? mergedConfigurationData.isAccessory,
+            displayName: item.displayName || configurationData.displayName || configurationData.name,
+            isAccessory: item.isAccessory ?? configurationData.isAccessory,
+       main
+        main
           };
         }));
         
