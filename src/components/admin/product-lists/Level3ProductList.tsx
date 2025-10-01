@@ -216,7 +216,11 @@ export const Level3ProductList: React.FC<Level3ProductListProps> = ({
                       />
                     </div>
                     <div>
+
                       <Label htmlFor={`partNumber-${product.id}`} className="text-gray-700">Level 3 Part Number</Label>
+
+                      <Label htmlFor={`partNumber-${product.id}`} className="text-gray-700">Part Number</Label>
+                      main
                       <Input
                         id={`partNumber-${product.id}`}
                         value={editFormData.partNumber || ''}
@@ -224,7 +228,10 @@ export const Level3ProductList: React.FC<Level3ProductListProps> = ({
                         placeholder="e.g., ANA-16CH-001"
                         className="bg-white border-gray-300 text-gray-900"
                       />
+
                       <p className="text-xs text-gray-500 mt-1">This value appears on generated quotes for the selected slot.</p>
+
+                    main
                     </div>
                       <div className="flex items-center space-x-2">
                         <Switch
