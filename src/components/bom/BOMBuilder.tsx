@@ -50,6 +50,54 @@ interface BOMBuilderProps {
 
 const SLOT_LEVEL4_FLAG = '__slotLevel4Session';
 
+const convertRackLayoutToAssignments = (
+  layout?: {
+    slots?: Array<{
+      slot?: number | null;
+      slotNumber?: number | null;
+      cardName?: string | null;
+      partNumber?: string | null;
+      product?: { id?: string | null; name?: string | null; displayName?: string | null } | null;
+      level4Config?: any;
+      level4Selections?: any;
+    }>;
+  }
+): Record<number, Level3Product & Record<string, any>> | undefined => {
+  if (!layout?.slots || layout.slots.length === 0) {
+    return undefined;
+  }
+
+  return layout.slots.reduce<Record<number, Level3Product & Record<string, any>>>((acc, slot) => {
+    const position = typeof slot.slot === 'number'
+      ? slot.slot
+      : typeof slot.slotNumber === 'number'
+        ? slot.slotNumber
+        : undefined;
+
+    if (position === undefined) {
+      return acc;
+    }
+
+    const name = slot.cardName || slot.product?.displayName || slot.product?.name || `Slot ${position} Card`;
+
+    acc[position] = {
+      id: slot.product?.id || `slot-${position}`,
+      name,
+      displayName: name,
+      description: '',
+      price: 0,
+      enabled: true,
+      parent_product_id: '',
+      product_level: 3,
+      partNumber: slot.partNumber || undefined,
+      level4Config: slot.level4Config ?? null,
+      level4Selections: slot.level4Selections ?? null,
+    } as Level3Product & Record<string, any>;
+
+    return acc;
+  }, {});
+};
+
 const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, mode = 'new' }: BOMBuilderProps) => {
   // ALL HOOKS MUST BE AT THE TOP - NO CONDITIONAL RETURNS BEFORE HOOKS
   const { user, loading } = useAuth();
@@ -373,8 +421,11 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
 
           const rawSlotAssignments =
             item.slotAssignments ||
+            item.slot_assignments ||
             rawConfiguration.slotAssignments ||
-            mergedConfigurationData.slotAssignments;
+            rawConfiguration.slot_assignments ||
+            mergedConfigurationData.slotAssignments ||
+            (mergedConfigurationData as any)?.slot_assignments;
 
           const normalizedSlotAssignments: SerializedSlotAssignment[] | undefined = Array.isArray(rawSlotAssignments)
             ? rawSlotAssignments
@@ -403,6 +454,16 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
                 })
               : undefined;
 
+          const slotAssignmentsMap =
+            deserializeSlotAssignments(normalizedSlotAssignments) ||
+            convertRackLayoutToAssignments(
+              item.rackConfiguration ||
+              item.rack_configuration ||
+              rawConfiguration.rackConfiguration ||
+              (rawConfiguration as any)?.rack_configuration ||
+              mergedConfigurationData.rackConfiguration ||
+              (mergedConfigurationData as any)?.rack_configuration
+            );
           // If price or cost is 0, fetch fresh product data
           if ((price === 0 || cost === 0) && (item.productId || item.product_id)) {
             try {
@@ -421,11 +482,13 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
             }
           }
           
-          const slotAssignmentsMap = deserializeSlotAssignments(normalizedSlotAssignments);
           const rackLayout =
             item.rackConfiguration ||
+            item.rack_configuration ||
             rawConfiguration.rackConfiguration ||
+            (rawConfiguration as any)?.rack_configuration ||
             mergedConfigurationData.rackConfiguration ||
+            (mergedConfigurationData as any)?.rack_configuration ||
             buildRackLayoutFromAssignments(normalizedSlotAssignments);
           const level4Config =
             item.level4Config ??
@@ -441,6 +504,7 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
             item.configuration ??
             rawConfiguration.configuration ??
             mergedConfigurationData.configuration ??
+            (item.configuration_data as any)?.configuration ??
             null;
 
           return {
@@ -461,7 +525,7 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
             original_unit_price: item.original_unit_price || price,
             approved_unit_price: item.approved_unit_price || price,
             priceHistory: item.priceHistory || [],
-            slotAssignments: slotAssignmentsMap,
+            slotAssignments: slotAssignmentsMap ?? {},
             rackConfiguration: rackLayout,
             configuration: configuration || undefined,
             level4Config: level4Config || undefined,
@@ -1824,10 +1888,20 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
     if (item.slotAssignments || (item.product as any).chassisType && (item.product as any).chassisType !== 'N/A') {
       console.log('Editing chassis configuration for:', item.product.name);
       
+      const productId = (item.product as Level2Product)?.id || item.productId || item.product_id;
+      const hydratedChassis =
+        (productId && allLevel2Products.find(p => p.id === productId)) ||
+        (item.product as Level2Product);
+
       // Set up the chassis for editing
-      setSelectedChassis(item.product as Level2Product);
-      setSlotAssignments(item.slotAssignments || {});
-      setConfiguringChassis(item.product as Level2Product);
+      setSelectedChassis(hydratedChassis);
+      setSlotAssignments(
+        (item.slotAssignments && Object.keys(item.slotAssignments).length > 0
+          ? item.slotAssignments
+          : convertRackLayoutToAssignments(item.rackConfiguration)) ||
+        {}
+      );
+      setConfiguringChassis(hydratedChassis);
       
       // Store the original item for restoration if edit is cancelled
       setEditingOriginalItem(item);
