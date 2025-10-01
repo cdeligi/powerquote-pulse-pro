@@ -169,6 +169,18 @@ const CardForm = ({ onSubmit, level2Products, initialData }: CardFormProps) => {
         </div>
       </div>
 
+      <div>
+        <Label htmlFor="partNumber" className="text-foreground">Part Number</Label>
+        <Input
+          id="partNumber"
+          value={formData.partNumber}
+          onChange={(e) => setFormData({ ...formData, partNumber: e.target.value })}
+          className="bg-background border-input text-foreground"
+          placeholder="e.g., ANA-16CH-001"
+        />
+      </div>
+
+      main
       {/* Specifications Section */}
       <div className="space-y-2">
         <Label className="text-foreground">Specifications (Optional)</Label>

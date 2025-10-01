@@ -217,6 +217,12 @@ export const Level3ProductList: React.FC<Level3ProductListProps> = ({
                     </div>
                     <div className="md:col-span-2">
                       <Label htmlFor={`partNumber-${product.id}`} className="text-gray-700">Part Number Shown on Quotes</Label>
+                    <div>
+
+                      <Label htmlFor={`partNumber-${product.id}`} className="text-gray-700">Level 3 Part Number</Label>
+
+                      <Label htmlFor={`partNumber-${product.id}`} className="text-gray-700">Part Number</Label>
+                      main
                       <Input
                         id={`partNumber-${product.id}`}
                         value={editFormData.partNumber || ''}
@@ -228,6 +234,28 @@ export const Level3ProductList: React.FC<Level3ProductListProps> = ({
                         Update this value to control the part number that appears in rack slot listings within generated quotes.
                       </p>
                     </div>
+
+                      <p className="text-xs text-gray-500 mt-1">This value appears on generated quotes for the selected slot.</p>
+
+                    main
+                    </div>
+                      <div className="flex items-center space-x-2">
+                        <Switch
+                          id={`enabled-${product.id}`}
+                          checked={editFormData.enabled !== false}
+                          onCheckedChange={(checked) => setEditFormData(prev => ({ ...prev, enabled: checked }))}
+                        />
+                        <Label htmlFor={`enabled-${product.id}`} className="text-gray-700">Enabled</Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Switch
+                          id={`has-level4-${product.id}`}
+                          checked={(editFormData as any).has_level4 || false}
+                          onCheckedChange={(checked) => setEditFormData(prev => ({ ...prev, has_level4: checked }))}
+                        />
+                        <Label htmlFor={`has-level4-${product.id}`} className="text-gray-700">Has Level 4 Config</Label>
+                      </div>
+                    main
                     <div>
                       <Label htmlFor={`price-${product.id}`} className="text-gray-700">Price ($)</Label>
                       <Input

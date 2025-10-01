@@ -90,6 +90,15 @@ export const Level3ProductForm: React.FC<Level3ProductFormProps> = ({
             {errors.sku && <p className="text-sm text-destructive">{errors.sku.message}</p>}
           </div>
           <div className="space-y-2">
+            <Label htmlFor="partNumber">Part Number</Label>
+            <Input
+              id="partNumber"
+              {...register('partNumber')}
+              placeholder="e.g., ANA-16CH-001"
+            />
+            {errors.partNumber && <p className="text-sm text-destructive">{errors.partNumber.message}</p>}
+          </div>
+          <div className="space-y-2">
             <Label htmlFor="price">Price</Label>
             <Input
               id="price"
