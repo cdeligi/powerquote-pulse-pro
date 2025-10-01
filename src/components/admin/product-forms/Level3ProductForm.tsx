@@ -112,6 +112,19 @@ export const Level3ProductForm: React.FC<Level3ProductFormProps> = ({
         </div>
 
         <div className="space-y-2">
+          <Label htmlFor="partNumber">Part Number Shown on Quotes</Label>
+          <Input
+            id="partNumber"
+            {...register('partNumber')}
+            placeholder="e.g., ANA-16CH-001"
+          />
+          <p className="text-xs text-muted-foreground">
+            Provide the part number that should appear for this card in generated rack slot listings.
+          </p>
+          {errors.partNumber && <p className="text-sm text-destructive">{errors.partNumber.message}</p>}
+        </div>
+
+        <div className="space-y-2">
           <div className="flex items-center space-x-2">
             <Checkbox 
               id="requiresLevel4" 
