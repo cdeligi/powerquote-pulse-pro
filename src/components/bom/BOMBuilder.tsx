@@ -361,6 +361,7 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
           // Use stored values from draft_bom, fallback to unit_price/unit_cost, then fetch if needed
           let price = item.product?.price || item.unit_price || item.total_price || 0;
           let cost = item.product?.cost || item.unit_cost || item.total_cost || 0;
+        main
           const rawConfiguration =
             (typeof item.configuration_data === 'object' && item.configuration_data) ||
             (typeof item.configurationData === 'object' && item.configurationData) ||
@@ -368,12 +369,16 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
             {};
 
           const productSource = (typeof item.product === 'object' && item.product) || {};
+          const mergedConfigurationData = { ...productSource, ...rawConfiguration };
           const configurationData = { ...productSource, ...rawConfiguration };
+        main
 
           const rawSlotAssignments =
             item.slotAssignments ||
             rawConfiguration.slotAssignments ||
+            mergedConfigurationData.slotAssignments;
             configurationData.slotAssignments;
+        main
 
           const normalizedSlotAssignments: SerializedSlotAssignment[] | undefined = Array.isArray(rawSlotAssignments)
             ? rawSlotAssignments
@@ -403,6 +408,7 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
               : undefined;
           const configurationData = item.configuration_data || item.product || {};
           main
+         main
 
           // If price or cost is 0, fetch fresh product data
           if ((price === 0 || cost === 0) && (item.productId || item.product_id)) {
@@ -426,22 +432,30 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
           const rackLayout =
             item.rackConfiguration ||
             rawConfiguration.rackConfiguration ||
+            mergedConfigurationData.rackConfiguration ||
             configurationData.rackConfiguration ||
+        main
             buildRackLayoutFromAssignments(normalizedSlotAssignments);
           const level4Config =
             item.level4Config ??
             rawConfiguration.level4Config ??
+            mergedConfigurationData.level4Config ??
             configurationData.level4Config ??
+        main
             null;
           const level4Selections =
             item.level4Selections ??
             rawConfiguration.level4Selections ??
+            mergedConfigurationData.level4Selections ??
             configurationData.level4Selections ??
+        main
             null;
           const configuration =
             item.configuration ??
             rawConfiguration.configuration ??
+            mergedConfigurationData.configuration ??
             configurationData.configuration ??
+        main
             null;
 
           return {
@@ -450,8 +464,11 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
               id: item.productId || item.product_id || item.product?.id,
               name: item.name || item.product?.name,
               partNumber: item.partNumber || item.part_number || item.product?.partNumber,
+              description: item.description || item.product?.description || mergedConfigurationData.description || '',
+              ...mergedConfigurationData,
               description: item.description || item.product?.description || configurationData.description || '',
               ...configurationData,
+        main
               price,
               cost,
             },
@@ -467,8 +484,11 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
             configuration: configuration || undefined,
             level4Config: level4Config || undefined,
             level4Selections: level4Selections || undefined,
+            displayName: item.displayName || mergedConfigurationData.displayName || mergedConfigurationData.name,
+            isAccessory: item.isAccessory ?? mergedConfigurationData.isAccessory,
             displayName: item.displayName || configurationData.displayName || configurationData.name,
             isAccessory: item.isAccessory ?? configurationData.isAccessory,
+       main
           };
         }));
         
