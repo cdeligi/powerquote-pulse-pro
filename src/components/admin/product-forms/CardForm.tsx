@@ -121,6 +121,20 @@ const CardForm = ({ onSubmit, level2Products, initialData }: CardFormProps) => {
       </div>
 
       <div>
+        <Label htmlFor="partNumber" className="text-foreground">Part Number Shown on Quotes</Label>
+        <Input
+          id="partNumber"
+          value={formData.partNumber}
+          onChange={(e) => setFormData({ ...formData, partNumber: e.target.value })}
+          className="bg-background border-input text-foreground"
+          placeholder="e.g., ANA-16CH-001"
+        />
+        <p className="text-xs text-muted-foreground mt-1">
+          This value is surfaced in the generated quote alongside the card slot details.
+        </p>
+      </div>
+
+      <div>
         <Label htmlFor="description" className="text-foreground">Description</Label>
         <Textarea
           id="description"
@@ -166,6 +180,7 @@ const CardForm = ({ onSubmit, level2Products, initialData }: CardFormProps) => {
         />
       </div>
 
+      main
       {/* Specifications Section */}
       <div className="space-y-2">
         <Label className="text-foreground">Specifications (Optional)</Label>
