@@ -361,7 +361,9 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
           // Use stored values from draft_bom, fallback to unit_price/unit_cost, then fetch if needed
           let price = item.product?.price || item.unit_price || item.total_price || 0;
           let cost = item.product?.cost || item.unit_cost || item.total_cost || 0;
-          
+
+          const configurationData = item.configuration_data || item.product || {};
+
           // If price or cost is 0, fetch fresh product data
           if ((price === 0 || cost === 0) && (item.productId || item.product_id)) {
             try {
@@ -392,9 +394,10 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
               id: item.productId || item.product_id || item.product?.id,
               name: item.name || item.product?.name,
               partNumber: item.partNumber || item.part_number || item.product?.partNumber,
+              description: item.description || item.product?.description || configurationData.description || '',
+              ...configurationData,
               price,
               cost,
-              description: item.description || item.product?.description || ''
             },
             quantity: item.quantity || 1,
             enabled: item.enabled !== false,
