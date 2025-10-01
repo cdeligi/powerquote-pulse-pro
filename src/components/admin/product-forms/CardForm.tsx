@@ -27,7 +27,8 @@ const CardForm = ({ onSubmit, level2Products, initialData }: CardFormProps) => {
     has_level4: (initialData as any)?.has_level4 || false,
     specifications: initialData?.specifications || {},
     product_level: 3 as const,
-    image: initialData?.image || ''
+    image: initialData?.image || '',
+    partNumber: initialData?.partNumber || ''
   });
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -46,7 +47,8 @@ const CardForm = ({ onSubmit, level2Products, initialData }: CardFormProps) => {
       has_level4: (formData as any).has_level4,
       specifications: formData.specifications,
       product_level: 3,
-      image: formData.image || undefined
+      image: formData.image || undefined,
+      partNumber: formData.partNumber?.trim() ? formData.partNumber.trim() : undefined
     };
     onSubmit(newCard);
   };
@@ -156,10 +158,14 @@ const CardForm = ({ onSubmit, level2Products, initialData }: CardFormProps) => {
       </div>
 
       <div>
-        <Label className="text-foreground">Part Number</Label>
-        <div className="text-sm text-gray-400">
-          Part numbers are configured under Products → Part Numbers.
-        </div>
+        <Label htmlFor="partNumber" className="text-foreground">Part Number</Label>
+        <Input
+          id="partNumber"
+          value={formData.partNumber}
+          onChange={(e) => setFormData({ ...formData, partNumber: e.target.value })}
+          className="bg-background border-input text-foreground"
+          placeholder="e.g., ANA-16CH-001"
+        />
       </div>
 
       {/* Specifications Section */}
