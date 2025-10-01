@@ -361,7 +361,48 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
           // Use stored values from draft_bom, fallback to unit_price/unit_cost, then fetch if needed
           let price = item.product?.price || item.unit_price || item.total_price || 0;
           let cost = item.product?.cost || item.unit_cost || item.total_cost || 0;
-          
+
+          const rawConfiguration =
+            (typeof item.configuration_data === 'object' && item.configuration_data) ||
+            (typeof item.configurationData === 'object' && item.configurationData) ||
+            (typeof item.product?.configuration_data === 'object' && item.product.configuration_data) ||
+            {};
+
+          const productSource = (typeof item.product === 'object' && item.product) || {};
+          const mergedConfigurationData = { ...productSource, ...rawConfiguration };
+
+          const rawSlotAssignments =
+            item.slotAssignments ||
+            rawConfiguration.slotAssignments ||
+            mergedConfigurationData.slotAssignments;
+
+          const normalizedSlotAssignments: SerializedSlotAssignment[] | undefined = Array.isArray(rawSlotAssignments)
+            ? rawSlotAssignments
+            : rawSlotAssignments && typeof rawSlotAssignments === 'object'
+              ? Object.entries(rawSlotAssignments).map(([slotKey, cardData]) => {
+                  const slotNumber = Number.parseInt(slotKey, 10);
+                  const card = (cardData || {}) as Record<string, any>;
+                  return {
+                    slot: Number.isNaN(slotNumber) ? 0 : slotNumber,
+                    productId: card.id,
+                    name: card.name,
+                    displayName: card.displayName,
+                    partNumber: card.partNumber,
+                    hasLevel4Configuration:
+                      Boolean(card.hasLevel4Configuration) ||
+                      Boolean(card.has_level4) ||
+                      Boolean(card.requires_level4_config),
+                    level4BomItemId: card.level4BomItemId,
+                    level4TempQuoteId: card.level4TempQuoteId,
+                    level4Config: card.level4Config ?? null,
+                    level4Selections: card.level4Selections ?? null,
+                    isBushingPrimary: card.isBushingPrimary ?? false,
+                    isBushingSecondary: card.isBushingSecondary ?? false,
+                    bushingPairSlot: card.bushingPairSlot ?? card.bushing_pair_slot ?? null,
+                  } as SerializedSlotAssignment;
+                })
+              : undefined;
+
           // If price or cost is 0, fetch fresh product data
           if ((price === 0 || cost === 0) && (item.productId || item.product_id)) {
             try {
@@ -380,11 +421,27 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
             }
           }
           
-          const storedSlotAssignments = item.slotAssignments as SerializedSlotAssignment[] | undefined;
-          const slotAssignmentsMap = deserializeSlotAssignments(storedSlotAssignments);
-          const rackLayout = item.rackConfiguration || buildRackLayoutFromAssignments(storedSlotAssignments);
-          const level4Config = item.level4Config ?? null;
-          const level4Selections = item.level4Selections ?? null;
+          const slotAssignmentsMap = deserializeSlotAssignments(normalizedSlotAssignments);
+          const rackLayout =
+            item.rackConfiguration ||
+            rawConfiguration.rackConfiguration ||
+            mergedConfigurationData.rackConfiguration ||
+            buildRackLayoutFromAssignments(normalizedSlotAssignments);
+          const level4Config =
+            item.level4Config ??
+            rawConfiguration.level4Config ??
+            mergedConfigurationData.level4Config ??
+            null;
+          const level4Selections =
+            item.level4Selections ??
+            rawConfiguration.level4Selections ??
+            mergedConfigurationData.level4Selections ??
+            null;
+          const configuration =
+            item.configuration ??
+            rawConfiguration.configuration ??
+            mergedConfigurationData.configuration ??
+            null;
 
           return {
             id: item.id || crypto.randomUUID(),
@@ -392,9 +449,10 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
               id: item.productId || item.product_id || item.product?.id,
               name: item.name || item.product?.name,
               partNumber: item.partNumber || item.part_number || item.product?.partNumber,
-              price,
-              cost,
-              description: item.description || item.product?.description || ''
+              description: item.description || item.product?.description || mergedConfigurationData.description || '',
+              ...mergedConfigurationData,
+              price: price,
+              cost: cost,
             },
             quantity: item.quantity || 1,
             enabled: item.enabled !== false,
@@ -405,8 +463,11 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
             priceHistory: item.priceHistory || [],
             slotAssignments: slotAssignmentsMap,
             rackConfiguration: rackLayout,
+            configuration: configuration || undefined,
             level4Config: level4Config || undefined,
             level4Selections: level4Selections || undefined,
+            displayName: item.displayName || mergedConfigurationData.displayName || mergedConfigurationData.name,
+            isAccessory: item.isAccessory ?? mergedConfigurationData.isAccessory,
           };
         }));
         
