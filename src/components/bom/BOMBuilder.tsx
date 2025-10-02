@@ -579,10 +579,8 @@ if (
       } as BOMItem;
     }),
   );
-}
-        
-        console.log(`Loaded ${loadedItems.length} items from draft_bom`);
-      } else {
+  console.log(`Loaded ${loadedItems.length} items from draft_bom`);
+} else {
         console.log('Loading BOM data from bom_items table');
         // Load BOM items with Level 4 configurations from database table
         const { data: bomData, error: bomError } = await supabase
