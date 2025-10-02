@@ -23,11 +23,12 @@ type Level4DisplayItem = {
   slotNumber?: number;
   slotCardName?: string;
   partNumber?: string;
+  level4BomItemId?: string;
   config: any;
 };
 
 type Level4AnalyzedEntry = Level4DisplayItem & {
-  payload?: NormalizedLevel4Payload | null1;
+  payload?: NormalizedLevel4Payload | null;
   fieldLabel?: string;
   templateType?: 'OPTION_1' | 'OPTION_2';
   options: NormalizedLevel4Option[];
@@ -603,7 +604,17 @@ export const generateQuotePDF = async (
     return fallbackIndex + 1;
   };
 
-  const toSlotEntries = (slots: any[]): Array<{ slot: number; cardName: string; partNumber?: string; level4Config?: any; level4Selections?: any; }> => {
+  const toSlotEntries = (slots: any[]): Array<{
+    slot: number;
+    cardName: string;
+    partNumber?: string;
+    level4Config?: any;
+    level4Selections?: any;
+    level4BomItemId?: string;
+    isSharedLevel4Config?: boolean;
+    isBushingSecondary?: boolean;
+    sharedFromSlot?: number;
+  }> => {
     if (!Array.isArray(slots)) return [];
     return slots
       .map((slot, index) => {
@@ -614,12 +625,65 @@ export const generateQuotePDF = async (
           partNumber: slot?.partNumber || slot?.product?.partNumber || slot?.part_number || undefined,
           level4Config: slot?.level4Config || slot?.configuration || null,
           level4Selections: slot?.level4Selections || slot?.selections || null,
+          level4BomItemId:
+            slot?.level4BomItemId ||
+            slot?.level4_bom_item_id ||
+            slot?.level4Config?.bomItemId ||
+            slot?.level4Config?.bom_item_id ||
+            slot?.level4Config?.bom_item ||
+            slot?.configuration?.bomItemId ||
+            slot?.configuration?.bom_item_id ||
+            slot?.configuration?.bom_item ||
+            undefined,
+          isSharedLevel4Config:
+            Boolean(
+              slot?.isSharedLevel4Config ||
+              slot?.sharedLevel4Config ||
+              slot?.is_shared_level4_config ||
+              slot?.isBushingSecondary ||
+              slot?.level4Config?.isSharedLevel4Config ||
+              slot?.level4Config?.sharedLevel4Config ||
+              slot?.level4Config?.is_shared_level4_config ||
+              slot?.level4Config?.shared_from_slot != null ||
+              slot?.level4Config?.sharedFromSlot != null ||
+              slot?.configuration?.isSharedLevel4Config ||
+              slot?.configuration?.sharedLevel4Config ||
+              slot?.configuration?.is_shared_level4_config ||
+              slot?.configuration?.shared_from_slot != null ||
+              slot?.configuration?.sharedFromSlot != null
+            ),
+          isBushingSecondary: Boolean(slot?.isBushingSecondary || slot?.is_bushing_secondary),
+          sharedFromSlot: (() => {
+            const rawShared =
+              slot?.sharedFromSlot ??
+              slot?.shared_from_slot ??
+              slot?.level4Config?.sharedFromSlot ??
+              slot?.level4Config?.shared_from_slot ??
+              slot?.configuration?.sharedFromSlot ??
+              slot?.configuration?.shared_from_slot;
+            if (rawShared === undefined || rawShared === null || rawShared === '') {
+              return undefined;
+            }
+            return normalizeSlotNumber(rawShared, index);
+          })(),
         };
       })
       .filter(entry => entry.slot !== undefined && entry.slot !== null);
   };
 
-  const deriveRackConfiguration = (item: any): { slots: Array<{ slot: number; cardName: string; partNumber?: string; level4Config?: any; level4Selections?: any; }> } | undefined => {
+  const deriveRackConfiguration = (item: any): {
+    slots: Array<{
+      slot: number;
+      cardName: string;
+      partNumber?: string;
+      level4Config?: any;
+      level4Selections?: any;
+      level4BomItemId?: string;
+      isSharedLevel4Config?: boolean;
+      isBushingSecondary?: boolean;
+      sharedFromSlot?: number;
+    }>;
+  } | undefined => {
     if (!item) return undefined;
 
     if (item.rackConfiguration && typeof item.rackConfiguration === 'object') {
@@ -645,6 +709,28 @@ export const generateQuotePDF = async (
           partNumber: data?.partNumber || data?.product?.partNumber || data?.part_number || undefined,
           level4Config: data?.level4Config || null,
           level4Selections: data?.level4Selections || null,
+          level4BomItemId:
+            data?.level4BomItemId ||
+            data?.level4_bom_item_id ||
+            data?.level4Config?.bomItemId ||
+            data?.level4Config?.bom_item_id ||
+            data?.configuration?.bomItemId ||
+            data?.configuration?.bom_item_id,
+          isSharedLevel4Config:
+            Boolean(
+              data?.isSharedLevel4Config ||
+              data?.sharedLevel4Config ||
+              data?.is_shared_level4_config ||
+              data?.isBushingSecondary ||
+              data?.is_bushing_secondary
+            ),
+          isBushingSecondary: Boolean(data?.isBushingSecondary || data?.is_bushing_secondary),
+          sharedFromSlot:
+            data?.sharedFromSlot ??
+            data?.shared_from_slot ??
+            data?.bushingPairSlot ??
+            data?.bushing_pair_slot ??
+            undefined,
         };
       }).filter(entry => entry.slot !== undefined && entry.slot !== null);
 
@@ -672,6 +758,108 @@ export const generateQuotePDF = async (
     return String(config).trim().length > 0;
   };
 
+  const isSharedLevel4Slot = (slot: any): boolean => {
+    if (!slot) return false;
+
+    const directFlags = [
+      slot.isSharedLevel4Config,
+      slot.sharedLevel4Config,
+      slot.is_shared_level4_config,
+      slot.isBushingSecondary,
+      slot.is_bushing_secondary,
+    ];
+
+    if (directFlags.some(flag => Boolean(flag))) {
+      return true;
+    }
+
+    const sharedSource =
+      slot.sharedFromSlot ??
+      slot.shared_from_slot ??
+      slot.primarySlot ??
+      slot.primary_slot ??
+      slot.bushingPairSlot ??
+      slot.bushing_pair_slot;
+
+    const slotNumber =
+      typeof slot.slot === 'number' ? slot.slot :
+      typeof slot.slotNumber === 'number' ? slot.slotNumber :
+      undefined;
+
+    if (sharedSource != null && sharedSource !== '' && sharedSource !== undefined) {
+      const normalizedShared = Number.parseInt(String(sharedSource), 10);
+      if (!Number.isNaN(normalizedShared)) {
+        if (slotNumber === undefined || normalizedShared !== slotNumber) {
+          return true;
+        }
+      }
+    }
+
+    const nestedCandidates = [slot.level4Config, slot.configuration, slot.level4Selections, slot.selections];
+    return nestedCandidates.some(candidate => {
+      if (!candidate || typeof candidate !== 'object') return false;
+      if (
+        candidate.isSharedLevel4Config ||
+        candidate.sharedLevel4Config ||
+        candidate.is_shared_level4_config ||
+        candidate.isBushingSecondary ||
+        candidate.is_bushing_secondary
+      ) {
+        return true;
+      }
+      const nestedShared = candidate.sharedFromSlot ?? candidate.shared_from_slot;
+      if (nestedShared != null && nestedShared !== '') {
+        return true;
+      }
+      return false;
+    });
+  };
+
+  const buildLevel4SharedKey = (slot: any, configuration: any): string | undefined => {
+    const candidateValues = [
+      slot?.level4BomItemId,
+      slot?.level4_bom_item_id,
+      configuration?.level4BomItemId,
+      configuration?.level4_bom_item_id,
+      configuration?.bomItemId,
+      configuration?.bom_item_id,
+      configuration?.bom_item,
+      configuration?.bomId,
+      configuration?.bom_id,
+      configuration?.bomItem?.id,
+      configuration?.payload?.bomItemId,
+      configuration?.payload?.bom_item_id,
+    ];
+
+    for (const candidate of candidateValues) {
+      if (candidate === undefined || candidate === null) continue;
+      const value = typeof candidate === 'string' ? candidate : String(candidate);
+      if (value.trim().length > 0) {
+        return `bom:${value.trim()}`;
+      }
+    }
+
+    if (configuration !== undefined && configuration !== null) {
+      if (typeof configuration === 'string') {
+        const trimmed = configuration.trim();
+        if (trimmed.length > 0) {
+          return `cfg:${trimmed}`;
+        }
+      }
+
+      try {
+        const serialized = JSON.stringify(configuration);
+        if (serialized.length > 0) {
+          return `cfg:${serialized}`;
+        }
+      } catch {
+        // Ignore serialization errors
+      }
+    }
+
+    return undefined;
+  };
+
   const normalizedBomItems = bomItems.map(item => {
     const product = (item.product || {}) as any;
     const normalizedProduct = {
@@ -694,28 +882,68 @@ export const generateQuotePDF = async (
       directLevel4 = fallbackLevel4.configuration;
     }
 
-    const slotLevel4Entries: Array<{ slot: number; cardName: string; partNumber?: string; configuration: any; }> = [];
+    const slotLevel4Entries: Array<{ slot: number; cardName: string; partNumber?: string; level4BomItemId?: string; configuration: any; }> = [];
+    const seenLevel4Keys = new Set<string>();
+
     const rackSlots = derivedRack?.slots || [];
     rackSlots.forEach(slot => {
       const configuration = slot.level4Config || slot.level4Selections;
-      if (hasConfigData(configuration)) {
-        slotLevel4Entries.push({
-          slot: slot.slot,
-          cardName: slot.cardName,
-          partNumber: slot.partNumber,
-          configuration,
-        });
+      if (!hasConfigData(configuration)) return;
+
+      const sharedKey = buildLevel4SharedKey(slot, configuration);
+      const isShared = isSharedLevel4Slot(slot);
+
+      if (sharedKey && seenLevel4Keys.has(sharedKey) && isShared) {
+        return;
       }
+
+      if (sharedKey) {
+        seenLevel4Keys.add(sharedKey);
+      }
+
+      slotLevel4Entries.push({
+        slot: slot.slot,
+        cardName: slot.cardName,
+        partNumber: slot.partNumber,
+        level4BomItemId: slot.level4BomItemId,
+        configuration,
+      });
     });
 
     if (Array.isArray(fallbackLevel4?.slots)) {
       fallbackLevel4.slots.forEach((slot: any, index: number) => {
         const configuration = slot?.configuration || slot?.level4Config || slot?.level4Selections;
         if (!hasConfigData(configuration)) return;
-        slotLevel4Entries.push({
+
+        const normalizedSlot = {
           slot: normalizeSlotNumber(slot?.slot, index),
           cardName: slot?.cardName || slot?.name || normalizedProduct.name,
           partNumber: slot?.partNumber || partNumber,
+          level4BomItemId:
+            slot?.level4BomItemId ||
+            slot?.level4_bom_item_id ||
+            slot?.configuration?.bomItemId ||
+            slot?.configuration?.bom_item_id ||
+            slot?.level4Config?.bomItemId ||
+            slot?.level4Config?.bom_item_id,
+        };
+
+        const sharedKey = buildLevel4SharedKey(normalizedSlot, configuration);
+        const isShared = isSharedLevel4Slot({ ...normalizedSlot, level4Config: slot?.level4Config, level4Selections: slot?.level4Selections, configuration });
+
+        if (sharedKey && seenLevel4Keys.has(sharedKey) && isShared) {
+          return;
+        }
+
+        if (sharedKey) {
+          seenLevel4Keys.add(sharedKey);
+        }
+
+        slotLevel4Entries.push({
+          slot: normalizedSlot.slot,
+          cardName: normalizedSlot.cardName,
+          partNumber: normalizedSlot.partNumber,
+          level4BomItemId: normalizedSlot.level4BomItemId,
           configuration,
         });
       });
@@ -740,6 +968,11 @@ export const generateQuotePDF = async (
         productName: item.product?.name || 'Configured Item',
         productPartNumber: item.partNumber,
         partNumber: item.partNumber,
+        level4BomItemId:
+          (item.level4Config as any)?.bomItemId ||
+          (item.level4Config as any)?.bom_item_id ||
+          (item.level4Config as any)?.bom_item ||
+          undefined,
         config: item.level4Config,
       });
     }
@@ -757,6 +990,7 @@ export const generateQuotePDF = async (
           slotNumber: resolvedSlotNumber,
           slotCardName: slot.cardName,
           partNumber: slot.partNumber || item.partNumber,
+          level4BomItemId: slot.level4BomItemId,
           config: slot.configuration,
         });
       });
