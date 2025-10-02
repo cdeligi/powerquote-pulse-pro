@@ -202,6 +202,25 @@ export const generateQuotePDF = async (
   const normalizeLevel4Entries = (entries: any): Array<{ index: number; value: string }> => {
     if (!entries) return [];
 
+    if (typeof entries === 'string') {
+      try {
+        const parsed = JSON.parse(entries);
+        const normalized = normalizeLevel4Entries(parsed);
+        if (normalized.length > 0) {
+          return normalized;
+        }
+      } catch {
+        // Fall back to treating the string as a single value below
+      }
+
+      if (entries.trim().length > 0) {
+        return [{ index: 0, value: entries.trim() }];
+      }
+
+      return [];
+    }
+
+main
     if (Array.isArray(entries)) {
       return entries
         .map((entry, idx) => {
@@ -472,9 +491,46 @@ export const generateQuotePDF = async (
         metaParts.push('Metadata unavailable - displaying saved selections');
       }
 
+      const selections = (() => {
+        const normalizedPayloadEntries = payload?.entries
+          ? [...payload.entries].sort((a, b) => a.index - b.index)
+          : [];
+
+        if (normalizedPayloadEntries.length > 0) {
+          return normalizedPayloadEntries;
+        }
+
+        const fallbackSources: any[] = [];
+        if (entry.rawConfig && typeof entry.rawConfig === 'object') {
+          fallbackSources.push(
+            (entry.rawConfig as any).entries,
+            (entry.rawConfig as any).selections,
+            (entry.rawConfig as any).values,
+            (entry.rawConfig as any).inputs
+          );
+          fallbackSources.push(entry.rawConfig);
+
+          if (Array.isArray(entry.rawConfig)) {
+            fallbackSources.push(entry.rawConfig);
+          }
+        } else if (Array.isArray(entry.rawConfig)) {
+          fallbackSources.push(entry.rawConfig);
+        }
+
+        for (const source of fallbackSources) {
+          const normalized = normalizeLevel4Entries(source);
+          if (normalized.length > 0) {
+            return normalized.sort((a, b) => a.index - b.index);
+          }
+        }
+
+        return [] as Array<{ index: number; value: string }>;
+      })();
+
       const selections = payload?.entries
         ? [...payload.entries].sort((a, b) => a.index - b.index)
         : [];
+main
 
       let bodyHtml = '';
 
@@ -516,7 +572,11 @@ export const generateQuotePDF = async (
         bodyHtml += '<p class="level4-empty">Unable to parse configuration details. Saved data shown below.</p>';
       }
 
+
+      if ((!payload || !payload.entries?.length) && selections.length === 0 && entry.rawConfig) {
+
       if ((!payload || selections.length === 0) && entry.rawConfig) {
+main
         bodyHtml += `<pre class="level4-raw">${escapeHtml(JSON.stringify(entry.rawConfig, null, 2))}</pre>`;
       }
 
