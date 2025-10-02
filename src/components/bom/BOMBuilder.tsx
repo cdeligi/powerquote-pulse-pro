@@ -445,12 +445,12 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
         description: `Loading quote data for ${quoteId}...`,
       });
       
-      // Load quote data
+      // Load quote data - use maybeSingle to handle missing quotes gracefully
       const { data: quote, error: quoteError } = await supabase
         .from('quotes')
         .select('*')
         .eq('id', quoteId)
-        .single();
+        .maybeSingle();
         
       if (quoteError) {
         console.error('Error loading quote:', quoteError);
@@ -459,16 +459,20 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
           description: `Failed to load quote ${quoteId}: ${quoteError.message}`,
           variant: "destructive"
         });
-        throw quoteError;
+        setIsLoading(false);
+        return;
       }
       
       if (!quote) {
         console.log('No quote found with ID:', quoteId);
         toast({
           title: 'Quote Not Found',
-          description: `Quote ${quoteId} could not be found`,
+          description: `Quote ${quoteId} does not exist. Please check the quote ID and try again.`,
           variant: 'destructive'
         });
+        setIsLoading(false);
+        // Clear invalid quote ID from URL
+        window.history.replaceState({}, '', '/#configure');
         return;
       }
       
@@ -1934,14 +1938,43 @@ if (
   const handleUpdateChassisInBOM = () => {
     if (!selectedChassis || !editingOriginalItem) return;
 
-    const partNumber = buildQTMSPartNumber({
-      chassis: selectedChassis,
-      slotAssignments,
-      hasRemoteDisplay,
-      pnConfig,
-      codeMap,
-      includeSuffix: true,
-    });
+    // Check if the configuration has actually changed
+    const originalSlotAssignments = editingOriginalItem.slotAssignments || {};
+    const originalHasRemoteDisplay = editingOriginalItem.configuration?.hasRemoteDisplay || false;
+    
+    // Deep comparison of slot assignments
+    const slotAssignmentsChanged = 
+      Object.keys(originalSlotAssignments).length !== Object.keys(slotAssignments).length ||
+      Object.entries(slotAssignments).some(([slot, card]) => {
+        const originalCard = originalSlotAssignments[parseInt(slot)];
+        return !originalCard || originalCard.id !== card.id;
+      });
+    
+    const remoteDisplayChanged = originalHasRemoteDisplay !== hasRemoteDisplay;
+    
+    // Only regenerate part number if configuration actually changed
+    let partNumber: string;
+    if (slotAssignmentsChanged || remoteDisplayChanged) {
+      console.log('Configuration changed, regenerating part number');
+      partNumber = buildQTMSPartNumber({
+        chassis: selectedChassis,
+        slotAssignments,
+        hasRemoteDisplay,
+        pnConfig,
+        codeMap,
+        includeSuffix: true,
+      });
+    } else {
+      console.log('Configuration unchanged, preserving original part number:', editingOriginalItem.partNumber);
+      partNumber = editingOriginalItem.partNumber || buildQTMSPartNumber({
+        chassis: selectedChassis,
+        slotAssignments,
+        hasRemoteDisplay,
+        pnConfig,
+        codeMap,
+        includeSuffix: true,
+      });
+    }
 
     const updatedItem: BOMItem = {
       ...editingOriginalItem,
@@ -2053,6 +2086,7 @@ if (
       setConfiguringChassis(hydratedChassis);
       
       // Store the original item for restoration if edit is cancelled
+      // This preserves the original part number and configuration
       setEditingOriginalItem(item);
       
       const chassisIndex = bomItems.findIndex(bomItem => bomItem.id === item.id);
@@ -2070,15 +2104,19 @@ if (
         setSelectedAccessories(accessoriesToSelect);
       }
       
-      // Determine hasRemoteDisplay from the part number pattern
-      // QTMS part numbers end with suffixes like "-D1" or "-RD" for remote display
+      // Improved remote display detection from part number pattern
+      // QTMS part numbers with remote display end with suffixes like "-D1", "-RD", or "-D<number>"
+      // Part numbers WITHOUT remote display don't have these suffixes (e.g., QTMS-LTX-0RF8A0000000000)
       const partNumberStr = item.partNumber || item.product.partNumber || '';
-      const hasRemoteSuffix = partNumberStr.includes('-D1') || 
-                             partNumberStr.includes('-RD') ||
-                             partNumberStr.match(/-D\d+$/);
       
-      console.log('Detected remote display from part number:', partNumberStr, '-> hasRemote:', hasRemoteSuffix);
-      setHasRemoteDisplay(!!hasRemoteSuffix || item.configuration?.hasRemoteDisplay || false);
+      // Check for remote display suffixes at the end of the part number
+      const hasRemoteSuffix = /-(D1|RD|D\d+)$/.test(partNumberStr);
+      
+      // Also check configuration if available
+      const configHasRemote = item.configuration?.hasRemoteDisplay || false;
+      
+      console.log('Detected remote display from part number:', partNumberStr, '-> hasRemote:', hasRemoteSuffix, 'configHasRemote:', configHasRemote);
+      setHasRemoteDisplay(hasRemoteSuffix || configHasRemote);
       
       setTimeout(() => {
         const configSection = document.getElementById('chassis-configuration');
