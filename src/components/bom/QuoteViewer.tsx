@@ -151,6 +151,67 @@ const QuoteViewer: React.FC = () => {
             const storedSlotAssignments = configData.slotAssignments as SerializedSlotAssignment[] | undefined;
             const slotAssignments = deserializeSlotAssignments(storedSlotAssignments);
             const rackLayout = configData.rackConfiguration || buildRackLayoutFromAssignments(storedSlotAssignments);
+            const relationLevel4 = Array.isArray(item.bom_level4_values) && item.bom_level4_values.length > 0
+              ? {
+                  level4_config_id: item.bom_level4_values[0].level4_config_id,
+                  entries: item.bom_level4_values[0].entries,
+                }
+              : null;
+
+            const normalizedLevel4Config = (() => {
+              const direct = configData.level4Config as any;
+
+              const mergeWithRelation = (candidate: any) => {
+                if (!relationLevel4) return candidate;
+
+                const templateType = candidate?.template_type ?? candidate?.templateType ?? candidate?.mode
+                  ?? configData.level4Config?.template_type
+                  ?? configData.level4Config?.templateType
+                  ?? configData.level4Config?.mode;
+
+                const relationEntries = relationLevel4.entries;
+                const candidateEntries = candidate?.entries;
+                const relationHasEntries = Array.isArray(relationEntries)
+                  ? relationEntries.length > 0
+                  : relationEntries !== undefined && relationEntries !== null && relationEntries !== '';
+                const candidateHasEntries = Array.isArray(candidateEntries)
+                  ? candidateEntries.length > 0
+                  : candidateEntries !== undefined && candidateEntries !== null && candidateEntries !== '';
+
+                const merged: any = {
+                  ...relationLevel4,
+                  ...candidate,
+                };
+
+                if (candidateHasEntries && (!relationHasEntries || Array.isArray(candidateEntries))) {
+                  merged.entries = candidateEntries;
+                }
+
+                if (templateType) {
+                  merged.template_type = templateType;
+                }
+
+                return merged;
+              };
+
+              if (direct && typeof direct === 'object' && !Array.isArray(direct)) {
+                if (!('level4_config_id' in direct) && relationLevel4) {
+                  return mergeWithRelation(direct);
+                }
+                return direct;
+              }
+
+              if (Array.isArray(direct) || typeof direct === 'string') {
+                const candidate = direct ? { entries: direct } : null;
+                return candidate ? mergeWithRelation(candidate) : relationLevel4;
+              }
+
+              if (relationLevel4) {
+                return relationLevel4;
+              }
+
+              return null;
+            })();
 
             return {
               id: item.id,
@@ -169,7 +230,7 @@ const QuoteViewer: React.FC = () => {
               level4Values: item.bom_level4_values || [],
               slotAssignments,
               rackConfiguration: rackLayout,
-              level4Config: configData.level4Config || null,
+              level4Config: normalizedLevel4Config,
               level4Selections: configData.level4Selections || null,
             };
           });
