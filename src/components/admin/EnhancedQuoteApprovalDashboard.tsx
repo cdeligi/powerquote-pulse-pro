@@ -1,10 +1,10 @@
 
 import { useState, useEffect } from 'react';
-import { getSupabaseClient, getSupabaseAdminClient, isAdminAvailable } from "@/integrations/supabase/client";
+import { getSupabaseClient, getSupabaseAdminClient } from "@/integrations/supabase/client";
 
 const supabase = getSupabaseClient();
-const supabaseAdmin = getSupabaseAdminClient();;
-import { Quote } from '@/types/quote';
+const supabaseAdmin = getSupabaseAdminClient();
+import { Quote, BOMItemWithDetails } from '@/types/quote';
 import { User } from '@/types/auth';
 import { toast } from "@/hooks/use-toast"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -147,12 +147,13 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
     quoteId: string,
     action: 'approve' | 'reject',
     notes?: string,
-    updatedBOMItems?: any[]
+    updatedBOMItems?: BOMItemWithDetails[]
   ) => {
     console.log(`Processing ${action} for quote ${quoteId} with notes:`, notes);
     setActionLoading(prev => ({ ...prev, [quoteId]: true }));
-    
+
     try {
+      const client = supabaseAdmin ?? supabase;
       const updates: any = {
         status: action === 'approve' ? 'approved' : 'rejected',
         reviewed_by: user?.id,
@@ -167,27 +168,29 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
       }
 
       if (updatedBOMItems && updatedBOMItems.length > 0) {
-        const { error: quoteError } = await supabase
+        const { error: quoteError } = await client
           .from('quotes')
           .update(updates)
           .eq('id', quoteId);
 
         if (quoteError) throw quoteError;
 
-        for (const item of updatedBOMItems) {
-          const { error: bomError } = await supabase
+        const persistedItems = updatedBOMItems.filter((item) => item.persisted_id);
+
+        for (const item of persistedItems) {
+          const { error: bomError } = await client
             .from('bom_items')
             .update({
               approved_unit_price: item.unit_price,
               total_price: item.unit_price * item.quantity,
               margin: item.margin
             })
-            .eq('id', item.id);
+            .eq('id', item.persisted_id);
 
           if (bomError) throw bomError;
         }
       } else {
-        const { error } = await supabase
+        const { error } = await client
           .from('quotes')
           .update(updates)
           .eq('id', quoteId);
