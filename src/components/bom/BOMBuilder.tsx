@@ -21,11 +21,8 @@ import { Level4RuntimeModal } from "../level4/Level4RuntimeModal";
 import { productDataService } from '@/services/productDataService';
 import QuoteFieldsSection from './QuoteFieldsSection';
 
-import { getSupabaseClient, getSupabaseAdminClient, isAdminAvailable } from "@/integrations/supabase/client";
-
-const supabase = getSupabaseClient();
-const supabaseAdmin = getSupabaseAdminClient();;
 import { toast } from '@/components/ui/use-toast';
+import { getSupabaseClient, getSupabaseAdminClient, isAdminAvailable } from "@/integrations/supabase/client";
 import QTMSConfigurationEditor from './QTMSConfigurationEditor';
 import { consolidateQTMSConfiguration, createQTMSBOMItem, ConsolidatedQTMS, QTMSConfiguration } from '@/utils/qtmsConsolidation';
 import { buildQTMSPartNumber } from '@/utils/qtmsPartNumberBuilder';
@@ -40,6 +37,9 @@ import {
   type SerializedSlotAssignment,
 } from '@/utils/slotAssignmentUtils';
 
+const supabase = getSupabaseClient();
+const supabaseAdmin = getSupabaseAdminClient();
+
 interface BOMBuilderProps {
   onBOMUpdate: (items: BOMItem[]) => void;
   canSeePrices: boolean;
@@ -49,6 +49,216 @@ interface BOMBuilderProps {
 }
 
 const SLOT_LEVEL4_FLAG = '__slotLevel4Session';
+
+const convertRackLayoutToAssignments = (
+  layout?: {
+    slots?: Array<{
+      slot?: number | null;
+      slotNumber?: number | null;
+      cardName?: string | null;
+      partNumber?: string | null;
+      product?: { id?: string | null; name?: string | null; displayName?: string | null; partNumber?: string | null; part_number?: string | null } | null;
+      level4Config?: any;
+      level4Selections?: any;
+      productId?: string | null;
+      product_id?: string | null;
+      cardId?: string | null;
+      card_id?: string | null;
+    }>;
+  }
+): Record<number, Level3Product & Record<string, any>> | undefined => {
+  if (!layout?.slots || layout.slots.length === 0) {
+    return undefined;
+  }
+
+  return layout.slots.reduce<Record<number, Level3Product & Record<string, any>>>((acc, slot) => {
+    const position = typeof slot.slot === 'number'
+      ? slot.slot
+      : typeof slot.slotNumber === 'number'
+        ? slot.slotNumber
+        : undefined;
+
+    if (position === undefined) {
+      return acc;
+    }
+
+    const rawSlot = slot as Record<string, any>;
+    const cardRecord = (rawSlot.card as Record<string, any> | undefined) || undefined;
+    const nestedProduct =
+      (cardRecord?.product as Record<string, any> | undefined) ||
+      (cardRecord?.card as Record<string, any> | undefined) ||
+      (cardRecord?.level3Product as Record<string, any> | undefined) ||
+      undefined;
+
+    // Prefer explicit product on the slot, then card/nested fallbacks
+    const productSource =
+      (rawSlot.product as Record<string, any> | null | undefined) ||
+      cardRecord ||
+      nestedProduct ||
+      // keep main-branch fallback (equivalent to cardRecord but safe if rawSlot not used)
+      ((slot as Record<string, any>).card as Record<string, any> | undefined) ||
+      undefined;
+
+    // Exhaustive product ID resolution across known shapes/keys
+    const productId =
+      rawSlot.productId ??
+      rawSlot.product_id ??
+      rawSlot.cardId ??
+      rawSlot.card_id ??
+      rawSlot.level3ProductId ??
+      rawSlot.level3_product_id ??
+      cardRecord?.id ??
+      (cardRecord as any)?.productId ??
+      (cardRecord as any)?.product_id ??
+      (cardRecord as any)?.cardId ??
+      (cardRecord as any)?.card_id ??
+      (cardRecord as any)?.level3ProductId ??
+      (cardRecord as any)?.level3_product_id ??
+      (nestedProduct as any)?.id ??
+      (nestedProduct as any)?.productId ??
+      (nestedProduct as any)?.product_id ??
+      (slot as any).productId ??
+      (slot as any).product_id ??
+      (slot as any).cardId ??
+      (slot as any).card_id ??
+      productSource?.id ??
+      undefined;
+
+    // Friendly display name with fallbacks
+    const name =
+      (slot as any).cardName ||
+      productSource?.displayName ||
+      productSource?.name ||
+      `Slot ${position} Card`;
+
+    // Resolve part number from multiple possible shapes/keys
+    const partNumber =
+      (slot as any).partNumber ||
+      rawSlot.part_number ||
+      rawSlot.cardPartNumber ||
+      rawSlot.card_part_number ||
+      cardRecord?.partNumber ||
+      (cardRecord as any)?.part_number ||
+      (cardRecord as any)?.cardPartNumber ||
+      (cardRecord as any)?.card_part_number ||
+      (typeof (cardRecord as any)?.pn === 'string'
+        ? (cardRecord as any).pn
+        : undefined) ||
+      (nestedProduct as any)?.partNumber ||
+      (nestedProduct as any)?.part_number ||
+      (slot as any).part_number ||
+      productSource?.partNumber ||
+      (productSource as any)?.part_number ||
+      undefined;
+
+    acc[position] = {
+      id: productId || `slot-${position}`,
+      name,
+      displayName: name,
+      description: '',
+      price: 0,
+      enabled: true,
+      parent_product_id: '',
+      product_level: 3,
+      partNumber,
+      level4Config: slot.level4Config ?? null,
+      level4Selections: slot.level4Selections ?? null,
+    } as Level3Product & Record<string, any>;
+
+    return acc;
+  }, {});
+};
+
+const deepClone = <T,>(value: T): T => {
+  if (value === undefined || value === null) {
+    return value;
+  }
+
+  try {
+    return JSON.parse(JSON.stringify(value));
+  } catch (error) {
+    console.warn('Failed to deep clone value, returning original reference.', error);
+    return value;
+  }
+};
+
+const resolvePartNumberContext = (...candidates: Array<any>) => {
+  for (const candidate of candidates) {
+    if (!candidate) continue;
+
+    const container =
+      typeof candidate === 'object' && candidate !== null && 'partNumberContext' in candidate
+        ? (candidate as Record<string, any>).partNumberContext
+        : candidate;
+
+    if (container && typeof container === 'object') {
+      const context = container as Record<string, any>;
+      if ('pnConfig' in context || 'codeMap' in context) {
+        return context;
+      }
+    }
+  }
+
+  return undefined;
+};
+
+const slotSignature = (card?: Level3Product & Record<string, any>) => {
+  if (!card) {
+    return '';
+  }
+
+  const productId =
+    (card as any).productId ||
+    (card as any).product_id ||
+    (card as any).cardId ||
+    (card as any).card_id ||
+    card.id ||
+    '';
+
+  const partNumber =
+    (card as any).partNumber ||
+    (card as any).part_number ||
+    card.partNumber ||
+    '';
+
+  return `${productId}::${partNumber}`;
+};
+
+const haveSlotAssignmentsChanged = (
+  originalAssignments?: Record<number, Level3Product & Record<string, any>>,
+  currentAssignments?: Record<number, Level3Product & Record<string, any>>
+) => {
+  const original = originalAssignments || {};
+  const current = currentAssignments || {};
+
+  const allSlots = new Set([
+    ...Object.keys(original).map(slot => Number.parseInt(slot, 10)),
+    ...Object.keys(current).map(slot => Number.parseInt(slot, 10)),
+  ]);
+
+  if (allSlots.size === 0) {
+    return false;
+  }
+
+  for (const slot of allSlots) {
+    const originalCard = original[slot];
+    const currentCard = current[slot];
+
+    if (!originalCard && !currentCard) {
+      continue;
+    }
+
+    if (!originalCard || !currentCard) {
+      return true;
+    }
+
+    if (slotSignature(originalCard) !== slotSignature(currentCard)) {
+      return true;
+    }
+  }
+
+  return false;
+};
 
 const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, mode = 'new' }: BOMBuilderProps) => {
   // ALL HOOKS MUST BE AT THE TOP - NO CONDITIONAL RETURNS BEFORE HOOKS
@@ -322,12 +532,12 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
         description: `Loading quote data for ${quoteId}...`,
       });
       
-      // Load quote data
+      // Load quote data - use maybeSingle to handle missing quotes gracefully
       const { data: quote, error: quoteError } = await supabase
         .from('quotes')
         .select('*')
         .eq('id', quoteId)
-        .single();
+        .maybeSingle();
         
       if (quoteError) {
         console.error('Error loading quote:', quoteError);
@@ -336,82 +546,247 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
           description: `Failed to load quote ${quoteId}: ${quoteError.message}`,
           variant: "destructive"
         });
-        throw quoteError;
+        setIsLoading(false);
+        return;
       }
       
       if (!quote) {
         console.log('No quote found with ID:', quoteId);
         toast({
           title: 'Quote Not Found',
-          description: `Quote ${quoteId} could not be found`,
+          description: `Quote ${quoteId} does not exist. Please check the quote ID and try again.`,
           variant: 'destructive'
         });
+        setIsLoading(false);
+        // Clear invalid quote ID from URL
+        window.history.replaceState({}, '', '/#configure');
         return;
       }
       
       console.log('Successfully loaded quote:', quote);
-      setCurrentQuote(quote); // Store the loaded quote data
-      
-      let loadedItems: BOMItem[] = [];
-      
-      // Check if this is a draft with data in draft_bom field
-      if (quote.status === 'draft' && quote.draft_bom && quote.draft_bom.items && Array.isArray(quote.draft_bom.items)) {
-        console.log('Loading BOM data from draft_bom field');
-        loadedItems = await Promise.all(quote.draft_bom.items.map(async (item: any) => {
-          // Use stored values from draft_bom, fallback to unit_price/unit_cost, then fetch if needed
-          let price = item.product?.price || item.unit_price || item.total_price || 0;
-          let cost = item.product?.cost || item.unit_cost || item.total_cost || 0;
-          
-          // If price or cost is 0, fetch fresh product data
-          if ((price === 0 || cost === 0) && (item.productId || item.product_id)) {
-            try {
-              const { data: productData } = await supabase
-                .from('products')
-                .select('price, cost')
-                .eq('id', item.productId || item.product_id)
-                .single();
-              
-              if (productData) {
-                if (price === 0) price = productData.price || 0;
-                if (cost === 0) cost = productData.cost || 0;
-              }
-            } catch (error) {
-              console.warn('Failed to fetch product pricing:', error);
-            }
-          }
-          
-          const storedSlotAssignments = item.slotAssignments as SerializedSlotAssignment[] | undefined;
-          const slotAssignmentsMap = deserializeSlotAssignments(storedSlotAssignments);
-          const rackLayout = item.rackConfiguration || buildRackLayoutFromAssignments(storedSlotAssignments);
-          const level4Config = item.level4Config ?? null;
-          const level4Selections = item.level4Selections ?? null;
+setCurrentQuote(quote); // Store the loaded quote data
 
-          return {
-            id: item.id || crypto.randomUUID(),
-            product: {
-              id: item.productId || item.product_id || item.product?.id,
-              name: item.name || item.product?.name,
-              partNumber: item.partNumber || item.part_number || item.product?.partNumber,
-              price,
-              cost,
-              description: item.description || item.product?.description || ''
-            },
-            quantity: item.quantity || 1,
-            enabled: item.enabled !== false,
-            partNumber: item.partNumber || item.part_number || item.product?.partNumber,
-            level4Values: item.level4Values || [],
-            original_unit_price: item.original_unit_price || price,
-            approved_unit_price: item.approved_unit_price || price,
-            priceHistory: item.priceHistory || [],
-            slotAssignments: slotAssignmentsMap,
-            rackConfiguration: rackLayout,
-            level4Config: level4Config || undefined,
-            level4Selections: level4Selections || undefined,
-          };
-        }));
-        
-        console.log(`Loaded ${loadedItems.length} items from draft_bom`);
-      } else {
+let loadedItems: BOMItem[] = [];
+
+// Check if this is a draft with data in draft_bom field
+if (
+  quote.status === 'draft' &&
+  quote.draft_bom &&
+  quote.draft_bom.items &&
+  Array.isArray(quote.draft_bom.items)
+) {
+  console.log('Loading BOM data from draft_bom field');
+  loadedItems = await Promise.all(
+    quote.draft_bom.items.map(async (item: any) => {
+      // Use stored values from draft_bom, fallback to unit_price/unit_cost, then fetch if needed
+      let price = item.product?.price || item.unit_price || item.total_price || 0;
+      let cost = item.product?.cost || item.unit_cost || item.total_cost || 0;
+
+      // Build configuration sources (prefer explicit item fields, then product fields)
+      const productSource = (typeof item.product === 'object' && item.product) || {};
+      const configurationSources = [
+        typeof (productSource as any)?.configuration === 'object'
+          ? (productSource as any).configuration
+          : null,
+        typeof (productSource as any)?.configuration_data === 'object'
+          ? (productSource as any).configuration_data
+          : null,
+        typeof item.configuration === 'object' ? item.configuration : null,
+        typeof item.configuration_data === 'object' ? item.configuration_data : null,
+        typeof item.configurationData === 'object' ? item.configurationData : null,
+      ].filter(Boolean) as Record<string, any>[];
+
+      const rawConfiguration = Object.assign({}, ...configurationSources);
+      const nestedConfiguration =
+        typeof rawConfiguration.configuration === 'object'
+          ? rawConfiguration.configuration
+          : undefined;
+
+      const mergedConfigurationData = { ...productSource, ...rawConfiguration };
+      const mergedPartNumberContext = (mergedConfigurationData as any)?.partNumberContext;
+      if (mergedPartNumberContext) {
+        delete (mergedConfigurationData as any).partNumberContext;
+      }
+
+      const partNumberContext = resolvePartNumberContext(
+        item.partNumberContext,
+        rawConfiguration.partNumberContext,
+        nestedConfiguration?.partNumberContext,
+        mergedPartNumberContext,
+        productSource,
+        item.configuration_data,
+        item.configuration
+      );
+
+      // Slot assignments: accept array or object maps; check multiple possible fields
+      const rawSlotAssignments =
+        item.slotAssignments ||
+        item.slot_assignments ||
+        rawConfiguration.slotAssignments ||
+        rawConfiguration.slot_assignments ||
+        nestedConfiguration?.slotAssignments ||
+        nestedConfiguration?.slot_assignments ||
+        (productSource as any)?.slotAssignments ||
+        (productSource as any)?.slot_assignments ||
+        (mergedConfigurationData as any)?.slotAssignments ||
+        (mergedConfigurationData as any)?.slot_assignments;
+
+      const normalizedSlotAssignments: SerializedSlotAssignment[] | undefined = Array.isArray(
+        rawSlotAssignments,
+      )
+        ? rawSlotAssignments
+        : rawSlotAssignments && typeof rawSlotAssignments === 'object'
+        ? Object.entries(rawSlotAssignments).map(([slotKey, cardData]) => {
+            const slotNumber = Number.parseInt(slotKey, 10);
+            const card = (cardData || {}) as Record<string, any>;
+
+            const productSource = (card.product || card.card || {}) as Record<string, any>;
+            const productId =
+              card.id ||
+              card.productId ||
+              card.product_id ||
+              card.cardId ||
+              card.card_id ||
+              card.level3ProductId ||
+              card.level3_product_id ||
+              productSource.id;
+
+            const partNumber =
+              card.partNumber ||
+              card.part_number ||
+              productSource.partNumber ||
+              productSource.part_number ||
+              (typeof card.pn === 'string' ? card.pn : undefined);
+
+            const displayName =
+              card.displayName ||
+              card.name ||
+              productSource.displayName ||
+              productSource.name;
+
+            return {
+              slot: Number.isNaN(slotNumber) ? 0 : slotNumber,
+              productId: productId,
+              name: card.name || productSource.name,
+              displayName,
+              partNumber,
+              hasLevel4Configuration:
+                Boolean(card.hasLevel4Configuration) ||
+                Boolean(card.has_level4) ||
+                Boolean(card.requires_level4_config),
+              level4BomItemId: card.level4BomItemId,
+              level4TempQuoteId: card.level4TempQuoteId,
+              level4Config: card.level4Config ?? null,
+              level4Selections: card.level4Selections ?? null,
+              isBushingPrimary: card.isBushingPrimary ?? false,
+              isBushingSecondary: card.isBushingSecondary ?? false,
+              bushingPairSlot: card.bushingPairSlot ?? card.bushing_pair_slot ?? null,
+            } as SerializedSlotAssignment;
+          })
+        : undefined;
+
+      // Rack configuration: gather from several possible fields
+      const storedRackConfiguration =
+        item.rackConfiguration ||
+        item.rack_configuration ||
+        rawConfiguration.rackConfiguration ||
+        rawConfiguration.rack_configuration ||
+        nestedConfiguration?.rackConfiguration ||
+        nestedConfiguration?.rack_configuration ||
+        (productSource as any)?.rackConfiguration ||
+        (productSource as any)?.rack_configuration ||
+        (mergedConfigurationData as any)?.rackConfiguration ||
+        (mergedConfigurationData as any)?.rack_configuration;
+
+      const slotAssignmentsMap =
+        deserializeSlotAssignments(normalizedSlotAssignments) ||
+        convertRackLayoutToAssignments(storedRackConfiguration);
+
+      const serializedAssignments =
+        normalizedSlotAssignments ||
+        (slotAssignmentsMap ? serializeSlotAssignments(slotAssignmentsMap) : undefined);
+
+      // If price or cost is 0, fetch fresh product data
+      if ((price === 0 || cost === 0) && (item.productId || item.product_id)) {
+        try {
+          const { data: productData } = await supabase
+            .from('products')
+            .select('price, cost')
+            .eq('id', item.productId || item.product_id)
+            .single();
+
+          if (productData) {
+            if (price === 0) price = productData.price || 0;
+            if (cost === 0) cost = productData.cost || 0;
+          }
+        } catch (error) {
+          console.warn('Failed to fetch product pricing:', error);
+        }
+      }
+
+      // Build final rack layout from stored or from assignments
+      const rackLayout = storedRackConfiguration || buildRackLayoutFromAssignments(serializedAssignments);
+
+      // Level-4 data: check item, raw, nested, then merged
+      const level4Config =
+        item.level4Config ??
+        rawConfiguration.level4Config ??
+        nestedConfiguration?.level4Config ??
+        (mergedConfigurationData as any)?.level4Config ??
+        null;
+
+      const level4Selections =
+        item.level4Selections ??
+        rawConfiguration.level4Selections ??
+        nestedConfiguration?.level4Selections ??
+        (mergedConfigurationData as any)?.level4Selections ??
+        null;
+
+      // Configuration object (if any)
+      const configuration =
+        (typeof item.configuration === 'object' && item.configuration) ||
+        nestedConfiguration ||
+        (rawConfiguration as any)?.configuration ||
+        null;
+
+      return {
+        id: item.id || crypto.randomUUID(),
+        product: {
+          id: item.productId || item.product_id || item.product?.id,
+          name: item.name || item.product?.name,
+          partNumber: item.partNumber || item.part_number || item.product?.partNumber,
+          description:
+            item.description ||
+            item.product?.description ||
+            (mergedConfigurationData as any)?.description ||
+            '',
+          ...mergedConfigurationData,
+          price,
+          cost,
+        },
+        quantity: item.quantity || 1,
+        enabled: item.enabled !== false,
+        partNumber: item.partNumber || item.part_number || item.product?.partNumber,
+        level4Values: item.level4Values || [],
+        original_unit_price: item.original_unit_price || price,
+        approved_unit_price: item.approved_unit_price || price,
+        priceHistory: item.priceHistory || [],
+        slotAssignments: slotAssignmentsMap ? { ...slotAssignmentsMap } : {},
+        rackConfiguration: rackLayout,
+        configuration: configuration || undefined,
+        level4Config: level4Config || undefined,
+        level4Selections: level4Selections || undefined,
+        displayName:
+          item.displayName ||
+          (mergedConfigurationData as any)?.displayName ||
+          (mergedConfigurationData as any)?.name,
+        isAccessory: item.isAccessory ?? (mergedConfigurationData as any)?.isAccessory,
+        partNumberContext: partNumberContext ? deepClone(partNumberContext) : undefined,
+      } as BOMItem;
+    }),
+  );
+  console.log(`Loaded ${loadedItems.length} items from draft_bom`);
+} else {
         console.log('Loading BOM data from bom_items table');
         // Load BOM items with Level 4 configurations from database table
         const { data: bomData, error: bomError } = await supabase
@@ -441,6 +816,16 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
         // Convert BOM items back to local format with proper structure
         loadedItems = (bomData || []).map(item => {
           const configData = item.configuration_data || {};
+          const embeddedPartNumberContext = (configData as any)?.partNumberContext;
+          if (embeddedPartNumberContext) {
+            delete (configData as any).partNumberContext;
+          }
+
+          const partNumberContext = resolvePartNumberContext(
+            item.partNumberContext,
+            embeddedPartNumberContext,
+            configData
+          );
           const storedSlotAssignments = configData.slotAssignments as SerializedSlotAssignment[] | undefined;
           const slotAssignmentsMap = deserializeSlotAssignments(storedSlotAssignments);
           const rackLayout = configData.rackConfiguration || buildRackLayoutFromAssignments(storedSlotAssignments);
@@ -470,6 +855,7 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
             rackConfiguration: rackLayout,
             level4Config: mergedLevel4 || undefined,
             level4Selections: configData.level4Selections || undefined,
+            partNumberContext: partNumberContext ? deepClone(partNumberContext) : undefined,
           };
         });
       }
@@ -692,12 +1078,16 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
           }
 
           const serializedSlots = item.slotAssignments ? serializeSlotAssignments(item.slotAssignments) : undefined;
-          const rackLayout = item.rackConfiguration || buildRackLayoutFromAssignments(serializedSlots);
+        const rackLayout = item.rackConfiguration || buildRackLayoutFromAssignments(serializedSlots);
 
-          if (rackLayout?.slots && rackLayout.slots.length > 0) {
-            rackLayoutSummaries.push({
-              productId: item.product.id,
-              productName: item.product.name,
+        const partNumberContext =
+          item.partNumberContext ||
+          resolvePartNumberContext(item.configuration, item.product);
+
+        if (rackLayout?.slots && rackLayout.slots.length > 0) {
+          rackLayoutSummaries.push({
+            productId: item.product.id,
+            productName: item.product.name,
               partNumber: item.partNumber || item.product.partNumber,
               layout: rackLayout,
             });
@@ -742,13 +1132,15 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
             configuration_data: {
               ...item.product,
               price,
-              cost
+              cost,
+              partNumberContext: partNumberContext ? deepClone(partNumberContext) : undefined,
             },
             product_type: 'standard',
             slotAssignments: serializedSlots,
             rackConfiguration: rackLayout,
             level4Config: item.level4Config || null,
             level4Selections: item.level4Selections || null,
+            partNumberContext: partNumberContext ? deepClone(partNumberContext) : undefined,
           };
         }),
         quoteFields,
@@ -1589,14 +1981,22 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
     if (!selectedChassis) return;
 
     // Generate the part number for this configuration
-    const partNumber = buildQTMSPartNumber({ 
-      chassis: selectedChassis, 
-      slotAssignments, 
-      hasRemoteDisplay, 
-      pnConfig, 
-      codeMap, 
-      includeSuffix: true 
+    const partNumber = buildQTMSPartNumber({
+      chassis: selectedChassis,
+      slotAssignments,
+      hasRemoteDisplay,
+      pnConfig,
+      codeMap,
+      includeSuffix: true
     });
+
+    const partNumberContext =
+      pnConfig || (codeMap && Object.keys(codeMap).length > 0)
+        ? {
+            pnConfig: pnConfig ? deepClone(pnConfig) : null,
+            codeMap: codeMap ? deepClone(codeMap) : {},
+          }
+        : undefined;
 
     // Create a new BOM item for the chassis with its configuration
     const newItem: BOMItem = {
@@ -1613,7 +2013,8 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
       slotAssignments: { ...slotAssignments },
       configuration: {
         hasRemoteDisplay,
-      }
+      },
+      partNumberContext,
     };
 
     // Add chassis to BOM
@@ -1654,6 +2055,8 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
     setSelectedSlot(null);
     setHasRemoteDisplay(false);
     setSelectedAccessories(new Set());
+    setPnConfig(null);
+    setCodeMap({});
 
     // Show success message
     toast({
@@ -1665,7 +2068,16 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
   const handleUpdateChassisInBOM = () => {
     if (!selectedChassis || !editingOriginalItem) return;
 
-    const partNumber = buildQTMSPartNumber({
+
+    const originalSlotAssignments =
+      (editingOriginalItem.slotAssignments && Object.keys(editingOriginalItem.slotAssignments).length > 0
+        ? editingOriginalItem.slotAssignments
+        : convertRackLayoutToAssignments(editingOriginalItem.rackConfiguration)) ||
+      {};
+
+    const normalizedCurrentAssignments = Object.keys(slotAssignments).length > 0 ? slotAssignments : {};
+
+    const generatedPartNumber = buildQTMSPartNumber({
       chassis: selectedChassis,
       slotAssignments,
       hasRemoteDisplay,
@@ -1673,6 +2085,63 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
       codeMap,
       includeSuffix: true,
     });
+
+    // Check if the configuration has actually changed
+    // Ensure both slot assignments are using number keys for proper comparison
+    const originalHasRemoteDisplay = editingOriginalItem.configuration?.hasRemoteDisplay || false;
+    
+    // Normalize slot assignments to use number keys for comparison
+    const normalizeSlotKeys = (assignments: Record<string | number, any>): Record<number, any> => {
+      const normalized: Record<number, any> = {};
+      Object.entries(assignments).forEach(([key, value]) => {
+        const numKey = typeof key === 'string' ? parseInt(key, 10) : key;
+        if (!isNaN(numKey)) {
+          normalized[numKey] = value;
+        }
+      });
+      return normalized;
+    };
+    
+    const normalizedOriginal = normalizeSlotKeys(originalSlotAssignments);
+    const normalizedCurrent = normalizeSlotKeys(normalizedCurrentAssignments);
+    
+    // Deep comparison of slot assignments using normalized keys
+    const slotAssignmentsChanged = 
+      Object.keys(normalizedOriginal).length !== Object.keys(normalizedCurrent).length ||
+      Object.entries(normalizedCurrent).some(([slot, card]) => {
+        const slotNum = parseInt(slot, 10);
+        const originalCard = normalizedOriginal[slotNum];
+        return !originalCard || originalCard.id !== card.id;
+      });
+    
+    const remoteDisplayChanged = originalHasRemoteDisplay !== hasRemoteDisplay;
+
+    const shouldRegeneratePartNumber = slotAssignmentsChanged || remoteDisplayChanged;
+
+    console.log('Configuration comparison:', {
+      originalSlots: Object.keys(normalizedOriginal),
+      currentSlots: Object.keys(normalizedCurrent),
+      slotAssignmentsChanged,
+      remoteDisplayChanged,
+      originalHasRemoteDisplay,
+      currentHasRemoteDisplay: hasRemoteDisplay,
+    });
+
+    const partNumber = shouldRegeneratePartNumber
+      ? generatedPartNumber
+      : editingOriginalItem.partNumber || generatedPartNumber;
+
+    const capturedContext =
+      pnConfig || (codeMap && Object.keys(codeMap).length > 0)
+        ? {
+            pnConfig: pnConfig ? deepClone(pnConfig) : null,
+            codeMap: codeMap ? deepClone(codeMap) : {},
+          }
+        : undefined;
+
+    const partNumberContext = shouldRegeneratePartNumber
+      ? capturedContext
+      : editingOriginalItem.partNumberContext || capturedContext;
 
     const updatedItem: BOMItem = {
       ...editingOriginalItem,
@@ -1687,9 +2156,8 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
       configuration: {
         hasRemoteDisplay,
       },
+      partNumberContext,
     };
-
-    
 
     const chassisIndex = bomItems.findIndex(item => item.id === editingOriginalItem.id);
 
@@ -1742,6 +2210,8 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
     setHasRemoteDisplay(false);
     setEditingOriginalItem(null);
     setSelectedAccessories(new Set());
+    setPnConfig(null);
+    setCodeMap({});
 
     toast({
       title: "Configuration Updated",
@@ -1762,13 +2232,47 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
     // Check if this is a chassis-configured item (has slot assignments)
     if (item.slotAssignments || (item.product as any).chassisType && (item.product as any).chassisType !== 'N/A') {
       console.log('Editing chassis configuration for:', item.product.name);
+      console.log('Existing slot assignments:', item.slotAssignments);
+      console.log('Existing part number:', item.partNumber);
       
+      const productId = (item.product as Level2Product)?.id;
+      const hydratedChassis =
+        (productId && allLevel2Products.find(p => p.id === productId)) ||
+        (item.product as Level2Product);
+
       // Set up the chassis for editing
-      setSelectedChassis(item.product as Level2Product);
-      setSlotAssignments(item.slotAssignments || {});
-      setConfiguringChassis(item.product as Level2Product);
+      setSelectedChassis(hydratedChassis);
       
+      // Properly deserialize slot assignments
+      const existingSlotAssignments = 
+        (item.slotAssignments && Object.keys(item.slotAssignments).length > 0
+          ? item.slotAssignments
+          : convertRackLayoutToAssignments(item.rackConfiguration)) || {};
+      
+      console.log('Setting slot assignments for edit:', existingSlotAssignments);
+      setSlotAssignments(existingSlotAssignments);
+      setConfiguringChassis(hydratedChassis);
+
+      const context = resolvePartNumberContext(
+        item.partNumberContext,
+        item.configuration,
+        item.product
+      );
+
+      if (context?.pnConfig) {
+        setPnConfig(deepClone(context.pnConfig));
+      } else {
+        setPnConfig(null);
+      }
+
+      if (context?.codeMap) {
+        setCodeMap(deepClone(context.codeMap));
+      } else {
+        setCodeMap({});
+      }
+
       // Store the original item for restoration if edit is cancelled
+      // This preserves the original part number and configuration
       setEditingOriginalItem(item);
       
       const chassisIndex = bomItems.findIndex(bomItem => bomItem.id === item.id);
@@ -1786,7 +2290,53 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
         setSelectedAccessories(accessoriesToSelect);
       }
       
+
       setHasRemoteDisplay(item.configuration?.hasRemoteDisplay || false);
+      setAutoPlaced(false);
+
+      (async () => {
+        try {
+          const [cfg, codes, l3] = await Promise.all([
+            productDataService.getPartNumberConfig(hydratedChassis.id),
+            productDataService.getPartNumberCodesForLevel2(hydratedChassis.id),
+            productDataService.getLevel3ProductsForLevel2(hydratedChassis.id)
+          ]);
+
+          setLevel3Products(l3);
+
+          if (!context?.pnConfig) {
+            setPnConfig(cfg);
+          }
+
+          if (!context?.codeMap) {
+            setCodeMap(codes);
+          }
+        } catch (error) {
+          console.error('Failed to load PN config/codes for chassis reconfiguration:', error);
+          toast({
+            title: 'Configuration Load Failed',
+            description: 'Unable to load chassis configuration templates. Part number editing may be limited.',
+            variant: 'destructive',
+          });
+        }
+      })();
+
+
+      // Improved remote display detection from part number pattern
+      // QTMS part numbers with remote display end with suffixes like "-D1", "-RD", or "-D<number>"
+      // Part numbers WITHOUT remote display don't have these suffixes (e.g., QTMS-LTX-0RF8A0000000000)
+      const partNumberStr = item.partNumber || item.product.partNumber || '';
+      
+      // Check for remote display suffixes at the end of the part number
+      const hasRemoteSuffix = /-(D1|RD|D\d+)$/.test(partNumberStr);
+      
+      // Also check configuration if available
+      const configHasRemote = item.configuration?.hasRemoteDisplay || false;
+      
+      console.log('Detected remote display from part number:', partNumberStr, '-> hasRemote:', hasRemoteSuffix, 'configHasRemote:', configHasRemote);
+      setHasRemoteDisplay(hasRemoteSuffix || configHasRemote);
+      
+main
       setTimeout(() => {
         const configSection = document.getElementById('chassis-configuration');
         if (configSection) {
@@ -2039,6 +2589,19 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
       } else {
         // Insert new BOM items
         for (const item of bomItems) {
+          const serializedAssignments = item.slotAssignments
+            ? serializeSlotAssignments(item.slotAssignments)
+            : undefined;
+          const rackLayout = item.rackConfiguration || buildRackLayoutFromAssignments(serializedAssignments);
+          const configurationData = {
+            ...(item.configuration || {}),
+            slotAssignments: serializedAssignments,
+            rackConfiguration: rackLayout,
+            level4Config: item.level4Config || null,
+            level4Selections: item.level4Selections || null,
+            partNumberContext: item.partNumberContext ? deepClone(item.partNumberContext) : undefined,
+          };
+
           const { error: bomError } = await supabase.from('bom_items').insert({
             quote_id: quoteId,
             product_id: item.product.id,
@@ -2058,7 +2621,7 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
                 : 0,
             original_unit_price: item.original_unit_price || item.product.price,
             approved_unit_price: item.approved_unit_price || item.product.price,
-            configuration_data: item.configuration || {},
+            configuration_data: configurationData,
             product_type: 'standard',
           });
 

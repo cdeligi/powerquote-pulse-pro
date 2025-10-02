@@ -12,6 +12,7 @@ const formSchema = z.object({
   name: z.string().min(1, 'Name is required'),
   displayName: z.string().optional(),
   sku: z.string().optional(),
+  partNumber: z.string().optional(),
   price: z.number().min(0, 'Price must be 0 or greater').optional(),
   requires_level4_config: z.boolean().default(false),
   // Add other fields as needed
@@ -40,13 +41,21 @@ export const Level3ProductForm: React.FC<Level3ProductFormProps> = ({
       sku: initialData?.sku || '',
       price: initialData?.price,
       requires_level4_config: initialData?.requires_level4_config || false,
+      partNumber: initialData?.partNumber || '',
     },
   });
 
   const { register, handleSubmit, formState: { errors }, watch } = form;
 
+  const handleFormSubmit = (values: FormValues) => {
+    onSubmit({
+      ...values,
+      partNumber: values.partNumber?.trim() ? values.partNumber.trim() : undefined,
+    });
+  };
+
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+    <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-6">
       <div className="space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-2">
@@ -81,6 +90,15 @@ export const Level3ProductForm: React.FC<Level3ProductFormProps> = ({
             {errors.sku && <p className="text-sm text-destructive">{errors.sku.message}</p>}
           </div>
           <div className="space-y-2">
+            <Label htmlFor="partNumber">Part Number</Label>
+            <Input
+              id="partNumber"
+              {...register('partNumber')}
+              placeholder="e.g., ANA-16CH-001"
+            />
+            {errors.partNumber && <p className="text-sm text-destructive">{errors.partNumber.message}</p>}
+          </div>
+          <div className="space-y-2">
             <Label htmlFor="price">Price</Label>
             <Input
               id="price"
@@ -91,6 +109,19 @@ export const Level3ProductForm: React.FC<Level3ProductFormProps> = ({
             />
             {errors.price && <p className="text-sm text-destructive">{errors.price.message}</p>}
           </div>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="partNumber">Part Number Shown on Quotes</Label>
+          <Input
+            id="partNumber"
+            {...register('partNumber')}
+            placeholder="e.g., ANA-16CH-001"
+          />
+          <p className="text-xs text-muted-foreground">
+            Provide the part number that should appear for this card in generated rack slot listings.
+          </p>
+          {errors.partNumber && <p className="text-sm text-destructive">{errors.partNumber.message}</p>}
         </div>
 
         <div className="space-y-2">
