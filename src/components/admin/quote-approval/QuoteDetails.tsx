@@ -8,9 +8,10 @@ import { Input } from "@/components/ui/input";
 import { CheckCircle, XCircle, DollarSign, Edit3, Save, X, Settings } from "lucide-react";
 import QTMSConfigurationEditor from "@/components/bom/QTMSConfigurationEditor";
 import { consolidateQTMSConfiguration, QTMSConfiguration, ConsolidatedQTMS } from "@/utils/qtmsConsolidation";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Quote, BOMItemWithDetails } from "@/types/quote";
 import { User } from "@/types/auth";
+import { supabase } from "@/integrations/supabase/client";
 
 interface QuoteDetailsProps {
   quote: Quote;
@@ -20,12 +21,21 @@ interface QuoteDetailsProps {
   user: User | null;
 }
 
-const QuoteDetails = ({ 
-  quote, 
-  onApprove, 
-  onReject, 
+interface ConfiguredQuoteField {
+  id: string;
+  label: string;
+  type: string;
+  required: boolean;
+  enabled: boolean;
+  display_order?: number;
+}
+
+const QuoteDetails = ({
+  quote,
+  onApprove,
+  onReject,
   isLoading,
-  user 
+  user
 }: QuoteDetailsProps) => {
   const [approvalNotes, setApprovalNotes] = useState('');
   const [rejectionReason, setRejectionReason] = useState('');
@@ -48,6 +58,30 @@ const QuoteDetails = ({
   );
   const [qtmsConfig, setQtmsConfig] = useState<ConsolidatedQTMS | null>(null);
   const [editingQTMS, setEditingQTMS] = useState(false);
+  const [configuredQuoteFields, setConfiguredQuoteFields] = useState<ConfiguredQuoteField[]>([]);
+
+  useEffect(() => {
+    const fetchConfiguredFields = async () => {
+      try {
+        const { data, error } = await supabase
+          .from("quote_fields")
+          .select("id,label,type,required,enabled,display_order")
+          .eq("enabled", true)
+          .order("display_order", { ascending: true });
+
+        if (error) {
+          console.error("Failed to fetch quote field configuration for admin view:", error);
+          return;
+        }
+
+        setConfiguredQuoteFields(data || []);
+      } catch (fetchError) {
+        console.error("Unexpected error loading quote field configuration:", fetchError);
+      }
+    };
+
+    fetchConfiguredFields();
+  }, []);
 
   useEffect(() => {
     const item = bomItems.find(i => i.product.type === 'QTMS' && i.configuration);
@@ -160,77 +194,134 @@ const QuoteDetails = ({
     }
   };
 
-  // Prepare basic quote info to avoid duplication
-  const basicQuoteFields = ['customer_name', 'oracle_customer_id', 'sfdc_opportunity', 'is_rep_involved', 'payment_terms', 'shipping_terms'];
-  const additionalFields = quote.quote_fields ? Object.keys(quote.quote_fields).filter(key => !basicQuoteFields.includes(key)) : [];
+  const formattedConfiguredFields = useMemo(() => {
+    const quoteFieldValues = quote.quote_fields || {};
+
+    const formatValue = (value: unknown, type: string) => {
+      if (value === null || value === undefined) {
+        return '—';
+      }
+
+      if (typeof value === 'string' && value.trim() === '') {
+        return '—';
+      }
+
+      if (type === 'checkbox') {
+        if (typeof value === 'boolean') {
+          return value ? 'Yes' : 'No';
+        }
+
+        if (typeof value === 'string') {
+          return value.toLowerCase() === 'true' ? 'Yes' : 'No';
+        }
+      }
+
+      if (type === 'date') {
+        try {
+          const dateValue = value instanceof Date ? value : new Date(value as string);
+          if (Number.isNaN(dateValue.getTime())) {
+            return String(value);
+          }
+          return dateValue.toLocaleDateString();
+        } catch (error) {
+          console.warn('Unable to format date field value', value, error);
+          return String(value);
+        }
+      }
+
+      if (Array.isArray(value)) {
+        return value.join(', ');
+      }
+
+      if (typeof value === 'object') {
+        return JSON.stringify(value);
+      }
+
+      return String(value);
+    };
+
+    return configuredQuoteFields.map((field) => ({
+      ...field,
+      formattedValue: formatValue(quoteFieldValues[field.id], field.type)
+    }));
+  }, [configuredQuoteFields, quote.quote_fields]);
+
+  const unmappedQuoteFields = useMemo(() => {
+    if (!quote.quote_fields) return [];
+    const mappedIds = new Set(configuredQuoteFields.map(field => field.id));
+    return Object.entries(quote.quote_fields)
+      .filter(([key]) => !mappedIds.has(key))
+      .map(([key, value]) => ({ key, value }));
+  }, [configuredQuoteFields, quote.quote_fields]);
 
   return (
     <div className="space-y-6">
       {/* Quote Header */}
       <Card className="bg-gray-900 border-gray-800">
         <CardHeader>
-          <CardTitle className="text-white flex items-center justify-between">
-            Quote Details - {quote.id}
-            <div className="flex items-center space-x-2">
+          <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+            <div className="space-y-2">
+              <CardTitle className="text-white">Quote Details</CardTitle>
+              <div className="grid grid-cols-1 gap-2 text-sm text-gray-300 sm:grid-cols-2 lg:grid-cols-3">
+                <div>
+                  <Label className="text-gray-400">Quote ID</Label>
+                  <p className="text-white font-medium font-mono">{quote.id}</p>
+                </div>
+                <div>
+                  <Label className="text-gray-400">Requested By</Label>
+                  <p className="text-white font-medium">
+                    {quote.submitted_by_name || quote.submitted_by_email || `User ${quote.user_id}`}
+                  </p>
+                </div>
+                <div>
+                  <Label className="text-gray-400">Priority</Label>
+                  <div>
+                    <Badge className={`${
+                      quote.priority === 'Urgent' ? 'bg-red-500' :
+                      quote.priority === 'High' ? 'bg-orange-500' :
+                      quote.priority === 'Medium' ? 'bg-yellow-500' : 'bg-green-500'
+                    } text-white`}>
+                      {quote.priority}
+                    </Badge>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="flex items-start space-x-2">
               {getStatusBadge()}
-              <Badge className={`${
-                quote.priority === 'Urgent' ? 'bg-red-500' :
-                quote.priority === 'High' ? 'bg-orange-500' :
-                quote.priority === 'Medium' ? 'bg-yellow-500' : 'bg-green-500'
-              } text-white`}>
-                {quote.priority}
-              </Badge>
-            </div>
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-            <div>
-              <Label className="text-gray-400">Customer</Label>
-              <p className="text-white font-medium">{quote.customer_name}</p>
-            </div>
-            <div>
-              <Label className="text-gray-400">Oracle Customer ID</Label>
-              <p className="text-white font-medium">{quote.oracle_customer_id}</p>
-            </div>
-            <div>
-              <Label className="text-gray-400">SFDC Opportunity</Label>
-              <p className="text-white font-medium">{quote.sfdc_opportunity}</p>
-            </div>
-            <div>
-              <Label className="text-gray-400">Rep Involved</Label>
-              <p className="text-white font-medium">{quote.is_rep_involved ? 'Yes' : 'No'}</p>
-            </div>
-            <div>
-              <Label className="text-gray-400">Payment Terms</Label>
-              <p className="text-white font-medium">{quote.payment_terms}</p>
-            </div>
-            <div>
-              <Label className="text-gray-400">Shipping Terms</Label>
-              <p className="text-white font-medium">{quote.shipping_terms}</p>
             </div>
           </div>
-
-          {quote.discount_justification && (
-            <div>
-              <Label className="text-gray-400">Discount Justification</Label>
-              <p className="text-gray-300 bg-gray-800 p-3 rounded mt-1">{quote.discount_justification}</p>
-            </div>
-          )}
-        </CardContent>
+        </CardHeader>
       </Card>
 
-      {/* Additional Quote Fields - Only show fields not already displayed */}
-      {additionalFields.length > 0 && (
+      {/* Configured Quote Fields */}
+      {configuredQuoteFields.length > 0 && (
+        <Card className="bg-gray-900 border-gray-800">
+          <CardHeader>
+            <CardTitle className="text-white">Quote Information</CardTitle>
+          </CardHeader>
+          <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 text-sm">
+            {formattedConfiguredFields.map((field) => (
+              <div key={field.id} className="space-y-1">
+                <Label className="text-gray-400">{field.label}</Label>
+                <p className="text-white font-medium break-words">{field.formattedValue}</p>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Unmapped fields fallback */}
+      {unmappedQuoteFields.length > 0 && (
         <Card className="bg-gray-900 border-gray-800">
           <CardHeader>
             <CardTitle className="text-white">Additional Quote Information</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            {additionalFields.map((key) => (
+            {unmappedQuoteFields.map(({ key, value }) => (
               <div key={key} className="grid grid-cols-2 gap-4">
                 <Label className="text-gray-400 capitalize">{key.replace(/_/g, ' ')}</Label>
-                <p className="text-white">{String(quote.quote_fields![key])}</p>
+                <p className="text-white">{String(value ?? '—')}</p>
               </div>
             ))}
           </CardContent>
