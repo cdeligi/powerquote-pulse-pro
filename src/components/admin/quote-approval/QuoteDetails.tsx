@@ -11,23 +11,14 @@ import { consolidateQTMSConfiguration, QTMSConfiguration, ConsolidatedQTMS } fro
 import { useState, useEffect, useMemo } from "react";
 import { Quote, BOMItemWithDetails } from "@/types/quote";
 import { User } from "@/types/auth";
-import { supabase } from "@/integrations/supabase/client";
+import { useConfiguredQuoteFields } from "@/hooks/useConfiguredQuoteFields";
 
 interface QuoteDetailsProps {
   quote: Quote;
-  onApprove: (notes?: string, updatedBOMItems?: any[]) => void;
+  onApprove: (notes?: string, updatedBOMItems?: BOMItemWithDetails[]) => void;
   onReject: (notes?: string) => void;
   isLoading: boolean;
   user: User | null;
-}
-
-interface ConfiguredQuoteField {
-  id: string;
-  label: string;
-  type: string;
-  required: boolean;
-  enabled: boolean;
-  display_order?: number;
 }
 
 const QuoteDetails = ({
@@ -42,46 +33,30 @@ const QuoteDetails = ({
   const [selectedAction, setSelectedAction] = useState<'approve' | 'reject' | null>(null);
   const [editingPrices, setEditingPrices] = useState<Record<string, string>>({});
   const [bomItems, setBomItems] = useState<BOMItemWithDetails[]>(
-    (quote.bom_items || []).map(item => ({
-      ...item,
-      id: item.id || Math.random().toString(),
-      name: item.name || item.product?.name || 'Unknown Item',
-      description: item.description || item.product?.description || '',
-      part_number: item.part_number || item.partNumber || '',
-      unit_price: item.unit_price || item.product?.price || 0,
-      unit_cost: item.unit_cost || item.product?.cost || 0,
-      total_price: item.total_price || (item.product?.price || 0) * item.quantity,
-      margin: item.margin || 0,
-      quantity: item.quantity || 1,
-      product: item.product
-    }))
+    (quote.bom_items || []).map((item, index) => {
+      const persistedId = item.id ? String(item.id) : undefined;
+      const fallbackId = `local-${index}-${Math.random().toString(36).slice(2, 8)}`;
+
+      return {
+        ...item,
+        id: persistedId || fallbackId,
+        persisted_id: persistedId,
+        name: item.name || item.product?.name || 'Unknown Item',
+        description: item.description || item.product?.description || '',
+        part_number: item.part_number || item.partNumber || '',
+        unit_price: item.unit_price || item.product?.price || 0,
+        unit_cost: item.unit_cost || item.product?.cost || 0,
+        total_price: item.total_price || (item.product?.price || 0) * item.quantity,
+        margin: item.margin || 0,
+        quantity: item.quantity || 1,
+        product: item.product
+      } as BOMItemWithDetails;
+    })
   );
   const [qtmsConfig, setQtmsConfig] = useState<ConsolidatedQTMS | null>(null);
   const [editingQTMS, setEditingQTMS] = useState(false);
-  const [configuredQuoteFields, setConfiguredQuoteFields] = useState<ConfiguredQuoteField[]>([]);
-
-  useEffect(() => {
-    const fetchConfiguredFields = async () => {
-      try {
-        const { data, error } = await supabase
-          .from("quote_fields")
-          .select("id,label,type,required,enabled,display_order")
-          .eq("enabled", true)
-          .order("display_order", { ascending: true });
-
-        if (error) {
-          console.error("Failed to fetch quote field configuration for admin view:", error);
-          return;
-        }
-
-        setConfiguredQuoteFields(data || []);
-      } catch (fetchError) {
-        console.error("Unexpected error loading quote field configuration:", fetchError);
-      }
-    };
-
-    fetchConfiguredFields();
-  }, []);
+  const { formattedFields: formattedConfiguredFields, unmappedFields: unmappedQuoteFields } =
+    useConfiguredQuoteFields(quote.quote_fields);
 
   useEffect(() => {
     const item = bomItems.find(i => i.product.type === 'QTMS' && i.configuration);
@@ -179,6 +154,19 @@ const QuoteDetails = ({
 
   const totals = calculateTotals();
 
+  const formatCurrency = (value: number) => {
+    return `${quote.currency} ${value.toLocaleString()}`;
+  };
+
+  const formatPercentage = (value: number | null | undefined) => {
+    if (value === null || value === undefined) {
+      return '—';
+    }
+
+    const normalized = value <= 1 && value >= -1 ? value * 100 : value;
+    return `${normalized.toFixed(1)}%`;
+  };
+
   const getStatusBadge = () => {
     switch (quote.status) {
       case 'approved':
@@ -193,66 +181,6 @@ const QuoteDetails = ({
         return <Badge className="bg-gray-600 text-white">Unknown</Badge>;
     }
   };
-
-  const formattedConfiguredFields = useMemo(() => {
-    const quoteFieldValues = quote.quote_fields || {};
-
-    const formatValue = (value: unknown, type: string) => {
-      if (value === null || value === undefined) {
-        return '—';
-      }
-
-      if (typeof value === 'string' && value.trim() === '') {
-        return '—';
-      }
-
-      if (type === 'checkbox') {
-        if (typeof value === 'boolean') {
-          return value ? 'Yes' : 'No';
-        }
-
-        if (typeof value === 'string') {
-          return value.toLowerCase() === 'true' ? 'Yes' : 'No';
-        }
-      }
-
-      if (type === 'date') {
-        try {
-          const dateValue = value instanceof Date ? value : new Date(value as string);
-          if (Number.isNaN(dateValue.getTime())) {
-            return String(value);
-          }
-          return dateValue.toLocaleDateString();
-        } catch (error) {
-          console.warn('Unable to format date field value', value, error);
-          return String(value);
-        }
-      }
-
-      if (Array.isArray(value)) {
-        return value.join(', ');
-      }
-
-      if (typeof value === 'object') {
-        return JSON.stringify(value);
-      }
-
-      return String(value);
-    };
-
-    return configuredQuoteFields.map((field) => ({
-      ...field,
-      formattedValue: formatValue(quoteFieldValues[field.id], field.type)
-    }));
-  }, [configuredQuoteFields, quote.quote_fields]);
-
-  const unmappedQuoteFields = useMemo(() => {
-    if (!quote.quote_fields) return [];
-    const mappedIds = new Set(configuredQuoteFields.map(field => field.id));
-    return Object.entries(quote.quote_fields)
-      .filter(([key]) => !mappedIds.has(key))
-      .map(([key, value]) => ({ key, value }));
-  }, [configuredQuoteFields, quote.quote_fields]);
 
   return (
     <div className="space-y-6">
@@ -295,7 +223,7 @@ const QuoteDetails = ({
       </Card>
 
       {/* Configured Quote Fields */}
-      {configuredQuoteFields.length > 0 && (
+      {formattedConfiguredFields.length > 0 && (
         <Card className="bg-gray-900 border-gray-800">
           <CardHeader>
             <CardTitle className="text-white">Quote Information</CardTitle>
@@ -334,36 +262,56 @@ const QuoteDetails = ({
           <CardTitle className="text-white">Project Financial Analysis</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="text-center p-4 bg-gray-800 rounded">
               <p className="text-gray-400 text-sm">Original Value</p>
-              <p className="text-white text-xl font-bold">{quote.currency} {quote.original_quote_value.toLocaleString()}</p>
+              <p className="text-white text-xl font-bold">{formatCurrency(quote.original_quote_value)}</p>
             </div>
             <div className="text-center p-4 bg-gray-800 rounded">
               <p className="text-gray-400 text-sm">Current Total</p>
-              <p className="text-white text-xl font-bold">{quote.currency} {totals.totalRevenue.toLocaleString()}</p>
+              <p className="text-white text-xl font-bold">{formatCurrency(totals.totalRevenue)}</p>
             </div>
             <div className="text-center p-4 bg-gray-800 rounded">
               <p className="text-gray-400 text-sm">Total Cost</p>
-              <p className="text-orange-400 text-xl font-bold">{quote.currency} {totals.totalCost.toLocaleString()}</p>
+              <p className="text-orange-400 text-xl font-bold">{formatCurrency(totals.totalCost)}</p>
             </div>
             <div className="text-center p-4 bg-gray-800 rounded">
               <p className="text-gray-400 text-sm">Margin</p>
               <p className={`text-xl font-bold ${
-                totals.marginPercentage >= 25 ? 'text-green-400' : 
+                totals.marginPercentage >= 25 ? 'text-green-400' :
                 totals.marginPercentage >= 15 ? 'text-yellow-400' : 'text-red-400'
               }`}>
                 {totals.marginPercentage.toFixed(1)}%
               </p>
             </div>
           </div>
-          <div className="mt-4 p-4 bg-gray-800 rounded">
-            <div className="flex justify-between items-center">
-              <span className="text-gray-400">Gross Profit:</span>
+          <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="text-center p-4 bg-gray-800 rounded">
+              <p className="text-gray-400 text-sm">Discounted Value</p>
+              <p className="text-white text-xl font-bold">{formatCurrency(quote.discounted_value)}</p>
+            </div>
+            <div className="text-center p-4 bg-gray-800 rounded">
+              <p className="text-gray-400 text-sm">Requested Discount</p>
+              <p className="text-blue-400 text-xl font-bold">{formatPercentage(quote.requested_discount)}</p>
+            </div>
+            <div className="text-center p-4 bg-gray-800 rounded">
+              <p className="text-gray-400 text-sm">Approved Discount</p>
+              <p className="text-emerald-400 text-xl font-bold">{formatPercentage(quote.approved_discount)}</p>
+            </div>
+          </div>
+          <div className="mt-4 p-4 bg-gray-800 rounded space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+              <span className="text-gray-400">Gross Profit</span>
               <span className="text-green-400 text-lg font-bold">
-                {quote.currency} {totals.grossProfit.toLocaleString()}
+                {formatCurrency(totals.grossProfit)}
               </span>
             </div>
+            {quote.discount_justification && (
+              <div>
+                <Label className="text-gray-400">Discount Justification</Label>
+                <p className="text-gray-200 mt-1 whitespace-pre-line">{quote.discount_justification}</p>
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
