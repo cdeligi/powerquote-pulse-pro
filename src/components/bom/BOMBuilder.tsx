@@ -82,7 +82,6 @@ const convertRackLayoutToAssignments = (
       return acc;
     }
 
-
     const rawSlot = slot as Record<string, any>;
     const cardRecord = (rawSlot.card as Record<string, any> | undefined) || undefined;
     const nestedProduct =
@@ -91,127 +90,66 @@ const convertRackLayoutToAssignments = (
       (cardRecord?.level3Product as Record<string, any> | undefined) ||
       undefined;
 
+    // Prefer explicit product on the slot, then card/nested fallbacks
     const productSource =
-      (slot.product as Record<string, any> | null | undefined) ||
+      (rawSlot.product as Record<string, any> | null | undefined) ||
       cardRecord ||
       nestedProduct ||
+      // keep main-branch fallback (equivalent to cardRecord but safe if rawSlot not used)
+      ((slot as Record<string, any>).card as Record<string, any> | undefined) ||
       undefined;
 
+    // Exhaustive product ID resolution across known shapes/keys
     const productId =
-      rawSlot.productId ||
-      rawSlot.product_id ||
-      rawSlot.cardId ||
-      rawSlot.card_id ||
-      rawSlot.level3ProductId ||
-      rawSlot.level3_product_id ||
-      cardRecord?.id ||
-      cardRecord?.productId ||
-      cardRecord?.product_id ||
-      cardRecord?.cardId ||
-      cardRecord?.card_id ||
-      cardRecord?.level3ProductId ||
-      cardRecord?.level3_product_id ||
-      nestedProduct?.id ||
-      nestedProduct?.productId ||
-      nestedProduct?.product_id ||
-      productSource?.id ||
+      rawSlot.productId ??
+      rawSlot.product_id ??
+      rawSlot.cardId ??
+      rawSlot.card_id ??
+      rawSlot.level3ProductId ??
+      rawSlot.level3_product_id ??
+      cardRecord?.id ??
+      (cardRecord as any)?.productId ??
+      (cardRecord as any)?.product_id ??
+      (cardRecord as any)?.cardId ??
+      (cardRecord as any)?.card_id ??
+      (cardRecord as any)?.level3ProductId ??
+      (cardRecord as any)?.level3_product_id ??
+      (nestedProduct as any)?.id ??
+      (nestedProduct as any)?.productId ??
+      (nestedProduct as any)?.product_id ??
+      (slot as any).productId ??
+      (slot as any).product_id ??
+      (slot as any).cardId ??
+      (slot as any).card_id ??
+      productSource?.id ??
       undefined;
 
+    // Friendly display name with fallbacks
     const name =
-      slot.cardName ||
+      (slot as any).cardName ||
       productSource?.displayName ||
       productSource?.name ||
       `Slot ${position} Card`;
 
+    // Resolve part number from multiple possible shapes/keys
     const partNumber =
-      slot.partNumber ||
+      (slot as any).partNumber ||
       rawSlot.part_number ||
       rawSlot.cardPartNumber ||
       rawSlot.card_part_number ||
       cardRecord?.partNumber ||
-      cardRecord?.part_number ||
-      cardRecord?.cardPartNumber ||
-      cardRecord?.card_part_number ||
-      (typeof cardRecord?.pn === 'string' ? cardRecord?.pn : undefined) ||
-      nestedProduct?.partNumber ||
-      nestedProduct?.part_number ||
+      (cardRecord as any)?.part_number ||
+      (cardRecord as any)?.cardPartNumber ||
+      (cardRecord as any)?.card_part_number ||
+      (typeof (cardRecord as any)?.pn === 'string'
+        ? (cardRecord as any).pn
+        : undefined) ||
+      (nestedProduct as any)?.partNumber ||
+      (nestedProduct as any)?.part_number ||
+      (slot as any).part_number ||
       productSource?.partNumber ||
-      productSource?.part_number ||
+      (productSource as any)?.part_number ||
       undefined;
-
-const rawSlot = slot as Record<string, any>;
-
-const cardRecord =
-  (rawSlot.card as Record<string, any> | undefined) || undefined;
-
-const nestedProduct =
-  (cardRecord?.product as Record<string, any> | undefined) ||
-  (cardRecord?.card as Record<string, any> | undefined) ||
-  (cardRecord?.level3Product as Record<string, any> | undefined) ||
-  undefined;
-
-// Prefer explicit product on the slot, then card/nested fallbacks
-const productSource =
-  (rawSlot.product as Record<string, any> | null | undefined) ||
-  cardRecord ||
-  nestedProduct ||
-  // keep main-branch fallback (equivalent to cardRecord but safe if rawSlot not used)
-  ((slot as Record<string, any>).card as Record<string, any> | undefined) ||
-  undefined;
-
-// Exhaustive product ID resolution across known shapes/keys
-const productId =
-  rawSlot.productId ??
-  rawSlot.product_id ??
-  rawSlot.cardId ??
-  rawSlot.card_id ??
-  rawSlot.level3ProductId ??
-  rawSlot.level3_product_id ??
-  cardRecord?.id ??
-  (cardRecord as any)?.productId ??
-  (cardRecord as any)?.product_id ??
-  (cardRecord as any)?.cardId ??
-  (cardRecord as any)?.card_id ??
-  (cardRecord as any)?.level3ProductId ??
-  (cardRecord as any)?.level3_product_id ??
-  (nestedProduct as any)?.id ??
-  (nestedProduct as any)?.productId ??
-  (nestedProduct as any)?.product_id ??
-  (slot as any).productId ??
-  (slot as any).product_id ??
-  (slot as any).cardId ??
-  (slot as any).card_id ??
-  productSource?.id ??
-  undefined;
-
-// Friendly display name with fallbacks
-const name =
-  (slot as any).cardName ||
-  productSource?.displayName ||
-  productSource?.name ||
-  `Slot ${position} Card`;
-
-// Resolve part number from multiple possible shapes/keys
-const partNumber =
-  (slot as any).partNumber ||
-  rawSlot.part_number ||
-  rawSlot.cardPartNumber ||
-  rawSlot.card_part_number ||
-  cardRecord?.partNumber ||
-  (cardRecord as any)?.part_number ||
-  (cardRecord as any)?.cardPartNumber ||
-  (cardRecord as any)?.card_part_number ||
-  (typeof (cardRecord as any)?.pn === 'string'
-    ? (cardRecord as any).pn
-    : undefined) ||
-  (nestedProduct as any)?.partNumber ||
-  (nestedProduct as any)?.part_number ||
-  (slot as any).part_number ||
-  productSource?.partNumber ||
-  (productSource as any)?.part_number ||
-  undefined;
-
-main
 
     acc[position] = {
       id: productId || `slot-${position}`,
@@ -2131,7 +2069,7 @@ if (
     if (!selectedChassis || !editingOriginalItem) return;
 
 
-    const originalAssignments =
+    const originalSlotAssignments =
       (editingOriginalItem.slotAssignments && Object.keys(editingOriginalItem.slotAssignments).length > 0
         ? editingOriginalItem.slotAssignments
         : convertRackLayoutToAssignments(editingOriginalItem.rackConfiguration)) ||
@@ -2139,38 +2077,17 @@ if (
 
     const normalizedCurrentAssignments = Object.keys(slotAssignments).length > 0 ? slotAssignments : {};
 
-    const assignmentsChanged = haveSlotAssignmentsChanged(
-      originalAssignments as Record<number, Level3Product & Record<string, any>>,
-      normalizedCurrentAssignments as Record<number, Level3Product & Record<string, any>>
-    );
-
-    const originalRemoteDisplay = editingOriginalItem.configuration?.hasRemoteDisplay || false;
-    const remoteDisplayChanged = originalRemoteDisplay !== hasRemoteDisplay;
-
-    const shouldRegeneratePartNumber = assignmentsChanged || remoteDisplayChanged;
-
-    const generatedPartNumber = shouldRegeneratePartNumber
-      ? buildQTMSPartNumber({
-          chassis: selectedChassis,
-          slotAssignments,
-          hasRemoteDisplay,
-          pnConfig,
-          codeMap,
-          includeSuffix: true,
-        })
-      : editingOriginalItem.partNumber || editingOriginalItem.product.partNumber;
-
-    const fallbackPartNumber = buildQTMSPartNumber({
+    const generatedPartNumber = buildQTMSPartNumber({
       chassis: selectedChassis,
       slotAssignments,
       hasRemoteDisplay,
       pnConfig,
       codeMap,
       includeSuffix: true,
+    });
 
     // Check if the configuration has actually changed
     // Ensure both slot assignments are using number keys for proper comparison
-    const originalSlotAssignments = editingOriginalItem.slotAssignments || {};
     const originalHasRemoteDisplay = editingOriginalItem.configuration?.hasRemoteDisplay || false;
     
     // Normalize slot assignments to use number keys for comparison
@@ -2186,7 +2103,7 @@ if (
     };
     
     const normalizedOriginal = normalizeSlotKeys(originalSlotAssignments);
-    const normalizedCurrent = normalizeSlotKeys(slotAssignments);
+    const normalizedCurrent = normalizeSlotKeys(normalizedCurrentAssignments);
     
     // Deep comparison of slot assignments using normalized keys
     const slotAssignmentsChanged = 
@@ -2198,42 +2115,21 @@ if (
       });
     
     const remoteDisplayChanged = originalHasRemoteDisplay !== hasRemoteDisplay;
-    
+
+    const shouldRegeneratePartNumber = slotAssignmentsChanged || remoteDisplayChanged;
+
     console.log('Configuration comparison:', {
       originalSlots: Object.keys(normalizedOriginal),
       currentSlots: Object.keys(normalizedCurrent),
       slotAssignmentsChanged,
       remoteDisplayChanged,
       originalHasRemoteDisplay,
-      currentHasRemoteDisplay: hasRemoteDisplay
-main
+      currentHasRemoteDisplay: hasRemoteDisplay,
     });
-    
-    // Only regenerate part number if configuration actually changed
-    let partNumber: string;
-    if (slotAssignmentsChanged || remoteDisplayChanged) {
-      console.log('Configuration changed, regenerating part number');
-      partNumber = buildQTMSPartNumber({
-        chassis: selectedChassis,
-        slotAssignments,
-        hasRemoteDisplay,
-        pnConfig,
-        codeMap,
-        includeSuffix: true,
-      });
-    } else {
-      console.log('Configuration unchanged, preserving original part number:', editingOriginalItem.partNumber);
-      partNumber = editingOriginalItem.partNumber || buildQTMSPartNumber({
-        chassis: selectedChassis,
-        slotAssignments,
-        hasRemoteDisplay,
-        pnConfig,
-        codeMap,
-        includeSuffix: true,
-      });
-    }
 
-    const partNumber = generatedPartNumber || fallbackPartNumber;
+    const partNumber = shouldRegeneratePartNumber
+      ? generatedPartNumber
+      : editingOriginalItem.partNumber || generatedPartNumber;
 
     const capturedContext =
       pnConfig || (codeMap && Object.keys(codeMap).length > 0)
