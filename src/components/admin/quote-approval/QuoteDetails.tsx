@@ -11,43 +11,52 @@ import { consolidateQTMSConfiguration, QTMSConfiguration, ConsolidatedQTMS } fro
 import { useState, useEffect } from "react";
 import { Quote, BOMItemWithDetails } from "@/types/quote";
 import { User } from "@/types/auth";
+import { useConfiguredQuoteFields } from "@/hooks/useConfiguredQuoteFields";
 
 interface QuoteDetailsProps {
   quote: Quote;
-  onApprove: (notes?: string, updatedBOMItems?: any[]) => void;
+  onApprove: (notes?: string, updatedBOMItems?: BOMItemWithDetails[]) => void;
   onReject: (notes?: string) => void;
   isLoading: boolean;
   user: User | null;
 }
 
-const QuoteDetails = ({ 
-  quote, 
-  onApprove, 
-  onReject, 
+const QuoteDetails = ({
+  quote,
+  onApprove,
+  onReject,
   isLoading,
-  user 
+  user
 }: QuoteDetailsProps) => {
   const [approvalNotes, setApprovalNotes] = useState('');
   const [rejectionReason, setRejectionReason] = useState('');
   const [selectedAction, setSelectedAction] = useState<'approve' | 'reject' | null>(null);
   const [editingPrices, setEditingPrices] = useState<Record<string, string>>({});
   const [bomItems, setBomItems] = useState<BOMItemWithDetails[]>(
-    (quote.bom_items || []).map(item => ({
-      ...item,
-      id: item.id || Math.random().toString(),
-      name: item.name || item.product?.name || 'Unknown Item',
-      description: item.description || item.product?.description || '',
-      part_number: item.part_number || item.partNumber || '',
-      unit_price: item.unit_price || item.product?.price || 0,
-      unit_cost: item.unit_cost || item.product?.cost || 0,
-      total_price: item.total_price || (item.product?.price || 0) * item.quantity,
-      margin: item.margin || 0,
-      quantity: item.quantity || 1,
-      product: item.product
-    }))
+    (quote.bom_items || []).map((item, index) => {
+      const persistedId = item.id ? String(item.id) : undefined;
+      const fallbackId = `local-${index}-${Math.random().toString(36).slice(2, 8)}`;
+
+      return {
+        ...item,
+        id: persistedId || fallbackId,
+        persisted_id: persistedId,
+        name: item.name || item.product?.name || 'Unknown Item',
+        description: item.description || item.product?.description || '',
+        part_number: item.part_number || item.partNumber || '',
+        unit_price: item.unit_price || item.product?.price || 0,
+        unit_cost: item.unit_cost || item.product?.cost || 0,
+        total_price: item.total_price || (item.product?.price || 0) * item.quantity,
+        margin: item.margin || 0,
+        quantity: item.quantity || 1,
+        product: item.product
+      } as BOMItemWithDetails;
+    })
   );
   const [qtmsConfig, setQtmsConfig] = useState<ConsolidatedQTMS | null>(null);
   const [editingQTMS, setEditingQTMS] = useState(false);
+  const { formattedFields: formattedConfiguredFields, unmappedFields: unmappedQuoteFields } =
+    useConfiguredQuoteFields(quote.quote_fields);
 
   useEffect(() => {
     const item = bomItems.find(i => i.product.type === 'QTMS' && i.configuration);
@@ -145,6 +154,19 @@ const QuoteDetails = ({
 
   const totals = calculateTotals();
 
+  const formatCurrency = (value: number) => {
+    return `${quote.currency} ${value.toLocaleString()}`;
+  };
+
+  const formatPercentage = (value: number | null | undefined) => {
+    if (value === null || value === undefined) {
+      return '—';
+    }
+
+    const normalized = value <= 1 && value >= -1 ? value * 100 : value;
+    return `${normalized.toFixed(1)}%`;
+  };
+
   const getStatusBadge = () => {
     switch (quote.status) {
       case 'approved':
@@ -160,77 +182,74 @@ const QuoteDetails = ({
     }
   };
 
-  // Prepare basic quote info to avoid duplication
-  const basicQuoteFields = ['customer_name', 'oracle_customer_id', 'sfdc_opportunity', 'is_rep_involved', 'payment_terms', 'shipping_terms'];
-  const additionalFields = quote.quote_fields ? Object.keys(quote.quote_fields).filter(key => !basicQuoteFields.includes(key)) : [];
-
   return (
     <div className="space-y-6">
       {/* Quote Header */}
       <Card className="bg-gray-900 border-gray-800">
         <CardHeader>
-          <CardTitle className="text-white flex items-center justify-between">
-            Quote Details - {quote.id}
-            <div className="flex items-center space-x-2">
+          <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+            <div className="space-y-2">
+              <CardTitle className="text-white">Quote Details</CardTitle>
+              <div className="grid grid-cols-1 gap-2 text-sm text-gray-300 sm:grid-cols-2 lg:grid-cols-3">
+                <div>
+                  <Label className="text-gray-400">Quote ID</Label>
+                  <p className="text-white font-medium font-mono">{quote.id}</p>
+                </div>
+                <div>
+                  <Label className="text-gray-400">Requested By</Label>
+                  <p className="text-white font-medium">
+                    {quote.submitted_by_name || quote.submitted_by_email || `User ${quote.user_id}`}
+                  </p>
+                </div>
+                <div>
+                  <Label className="text-gray-400">Priority</Label>
+                  <div>
+                    <Badge className={`${
+                      quote.priority === 'Urgent' ? 'bg-red-500' :
+                      quote.priority === 'High' ? 'bg-orange-500' :
+                      quote.priority === 'Medium' ? 'bg-yellow-500' : 'bg-green-500'
+                    } text-white`}>
+                      {quote.priority}
+                    </Badge>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="flex items-start space-x-2">
               {getStatusBadge()}
-              <Badge className={`${
-                quote.priority === 'Urgent' ? 'bg-red-500' :
-                quote.priority === 'High' ? 'bg-orange-500' :
-                quote.priority === 'Medium' ? 'bg-yellow-500' : 'bg-green-500'
-              } text-white`}>
-                {quote.priority}
-              </Badge>
-            </div>
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-            <div>
-              <Label className="text-gray-400">Customer</Label>
-              <p className="text-white font-medium">{quote.customer_name}</p>
-            </div>
-            <div>
-              <Label className="text-gray-400">Oracle Customer ID</Label>
-              <p className="text-white font-medium">{quote.oracle_customer_id}</p>
-            </div>
-            <div>
-              <Label className="text-gray-400">SFDC Opportunity</Label>
-              <p className="text-white font-medium">{quote.sfdc_opportunity}</p>
-            </div>
-            <div>
-              <Label className="text-gray-400">Rep Involved</Label>
-              <p className="text-white font-medium">{quote.is_rep_involved ? 'Yes' : 'No'}</p>
-            </div>
-            <div>
-              <Label className="text-gray-400">Payment Terms</Label>
-              <p className="text-white font-medium">{quote.payment_terms}</p>
-            </div>
-            <div>
-              <Label className="text-gray-400">Shipping Terms</Label>
-              <p className="text-white font-medium">{quote.shipping_terms}</p>
             </div>
           </div>
-
-          {quote.discount_justification && (
-            <div>
-              <Label className="text-gray-400">Discount Justification</Label>
-              <p className="text-gray-300 bg-gray-800 p-3 rounded mt-1">{quote.discount_justification}</p>
-            </div>
-          )}
-        </CardContent>
+        </CardHeader>
       </Card>
 
-      {/* Additional Quote Fields - Only show fields not already displayed */}
-      {additionalFields.length > 0 && (
+      {/* Configured Quote Fields */}
+      {formattedConfiguredFields.length > 0 && (
+        <Card className="bg-gray-900 border-gray-800">
+          <CardHeader>
+            <CardTitle className="text-white">Quote Information</CardTitle>
+          </CardHeader>
+          <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 text-sm">
+            {formattedConfiguredFields.map((field) => (
+              <div key={field.id} className="space-y-1">
+                <Label className="text-gray-400">{field.label}</Label>
+                <p className="text-white font-medium break-words">{field.formattedValue}</p>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Unmapped fields fallback */}
+      {unmappedQuoteFields.length > 0 && (
         <Card className="bg-gray-900 border-gray-800">
           <CardHeader>
             <CardTitle className="text-white">Additional Quote Information</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            {additionalFields.map((key) => (
+            {unmappedQuoteFields.map(({ key, value }) => (
               <div key={key} className="grid grid-cols-2 gap-4">
                 <Label className="text-gray-400 capitalize">{key.replace(/_/g, ' ')}</Label>
-                <p className="text-white">{String(quote.quote_fields![key])}</p>
+                <p className="text-white">{String(value ?? '—')}</p>
               </div>
             ))}
           </CardContent>
@@ -243,36 +262,56 @@ const QuoteDetails = ({
           <CardTitle className="text-white">Project Financial Analysis</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="text-center p-4 bg-gray-800 rounded">
               <p className="text-gray-400 text-sm">Original Value</p>
-              <p className="text-white text-xl font-bold">{quote.currency} {quote.original_quote_value.toLocaleString()}</p>
+              <p className="text-white text-xl font-bold">{formatCurrency(quote.original_quote_value)}</p>
             </div>
             <div className="text-center p-4 bg-gray-800 rounded">
               <p className="text-gray-400 text-sm">Current Total</p>
-              <p className="text-white text-xl font-bold">{quote.currency} {totals.totalRevenue.toLocaleString()}</p>
+              <p className="text-white text-xl font-bold">{formatCurrency(totals.totalRevenue)}</p>
             </div>
             <div className="text-center p-4 bg-gray-800 rounded">
               <p className="text-gray-400 text-sm">Total Cost</p>
-              <p className="text-orange-400 text-xl font-bold">{quote.currency} {totals.totalCost.toLocaleString()}</p>
+              <p className="text-orange-400 text-xl font-bold">{formatCurrency(totals.totalCost)}</p>
             </div>
             <div className="text-center p-4 bg-gray-800 rounded">
               <p className="text-gray-400 text-sm">Margin</p>
               <p className={`text-xl font-bold ${
-                totals.marginPercentage >= 25 ? 'text-green-400' : 
+                totals.marginPercentage >= 25 ? 'text-green-400' :
                 totals.marginPercentage >= 15 ? 'text-yellow-400' : 'text-red-400'
               }`}>
                 {totals.marginPercentage.toFixed(1)}%
               </p>
             </div>
           </div>
-          <div className="mt-4 p-4 bg-gray-800 rounded">
-            <div className="flex justify-between items-center">
-              <span className="text-gray-400">Gross Profit:</span>
+          <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="text-center p-4 bg-gray-800 rounded">
+              <p className="text-gray-400 text-sm">Discounted Value</p>
+              <p className="text-white text-xl font-bold">{formatCurrency(quote.discounted_value)}</p>
+            </div>
+            <div className="text-center p-4 bg-gray-800 rounded">
+              <p className="text-gray-400 text-sm">Requested Discount</p>
+              <p className="text-blue-400 text-xl font-bold">{formatPercentage(quote.requested_discount)}</p>
+            </div>
+            <div className="text-center p-4 bg-gray-800 rounded">
+              <p className="text-gray-400 text-sm">Approved Discount</p>
+              <p className="text-emerald-400 text-xl font-bold">{formatPercentage(quote.approved_discount)}</p>
+            </div>
+          </div>
+          <div className="mt-4 p-4 bg-gray-800 rounded space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+              <span className="text-gray-400">Gross Profit</span>
               <span className="text-green-400 text-lg font-bold">
-                {quote.currency} {totals.grossProfit.toLocaleString()}
+                {formatCurrency(totals.grossProfit)}
               </span>
             </div>
+            {quote.discount_justification && (
+              <div>
+                <Label className="text-gray-400">Discount Justification</Label>
+                <p className="text-gray-200 mt-1 whitespace-pre-line">{quote.discount_justification}</p>
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
