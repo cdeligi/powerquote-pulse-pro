@@ -423,6 +423,35 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
     (fieldId: string) => Boolean(getFieldConfig(fieldId)?.required),
     [getFieldConfig]
   );
+
+  const getStringFieldValue = useCallback(
+    (fieldId: string, requiredFallback: string, optionalFallback?: string) => {
+      const fallbackValue = isFieldRequired(fieldId)
+        ? requiredFallback
+        : optionalFallback ?? requiredFallback;
+
+      const resolved = resolveQuoteFieldValue(fieldId, fallbackValue);
+
+      if (resolved === undefined || resolved === null) {
+        return fallbackValue;
+      }
+
+      if (typeof resolved === 'string') {
+        return resolved.trim().length > 0 ? resolved : fallbackValue;
+      }
+
+      if (typeof resolved === 'number' && Number.isFinite(resolved)) {
+        return String(resolved);
+      }
+
+      if (typeof resolved === 'boolean') {
+        return resolved ? 'true' : 'false';
+      }
+
+      return String(resolved);
+    },
+    [isFieldRequired, resolveQuoteFieldValue]
+  );
   
   useEffect(() => {
     const fetchQuoteFields = async () => {
@@ -527,12 +556,12 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
 
       console.log('Generated simple draft quote ID:', draftQuoteId);
 
-      const resolvedOracleCustomerId = resolveQuoteFieldValue('oracle_customer_id', 'TBD');
-      const resolvedSfdcOpportunity = resolveQuoteFieldValue('sfdc_opportunity', 'TBD');
-      const resolvedPriority = resolveQuoteFieldValue('priority', 'Medium');
-      const resolvedShippingTerms = resolveQuoteFieldValue('shipping_terms', 'TBD');
-      const resolvedPaymentTerms = resolveQuoteFieldValue('payment_terms', 'TBD');
-      const resolvedCurrency = resolveQuoteFieldValue('currency', 'USD');
+      const resolvedOracleCustomerId = getStringFieldValue('oracle_customer_id', 'TBD', 'TBD');
+      const resolvedSfdcOpportunity = getStringFieldValue('sfdc_opportunity', 'TBD', 'TBD');
+      const resolvedPriority = getStringFieldValue('priority', 'Medium');
+      const resolvedShippingTerms = getStringFieldValue('shipping_terms', 'TBD', 'TBD');
+      const resolvedPaymentTerms = getStringFieldValue('payment_terms', 'TBD', 'TBD');
+      const resolvedCurrency = getStringFieldValue('currency', 'USD');
       const rawRepInvolved = resolveQuoteFieldValue('is_rep_involved', false);
       const resolvedRepInvolved =
         typeof rawRepInvolved === 'string'
@@ -544,12 +573,12 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
         id: draftQuoteId,
         user_id: user.id,
         customer_name: draftCustomerName,
-        oracle_customer_id: resolvedOracleCustomerId || 'TBD',
-        sfdc_opportunity: resolvedSfdcOpportunity || 'TBD',
+        oracle_customer_id: resolvedOracleCustomerId,
+        sfdc_opportunity: resolvedSfdcOpportunity,
         priority: (resolvedPriority as any) || 'Medium',
-        shipping_terms: resolvedShippingTerms || 'TBD',
-        payment_terms: resolvedPaymentTerms || 'TBD',
-        currency: resolvedCurrency || 'USD',
+        shipping_terms: resolvedShippingTerms,
+        payment_terms: resolvedPaymentTerms,
+        currency: resolvedCurrency,
         is_rep_involved: resolvedRepInvolved,
         status: 'draft' as const,
         quote_fields: quoteFields,
@@ -1042,12 +1071,12 @@ if (
         const originalMargin = totalValue > 0 ? ((totalValue - totalCost) / totalValue) * 100 : 0;
 
         const timestampFallback = `DRAFT-${Date.now()}`;
-        const resolvedOracleCustomerId = resolveQuoteFieldValue('oracle_customer_id', 'DRAFT');
-        const resolvedSfdcOpportunity = resolveQuoteFieldValue('sfdc_opportunity', timestampFallback);
-        const resolvedPriority = resolveQuoteFieldValue('priority', 'Medium');
-        const resolvedShippingTerms = resolveQuoteFieldValue('shipping_terms', 'Ex-Works');
-        const resolvedPaymentTerms = resolveQuoteFieldValue('payment_terms', 'Net 30');
-        const resolvedCurrency = resolveQuoteFieldValue('currency', 'USD');
+        const resolvedOracleCustomerId = getStringFieldValue('oracle_customer_id', 'DRAFT', 'DRAFT');
+        const resolvedSfdcOpportunity = getStringFieldValue('sfdc_opportunity', timestampFallback, timestampFallback);
+        const resolvedPriority = getStringFieldValue('priority', 'Medium');
+        const resolvedShippingTerms = getStringFieldValue('shipping_terms', 'Ex-Works', 'Ex-Works');
+        const resolvedPaymentTerms = getStringFieldValue('payment_terms', 'Net 30', 'Net 30');
+        const resolvedCurrency = getStringFieldValue('currency', 'USD');
         const rawRepInvolved = resolveQuoteFieldValue('is_rep_involved', false);
         const resolvedRepInvolved =
           typeof rawRepInvolved === 'string'
@@ -1058,12 +1087,12 @@ if (
           id: newQuoteId,
           user_id: user.id,
           customer_name: draftName,
-          oracle_customer_id: resolvedOracleCustomerId || 'DRAFT',
-          sfdc_opportunity: resolvedSfdcOpportunity || timestampFallback,
+          oracle_customer_id: resolvedOracleCustomerId,
+          sfdc_opportunity: resolvedSfdcOpportunity,
           priority: (resolvedPriority as any) || 'Medium',
-          shipping_terms: resolvedShippingTerms || 'Ex-Works',
-          payment_terms: resolvedPaymentTerms || 'Net 30',
-          currency: resolvedCurrency || 'USD',
+          shipping_terms: resolvedShippingTerms,
+          payment_terms: resolvedPaymentTerms,
+          currency: resolvedCurrency,
           is_rep_involved: resolvedRepInvolved,
           status: 'draft' as const,
           quote_fields: quoteFields,
@@ -1266,15 +1295,15 @@ if (
           : await generateUniqueDraftName();
 
       const timestampFallback = `DRAFT-${Date.now()}`;
-      const resolvedOracleCustomerId = resolveQuoteFieldValue('oracle_customer_id', 'DRAFT');
-      const resolvedSfdcOpportunity = resolveQuoteFieldValue('sfdc_opportunity', timestampFallback);
+      const resolvedOracleCustomerId = getStringFieldValue('oracle_customer_id', 'DRAFT', 'DRAFT');
+      const resolvedSfdcOpportunity = getStringFieldValue('sfdc_opportunity', timestampFallback, timestampFallback);
       
       const { error: quoteError } = await supabase
         .from('quotes')
         .update({
           customer_name: draftCustomerName,
-          oracle_customer_id: resolvedOracleCustomerId || 'DRAFT',
-          sfdc_opportunity: resolvedSfdcOpportunity || timestampFallback,
+          oracle_customer_id: resolvedOracleCustomerId,
+          sfdc_opportunity: resolvedSfdcOpportunity,
           original_quote_value: totalValue,
           discounted_value: totalValue * (1 - discountPercentage / 100),
           requested_discount: discountPercentage,
@@ -2592,21 +2621,13 @@ main
       quoteId = newQuoteId;
       }
 
-      const oracleFallback = isFieldRequired('oracle_customer_id') ? 'TBD' : 'N/A';
-      const sfdcFallback = isFieldRequired('sfdc_opportunity') ? 'TBD' : 'N/A';
-      const customerNameValue = String(
-        resolveQuoteFieldValue('customer_name', 'Unnamed Customer') || 'Unnamed Customer'
-      );
-      const oracleCustomerIdValue = String(
-        resolveQuoteFieldValue('oracle_customer_id', oracleFallback) || oracleFallback
-      );
-      const sfdcOpportunityValue = String(
-        resolveQuoteFieldValue('sfdc_opportunity', sfdcFallback) || sfdcFallback
-      );
-      const priorityValue = String(resolveQuoteFieldValue('priority', 'Medium') || 'Medium');
-      const shippingTermsValue = String(resolveQuoteFieldValue('shipping_terms', 'TBD') || 'TBD');
-      const paymentTermsValue = String(resolveQuoteFieldValue('payment_terms', 'TBD') || 'TBD');
-      const currencyValue = String(resolveQuoteFieldValue('currency', 'USD') || 'USD');
+      const customerNameValue = getStringFieldValue('customer_name', 'Unnamed Customer');
+      const oracleCustomerIdValue = getStringFieldValue('oracle_customer_id', 'TBD', 'N/A');
+      const sfdcOpportunityValue = getStringFieldValue('sfdc_opportunity', 'TBD', 'N/A');
+      const priorityValue = getStringFieldValue('priority', 'Medium');
+      const shippingTermsValue = getStringFieldValue('shipping_terms', 'TBD', 'N/A');
+      const paymentTermsValue = getStringFieldValue('payment_terms', 'TBD', 'N/A');
+      const currencyValue = getStringFieldValue('currency', 'USD');
       const rawRepInvolvedFinal = resolveQuoteFieldValue('is_rep_involved', false);
       const isRepInvolvedFinal =
         typeof rawRepInvolvedFinal === 'string'
