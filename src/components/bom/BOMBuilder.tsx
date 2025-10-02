@@ -1939,18 +1939,44 @@ if (
     if (!selectedChassis || !editingOriginalItem) return;
 
     // Check if the configuration has actually changed
+    // Ensure both slot assignments are using number keys for proper comparison
     const originalSlotAssignments = editingOriginalItem.slotAssignments || {};
     const originalHasRemoteDisplay = editingOriginalItem.configuration?.hasRemoteDisplay || false;
     
-    // Deep comparison of slot assignments
+    // Normalize slot assignments to use number keys for comparison
+    const normalizeSlotKeys = (assignments: Record<string | number, any>): Record<number, any> => {
+      const normalized: Record<number, any> = {};
+      Object.entries(assignments).forEach(([key, value]) => {
+        const numKey = typeof key === 'string' ? parseInt(key, 10) : key;
+        if (!isNaN(numKey)) {
+          normalized[numKey] = value;
+        }
+      });
+      return normalized;
+    };
+    
+    const normalizedOriginal = normalizeSlotKeys(originalSlotAssignments);
+    const normalizedCurrent = normalizeSlotKeys(slotAssignments);
+    
+    // Deep comparison of slot assignments using normalized keys
     const slotAssignmentsChanged = 
-      Object.keys(originalSlotAssignments).length !== Object.keys(slotAssignments).length ||
-      Object.entries(slotAssignments).some(([slot, card]) => {
-        const originalCard = originalSlotAssignments[parseInt(slot)];
+      Object.keys(normalizedOriginal).length !== Object.keys(normalizedCurrent).length ||
+      Object.entries(normalizedCurrent).some(([slot, card]) => {
+        const slotNum = parseInt(slot, 10);
+        const originalCard = normalizedOriginal[slotNum];
         return !originalCard || originalCard.id !== card.id;
       });
     
     const remoteDisplayChanged = originalHasRemoteDisplay !== hasRemoteDisplay;
+    
+    console.log('Configuration comparison:', {
+      originalSlots: Object.keys(normalizedOriginal),
+      currentSlots: Object.keys(normalizedCurrent),
+      slotAssignmentsChanged,
+      remoteDisplayChanged,
+      originalHasRemoteDisplay,
+      currentHasRemoteDisplay: hasRemoteDisplay
+    });
     
     // Only regenerate part number if configuration actually changed
     let partNumber: string;
