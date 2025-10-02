@@ -2131,7 +2131,7 @@ if (
     if (!selectedChassis || !editingOriginalItem) return;
 
 
-    const originalAssignments =
+    const originalSlotAssignments =
       (editingOriginalItem.slotAssignments && Object.keys(editingOriginalItem.slotAssignments).length > 0
         ? editingOriginalItem.slotAssignments
         : convertRackLayoutToAssignments(editingOriginalItem.rackConfiguration)) ||
@@ -2139,38 +2139,17 @@ if (
 
     const normalizedCurrentAssignments = Object.keys(slotAssignments).length > 0 ? slotAssignments : {};
 
-    const assignmentsChanged = haveSlotAssignmentsChanged(
-      originalAssignments as Record<number, Level3Product & Record<string, any>>,
-      normalizedCurrentAssignments as Record<number, Level3Product & Record<string, any>>
-    );
-
-    const originalRemoteDisplay = editingOriginalItem.configuration?.hasRemoteDisplay || false;
-    const remoteDisplayChanged = originalRemoteDisplay !== hasRemoteDisplay;
-
-    const shouldRegeneratePartNumber = assignmentsChanged || remoteDisplayChanged;
-
-    const generatedPartNumber = shouldRegeneratePartNumber
-      ? buildQTMSPartNumber({
-          chassis: selectedChassis,
-          slotAssignments,
-          hasRemoteDisplay,
-          pnConfig,
-          codeMap,
-          includeSuffix: true,
-        })
-      : editingOriginalItem.partNumber || editingOriginalItem.product.partNumber;
-
-    const fallbackPartNumber = buildQTMSPartNumber({
+    const generatedPartNumber = buildQTMSPartNumber({
       chassis: selectedChassis,
       slotAssignments,
       hasRemoteDisplay,
       pnConfig,
       codeMap,
       includeSuffix: true,
+    });
 
     // Check if the configuration has actually changed
     // Ensure both slot assignments are using number keys for proper comparison
-    const originalSlotAssignments = editingOriginalItem.slotAssignments || {};
     const originalHasRemoteDisplay = editingOriginalItem.configuration?.hasRemoteDisplay || false;
     
     // Normalize slot assignments to use number keys for comparison
@@ -2186,7 +2165,7 @@ if (
     };
     
     const normalizedOriginal = normalizeSlotKeys(originalSlotAssignments);
-    const normalizedCurrent = normalizeSlotKeys(slotAssignments);
+    const normalizedCurrent = normalizeSlotKeys(normalizedCurrentAssignments);
     
     // Deep comparison of slot assignments using normalized keys
     const slotAssignmentsChanged = 
@@ -2198,42 +2177,21 @@ if (
       });
     
     const remoteDisplayChanged = originalHasRemoteDisplay !== hasRemoteDisplay;
-    
+
+    const shouldRegeneratePartNumber = slotAssignmentsChanged || remoteDisplayChanged;
+
     console.log('Configuration comparison:', {
       originalSlots: Object.keys(normalizedOriginal),
       currentSlots: Object.keys(normalizedCurrent),
       slotAssignmentsChanged,
       remoteDisplayChanged,
       originalHasRemoteDisplay,
-      currentHasRemoteDisplay: hasRemoteDisplay
-main
+      currentHasRemoteDisplay: hasRemoteDisplay,
     });
-    
-    // Only regenerate part number if configuration actually changed
-    let partNumber: string;
-    if (slotAssignmentsChanged || remoteDisplayChanged) {
-      console.log('Configuration changed, regenerating part number');
-      partNumber = buildQTMSPartNumber({
-        chassis: selectedChassis,
-        slotAssignments,
-        hasRemoteDisplay,
-        pnConfig,
-        codeMap,
-        includeSuffix: true,
-      });
-    } else {
-      console.log('Configuration unchanged, preserving original part number:', editingOriginalItem.partNumber);
-      partNumber = editingOriginalItem.partNumber || buildQTMSPartNumber({
-        chassis: selectedChassis,
-        slotAssignments,
-        hasRemoteDisplay,
-        pnConfig,
-        codeMap,
-        includeSuffix: true,
-      });
-    }
 
-    const partNumber = generatedPartNumber || fallbackPartNumber;
+    const partNumber = shouldRegeneratePartNumber
+      ? generatedPartNumber
+      : editingOriginalItem.partNumber || generatedPartNumber;
 
     const capturedContext =
       pnConfig || (codeMap && Object.keys(codeMap).length > 0)
