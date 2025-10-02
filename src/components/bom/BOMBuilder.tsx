@@ -82,6 +82,7 @@ const convertRackLayoutToAssignments = (
       return acc;
     }
 
+
     const rawSlot = slot as Record<string, any>;
     const cardRecord = (rawSlot.card as Record<string, any> | undefined) || undefined;
     const nestedProduct =
@@ -137,6 +138,80 @@ const convertRackLayoutToAssignments = (
       productSource?.partNumber ||
       productSource?.part_number ||
       undefined;
+
+const rawSlot = slot as Record<string, any>;
+
+const cardRecord =
+  (rawSlot.card as Record<string, any> | undefined) || undefined;
+
+const nestedProduct =
+  (cardRecord?.product as Record<string, any> | undefined) ||
+  (cardRecord?.card as Record<string, any> | undefined) ||
+  (cardRecord?.level3Product as Record<string, any> | undefined) ||
+  undefined;
+
+// Prefer explicit product on the slot, then card/nested fallbacks
+const productSource =
+  (rawSlot.product as Record<string, any> | null | undefined) ||
+  cardRecord ||
+  nestedProduct ||
+  // keep main-branch fallback (equivalent to cardRecord but safe if rawSlot not used)
+  ((slot as Record<string, any>).card as Record<string, any> | undefined) ||
+  undefined;
+
+// Exhaustive product ID resolution across known shapes/keys
+const productId =
+  rawSlot.productId ??
+  rawSlot.product_id ??
+  rawSlot.cardId ??
+  rawSlot.card_id ??
+  rawSlot.level3ProductId ??
+  rawSlot.level3_product_id ??
+  cardRecord?.id ??
+  (cardRecord as any)?.productId ??
+  (cardRecord as any)?.product_id ??
+  (cardRecord as any)?.cardId ??
+  (cardRecord as any)?.card_id ??
+  (cardRecord as any)?.level3ProductId ??
+  (cardRecord as any)?.level3_product_id ??
+  (nestedProduct as any)?.id ??
+  (nestedProduct as any)?.productId ??
+  (nestedProduct as any)?.product_id ??
+  (slot as any).productId ??
+  (slot as any).product_id ??
+  (slot as any).cardId ??
+  (slot as any).card_id ??
+  productSource?.id ??
+  undefined;
+
+// Friendly display name with fallbacks
+const name =
+  (slot as any).cardName ||
+  productSource?.displayName ||
+  productSource?.name ||
+  `Slot ${position} Card`;
+
+// Resolve part number from multiple possible shapes/keys
+const partNumber =
+  (slot as any).partNumber ||
+  rawSlot.part_number ||
+  rawSlot.cardPartNumber ||
+  rawSlot.card_part_number ||
+  cardRecord?.partNumber ||
+  (cardRecord as any)?.part_number ||
+  (cardRecord as any)?.cardPartNumber ||
+  (cardRecord as any)?.card_part_number ||
+  (typeof (cardRecord as any)?.pn === 'string'
+    ? (cardRecord as any).pn
+    : undefined) ||
+  (nestedProduct as any)?.partNumber ||
+  (nestedProduct as any)?.part_number ||
+  (slot as any).part_number ||
+  productSource?.partNumber ||
+  (productSource as any)?.part_number ||
+  undefined;
+
+main
 
     acc[position] = {
       id: productId || `slot-${position}`,
@@ -519,12 +594,12 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
         description: `Loading quote data for ${quoteId}...`,
       });
       
-      // Load quote data
+      // Load quote data - use maybeSingle to handle missing quotes gracefully
       const { data: quote, error: quoteError } = await supabase
         .from('quotes')
         .select('*')
         .eq('id', quoteId)
-        .single();
+        .maybeSingle();
         
       if (quoteError) {
         console.error('Error loading quote:', quoteError);
@@ -533,16 +608,20 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
           description: `Failed to load quote ${quoteId}: ${quoteError.message}`,
           variant: "destructive"
         });
-        throw quoteError;
+        setIsLoading(false);
+        return;
       }
       
       if (!quote) {
         console.log('No quote found with ID:', quoteId);
         toast({
           title: 'Quote Not Found',
-          description: `Quote ${quoteId} could not be found`,
+          description: `Quote ${quoteId} does not exist. Please check the quote ID and try again.`,
           variant: 'destructive'
         });
+        setIsLoading(false);
+        // Clear invalid quote ID from URL
+        window.history.replaceState({}, '', '/#configure');
         return;
       }
       
@@ -2051,6 +2130,7 @@ if (
   const handleUpdateChassisInBOM = () => {
     if (!selectedChassis || !editingOriginalItem) return;
 
+
     const originalAssignments =
       (editingOriginalItem.slotAssignments && Object.keys(editingOriginalItem.slotAssignments).length > 0
         ? editingOriginalItem.slotAssignments
@@ -2087,7 +2167,71 @@ if (
       pnConfig,
       codeMap,
       includeSuffix: true,
+
+    // Check if the configuration has actually changed
+    // Ensure both slot assignments are using number keys for proper comparison
+    const originalSlotAssignments = editingOriginalItem.slotAssignments || {};
+    const originalHasRemoteDisplay = editingOriginalItem.configuration?.hasRemoteDisplay || false;
+    
+    // Normalize slot assignments to use number keys for comparison
+    const normalizeSlotKeys = (assignments: Record<string | number, any>): Record<number, any> => {
+      const normalized: Record<number, any> = {};
+      Object.entries(assignments).forEach(([key, value]) => {
+        const numKey = typeof key === 'string' ? parseInt(key, 10) : key;
+        if (!isNaN(numKey)) {
+          normalized[numKey] = value;
+        }
+      });
+      return normalized;
+    };
+    
+    const normalizedOriginal = normalizeSlotKeys(originalSlotAssignments);
+    const normalizedCurrent = normalizeSlotKeys(slotAssignments);
+    
+    // Deep comparison of slot assignments using normalized keys
+    const slotAssignmentsChanged = 
+      Object.keys(normalizedOriginal).length !== Object.keys(normalizedCurrent).length ||
+      Object.entries(normalizedCurrent).some(([slot, card]) => {
+        const slotNum = parseInt(slot, 10);
+        const originalCard = normalizedOriginal[slotNum];
+        return !originalCard || originalCard.id !== card.id;
+      });
+    
+    const remoteDisplayChanged = originalHasRemoteDisplay !== hasRemoteDisplay;
+    
+    console.log('Configuration comparison:', {
+      originalSlots: Object.keys(normalizedOriginal),
+      currentSlots: Object.keys(normalizedCurrent),
+      slotAssignmentsChanged,
+      remoteDisplayChanged,
+      originalHasRemoteDisplay,
+      currentHasRemoteDisplay: hasRemoteDisplay
+main
     });
+    
+    // Only regenerate part number if configuration actually changed
+    let partNumber: string;
+    if (slotAssignmentsChanged || remoteDisplayChanged) {
+      console.log('Configuration changed, regenerating part number');
+      partNumber = buildQTMSPartNumber({
+        chassis: selectedChassis,
+        slotAssignments,
+        hasRemoteDisplay,
+        pnConfig,
+        codeMap,
+        includeSuffix: true,
+      });
+    } else {
+      console.log('Configuration unchanged, preserving original part number:', editingOriginalItem.partNumber);
+      partNumber = editingOriginalItem.partNumber || buildQTMSPartNumber({
+        chassis: selectedChassis,
+        slotAssignments,
+        hasRemoteDisplay,
+        pnConfig,
+        codeMap,
+        includeSuffix: true,
+      });
+    }
 
     const partNumber = generatedPartNumber || fallbackPartNumber;
 
@@ -2192,20 +2336,25 @@ if (
     // Check if this is a chassis-configured item (has slot assignments)
     if (item.slotAssignments || (item.product as any).chassisType && (item.product as any).chassisType !== 'N/A') {
       console.log('Editing chassis configuration for:', item.product.name);
+      console.log('Existing slot assignments:', item.slotAssignments);
+      console.log('Existing part number:', item.partNumber);
       
-      const productId = (item.product as Level2Product)?.id || item.productId || item.product_id;
+      const productId = (item.product as Level2Product)?.id;
       const hydratedChassis =
         (productId && allLevel2Products.find(p => p.id === productId)) ||
         (item.product as Level2Product);
 
       // Set up the chassis for editing
       setSelectedChassis(hydratedChassis);
-      setSlotAssignments(
+      
+      // Properly deserialize slot assignments
+      const existingSlotAssignments = 
         (item.slotAssignments && Object.keys(item.slotAssignments).length > 0
           ? item.slotAssignments
-          : convertRackLayoutToAssignments(item.rackConfiguration)) ||
-        {}
-      );
+          : convertRackLayoutToAssignments(item.rackConfiguration)) || {};
+      
+      console.log('Setting slot assignments for edit:', existingSlotAssignments);
+      setSlotAssignments(existingSlotAssignments);
       setConfiguringChassis(hydratedChassis);
 
       const context = resolvePartNumberContext(
@@ -2227,6 +2376,7 @@ if (
       }
 
       // Store the original item for restoration if edit is cancelled
+      // This preserves the original part number and configuration
       setEditingOriginalItem(item);
       
       const chassisIndex = bomItems.findIndex(bomItem => bomItem.id === item.id);
@@ -2244,6 +2394,7 @@ if (
         setSelectedAccessories(accessoriesToSelect);
       }
       
+
       setHasRemoteDisplay(item.configuration?.hasRemoteDisplay || false);
       setAutoPlaced(false);
 
@@ -2274,6 +2425,22 @@ if (
         }
       })();
 
+
+      // Improved remote display detection from part number pattern
+      // QTMS part numbers with remote display end with suffixes like "-D1", "-RD", or "-D<number>"
+      // Part numbers WITHOUT remote display don't have these suffixes (e.g., QTMS-LTX-0RF8A0000000000)
+      const partNumberStr = item.partNumber || item.product.partNumber || '';
+      
+      // Check for remote display suffixes at the end of the part number
+      const hasRemoteSuffix = /-(D1|RD|D\d+)$/.test(partNumberStr);
+      
+      // Also check configuration if available
+      const configHasRemote = item.configuration?.hasRemoteDisplay || false;
+      
+      console.log('Detected remote display from part number:', partNumberStr, '-> hasRemote:', hasRemoteSuffix, 'configHasRemote:', configHasRemote);
+      setHasRemoteDisplay(hasRemoteSuffix || configHasRemote);
+      
+main
       setTimeout(() => {
         const configSection = document.getElementById('chassis-configuration');
         if (configSection) {
