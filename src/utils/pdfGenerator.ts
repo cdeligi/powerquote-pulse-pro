@@ -106,9 +106,10 @@ export const generateQuotePDF = async (
     console.warn('Could not fetch PDF settings:', error);
   }
 
+  const draftBom = quoteInfo?.draft_bom as any;
   const combinedQuoteFields: Record<string, any> = {
-    ...(quoteInfo?.draft_bom?.quoteFields && typeof quoteInfo.draft_bom.quoteFields === 'object'
-      ? quoteInfo.draft_bom.quoteFields
+    ...(draftBom?.quoteFields && typeof draftBom.quoteFields === 'object'
+      ? draftBom.quoteFields
       : {}),
     ...(quoteInfo?.quote_fields && typeof quoteInfo.quote_fields === 'object'
       ? quoteInfo.quote_fields
@@ -117,8 +118,8 @@ export const generateQuotePDF = async (
   const combinedFieldKeys = Object.keys(combinedQuoteFields);
 
   const rackLayoutFallbackMap = new Map<string, any>();
-  if (Array.isArray(quoteInfo?.draft_bom?.rackLayouts)) {
-    quoteInfo.draft_bom.rackLayouts.forEach((entry: any) => {
+  if (Array.isArray(draftBom?.rackLayouts)) {
+    draftBom.rackLayouts.forEach((entry: any) => {
       const key = entry?.productId || entry?.partNumber;
       if (!key) return;
       rackLayoutFallbackMap.set(String(key), entry?.layout || entry);
@@ -126,8 +127,8 @@ export const generateQuotePDF = async (
   }
 
   const level4FallbackMap = new Map<string, any>();
-  if (Array.isArray(quoteInfo?.draft_bom?.level4Configurations)) {
-    quoteInfo.draft_bom.level4Configurations.forEach((entry: any) => {
+  if (Array.isArray(draftBom?.level4Configurations)) {
+    draftBom.level4Configurations.forEach((entry: any) => {
       const key = entry?.productId || entry?.partNumber;
       if (!key) return;
       level4FallbackMap.set(String(key), entry);
@@ -588,13 +589,16 @@ export const generateQuotePDF = async (
     }
 
     if (item.slotAssignments && typeof item.slotAssignments === 'object') {
-      const entries = Object.entries(item.slotAssignments).map(([slotKey, slotData], index) => ({
-        slot: normalizeSlotNumber(slotKey, index),
-        cardName: slotData?.displayName || slotData?.name || slotData?.product?.name || `Slot ${slotKey}`,
-        partNumber: slotData?.partNumber || slotData?.product?.partNumber || slotData?.part_number || undefined,
-        level4Config: slotData?.level4Config || null,
-        level4Selections: slotData?.level4Selections || null,
-      })).filter(entry => entry.slot !== undefined && entry.slot !== null);
+      const entries = Object.entries(item.slotAssignments).map(([slotKey, slotData], index) => {
+        const data = slotData as any;
+        return {
+          slot: normalizeSlotNumber(slotKey, index),
+          cardName: data?.displayName || data?.name || data?.product?.name || `Slot ${slotKey}`,
+          partNumber: data?.partNumber || data?.product?.partNumber || data?.part_number || undefined,
+          level4Config: data?.level4Config || null,
+          level4Selections: data?.level4Selections || null,
+        };
+      }).filter(entry => entry.slot !== undefined && entry.slot !== null);
 
       if (entries.length > 0) {
         return { slots: entries };
@@ -621,7 +625,7 @@ export const generateQuotePDF = async (
   };
 
   const normalizedBomItems = bomItems.map(item => {
-    const product = item.product || {};
+    const product = (item.product || {}) as any;
     const normalizedProduct = {
       ...product,
       name: product.name || item.name || 'Configured Item',
@@ -960,7 +964,7 @@ export const generateQuotePDF = async (
           typeof item.rackConfiguration === 'object'
         );
 
-        const fallbackRackLayouts = Array.isArray(quoteInfo.draft_bom?.rackLayouts) ? quoteInfo.draft_bom.rackLayouts : [];
+        const fallbackRackLayouts = Array.isArray(draftBom?.rackLayouts) ? draftBom.rackLayouts : [];
 
         if (chassisItems.length === 0 && fallbackRackLayouts.length === 0 && !quoteInfo.draft_bom?.rackConfiguration) {
           return '';

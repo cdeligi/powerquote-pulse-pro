@@ -2031,20 +2031,25 @@ if (
     // Check if this is a chassis-configured item (has slot assignments)
     if (item.slotAssignments || (item.product as any).chassisType && (item.product as any).chassisType !== 'N/A') {
       console.log('Editing chassis configuration for:', item.product.name);
+      console.log('Existing slot assignments:', item.slotAssignments);
+      console.log('Existing part number:', item.partNumber);
       
-      const productId = (item.product as Level2Product)?.id || item.productId || item.product_id;
+      const productId = (item.product as Level2Product)?.id;
       const hydratedChassis =
         (productId && allLevel2Products.find(p => p.id === productId)) ||
         (item.product as Level2Product);
 
       // Set up the chassis for editing
       setSelectedChassis(hydratedChassis);
-      setSlotAssignments(
+      
+      // Properly deserialize slot assignments
+      const existingSlotAssignments = 
         (item.slotAssignments && Object.keys(item.slotAssignments).length > 0
           ? item.slotAssignments
-          : convertRackLayoutToAssignments(item.rackConfiguration)) ||
-        {}
-      );
+          : convertRackLayoutToAssignments(item.rackConfiguration)) || {};
+      
+      console.log('Setting slot assignments for edit:', existingSlotAssignments);
+      setSlotAssignments(existingSlotAssignments);
       setConfiguringChassis(hydratedChassis);
       
       // Store the original item for restoration if edit is cancelled
@@ -2065,7 +2070,16 @@ if (
         setSelectedAccessories(accessoriesToSelect);
       }
       
-      setHasRemoteDisplay(item.configuration?.hasRemoteDisplay || false);
+      // Determine hasRemoteDisplay from the part number pattern
+      // QTMS part numbers end with suffixes like "-D1" or "-RD" for remote display
+      const partNumberStr = item.partNumber || item.product.partNumber || '';
+      const hasRemoteSuffix = partNumberStr.includes('-D1') || 
+                             partNumberStr.includes('-RD') ||
+                             partNumberStr.match(/-D\d+$/);
+      
+      console.log('Detected remote display from part number:', partNumberStr, '-> hasRemote:', hasRemoteSuffix);
+      setHasRemoteDisplay(!!hasRemoteSuffix || item.configuration?.hasRemoteDisplay || false);
+      
       setTimeout(() => {
         const configSection = document.getElementById('chassis-configuration');
         if (configSection) {
