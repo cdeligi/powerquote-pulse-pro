@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { CheckCircle, XCircle, DollarSign, Edit3, Save, X, Settings } from "lucide-react";
 import QTMSConfigurationEditor from "@/components/bom/QTMSConfigurationEditor";
 import { consolidateQTMSConfiguration, QTMSConfiguration, ConsolidatedQTMS } from "@/utils/qtmsConsolidation";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Quote, BOMItemWithDetails } from "@/types/quote";
 import { User } from "@/types/auth";
 import { useConfiguredQuoteFields } from "@/hooks/useConfiguredQuoteFields";
