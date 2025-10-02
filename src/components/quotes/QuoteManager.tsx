@@ -39,8 +39,9 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
 
   // Filter and process quotes with real BOM item counts
   const processedQuotes = quotes.map(quote => ({
-    id: quote.status === 'draft' ? 'Draft' : quote.id,
+    id: quote.id, // Use unique ID for React key
     displayId: quote.id, // Keep original ID for operations
+    displayLabel: quote.status === 'draft' ? 'Draft' : quote.id, // Label to show in UI
     customer: quote.customer_name || 'Unnamed Customer',
     oracleCustomerId: quote.oracle_customer_id || 'N/A',
     // Calculate values from draft_bom for draft quotes, use stored values for others
@@ -144,13 +145,40 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
     try {
       console.log('Deleting draft quote:', quoteId);
       
+      // First, verify the quote exists and is a draft
+      const { data: quoteCheck, error: checkError } = await supabase
+        .from('quotes')
+        .select('id, status, user_id')
+        .eq('id', quoteId)
+        .maybeSingle();
+        
+      if (checkError) {
+        console.error('Error checking quote:', checkError);
+        throw checkError;
+      }
+      
+      if (!quoteCheck) {
+        throw new Error(`Quote ${quoteId} not found`);
+      }
+      
+      if (quoteCheck.status !== 'draft') {
+        throw new Error('Only draft quotes can be deleted');
+      }
+      
+      console.log('Quote verified, proceeding with deletion:', quoteCheck);
+      
       // Delete BOM items first
       const { error: bomError } = await supabase
         .from('bom_items')
         .delete()
         .eq('quote_id', quoteId);
         
-      if (bomError) throw bomError;
+      if (bomError) {
+        console.error('Error deleting BOM items:', bomError);
+        throw bomError;
+      }
+      
+      console.log('BOM items deleted successfully');
       
       // Delete the quote
       const { error: quoteError } = await supabase
@@ -159,7 +187,12 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
         .eq('id', quoteId)
         .eq('status', 'draft'); // Extra safety check
         
-      if (quoteError) throw quoteError;
+      if (quoteError) {
+        console.error('Error deleting quote:', quoteError);
+        throw quoteError;
+      }
+      
+      console.log('Quote deleted successfully');
       
       toast({
         title: "Quote Deleted",
@@ -168,11 +201,11 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
       
       // Refresh the quote list
       fetchQuotes();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error deleting quote:', error);
       toast({
         title: "Error",
-        description: "Failed to delete quote. Please try again.",
+        description: error.message || "Failed to delete quote. Please try again.",
         variant: "destructive"
       });
     }
@@ -496,7 +529,7 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
                     <div>
                       <div className="flex items-center space-x-3">
                         <span className="text-white font-medium">
-                          {quote.status === 'draft' ? 'Draft' : quote.id}
+                          {quote.displayLabel}
                         </span>
                         <Badge className={`${statusBadge.color} text-white`}>
                           {statusBadge.text}
