@@ -57,9 +57,13 @@ const convertRackLayoutToAssignments = (
       slotNumber?: number | null;
       cardName?: string | null;
       partNumber?: string | null;
-      product?: { id?: string | null; name?: string | null; displayName?: string | null } | null;
+      product?: { id?: string | null; name?: string | null; displayName?: string | null; partNumber?: string | null; part_number?: string | null } | null;
       level4Config?: any;
       level4Selections?: any;
+      productId?: string | null;
+      product_id?: string | null;
+      cardId?: string | null;
+      card_id?: string | null;
     }>;
   }
 ): Record<number, Level3Product & Record<string, any>> | undefined => {
@@ -78,10 +82,34 @@ const convertRackLayoutToAssignments = (
       return acc;
     }
 
-    const name = slot.cardName || slot.product?.displayName || slot.product?.name || `Slot ${position} Card`;
+    const productSource =
+      (slot.product as Record<string, any> | null | undefined) ||
+      ((slot as Record<string, any>).card as Record<string, any> | undefined) ||
+      undefined;
+
+    const productId =
+      (slot as any).productId ||
+      (slot as any).product_id ||
+      (slot as any).cardId ||
+      (slot as any).card_id ||
+      productSource?.id ||
+      undefined;
+
+    const name =
+      slot.cardName ||
+      productSource?.displayName ||
+      productSource?.name ||
+      `Slot ${position} Card`;
+
+    const partNumber =
+      slot.partNumber ||
+      (slot as any).part_number ||
+      productSource?.partNumber ||
+      productSource?.part_number ||
+      undefined;
 
     acc[position] = {
-      id: slot.product?.id || `slot-${position}`,
+      id: productId || `slot-${position}`,
       name,
       displayName: name,
       description: '',
@@ -89,7 +117,7 @@ const convertRackLayoutToAssignments = (
       enabled: true,
       parent_product_id: '',
       product_level: 3,
-      partNumber: slot.partNumber || undefined,
+      partNumber,
       level4Config: slot.level4Config ?? null,
       level4Selections: slot.level4Selections ?? null,
     } as Level3Product & Record<string, any>;
@@ -459,12 +487,37 @@ if (
         ? Object.entries(rawSlotAssignments).map(([slotKey, cardData]) => {
             const slotNumber = Number.parseInt(slotKey, 10);
             const card = (cardData || {}) as Record<string, any>;
+
+            const productSource = (card.product || card.card || {}) as Record<string, any>;
+            const productId =
+              card.id ||
+              card.productId ||
+              card.product_id ||
+              card.cardId ||
+              card.card_id ||
+              card.level3ProductId ||
+              card.level3_product_id ||
+              productSource.id;
+
+            const partNumber =
+              card.partNumber ||
+              card.part_number ||
+              productSource.partNumber ||
+              productSource.part_number ||
+              (typeof card.pn === 'string' ? card.pn : undefined);
+
+            const displayName =
+              card.displayName ||
+              card.name ||
+              productSource.displayName ||
+              productSource.name;
+
             return {
               slot: Number.isNaN(slotNumber) ? 0 : slotNumber,
-              productId: card.id,
-              name: card.name,
-              displayName: card.displayName,
-              partNumber: card.partNumber,
+              productId: productId,
+              name: card.name || productSource.name,
+              displayName,
+              partNumber,
               hasLevel4Configuration:
                 Boolean(card.hasLevel4Configuration) ||
                 Boolean(card.has_level4) ||
@@ -579,10 +632,8 @@ if (
       } as BOMItem;
     }),
   );
-}
-        
-        console.log(`Loaded ${loadedItems.length} items from draft_bom`);
-      } else {
+  console.log(`Loaded ${loadedItems.length} items from draft_bom`);
+} else {
         console.log('Loading BOM data from bom_items table');
         // Load BOM items with Level 4 configurations from database table
         const { data: bomData, error: bomError } = await supabase
