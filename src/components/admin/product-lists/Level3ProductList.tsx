@@ -42,7 +42,8 @@ export const Level3ProductList: React.FC<Level3ProductListProps> = ({
       price: product.price,
       cost: product.cost || 0,
       enabled: product.enabled !== false,
-      has_level4: (product as any).has_level4 || false
+      has_level4: (product as any).has_level4 || false,
+      partNumber: product.partNumber || ''
     });
   };
 
@@ -60,10 +61,15 @@ export const Level3ProductList: React.FC<Level3ProductListProps> = ({
 
   const handleEditSave = async (productId: string) => {
     if (!editingProduct) return;
-    
+
     try {
       setIsSaving(true);
-      await productDataService.updateLevel3Product(productId, editFormData);
+      await productDataService.updateLevel3Product(productId, {
+        ...editFormData,
+        partNumber: editFormData.partNumber !== undefined
+          ? editFormData.partNumber.trim()
+          : undefined
+      });
 
       onProductUpdate();
       setEditingProduct(null);
@@ -209,6 +215,30 @@ export const Level3ProductList: React.FC<Level3ProductListProps> = ({
                         className="bg-white border-gray-300 text-gray-900"
                       />
                     </div>
+                    <div className="md:col-span-2">
+                      <Label htmlFor={`partNumber-${product.id}`} className="text-gray-700">Part Number Shown on Quotes</Label>
+                    <div>
+
+                      <Label htmlFor={`partNumber-${product.id}`} className="text-gray-700">Level 3 Part Number</Label>
+
+                      <Label htmlFor={`partNumber-${product.id}`} className="text-gray-700">Part Number</Label>
+                      main
+                      <Input
+                        id={`partNumber-${product.id}`}
+                        value={editFormData.partNumber || ''}
+                        onChange={(e) => setEditFormData(prev => ({ ...prev, partNumber: e.target.value }))}
+                        placeholder="e.g., ANA-16CH-001"
+                        className="bg-white border-gray-300 text-gray-900"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        Update this value to control the part number that appears in rack slot listings within generated quotes.
+                      </p>
+                    </div>
+
+                      <p className="text-xs text-gray-500 mt-1">This value appears on generated quotes for the selected slot.</p>
+
+                    main
+                    </div>
                       <div className="flex items-center space-x-2">
                         <Switch
                           id={`enabled-${product.id}`}
@@ -225,6 +255,7 @@ export const Level3ProductList: React.FC<Level3ProductListProps> = ({
                         />
                         <Label htmlFor={`has-level4-${product.id}`} className="text-gray-700">Has Level 4 Config</Label>
                       </div>
+                    main
                     <div>
                       <Label htmlFor={`price-${product.id}`} className="text-gray-700">Price ($)</Label>
                       <Input
@@ -246,6 +277,24 @@ export const Level3ProductList: React.FC<Level3ProductListProps> = ({
                         onChange={(e) => setEditFormData(prev => ({ ...prev, cost: parseFloat(e.target.value) || 0 }))}
                         className="bg-white border-gray-300 text-gray-900"
                       />
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-4">
+                    <div className="flex items-center space-x-2">
+                      <Switch
+                        id={`enabled-${product.id}`}
+                        checked={editFormData.enabled !== false}
+                        onCheckedChange={(checked) => setEditFormData(prev => ({ ...prev, enabled: checked }))}
+                      />
+                      <Label htmlFor={`enabled-${product.id}`} className="text-gray-700">Enabled</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Switch
+                        id={`has-level4-${product.id}`}
+                        checked={(editFormData as any).has_level4 || false}
+                        onCheckedChange={(checked) => setEditFormData(prev => ({ ...prev, has_level4: checked }))}
+                      />
+                      <Label htmlFor={`has-level4-${product.id}`} className="text-gray-700">Has Level 4 Config</Label>
                     </div>
                   </div>
                   <div>
@@ -348,6 +397,10 @@ export const Level3ProductList: React.FC<Level3ProductListProps> = ({
                     <div>
                       <span className="text-gray-500">Cost:</span>
                       <span className="text-gray-900 font-medium ml-2">${(product.cost || 0).toLocaleString()}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">Part Number:</span>
+                      <span className="text-gray-900 font-medium ml-2">{product.partNumber || '—'}</span>
                     </div>
                   </div>
                   {parentFilter !== 'all' && (
