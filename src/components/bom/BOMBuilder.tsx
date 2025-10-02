@@ -82,6 +82,63 @@ const convertRackLayoutToAssignments = (
       return acc;
     }
 
+
+    const rawSlot = slot as Record<string, any>;
+    const cardRecord = (rawSlot.card as Record<string, any> | undefined) || undefined;
+    const nestedProduct =
+      (cardRecord?.product as Record<string, any> | undefined) ||
+      (cardRecord?.card as Record<string, any> | undefined) ||
+      (cardRecord?.level3Product as Record<string, any> | undefined) ||
+      undefined;
+
+    const productSource =
+      (slot.product as Record<string, any> | null | undefined) ||
+      cardRecord ||
+      nestedProduct ||
+      undefined;
+
+    const productId =
+      rawSlot.productId ||
+      rawSlot.product_id ||
+      rawSlot.cardId ||
+      rawSlot.card_id ||
+      rawSlot.level3ProductId ||
+      rawSlot.level3_product_id ||
+      cardRecord?.id ||
+      cardRecord?.productId ||
+      cardRecord?.product_id ||
+      cardRecord?.cardId ||
+      cardRecord?.card_id ||
+      cardRecord?.level3ProductId ||
+      cardRecord?.level3_product_id ||
+      nestedProduct?.id ||
+      nestedProduct?.productId ||
+      nestedProduct?.product_id ||
+      productSource?.id ||
+      undefined;
+
+    const name =
+      slot.cardName ||
+      productSource?.displayName ||
+      productSource?.name ||
+      `Slot ${position} Card`;
+
+    const partNumber =
+      slot.partNumber ||
+      rawSlot.part_number ||
+      rawSlot.cardPartNumber ||
+      rawSlot.card_part_number ||
+      cardRecord?.partNumber ||
+      cardRecord?.part_number ||
+      cardRecord?.cardPartNumber ||
+      cardRecord?.card_part_number ||
+      (typeof cardRecord?.pn === 'string' ? cardRecord?.pn : undefined) ||
+      nestedProduct?.partNumber ||
+      nestedProduct?.part_number ||
+      productSource?.partNumber ||
+      productSource?.part_number ||
+      undefined;
+
 const rawSlot = slot as Record<string, any>;
 
 const cardRecord =
@@ -154,6 +211,7 @@ const partNumber =
   (productSource as any)?.part_number ||
   undefined;
 
+main
 
     acc[position] = {
       id: productId || `slot-${position}`,
@@ -171,6 +229,97 @@ const partNumber =
 
     return acc;
   }, {});
+};
+
+const deepClone = <T,>(value: T): T => {
+  if (value === undefined || value === null) {
+    return value;
+  }
+
+  try {
+    return JSON.parse(JSON.stringify(value));
+  } catch (error) {
+    console.warn('Failed to deep clone value, returning original reference.', error);
+    return value;
+  }
+};
+
+const resolvePartNumberContext = (...candidates: Array<any>) => {
+  for (const candidate of candidates) {
+    if (!candidate) continue;
+
+    const container =
+      typeof candidate === 'object' && candidate !== null && 'partNumberContext' in candidate
+        ? (candidate as Record<string, any>).partNumberContext
+        : candidate;
+
+    if (container && typeof container === 'object') {
+      const context = container as Record<string, any>;
+      if ('pnConfig' in context || 'codeMap' in context) {
+        return context;
+      }
+    }
+  }
+
+  return undefined;
+};
+
+const slotSignature = (card?: Level3Product & Record<string, any>) => {
+  if (!card) {
+    return '';
+  }
+
+  const productId =
+    (card as any).productId ||
+    (card as any).product_id ||
+    (card as any).cardId ||
+    (card as any).card_id ||
+    card.id ||
+    '';
+
+  const partNumber =
+    (card as any).partNumber ||
+    (card as any).part_number ||
+    card.partNumber ||
+    '';
+
+  return `${productId}::${partNumber}`;
+};
+
+const haveSlotAssignmentsChanged = (
+  originalAssignments?: Record<number, Level3Product & Record<string, any>>,
+  currentAssignments?: Record<number, Level3Product & Record<string, any>>
+) => {
+  const original = originalAssignments || {};
+  const current = currentAssignments || {};
+
+  const allSlots = new Set([
+    ...Object.keys(original).map(slot => Number.parseInt(slot, 10)),
+    ...Object.keys(current).map(slot => Number.parseInt(slot, 10)),
+  ]);
+
+  if (allSlots.size === 0) {
+    return false;
+  }
+
+  for (const slot of allSlots) {
+    const originalCard = original[slot];
+    const currentCard = current[slot];
+
+    if (!originalCard && !currentCard) {
+      continue;
+    }
+
+    if (!originalCard || !currentCard) {
+      return true;
+    }
+
+    if (slotSignature(originalCard) !== slotSignature(currentCard)) {
+      return true;
+    }
+  }
+
+  return false;
 };
 
 const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, mode = 'new' }: BOMBuilderProps) => {
@@ -516,6 +665,20 @@ if (
           : undefined;
 
       const mergedConfigurationData = { ...productSource, ...rawConfiguration };
+      const mergedPartNumberContext = (mergedConfigurationData as any)?.partNumberContext;
+      if (mergedPartNumberContext) {
+        delete (mergedConfigurationData as any).partNumberContext;
+      }
+
+      const partNumberContext = resolvePartNumberContext(
+        item.partNumberContext,
+        rawConfiguration.partNumberContext,
+        nestedConfiguration?.partNumberContext,
+        mergedPartNumberContext,
+        productSource,
+        item.configuration_data,
+        item.configuration
+      );
 
       // Slot assignments: accept array or object maps; check multiple possible fields
       const rawSlotAssignments =
@@ -680,6 +843,7 @@ if (
           (mergedConfigurationData as any)?.displayName ||
           (mergedConfigurationData as any)?.name,
         isAccessory: item.isAccessory ?? (mergedConfigurationData as any)?.isAccessory,
+        partNumberContext: partNumberContext ? deepClone(partNumberContext) : undefined,
       } as BOMItem;
     }),
   );
@@ -714,6 +878,16 @@ if (
         // Convert BOM items back to local format with proper structure
         loadedItems = (bomData || []).map(item => {
           const configData = item.configuration_data || {};
+          const embeddedPartNumberContext = (configData as any)?.partNumberContext;
+          if (embeddedPartNumberContext) {
+            delete (configData as any).partNumberContext;
+          }
+
+          const partNumberContext = resolvePartNumberContext(
+            item.partNumberContext,
+            embeddedPartNumberContext,
+            configData
+          );
           const storedSlotAssignments = configData.slotAssignments as SerializedSlotAssignment[] | undefined;
           const slotAssignmentsMap = deserializeSlotAssignments(storedSlotAssignments);
           const rackLayout = configData.rackConfiguration || buildRackLayoutFromAssignments(storedSlotAssignments);
@@ -743,6 +917,7 @@ if (
             rackConfiguration: rackLayout,
             level4Config: mergedLevel4 || undefined,
             level4Selections: configData.level4Selections || undefined,
+            partNumberContext: partNumberContext ? deepClone(partNumberContext) : undefined,
           };
         });
       }
@@ -965,12 +1140,16 @@ if (
           }
 
           const serializedSlots = item.slotAssignments ? serializeSlotAssignments(item.slotAssignments) : undefined;
-          const rackLayout = item.rackConfiguration || buildRackLayoutFromAssignments(serializedSlots);
+        const rackLayout = item.rackConfiguration || buildRackLayoutFromAssignments(serializedSlots);
 
-          if (rackLayout?.slots && rackLayout.slots.length > 0) {
-            rackLayoutSummaries.push({
-              productId: item.product.id,
-              productName: item.product.name,
+        const partNumberContext =
+          item.partNumberContext ||
+          resolvePartNumberContext(item.configuration, item.product);
+
+        if (rackLayout?.slots && rackLayout.slots.length > 0) {
+          rackLayoutSummaries.push({
+            productId: item.product.id,
+            productName: item.product.name,
               partNumber: item.partNumber || item.product.partNumber,
               layout: rackLayout,
             });
@@ -1015,13 +1194,15 @@ if (
             configuration_data: {
               ...item.product,
               price,
-              cost
+              cost,
+              partNumberContext: partNumberContext ? deepClone(partNumberContext) : undefined,
             },
             product_type: 'standard',
             slotAssignments: serializedSlots,
             rackConfiguration: rackLayout,
             level4Config: item.level4Config || null,
             level4Selections: item.level4Selections || null,
+            partNumberContext: partNumberContext ? deepClone(partNumberContext) : undefined,
           };
         }),
         quoteFields,
@@ -1862,14 +2043,22 @@ if (
     if (!selectedChassis) return;
 
     // Generate the part number for this configuration
-    const partNumber = buildQTMSPartNumber({ 
-      chassis: selectedChassis, 
-      slotAssignments, 
-      hasRemoteDisplay, 
-      pnConfig, 
-      codeMap, 
-      includeSuffix: true 
+    const partNumber = buildQTMSPartNumber({
+      chassis: selectedChassis,
+      slotAssignments,
+      hasRemoteDisplay,
+      pnConfig,
+      codeMap,
+      includeSuffix: true
     });
+
+    const partNumberContext =
+      pnConfig || (codeMap && Object.keys(codeMap).length > 0)
+        ? {
+            pnConfig: pnConfig ? deepClone(pnConfig) : null,
+            codeMap: codeMap ? deepClone(codeMap) : {},
+          }
+        : undefined;
 
     // Create a new BOM item for the chassis with its configuration
     const newItem: BOMItem = {
@@ -1886,7 +2075,8 @@ if (
       slotAssignments: { ...slotAssignments },
       configuration: {
         hasRemoteDisplay,
-      }
+      },
+      partNumberContext,
     };
 
     // Add chassis to BOM
@@ -1927,6 +2117,8 @@ if (
     setSelectedSlot(null);
     setHasRemoteDisplay(false);
     setSelectedAccessories(new Set());
+    setPnConfig(null);
+    setCodeMap({});
 
     // Show success message
     toast({
@@ -1937,6 +2129,44 @@ if (
 
   const handleUpdateChassisInBOM = () => {
     if (!selectedChassis || !editingOriginalItem) return;
+
+
+    const originalAssignments =
+      (editingOriginalItem.slotAssignments && Object.keys(editingOriginalItem.slotAssignments).length > 0
+        ? editingOriginalItem.slotAssignments
+        : convertRackLayoutToAssignments(editingOriginalItem.rackConfiguration)) ||
+      {};
+
+    const normalizedCurrentAssignments = Object.keys(slotAssignments).length > 0 ? slotAssignments : {};
+
+    const assignmentsChanged = haveSlotAssignmentsChanged(
+      originalAssignments as Record<number, Level3Product & Record<string, any>>,
+      normalizedCurrentAssignments as Record<number, Level3Product & Record<string, any>>
+    );
+
+    const originalRemoteDisplay = editingOriginalItem.configuration?.hasRemoteDisplay || false;
+    const remoteDisplayChanged = originalRemoteDisplay !== hasRemoteDisplay;
+
+    const shouldRegeneratePartNumber = assignmentsChanged || remoteDisplayChanged;
+
+    const generatedPartNumber = shouldRegeneratePartNumber
+      ? buildQTMSPartNumber({
+          chassis: selectedChassis,
+          slotAssignments,
+          hasRemoteDisplay,
+          pnConfig,
+          codeMap,
+          includeSuffix: true,
+        })
+      : editingOriginalItem.partNumber || editingOriginalItem.product.partNumber;
+
+    const fallbackPartNumber = buildQTMSPartNumber({
+      chassis: selectedChassis,
+      slotAssignments,
+      hasRemoteDisplay,
+      pnConfig,
+      codeMap,
+      includeSuffix: true,
 
     // Check if the configuration has actually changed
     // Ensure both slot assignments are using number keys for proper comparison
@@ -1976,6 +2206,7 @@ if (
       remoteDisplayChanged,
       originalHasRemoteDisplay,
       currentHasRemoteDisplay: hasRemoteDisplay
+main
     });
     
     // Only regenerate part number if configuration actually changed
@@ -2002,6 +2233,20 @@ if (
       });
     }
 
+    const partNumber = generatedPartNumber || fallbackPartNumber;
+
+    const capturedContext =
+      pnConfig || (codeMap && Object.keys(codeMap).length > 0)
+        ? {
+            pnConfig: pnConfig ? deepClone(pnConfig) : null,
+            codeMap: codeMap ? deepClone(codeMap) : {},
+          }
+        : undefined;
+
+    const partNumberContext = shouldRegeneratePartNumber
+      ? capturedContext
+      : editingOriginalItem.partNumberContext || capturedContext;
+
     const updatedItem: BOMItem = {
       ...editingOriginalItem,
       product: {
@@ -2015,9 +2260,8 @@ if (
       configuration: {
         hasRemoteDisplay,
       },
+      partNumberContext,
     };
-
-    
 
     const chassisIndex = bomItems.findIndex(item => item.id === editingOriginalItem.id);
 
@@ -2070,6 +2314,8 @@ if (
     setHasRemoteDisplay(false);
     setEditingOriginalItem(null);
     setSelectedAccessories(new Set());
+    setPnConfig(null);
+    setCodeMap({});
 
     toast({
       title: "Configuration Updated",
@@ -2110,7 +2356,25 @@ if (
       console.log('Setting slot assignments for edit:', existingSlotAssignments);
       setSlotAssignments(existingSlotAssignments);
       setConfiguringChassis(hydratedChassis);
-      
+
+      const context = resolvePartNumberContext(
+        item.partNumberContext,
+        item.configuration,
+        item.product
+      );
+
+      if (context?.pnConfig) {
+        setPnConfig(deepClone(context.pnConfig));
+      } else {
+        setPnConfig(null);
+      }
+
+      if (context?.codeMap) {
+        setCodeMap(deepClone(context.codeMap));
+      } else {
+        setCodeMap({});
+      }
+
       // Store the original item for restoration if edit is cancelled
       // This preserves the original part number and configuration
       setEditingOriginalItem(item);
@@ -2130,6 +2394,38 @@ if (
         setSelectedAccessories(accessoriesToSelect);
       }
       
+
+      setHasRemoteDisplay(item.configuration?.hasRemoteDisplay || false);
+      setAutoPlaced(false);
+
+      (async () => {
+        try {
+          const [cfg, codes, l3] = await Promise.all([
+            productDataService.getPartNumberConfig(hydratedChassis.id),
+            productDataService.getPartNumberCodesForLevel2(hydratedChassis.id),
+            productDataService.getLevel3ProductsForLevel2(hydratedChassis.id)
+          ]);
+
+          setLevel3Products(l3);
+
+          if (!context?.pnConfig) {
+            setPnConfig(cfg);
+          }
+
+          if (!context?.codeMap) {
+            setCodeMap(codes);
+          }
+        } catch (error) {
+          console.error('Failed to load PN config/codes for chassis reconfiguration:', error);
+          toast({
+            title: 'Configuration Load Failed',
+            description: 'Unable to load chassis configuration templates. Part number editing may be limited.',
+            variant: 'destructive',
+          });
+        }
+      })();
+
+
       // Improved remote display detection from part number pattern
       // QTMS part numbers with remote display end with suffixes like "-D1", "-RD", or "-D<number>"
       // Part numbers WITHOUT remote display don't have these suffixes (e.g., QTMS-LTX-0RF8A0000000000)
@@ -2144,6 +2440,7 @@ if (
       console.log('Detected remote display from part number:', partNumberStr, '-> hasRemote:', hasRemoteSuffix, 'configHasRemote:', configHasRemote);
       setHasRemoteDisplay(hasRemoteSuffix || configHasRemote);
       
+main
       setTimeout(() => {
         const configSection = document.getElementById('chassis-configuration');
         if (configSection) {
@@ -2396,6 +2693,19 @@ if (
       } else {
         // Insert new BOM items
         for (const item of bomItems) {
+          const serializedAssignments = item.slotAssignments
+            ? serializeSlotAssignments(item.slotAssignments)
+            : undefined;
+          const rackLayout = item.rackConfiguration || buildRackLayoutFromAssignments(serializedAssignments);
+          const configurationData = {
+            ...(item.configuration || {}),
+            slotAssignments: serializedAssignments,
+            rackConfiguration: rackLayout,
+            level4Config: item.level4Config || null,
+            level4Selections: item.level4Selections || null,
+            partNumberContext: item.partNumberContext ? deepClone(item.partNumberContext) : undefined,
+          };
+
           const { error: bomError } = await supabase.from('bom_items').insert({
             quote_id: quoteId,
             product_id: item.product.id,
@@ -2415,7 +2725,7 @@ if (
                 : 0,
             original_unit_price: item.original_unit_price || item.product.price,
             approved_unit_price: item.approved_unit_price || item.product.price,
-            configuration_data: item.configuration || {},
+            configuration_data: configurationData,
             product_type: 'standard',
           });
 

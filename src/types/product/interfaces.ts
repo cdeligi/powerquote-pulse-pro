@@ -169,6 +169,10 @@ export interface BOMItem {
   margin?: number;
   approved_unit_price?: number;
   price_adjustment_history?: any[];
+  partNumberContext?: {
+    pnConfig: any | null;
+    codeMap: Record<string, any>;
+  };
 }
 
 export type Product = Level1Product | Level2Product | Level3Product;
