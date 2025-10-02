@@ -292,41 +292,6 @@ const QuoteDetails = ({
             </div>
           </div>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-            <div>
-              <Label className="text-gray-400">Customer</Label>
-              <p className="text-white font-medium">{quote.customer_name}</p>
-            </div>
-            <div>
-              <Label className="text-gray-400">Oracle Customer ID</Label>
-              <p className="text-white font-medium">{quote.oracle_customer_id}</p>
-            </div>
-            <div>
-              <Label className="text-gray-400">SFDC Opportunity</Label>
-              <p className="text-white font-medium">{quote.sfdc_opportunity}</p>
-            </div>
-            <div>
-              <Label className="text-gray-400">Rep Involved</Label>
-              <p className="text-white font-medium">{quote.is_rep_involved ? 'Yes' : 'No'}</p>
-            </div>
-            <div>
-              <Label className="text-gray-400">Payment Terms</Label>
-              <p className="text-white font-medium">{quote.payment_terms}</p>
-            </div>
-            <div>
-              <Label className="text-gray-400">Shipping Terms</Label>
-              <p className="text-white font-medium">{quote.shipping_terms}</p>
-            </div>
-          </div>
-
-          {quote.discount_justification && (
-            <div>
-              <Label className="text-gray-400">Discount Justification</Label>
-              <p className="text-gray-300 bg-gray-800 p-3 rounded mt-1">{quote.discount_justification}</p>
-            </div>
-          )}
-        </CardContent>
       </Card>
 
       {/* Configured Quote Fields */}
