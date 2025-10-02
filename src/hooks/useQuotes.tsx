@@ -45,6 +45,7 @@ export interface Quote {
 
 export interface BOMItemWithDetails {
   id: string;
+  persisted_id?: string;
   quote_id: string;
   product_id: string;
   name: string;

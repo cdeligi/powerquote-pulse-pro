@@ -55,6 +55,12 @@ export interface QuoteItem {
 // Enhanced BOM Item for quote approval with admin editing capabilities
 export interface BOMItemWithDetails extends BOMItem {
   id: string;
+  /**
+   * The identifier persisted in the database for this BOM row. When a BOM
+   * item hasn't been stored yet we still generate a client-side id for React
+   * list rendering, but we skip persistence updates if this value is missing.
+   */
+  persisted_id?: string;
   name: string;
   description?: string;
   part_number?: string;
