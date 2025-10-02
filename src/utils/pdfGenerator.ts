@@ -27,7 +27,7 @@ type Level4DisplayItem = {
 };
 
 type Level4AnalyzedEntry = Level4DisplayItem & {
-  payload?: NormalizedLevel4Payload | null;
+  payload?: NormalizedLevel4Payload | null1;
   fieldLabel?: string;
   templateType?: 'OPTION_1' | 'OPTION_2';
   options: NormalizedLevel4Option[];
@@ -527,11 +527,11 @@ main
         return [] as Array<{ index: number; value: string }>;
       })();
 
+
       const selections = payload?.entries
         ? [...payload.entries].sort((a, b) => a.index - b.index)
         : [];
 main
-
       let bodyHtml = '';
 
       if (selections.length > 0) {
@@ -572,6 +572,7 @@ main
         bodyHtml += '<p class="level4-empty">Unable to parse configuration details. Saved data shown below.</p>';
       }
 
+      if ((!payload || !payload.entries?.length) && selections.length === 0 && entry.rawConfig) {
 
       if ((!payload || !payload.entries?.length) && selections.length === 0 && entry.rawConfig) {
 
@@ -1016,6 +1017,12 @@ main
         </tbody>
       </table>
 
+      ${canSeePrices ? `
+        <div class="total-section">
+          <p>Total: $${totalPrice.toLocaleString()}</p>
+        </div>
+      ` : ''}
+
       ${(() => {
         // Check if any items have chassis configurations
         const chassisItems = normalizedBomItems.filter(item =>
@@ -1099,6 +1106,7 @@ main
           <p>Total: $${totalPrice.toLocaleString()}</p>
         </div>
       ` : ''}
+main
 
       ${termsAndConditions ? `
         <div style="page-break-before: always; margin-top: 40px;">
