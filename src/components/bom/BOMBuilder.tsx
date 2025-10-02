@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
@@ -39,6 +39,23 @@ import {
 
 const supabase = getSupabaseClient();
 const supabaseAdmin = getSupabaseAdminClient();
+
+const coalesce = <T,>(...values: Array<T | undefined | null>) => {
+  for (const value of values) {
+    if (value !== undefined && value !== null && value !== '') {
+      return value;
+    }
+  }
+  return undefined;
+};
+
+const toCamelCase = (value: string) =>
+  value.replace(/_([a-z])/g, (_, letter: string) => letter.toUpperCase());
+
+const toPascalCase = (value: string) => {
+  const camel = toCamelCase(value);
+  return camel.charAt(0).toUpperCase() + camel.slice(1);
+};
 
 interface BOMBuilderProps {
   onBOMUpdate: (items: BOMItem[]) => void;
@@ -352,6 +369,60 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
 
   // Get available quote fields for validation
   const [availableQuoteFields, setAvailableQuoteFields] = useState<any[]>([]);
+
+  const getFieldConfig = useCallback(
+    (fieldId: string) => availableQuoteFields.find(field => field.id === fieldId),
+    [availableQuoteFields]
+  );
+
+  const getQuoteFieldValue = useCallback(
+    (fieldId: string, fallback?: any) => {
+      const camelCaseId = toCamelCase(fieldId);
+      const pascalCaseId = toPascalCase(fieldId);
+      const value = coalesce(
+        quoteFields[fieldId],
+        quoteFields[camelCaseId],
+        quoteFields[pascalCaseId]
+      );
+
+      if (
+        value === undefined ||
+        value === null ||
+        (typeof value === 'string' && value.trim() === '')
+      ) {
+        return fallback;
+      }
+
+      return value;
+    },
+    [quoteFields]
+  );
+
+  const resolveQuoteFieldValue = useCallback(
+    (fieldId: string, defaultValue: any) => {
+      const value = getQuoteFieldValue(fieldId);
+      if (
+        value !== undefined &&
+        value !== null &&
+        !(typeof value === 'string' && value.trim() === '')
+      ) {
+        return value;
+      }
+
+      const fieldConfig = getFieldConfig(fieldId);
+      if (fieldConfig && fieldConfig.required) {
+        return defaultValue;
+      }
+
+      return defaultValue;
+    },
+    [getFieldConfig, getQuoteFieldValue]
+  );
+
+  const isFieldRequired = useCallback(
+    (fieldId: string) => Boolean(getFieldConfig(fieldId)?.required),
+    [getFieldConfig]
+  );
   
   useEffect(() => {
     const fetchQuoteFields = async () => {
@@ -445,25 +516,41 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
       console.log('Creating draft quote for user:', user.id);
       
       // Generate unique customer name for draft
-      const draftCustomerName = await generateUniqueDraftName();
-      
+      const providedCustomerName = getQuoteFieldValue('customer_name');
+      const draftCustomerName =
+        typeof providedCustomerName === 'string' && providedCustomerName.trim().length > 0
+          ? providedCustomerName
+          : await generateUniqueDraftName();
+
       // Use simple UUID for draft quotes - no complex ID generation
       const draftQuoteId = crypto.randomUUID();
-      
+
       console.log('Generated simple draft quote ID:', draftQuoteId);
-      
+
+      const resolvedOracleCustomerId = resolveQuoteFieldValue('oracle_customer_id', 'TBD');
+      const resolvedSfdcOpportunity = resolveQuoteFieldValue('sfdc_opportunity', 'TBD');
+      const resolvedPriority = resolveQuoteFieldValue('priority', 'Medium');
+      const resolvedShippingTerms = resolveQuoteFieldValue('shipping_terms', 'TBD');
+      const resolvedPaymentTerms = resolveQuoteFieldValue('payment_terms', 'TBD');
+      const resolvedCurrency = resolveQuoteFieldValue('currency', 'USD');
+      const rawRepInvolved = resolveQuoteFieldValue('is_rep_involved', false);
+      const resolvedRepInvolved =
+        typeof rawRepInvolved === 'string'
+          ? rawRepInvolved === 'true'
+          : Boolean(rawRepInvolved);
+
       // Create draft quote with proper field mapping
       const quoteData = {
         id: draftQuoteId,
         user_id: user.id,
         customer_name: draftCustomerName,
-        oracle_customer_id: quoteFields.oracle_customer_id || 'TBD',
-        sfdc_opportunity: quoteFields.sfdc_opportunity || 'TBD',
-        priority: (quoteFields.priority as any) || 'Medium',
-        shipping_terms: quoteFields.shipping_terms || 'TBD',
-        payment_terms: quoteFields.payment_terms || 'TBD',
-        currency: quoteFields.currency || 'USD',
-        is_rep_involved: quoteFields.is_rep_involved || false,
+        oracle_customer_id: resolvedOracleCustomerId || 'TBD',
+        sfdc_opportunity: resolvedSfdcOpportunity || 'TBD',
+        priority: (resolvedPriority as any) || 'Medium',
+        shipping_terms: resolvedShippingTerms || 'TBD',
+        payment_terms: resolvedPaymentTerms || 'TBD',
+        currency: resolvedCurrency || 'USD',
+        is_rep_involved: resolvedRepInvolved,
         status: 'draft' as const,
         quote_fields: quoteFields,
         original_quote_value: 0,
@@ -947,24 +1034,37 @@ if (
         console.log('Generated new draft quote ID:', newQuoteId);
         
         const draftName = await generateUniqueDraftName();
-        
+
         // Calculate totals from BOM items
         const totalValue = bomItems.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
         const totalCost = bomItems.reduce((sum, item) => sum + ((item.product.cost || 0) * item.quantity), 0);
         const grossProfit = totalValue - totalCost;
         const originalMargin = totalValue > 0 ? ((totalValue - totalCost) / totalValue) * 100 : 0;
 
+        const timestampFallback = `DRAFT-${Date.now()}`;
+        const resolvedOracleCustomerId = resolveQuoteFieldValue('oracle_customer_id', 'DRAFT');
+        const resolvedSfdcOpportunity = resolveQuoteFieldValue('sfdc_opportunity', timestampFallback);
+        const resolvedPriority = resolveQuoteFieldValue('priority', 'Medium');
+        const resolvedShippingTerms = resolveQuoteFieldValue('shipping_terms', 'Ex-Works');
+        const resolvedPaymentTerms = resolveQuoteFieldValue('payment_terms', 'Net 30');
+        const resolvedCurrency = resolveQuoteFieldValue('currency', 'USD');
+        const rawRepInvolved = resolveQuoteFieldValue('is_rep_involved', false);
+        const resolvedRepInvolved =
+          typeof rawRepInvolved === 'string'
+            ? rawRepInvolved === 'true'
+            : Boolean(rawRepInvolved);
+
         const quoteData = {
           id: newQuoteId,
           user_id: user.id,
           customer_name: draftName,
-          oracle_customer_id: quoteFields.oracleCustomerId || 'DRAFT',
-          sfdc_opportunity: quoteFields.sfdcOpportunity || `DRAFT-${Date.now()}`,
-          priority: (quoteFields.priority as any) || 'Medium',
-          shipping_terms: quoteFields.shippingTerms || 'Ex-Works',
-          payment_terms: quoteFields.paymentTerms || 'Net 30',
-          currency: quoteFields.quoteCurrency || 'USD',
-          is_rep_involved: quoteFields.isRepInvolved || false,
+          oracle_customer_id: resolvedOracleCustomerId || 'DRAFT',
+          sfdc_opportunity: resolvedSfdcOpportunity || timestampFallback,
+          priority: (resolvedPriority as any) || 'Medium',
+          shipping_terms: resolvedShippingTerms || 'Ex-Works',
+          payment_terms: resolvedPaymentTerms || 'Net 30',
+          currency: resolvedCurrency || 'USD',
+          is_rep_involved: resolvedRepInvolved,
           status: 'draft' as const,
           quote_fields: quoteFields,
           draft_bom: {
@@ -1159,14 +1259,22 @@ if (
       };
 
       // Update quote with draft BOM data
-      const draftCustomerName = quoteFields.customerName || await generateUniqueDraftName();
+      const providedDraftName = getQuoteFieldValue('customer_name');
+      const draftCustomerName =
+        typeof providedDraftName === 'string' && providedDraftName.trim().length > 0
+          ? providedDraftName
+          : await generateUniqueDraftName();
+
+      const timestampFallback = `DRAFT-${Date.now()}`;
+      const resolvedOracleCustomerId = resolveQuoteFieldValue('oracle_customer_id', 'DRAFT');
+      const resolvedSfdcOpportunity = resolveQuoteFieldValue('sfdc_opportunity', timestampFallback);
       
       const { error: quoteError } = await supabase
         .from('quotes')
         .update({
           customer_name: draftCustomerName,
-          oracle_customer_id: quoteFields.oracleCustomerId || 'DRAFT',
-          sfdc_opportunity: quoteFields.sfdcOpportunity || `DRAFT-${Date.now()}`,
+          oracle_customer_id: resolvedOracleCustomerId || 'DRAFT',
+          sfdc_opportunity: resolvedSfdcOpportunity || timestampFallback,
           original_quote_value: totalValue,
           discounted_value: totalValue * (1 - discountPercentage / 100),
           requested_discount: discountPercentage,
@@ -2476,13 +2584,34 @@ main
         const { data: newQuoteId, error: generateError } = await supabase
           .rpc('generate_quote_id', { user_email: user.email, is_draft: false });
         
-        if (generateError) {
-          console.error('Error generating quote ID:', generateError);
-          throw generateError;
-        }
-        
-        quoteId = newQuoteId;
+      if (generateError) {
+        console.error('Error generating quote ID:', generateError);
+        throw generateError;
       }
+
+      quoteId = newQuoteId;
+      }
+
+      const oracleFallback = isFieldRequired('oracle_customer_id') ? 'TBD' : 'N/A';
+      const sfdcFallback = isFieldRequired('sfdc_opportunity') ? 'TBD' : 'N/A';
+      const customerNameValue = String(
+        resolveQuoteFieldValue('customer_name', 'Unnamed Customer') || 'Unnamed Customer'
+      );
+      const oracleCustomerIdValue = String(
+        resolveQuoteFieldValue('oracle_customer_id', oracleFallback) || oracleFallback
+      );
+      const sfdcOpportunityValue = String(
+        resolveQuoteFieldValue('sfdc_opportunity', sfdcFallback) || sfdcFallback
+      );
+      const priorityValue = String(resolveQuoteFieldValue('priority', 'Medium') || 'Medium');
+      const shippingTermsValue = String(resolveQuoteFieldValue('shipping_terms', 'TBD') || 'TBD');
+      const paymentTermsValue = String(resolveQuoteFieldValue('payment_terms', 'TBD') || 'TBD');
+      const currencyValue = String(resolveQuoteFieldValue('currency', 'USD') || 'USD');
+      const rawRepInvolvedFinal = resolveQuoteFieldValue('is_rep_involved', false);
+      const isRepInvolvedFinal =
+        typeof rawRepInvolvedFinal === 'string'
+          ? rawRepInvolvedFinal === 'true'
+          : Boolean(rawRepInvolvedFinal);
 
       const originalQuoteValue = bomItems.reduce(
         (sum, item) => sum + item.product.price * item.quantity,
@@ -2507,9 +2636,14 @@ main
           .update({
             id: quoteId,
             status: 'pending_approval',
-            customer_name: quoteFields.customerName,
-            oracle_customer_id: quoteFields.oracleCustomerId,
-            sfdc_opportunity: quoteFields.sfdcOpportunity,
+            customer_name: customerNameValue,
+            oracle_customer_id: oracleCustomerIdValue,
+            sfdc_opportunity: sfdcOpportunityValue,
+            priority: priorityValue,
+            shipping_terms: shippingTermsValue,
+            payment_terms: paymentTermsValue,
+            currency: currencyValue,
+            is_rep_involved: isRepInvolvedFinal,
             original_quote_value: originalQuoteValue,
             requested_discount: discountPercentage,
             discount_justification: discountJustification,
@@ -2531,9 +2665,9 @@ main
         const { error } = await supabase
           .from('quotes').insert({
             id: quoteId,
-            customer_name: quoteFields.customerName,
-            oracle_customer_id: quoteFields.oracleCustomerId,
-            sfdc_opportunity: quoteFields.sfdcOpportunity,
+            customer_name: customerNameValue,
+            oracle_customer_id: oracleCustomerIdValue,
+            sfdc_opportunity: sfdcOpportunityValue,
             status: 'pending_approval',
             user_id: user!.id,
             submitted_by_name: user!.name,
@@ -2550,10 +2684,11 @@ main
                 : 0,
             discounted_margin: discountedMargin,
             quote_fields: quoteFields,
-            priority: 'Medium',
-            currency: 'USD',
-            payment_terms: 'Net 30',
-            shipping_terms: 'FOB Origin',
+            priority: priorityValue,
+            currency: currencyValue,
+            payment_terms: paymentTermsValue,
+            shipping_terms: shippingTermsValue,
+            is_rep_involved: isRepInvolvedFinal,
           });
         quoteError = error;
       }
