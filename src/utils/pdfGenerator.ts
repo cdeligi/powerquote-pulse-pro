@@ -219,8 +219,6 @@ export const generateQuotePDF = async (
 
       return [];
     }
-
-main
     if (Array.isArray(entries)) {
       return entries
         .map((entry, idx) => {
@@ -526,12 +524,6 @@ main
 
         return [] as Array<{ index: number; value: string }>;
       })();
-
-
-      const selections = payload?.entries
-        ? [...payload.entries].sort((a, b) => a.index - b.index)
-        : [];
-main
       let bodyHtml = '';
 
       if (selections.length > 0) {
@@ -573,11 +565,6 @@ main
       }
 
       if ((!payload || !payload.entries?.length) && selections.length === 0 && entry.rawConfig) {
-
-      if ((!payload || !payload.entries?.length) && selections.length === 0 && entry.rawConfig) {
-
-      if ((!payload || selections.length === 0) && entry.rawConfig) {
-main
         bodyHtml += `<pre class="level4-raw">${escapeHtml(JSON.stringify(entry.rawConfig, null, 2))}</pre>`;
       }
 
@@ -1106,7 +1093,6 @@ main
           <p>Total: $${totalPrice.toLocaleString()}</p>
         </div>
       ` : ''}
-main
 
       ${termsAndConditions ? `
         <div style="page-break-before: always; margin-top: 40px;">
