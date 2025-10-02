@@ -24,14 +24,18 @@ const Level2OptionForm = ({ onSubmit, level1Products, initialData }: Level2Optio
     cost: initialData?.cost || 0,
     enabled: initialData?.enabled ?? true,
     specifications: initialData?.specifications || {},
-    
+
     image: initialData?.image || '',
-    productInfoUrl: initialData?.productInfoUrl || ''
+    productInfoUrl: initialData?.productInfoUrl || '',
+    partNumber: initialData?.partNumber || ''
   });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSubmit(formData);
+    onSubmit({
+      ...formData,
+      partNumber: formData.partNumber?.trim() ? formData.partNumber.trim() : undefined
+    });
   };
 
   const handleSpecificationChange = (key: string, value: any) => {
@@ -139,10 +143,14 @@ const Level2OptionForm = ({ onSubmit, level1Products, initialData }: Level2Optio
           <h3 className="text-lg font-medium text-white mb-4">Product Details</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <Label className="text-white">Part Number</Label>
-              <div className="text-sm text-gray-400">
-                Part numbers are configured under Products → Part Numbers.
-              </div>
+              <Label htmlFor="partNumber" className="text-white">Part Number</Label>
+              <Input
+                id="partNumber"
+                value={formData.partNumber}
+                onChange={(e) => setFormData({ ...formData, partNumber: e.target.value })}
+                className="bg-gray-900 border-gray-600 text-white"
+                placeholder="e.g., ANA-16CH-001"
+              />
             </div>
             <div>
               <Label htmlFor="productInfoUrl" className="text-white">Product Info URL</Label>
