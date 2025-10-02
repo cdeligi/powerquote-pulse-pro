@@ -1,5 +1,5 @@
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { 
@@ -56,13 +56,11 @@ export const QuoteCard = ({ quote, onReviewClick, onQuickApprove }: QuoteCardPro
                 {quote.status.charAt(0).toUpperCase() + quote.status.slice(1).replace('-', ' ')}
               </Badge>
             </CardTitle>
-            <CardDescription className="mt-2">
-              <div className="flex items-center space-x-4">
-                <span>Oracle: {quote.oracle_customer_id}</span>
-                <span>SFDC: {quote.sfdc_opportunity}</span>
-                <span>Submitted by: {quote.submitted_by_name}</span>
-              </div>
-            </CardDescription>
+            {(quote.submitted_by_name || quote.submitted_by_email) && (
+              <p className="mt-2 text-muted-foreground text-sm">
+                Submitted by: {quote.submitted_by_name || quote.submitted_by_email}
+              </p>
+            )}
           </div>
           <div className="text-right">
             <div className="text-2xl font-bold text-foreground">
