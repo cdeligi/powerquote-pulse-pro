@@ -82,7 +82,6 @@ const convertRackLayoutToAssignments = (
       return acc;
     }
 
-
     const rawSlot = slot as Record<string, any>;
     const cardRecord = (rawSlot.card as Record<string, any> | undefined) || undefined;
     const nestedProduct =
@@ -91,127 +90,66 @@ const convertRackLayoutToAssignments = (
       (cardRecord?.level3Product as Record<string, any> | undefined) ||
       undefined;
 
+    // Prefer explicit product on the slot, then card/nested fallbacks
     const productSource =
-      (slot.product as Record<string, any> | null | undefined) ||
+      (rawSlot.product as Record<string, any> | null | undefined) ||
       cardRecord ||
       nestedProduct ||
+      // keep main-branch fallback (equivalent to cardRecord but safe if rawSlot not used)
+      ((slot as Record<string, any>).card as Record<string, any> | undefined) ||
       undefined;
 
+    // Exhaustive product ID resolution across known shapes/keys
     const productId =
-      rawSlot.productId ||
-      rawSlot.product_id ||
-      rawSlot.cardId ||
-      rawSlot.card_id ||
-      rawSlot.level3ProductId ||
-      rawSlot.level3_product_id ||
-      cardRecord?.id ||
-      cardRecord?.productId ||
-      cardRecord?.product_id ||
-      cardRecord?.cardId ||
-      cardRecord?.card_id ||
-      cardRecord?.level3ProductId ||
-      cardRecord?.level3_product_id ||
-      nestedProduct?.id ||
-      nestedProduct?.productId ||
-      nestedProduct?.product_id ||
-      productSource?.id ||
+      rawSlot.productId ??
+      rawSlot.product_id ??
+      rawSlot.cardId ??
+      rawSlot.card_id ??
+      rawSlot.level3ProductId ??
+      rawSlot.level3_product_id ??
+      cardRecord?.id ??
+      (cardRecord as any)?.productId ??
+      (cardRecord as any)?.product_id ??
+      (cardRecord as any)?.cardId ??
+      (cardRecord as any)?.card_id ??
+      (cardRecord as any)?.level3ProductId ??
+      (cardRecord as any)?.level3_product_id ??
+      (nestedProduct as any)?.id ??
+      (nestedProduct as any)?.productId ??
+      (nestedProduct as any)?.product_id ??
+      (slot as any).productId ??
+      (slot as any).product_id ??
+      (slot as any).cardId ??
+      (slot as any).card_id ??
+      productSource?.id ??
       undefined;
 
+    // Friendly display name with fallbacks
     const name =
-      slot.cardName ||
+      (slot as any).cardName ||
       productSource?.displayName ||
       productSource?.name ||
       `Slot ${position} Card`;
 
+    // Resolve part number from multiple possible shapes/keys
     const partNumber =
-      slot.partNumber ||
+      (slot as any).partNumber ||
       rawSlot.part_number ||
       rawSlot.cardPartNumber ||
       rawSlot.card_part_number ||
       cardRecord?.partNumber ||
-      cardRecord?.part_number ||
-      cardRecord?.cardPartNumber ||
-      cardRecord?.card_part_number ||
-      (typeof cardRecord?.pn === 'string' ? cardRecord?.pn : undefined) ||
-      nestedProduct?.partNumber ||
-      nestedProduct?.part_number ||
+      (cardRecord as any)?.part_number ||
+      (cardRecord as any)?.cardPartNumber ||
+      (cardRecord as any)?.card_part_number ||
+      (typeof (cardRecord as any)?.pn === 'string'
+        ? (cardRecord as any).pn
+        : undefined) ||
+      (nestedProduct as any)?.partNumber ||
+      (nestedProduct as any)?.part_number ||
+      (slot as any).part_number ||
       productSource?.partNumber ||
-      productSource?.part_number ||
+      (productSource as any)?.part_number ||
       undefined;
-
-const rawSlot = slot as Record<string, any>;
-
-const cardRecord =
-  (rawSlot.card as Record<string, any> | undefined) || undefined;
-
-const nestedProduct =
-  (cardRecord?.product as Record<string, any> | undefined) ||
-  (cardRecord?.card as Record<string, any> | undefined) ||
-  (cardRecord?.level3Product as Record<string, any> | undefined) ||
-  undefined;
-
-// Prefer explicit product on the slot, then card/nested fallbacks
-const productSource =
-  (rawSlot.product as Record<string, any> | null | undefined) ||
-  cardRecord ||
-  nestedProduct ||
-  // keep main-branch fallback (equivalent to cardRecord but safe if rawSlot not used)
-  ((slot as Record<string, any>).card as Record<string, any> | undefined) ||
-  undefined;
-
-// Exhaustive product ID resolution across known shapes/keys
-const productId =
-  rawSlot.productId ??
-  rawSlot.product_id ??
-  rawSlot.cardId ??
-  rawSlot.card_id ??
-  rawSlot.level3ProductId ??
-  rawSlot.level3_product_id ??
-  cardRecord?.id ??
-  (cardRecord as any)?.productId ??
-  (cardRecord as any)?.product_id ??
-  (cardRecord as any)?.cardId ??
-  (cardRecord as any)?.card_id ??
-  (cardRecord as any)?.level3ProductId ??
-  (cardRecord as any)?.level3_product_id ??
-  (nestedProduct as any)?.id ??
-  (nestedProduct as any)?.productId ??
-  (nestedProduct as any)?.product_id ??
-  (slot as any).productId ??
-  (slot as any).product_id ??
-  (slot as any).cardId ??
-  (slot as any).card_id ??
-  productSource?.id ??
-  undefined;
-
-// Friendly display name with fallbacks
-const name =
-  (slot as any).cardName ||
-  productSource?.displayName ||
-  productSource?.name ||
-  `Slot ${position} Card`;
-
-// Resolve part number from multiple possible shapes/keys
-const partNumber =
-  (slot as any).partNumber ||
-  rawSlot.part_number ||
-  rawSlot.cardPartNumber ||
-  rawSlot.card_part_number ||
-  cardRecord?.partNumber ||
-  (cardRecord as any)?.part_number ||
-  (cardRecord as any)?.cardPartNumber ||
-  (cardRecord as any)?.card_part_number ||
-  (typeof (cardRecord as any)?.pn === 'string'
-    ? (cardRecord as any).pn
-    : undefined) ||
-  (nestedProduct as any)?.partNumber ||
-  (nestedProduct as any)?.part_number ||
-  (slot as any).part_number ||
-  productSource?.partNumber ||
-  (productSource as any)?.part_number ||
-  undefined;
-
-main
 
     acc[position] = {
       id: productId || `slot-${position}`,
