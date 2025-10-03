@@ -33,6 +33,10 @@ interface Quote {
   discounted_value: number;
   total_cost: number;
   requested_discount: number;
+  approved_discount?: number;
+  original_margin?: number;
+  discounted_margin?: number;
+  gross_profit?: number;
   submitted_at?: string;
   created_at: string;
   updated_at: string;
@@ -49,10 +53,33 @@ const QuoteViewer: React.FC = () => {
   const [bomItems, setBomItems] = useState<BOMItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
+
   const isDraft = quote?.status === 'draft';
   const isExplicitView = mode === 'view';
   const isEditable = isDraft && !isExplicitView;
+
+  const formatCurrency = (value: number) => {
+    const currency = quote?.currency || 'USD';
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency,
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    }).format(value || 0);
+  };
+
+  const normalizePercentage = (value?: number | null) => {
+    if (value === null || value === undefined) {
+      return 0;
+    }
+
+    const abs = Math.abs(value);
+    if (abs > 0 && abs <= 1) {
+      return value * 100;
+    }
+
+    return value;
+  };
 
   useEffect(() => {
     if (!id) {
@@ -444,30 +471,80 @@ const QuoteViewer: React.FC = () => {
             <CardTitle>Financial Summary</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div>
-                <label className="text-sm font-medium text-muted-foreground">Original Value</label>
-                <p className="text-xl font-bold text-foreground">
-                  ${quote.original_quote_value.toLocaleString()}
-                </p>
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground">Original Value</label>
+                  <p className="text-xl font-bold text-foreground">
+                    {formatCurrency(quote.original_quote_value)}
+                  </p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground">Discount Amount</label>
+                  <p className="text-xl font-bold text-destructive">
+                    -{formatCurrency(Math.max(quote.original_quote_value - quote.discounted_value, 0))}
+                  </p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground">Final Total After Discount</label>
+                  <p className="text-xl font-bold text-emerald-500">
+                    {formatCurrency(quote.discounted_value)}
+                  </p>
+                </div>
               </div>
-              <div>
-                <label className="text-sm font-medium text-muted-foreground">Discounted Value</label>
-                <p className="text-xl font-bold text-foreground">
-                  ${quote.discounted_value.toLocaleString()}
-                </p>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground">Total Cost</label>
+                  <p className="text-xl font-bold text-foreground">
+                    {formatCurrency(quote.total_cost)}
+                  </p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground">Gross Profit (Before Discount)</label>
+                  <p className="text-xl font-bold text-foreground">
+                    {formatCurrency(
+                      typeof quote.gross_profit === 'number'
+                        ? quote.gross_profit
+                        : quote.original_quote_value - quote.total_cost
+                    )}
+                  </p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground">Gross Profit After Discount</label>
+                  <p className="text-xl font-bold text-emerald-500">
+                    {formatCurrency(quote.discounted_value - quote.total_cost)}
+                  </p>
+                </div>
               </div>
-              <div>
-                <label className="text-sm font-medium text-muted-foreground">Total Cost</label>
-                <p className="text-xl font-bold text-foreground">
-                  ${quote.total_cost.toLocaleString()}
-                </p>
-              </div>
-              <div>
-                <label className="text-sm font-medium text-muted-foreground">Requested Discount</label>
-                <p className="text-xl font-bold text-foreground">
-                  {quote.requested_discount}%
-                </p>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground">Requested Discount</label>
+                  <p className="text-xl font-bold text-foreground">
+                    {normalizePercentage(quote.requested_discount).toFixed(1)}%
+                  </p>
+                </div>
+                {typeof quote.approved_discount === 'number' && (
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground">Approved Discount</label>
+                    <p className="text-xl font-bold text-foreground">
+                      {normalizePercentage(quote.approved_discount).toFixed(1)}%
+                    </p>
+                  </div>
+                )}
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground">Final Margin</label>
+                  <p className="text-xl font-bold text-foreground">
+                    {normalizePercentage(
+                      typeof quote.discounted_margin === 'number'
+                        ? quote.discounted_margin
+                        : quote.discounted_value > 0
+                          ? ((quote.discounted_value - quote.total_cost) / quote.discounted_value) * 100
+                          : 0
+                    ).toFixed(1)}%
+                  </p>
+                </div>
               </div>
             </div>
           </CardContent>

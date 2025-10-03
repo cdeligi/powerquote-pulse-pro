@@ -1,5 +1,6 @@
 
 import { useState, useEffect } from 'react';
+import type { PostgrestError } from '@supabase/supabase-js';
 import { getSupabaseClient, getSupabaseAdminClient } from "@/integrations/supabase/client";
 
 const supabase = getSupabaseClient();
@@ -154,12 +155,19 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
 
     try {
       const client = supabaseAdmin ?? supabase;
+      const quote = quotes.find(q => q.id === quoteId);
+
+      const appliedDiscount = quote?.approved_discount ?? quote?.requested_discount ?? 0;
+
       const updates: any = {
         status: action === 'approve' ? 'approved' : 'rejected',
-        reviewed_by: user?.id,
         reviewed_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       };
+
+      if (user?.id) {
+        updates.reviewed_by = user.id;
+      }
 
       if (action === 'approve') {
         updates.approval_notes = notes || '';
@@ -167,40 +175,74 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
         updates.rejection_reason = notes || '';
       }
 
+      if (action === 'approve') {
+        updates.approved_discount = appliedDiscount;
+      }
+
       if (updatedBOMItems && updatedBOMItems.length > 0) {
-        const { error: quoteError } = await client
-          .from('quotes')
-          .update(updates)
-          .eq('id', quoteId);
+        const totalRevenue = updatedBOMItems.reduce((sum, item) => sum + (item.unit_price * item.quantity), 0);
+        const totalCost = updatedBOMItems.reduce((sum, item) => sum + (item.unit_cost * item.quantity), 0);
+        const grossProfit = totalRevenue - totalCost;
+        const margin = totalRevenue > 0 ? (grossProfit / totalRevenue) * 100 : 0;
 
-        if (quoteError) throw quoteError;
+        const normalizedDiscount = Math.abs(appliedDiscount) <= 1 ? appliedDiscount * 100 : appliedDiscount;
+        const discountFraction = normalizedDiscount / 100;
+        const discountedValue = totalRevenue - (totalRevenue * discountFraction);
+        const discountedGrossProfit = discountedValue - totalCost;
+        const discountedMargin = discountedValue > 0 ? (discountedGrossProfit / discountedValue) * 100 : 0;
 
+        updates.total_cost = totalCost;
+        updates.gross_profit = grossProfit;
+        updates.original_quote_value = totalRevenue;
+        updates.original_margin = margin;
+        updates.discounted_value = discountedValue;
+        updates.discounted_margin = discountedMargin;
+      }
+
+      const { error: quoteError } = await client
+        .from('quotes')
+        .update(updates)
+        .eq('id', quoteId);
+
+      if (quoteError) throw quoteError;
+
+      let bomUpdateError: PostgrestError | null = null;
+
+      if (updatedBOMItems && updatedBOMItems.length > 0) {
         const persistedItems = updatedBOMItems.filter((item) => item.persisted_id);
 
-        for (const item of persistedItems) {
+        if (persistedItems.length > 0) {
+          const bomPayload = persistedItems.map((item) => {
+            const updatedUnitPrice = Number(item.unit_price) || 0;
+            const unitCost = item.unit_cost || 0;
+            return {
+              id: item.persisted_id!,
+              unit_price: updatedUnitPrice,
+              approved_unit_price: updatedUnitPrice,
+              total_price: updatedUnitPrice * item.quantity,
+              total_cost: unitCost * item.quantity,
+              margin: updatedUnitPrice > 0
+                ? ((updatedUnitPrice - unitCost) / updatedUnitPrice) * 100
+                : 0,
+            };
+          });
+
           const { error: bomError } = await client
             .from('bom_items')
-            .update({
-              approved_unit_price: item.unit_price,
-              total_price: item.unit_price * item.quantity,
-              margin: item.margin
-            })
-            .eq('id', item.persisted_id);
+            .upsert(bomPayload, { onConflict: 'id' });
 
-          if (bomError) throw bomError;
+          if (bomError) {
+            bomUpdateError = bomError;
+            console.error('Error updating BOM items for quote', quoteId, bomError);
+          }
         }
-      } else {
-        const { error } = await client
-          .from('quotes')
-          .update(updates)
-          .eq('id', quoteId);
-
-        if (error) throw error;
       }
 
       toast({
-        title: "Success",
-        description: `Quote ${action === 'approve' ? 'approved' : 'rejected'} successfully`,
+        title: bomUpdateError ? "Quote approved with warnings" : "Success",
+        description: bomUpdateError
+          ? "Quote approved, but some BOM price updates may not have been saved. Please verify the bill of materials."
+          : `Quote ${action === 'approve' ? 'approved' : 'rejected'} successfully`,
       });
 
       await refetch();
