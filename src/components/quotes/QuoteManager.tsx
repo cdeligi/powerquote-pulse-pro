@@ -510,12 +510,27 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
   };
 
   const formatCurrency = (value: number, currency: string) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency,
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(value || 0);
+    const normalizedCurrency = typeof currency === 'string' ? currency.trim().toUpperCase() : '';
+    const fallbackCurrency = 'USD';
+    const amount = Number.isFinite(value) ? value : 0;
+
+    const createFormatter = (code: string) =>
+      new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: code,
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      });
+
+    if (/^[A-Z]{3}$/.test(normalizedCurrency)) {
+      try {
+        return createFormatter(normalizedCurrency).format(amount);
+      } catch (err) {
+        console.warn('Unsupported currency code provided. Falling back to USD.', err);
+      }
+    }
+
+    return createFormatter(fallbackCurrency).format(amount);
   };
 
   const formatPercent = (value: number) => {
