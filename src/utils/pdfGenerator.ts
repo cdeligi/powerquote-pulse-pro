@@ -57,6 +57,65 @@ export const generateQuotePDF = async (
     .filter(item => item.enabled)
     .reduce((total, item) => total + (item.product.price * item.quantity), 0);
 
+  const normalizePercentage = (value?: number | null) => {
+    if (value === null || value === undefined) {
+      return 0;
+    }
+
+    const absolute = Math.abs(value);
+    if (absolute > 0 && absolute <= 1) {
+      return value * 100;
+    }
+
+    return value;
+  };
+
+  const originalTotal = typeof quoteInfo?.original_quote_value === 'number' && quoteInfo.original_quote_value > 0
+    ? quoteInfo.original_quote_value
+    : totalPrice;
+
+  const requestedDiscountPercent = normalizePercentage(quoteInfo?.requested_discount);
+  const approvedDiscountPercent = typeof quoteInfo?.approved_discount === 'number'
+    ? normalizePercentage(quoteInfo.approved_discount)
+    : undefined;
+
+  const effectiveDiscountPercent = typeof approvedDiscountPercent === 'number'
+    ? approvedDiscountPercent
+    : requestedDiscountPercent;
+
+  const discountedValueFromQuote = typeof quoteInfo?.discounted_value === 'number' && quoteInfo.discounted_value > 0
+    ? quoteInfo.discounted_value
+    : undefined;
+
+  const hasEffectivePercent = effectiveDiscountPercent > 0;
+
+  const derivedFinalTotal = discountedValueFromQuote !== undefined
+    ? discountedValueFromQuote
+    : hasEffectivePercent
+      ? originalTotal * (1 - (effectiveDiscountPercent / 100))
+      : originalTotal;
+
+  const finalTotal = Number.isFinite(derivedFinalTotal)
+    ? Math.max(derivedFinalTotal, 0)
+    : originalTotal;
+
+  const discountAmount = Math.max(originalTotal - finalTotal, 0);
+  const hasDiscount = discountAmount > 0.01 || effectiveDiscountPercent > 0.01;
+
+  const formatCurrency = (value: number) => value.toLocaleString(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+
+  const formatPercent = (value: number) => {
+    const absolute = Math.abs(value);
+    const hasFraction = Math.abs(absolute - Math.trunc(absolute)) > 0.001;
+    return new Intl.NumberFormat('en-US', {
+      minimumFractionDigits: hasFraction ? 1 : 0,
+      maximumFractionDigits: 2,
+    }).format(value);
+  };
+
   // Fetch Terms & Conditions and settings from database
   let termsAndConditions = '';
   let companyName = 'QUALITROL';
@@ -1094,7 +1153,11 @@ export const generateQuotePDF = async (
         .bom-table th, .bom-table td { border: 1px solid #ddd; padding: 12px; text-align: left; }
         .bom-table th { background-color: #dc2626; color: white; }
         .bom-table tr:nth-child(even) { background-color: #f2f2f2; }
-        .total-section { text-align: right; font-size: 18px; font-weight: bold; }
+        .total-section { text-align: right; margin-top: 10px; }
+        .total-line { font-size: 18px; font-weight: 600; margin: 4px 0; display: flex; justify-content: flex-end; gap: 12px; }
+        .total-line .label { font-weight: 500; color: #4b5563; }
+        .total-line.discount { color: #dc2626; }
+        .total-line.final { color: #059669; font-size: 20px; }
         .footer { margin-top: 40px; padding-top: 20px; border-top: 1px solid #ddd; font-size: 12px; color: #666; }
         .level4-section { margin-top: 25px; background: #f8f9fa; padding: 20px; border-radius: 8px; border-left: 4px solid #dc2626; }
         .level4-heading { margin: 0; color: #111827; font-size: 16px; font-weight: 600; }
@@ -1240,7 +1303,25 @@ export const generateQuotePDF = async (
 
       ${canSeePrices ? `
         <div class="total-section">
-          <p>Total: $${totalPrice.toLocaleString()}</p>
+          ${hasDiscount ? `
+            <p class="total-line">
+              <span class="label">Original Total:</span>
+              <span>$${formatCurrency(originalTotal)}</span>
+            </p>
+            <p class="total-line discount">
+              <span class="label">Discount (${formatPercent(effectiveDiscountPercent)}%):</span>
+              <span>-$${formatCurrency(discountAmount)}</span>
+            </p>
+            <p class="total-line final">
+              <span class="label">Final Total:</span>
+              <span>$${formatCurrency(finalTotal)}</span>
+            </p>
+          ` : `
+            <p class="total-line final">
+              <span class="label">Total:</span>
+              <span>$${formatCurrency(finalTotal)}</span>
+            </p>
+          `}
         </div>
       ` : ''}
 
@@ -1322,11 +1403,7 @@ export const generateQuotePDF = async (
 
       ${level4SectionHTML}
 
-      ${canSeePrices ? `
-        <div class="total-section">
-          <p>Total: $${totalPrice.toLocaleString()}</p>
-        </div>
-      ` : ''}
+
 
       ${termsAndConditions ? `
         <div style="page-break-before: always; margin-top: 40px;">
