@@ -163,14 +163,20 @@ const QuoteDetails = ({
   };
 
   const requestedDiscountPercentage = normalizeDiscountPercentage(quote.requested_discount);
-  const discountFraction = requestedDiscountPercentage / 100;
+  const approvedDiscountPercentage = normalizeDiscountPercentage(quote.approved_discount);
+  const effectiveDiscountPercentage = approvedDiscountPercentage > 0 ? approvedDiscountPercentage : requestedDiscountPercentage;
+  const discountFraction = effectiveDiscountPercentage / 100;
   const discountAmount = totals.totalRevenue * discountFraction;
   const discountedTotal = totals.totalRevenue - discountAmount;
   const discountedGrossProfit = discountedTotal - totals.totalCost;
   const discountedMargin = discountedTotal > 0 ? (discountedGrossProfit / discountedTotal) * 100 : 0;
+  const hasDiscount = effectiveDiscountPercentage > 0;
 
   const formatCurrency = (value: number) => {
-    return `${quote.currency} ${value.toLocaleString()}`;
+    return `${quote.currency} ${value.toLocaleString(undefined, {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    })}`;
   };
 
   const getStatusBadge = () => {
@@ -395,21 +401,31 @@ const QuoteDetails = ({
                 </div>
               </div>
 
-              {requestedDiscountPercentage > 0 && (
+              {hasDiscount && (
                 <div className="space-y-3 pt-3 border-t border-gray-700">
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-gray-400">Discount ({requestedDiscountPercentage.toFixed(1)}%)</span>
-                    <span className="text-red-400 font-medium">-{formatCurrency(discountAmount)}</span>
+                    <span className="text-gray-400">Discount ({effectiveDiscountPercentage.toFixed(1)}%)</span>
+                    <span className="text-red-400 font-medium">-{formatCurrency(Math.abs(discountAmount))}</span>
                   </div>
-                  {typeof quote.approved_discount === 'number' && (
+                  {requestedDiscountPercentage > 0 && (
+                    <div className="flex items-center justify-between text-xs text-gray-400">
+                      <span>Requested Discount</span>
+                      <span>{requestedDiscountPercentage.toFixed(1)}%</span>
+                    </div>
+                  )}
+                  {typeof quote.approved_discount === 'number' && approvedDiscountPercentage > 0 && (
                     <div className="flex items-center justify-between text-xs text-gray-400">
                       <span>Approved Discount</span>
-                      <span>{normalizeDiscountPercentage(quote.approved_discount).toFixed(1)}%</span>
+                      <span>{approvedDiscountPercentage.toFixed(1)}%</span>
                     </div>
                   )}
                   <div className="flex items-center justify-between text-base font-semibold">
                     <span className="text-gray-200">Final Total</span>
                     <span className="text-green-400">{formatCurrency(discountedTotal)}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-gray-400">Gross Profit After Discount</span>
+                    <span className="text-emerald-400 font-medium">{formatCurrency(discountedGrossProfit)}</span>
                   </div>
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-gray-400">Final Margin</span>
