@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Search, FileText, Eye, Download, ExternalLink, Edit, Share, Plus, Trash, Copy } from "lucide-react";
+import { Search, Eye, Download, Edit, Share, Plus, Trash, Copy } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuotes } from "@/hooks/useQuotes";
@@ -27,8 +27,7 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
   const [priorityFilter, setPriorityFilter] = useState<'All' | 'High' | 'Medium' | 'Low' | 'Draft'>('All');
   const { quotes, loading, error, fetchQuotes } = useQuotes();
   
-  // Loading states for individual operations
-  const [loadingOperations, setLoadingOperations] = useState<Record<string, boolean>>({});
+  const [pdfLoadingStates, setPdfLoadingStates] = useState<Record<string, boolean>>({});
   
   // Fetch BOM item count for each quote
   const [bomCounts, setBomCounts] = useState<Record<string, number>>({});
@@ -267,11 +266,22 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
 
   const canSeePrices = user.role !== 'LEVEL_1';
 
-  const handleViewPDF = async (quote: any) => {
+  const updatePdfLoading = (quoteId: string, isLoading: boolean) => {
+    setPdfLoadingStates(prev => {
+      if (isLoading) {
+        return { ...prev, [quoteId]: true };
+      }
+
+      const { [quoteId]: _, ...rest } = prev;
+      return rest;
+    });
+  };
+
+  const handleViewPDF = async (quote: any, action: 'view' | 'download' = 'view') => {
+    const actualQuoteId = quote.displayId || quote.id;
+    updatePdfLoading(actualQuoteId, true);
+
     try {
-      // Use displayId which contains the actual database ID
-      const actualQuoteId = quote.displayId || quote.id;
-      
       // Get the actual quote data for PDF generation
       const { data: fullQuote, error } = await supabase
         .from('quotes')
@@ -410,11 +420,13 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
 
       // Import and use the PDF generator
       const { generateQuotePDF } = await import('@/utils/pdfGenerator');
-      await generateQuotePDF(bomItems, fullQuote, canSeePrices);
-      
+      await generateQuotePDF(bomItems, fullQuote, canSeePrices, action);
+
       toast({
-        title: "PDF Generated",
-        description: `Quote PDF for ${quote.customer} opened successfully`,
+        title: action === 'download' ? "Download Ready" : "Preview Ready",
+        description: action === 'download'
+          ? `Quote PDF for ${quote.customer} opened in a new tab. Use the print dialog to save the file.`
+          : `Quote PDF for ${quote.customer} opened in a new browser tab for viewing.`,
       });
     } catch (error) {
       console.error('Error generating PDF:', error);
@@ -423,44 +435,23 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
         description: "Unable to generate PDF. Please try again.",
         variant: "destructive"
       });
+    } finally {
+      updatePdfLoading(actualQuoteId, false);
     }
   };
 
   const handleDownloadQuote = async (quote: any) => {
-    // Same as view PDF - the generateQuotePDF function opens a print dialog
-    // which allows users to save as PDF or print
-    await handleViewPDF(quote);
+    await handleViewPDF(quote, 'download');
   };
 
-  const handleViewQuote = async (quote: any) => {
-    // Use displayId which contains the actual database ID
+  const handleViewQuote = (quote: any) => {
     const actualQuoteId = quote.displayId || quote.id;
-    console.log('Opening quote:', actualQuoteId, 'with status:', quote.status);
-    
-    // Set loading state for this quote
-    setLoadingOperations(prev => ({ ...prev, [actualQuoteId]: true }));
-    
-    toast({
-      title: "Opening Quote",
-      description: `Loading quote ${quote.id}...`,
-    });
-    
-    try {
-      // Add a small delay to show loading state
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      // All quotes open in BOM Builder mode for viewing/editing
-      if (quote.status === 'draft') {
-        // Draft quotes open in edit mode
-        navigate(`/bom-edit/${actualQuoteId}`);
-      } else {
-        // Non-draft quotes also open in BOM Builder for viewing
-        navigate(`/bom-edit/${actualQuoteId}`);
-      }
-    } finally {
-      // Clear loading state
-      setLoadingOperations(prev => ({ ...prev, [actualQuoteId]: false }));
-    }
+    navigate(`/quote/${actualQuoteId}?mode=view`);
+  };
+
+  const handleEditDraft = (quote: any) => {
+    const actualQuoteId = quote.displayId || quote.id;
+    navigate(`/bom-edit/${actualQuoteId}`);
   };
 
   const handleCloneQuote = async (quote: any) => {
@@ -665,6 +656,8 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
             {filteredQuotes.map((quote) => {
               const statusBadge = getStatusBadge(quote.status);
               const priorityBadge = getPriorityBadge(quote.priority);
+              const actualQuoteId = quote.displayId || quote.id;
+              const isPdfLoading = Boolean(pdfLoadingStates[actualQuoteId]);
               return (
                 <div
                   key={quote.id}
@@ -726,48 +719,57 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
                     </div>
                   </div>
                   
-                   <div className="flex space-x-2 ml-4">
-                     <Button
-                       variant="ghost"
-                       size="sm"
-                       className="text-blue-400 hover:text-blue-300 hover:bg-gray-700"
-                       onClick={() => handleViewQuote(quote)}
-                       title="View Quote"
-                       disabled={loadingOperations[quote.id]}
-                     >
-                       {loadingOperations[quote.id] ? (
-                         <div className="h-4 w-4 animate-spin rounded-full border-2 border-blue-400 border-t-transparent" />
-                       ) : (
-                         <Eye className="h-4 w-4" />
-                       )}
-                       <span className="text-xs ml-1">
-                         {loadingOperations[quote.id] ? 'Loading...' : 'View'}
-                       </span>
-                     </Button>
-                      {quote.status === 'draft' && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-red-400 hover:text-red-300 hover:bg-gray-700"
-                          onClick={() => handleDeleteQuote(quote.displayId)}
-                          title="Delete Draft"
-                        >
-                          <Trash className="h-4 w-4" />
-                          <span className="text-xs ml-1">Delete</span>
-                        </Button>
-                      )}
-                     {quote.status !== 'draft' && (
-                       <Button
-                         variant="ghost"
-                         size="sm"
-                         className="text-green-400 hover:text-green-300 hover:bg-gray-700"
-                         onClick={() => handleCloneQuote(quote)}
-                         title="Clone Quote"
-                       >
-                         <Copy className="h-4 w-4" />
-                         <span className="text-xs ml-1">Clone</span>
-                       </Button>
-                     )}
+                  <div className="flex flex-wrap items-center gap-2 ml-4">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-blue-400 hover:text-blue-300 hover:bg-gray-700"
+                      onClick={() => handleViewQuote(quote)}
+                      title="View quote details"
+                    >
+                      <Eye className="h-4 w-4" />
+                      <span className="text-xs ml-1">View</span>
+                    </Button>
+
+                    {quote.status === 'draft' && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-purple-400 hover:text-purple-300 hover:bg-gray-700"
+                        onClick={() => handleEditDraft(quote)}
+                        title="Continue editing draft"
+                      >
+                        <Edit className="h-4 w-4" />
+                        <span className="text-xs ml-1">Edit</span>
+                      </Button>
+                    )}
+
+                    {quote.status === 'draft' && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-red-400 hover:text-red-300 hover:bg-gray-700"
+                        onClick={() => handleDeleteQuote(quote.displayId)}
+                        title="Delete draft quote"
+                      >
+                        <Trash className="h-4 w-4" />
+                        <span className="text-xs ml-1">Delete</span>
+                      </Button>
+                    )}
+
+                    {quote.status !== 'draft' && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-green-400 hover:text-green-300 hover:bg-gray-700"
+                        onClick={() => handleCloneQuote(quote)}
+                        title="Clone quote into a new draft"
+                      >
+                        <Copy className="h-4 w-4" />
+                        <span className="text-xs ml-1">Clone</span>
+                      </Button>
+                    )}
+
                     <QuoteShareDialog
                       quoteId={quote.id}
                       quoteName={`${quote.id} - ${quote.customer}`}
@@ -776,33 +778,41 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
                         variant="ghost"
                         size="sm"
                         className="text-cyan-400 hover:text-cyan-300 hover:bg-gray-700 flex items-center gap-1"
-                        title="Share Quote with Team"
+                        title="Share quote with teammates"
                       >
                         <Share className="h-4 w-4" />
                         <span className="text-xs">Share</span>
                       </Button>
                     </QuoteShareDialog>
-                     <Button
-                       variant="ghost"
-                       size="sm"
-                       className="text-blue-400 hover:text-blue-300 hover:bg-gray-700"
-                       onClick={() => handleViewPDF(quote)}
-                       title="View Quote PDF"
-                       disabled={!quote.pdfUrl}
-                     >
-                       <Eye className="h-4 w-4" />
-                     </Button>
-                    {(quote.status === 'approved') && quote.pdfUrl && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-green-400 hover:text-green-300 hover:bg-gray-700"
-                        onClick={() => handleDownloadQuote(quote)}
-                        title="Download Quote PDF"
-                      >
+
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-blue-400 hover:text-blue-300 hover:bg-gray-700"
+                      onClick={() => handleViewPDF(quote)}
+                      title="Open quote PDF in a new tab"
+                      disabled={isPdfLoading}
+                    >
+                      {isPdfLoading ? (
+                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-blue-400 border-t-transparent" />
+                      ) : (
+                        <Eye className="h-4 w-4" />
+                      )}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-green-400 hover:text-green-300 hover:bg-gray-700"
+                      onClick={() => handleDownloadQuote(quote)}
+                      title="Download quote as PDF"
+                      disabled={isPdfLoading}
+                    >
+                      {isPdfLoading ? (
+                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-green-400 border-t-transparent" />
+                      ) : (
                         <Download className="h-4 w-4" />
-                      </Button>
-                    )}
+                      )}
+                    </Button>
                   </div>
                 </div>
               );
