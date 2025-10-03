@@ -71,6 +71,15 @@ const QuoteViewer: React.FC = () => {
     }).format(value || 0);
   };
 
+  const formatPercent = (value: number) => {
+    const absolute = Math.abs(value);
+    const hasFraction = Math.abs(absolute - Math.trunc(absolute)) > 0.001;
+    return new Intl.NumberFormat('en-US', {
+      minimumFractionDigits: hasFraction ? 1 : 0,
+      maximumFractionDigits: 2
+    }).format(value);
+  };
+
   const normalizePercentage = (value?: number | null) => {
     if (value === null || value === undefined) {
       return 0;
@@ -382,6 +391,11 @@ const QuoteViewer: React.FC = () => {
     normalizedApprovedDiscount !== undefined
       ? normalizedApprovedDiscount - normalizedRequestedDiscount
       : undefined;
+  const effectiveDiscountPercent =
+    normalizedApprovedDiscount !== undefined
+      ? normalizedApprovedDiscount
+      : normalizedRequestedDiscount;
+  const hasDiscount = discountAmount > 0.01 || effectiveDiscountPercent > 0.01;
   const hasApprovalNotes = Boolean(quote.approval_notes?.trim());
   const hasRejectionReason = Boolean(quote.rejection_reason?.trim());
 
@@ -488,24 +502,47 @@ const QuoteViewer: React.FC = () => {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="text-sm font-medium text-muted-foreground">Original Value</label>
-                  <p className="text-xl font-bold text-foreground">
+                  <p
+                    className={`text-xl font-bold ${hasDiscount ? 'text-muted-foreground line-through decoration-2' : 'text-foreground'}`}
+                  >
                     {formatCurrency(quote.original_quote_value)}
                   </p>
+                  {hasDiscount && (
+                    <p className="text-xs text-muted-foreground">Before discount</p>
+                  )}
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-muted-foreground">Discount Amount</label>
-                  <p className="text-xl font-bold text-destructive">
-                    -{formatCurrency(discountAmount)}
-                  </p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-muted-foreground">Final Total After Discount</label>
-                  <p className="text-xl font-bold text-emerald-500">
+                  <label className="text-sm font-medium text-muted-foreground">
+                    Final Total {hasDiscount ? 'After Discount' : ''}
+                  </label>
+                  <p className="text-2xl font-bold text-emerald-500">
                     {formatCurrency(finalDiscountedValue)}
                   </p>
+                  {hasDiscount && (
+                    <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
+                      <div className="rounded-md border border-emerald-600/40 bg-emerald-900/20 p-3">
+                        <p className="text-xs uppercase tracking-wide text-emerald-200">Discount %</p>
+                        <p className="text-lg font-semibold text-emerald-50">
+                          {formatPercent(effectiveDiscountPercent)}%
+                        </p>
+                      </div>
+                      <div className="rounded-md border border-emerald-600/40 bg-emerald-900/20 p-3">
+                        <p className="text-xs uppercase tracking-wide text-emerald-200">Discount Value</p>
+                        <p className="text-lg font-semibold text-emerald-50">
+                          -{formatCurrency(discountAmount)}
+                        </p>
+                      </div>
+                      <div className="rounded-md border border-emerald-600/40 bg-emerald-900/20 p-3">
+                        <p className="text-xs uppercase tracking-wide text-emerald-200">Final Total</p>
+                        <p className="text-lg font-semibold text-emerald-50">
+                          {formatCurrency(finalDiscountedValue)}
+                        </p>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -538,14 +575,14 @@ const QuoteViewer: React.FC = () => {
                 <div>
                   <label className="text-sm font-medium text-muted-foreground">Requested Discount</label>
                   <p className="text-xl font-bold text-foreground">
-                    {normalizedRequestedDiscount.toFixed(1)}%
+                    {formatPercent(normalizedRequestedDiscount)}%
                   </p>
                 </div>
                 {normalizedApprovedDiscount !== undefined && (
                   <div>
                     <label className="text-sm font-medium text-muted-foreground">Approved Discount</label>
                     <p className="text-xl font-bold text-foreground">
-                      {normalizedApprovedDiscount.toFixed(1)}%
+                      {formatPercent(normalizedApprovedDiscount)}%
                     </p>
                   </div>
                 )}
@@ -581,7 +618,7 @@ const QuoteViewer: React.FC = () => {
                     <span>Reviewed on {new Date(quote.reviewed_at).toLocaleString()}</span>
                   )}
                   {normalizedApprovedDiscount !== undefined && (
-                    <span>Approved discount: {normalizedApprovedDiscount.toFixed(2)}%</span>
+                    <span>Approved discount: {formatPercent(normalizedApprovedDiscount)}%</span>
                   )}
                 </div>
 
