@@ -37,26 +37,80 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
     fetchQuotes();
   }, []);
 
+  const normalizePercentage = (value?: number | null) => {
+    if (value === null || value === undefined) {
+      return 0;
+    }
+
+    const absolute = Math.abs(value);
+    if (absolute > 0 && absolute <= 1) {
+      return value * 100;
+    }
+
+    return value;
+  };
+
   // Filter and process quotes with real BOM item counts
-  const processedQuotes = quotes.map(quote => ({
-    id: quote.id, // Use unique ID for React key
-    displayId: quote.id, // Keep original ID for operations
-    displayLabel: quote.status === 'draft' ? 'Draft' : quote.id, // Label to show in UI
-    customer: quote.customer_name || 'Unnamed Customer',
-    oracleCustomerId: quote.oracle_customer_id || 'N/A',
-    // Calculate values from draft_bom for draft quotes, use stored values for others
-    value: quote.status === 'draft' && quote.draft_bom?.items 
-      ? quote.draft_bom.items.reduce((sum: number, item: any) => 
+  const processedQuotes = quotes.map(quote => {
+    const currency = quote.currency || 'USD';
+    const isDraftQuote = quote.status === 'draft';
+
+    const originalValue = isDraftQuote && quote.draft_bom?.items
+      ? quote.draft_bom.items.reduce((sum: number, item: any) =>
           sum + ((item.unit_price || item.total_price || item.product?.price || 0) * (item.quantity || 1)), 0)
-      : (quote.original_quote_value || 0),
-    status: quote.status,
-    priority: quote.priority,
-    createdAt: new Date(quote.created_at).toLocaleDateString(),
-    updatedAt: new Date(quote.updated_at).toLocaleDateString(),
-    items: bomCounts[quote.id] || 0,
-    discountRequested: quote.requested_discount || 0,
-    pdfUrl: quote.status === 'draft' ? null : `/quotes/${quote.id}.pdf`
-  }));
+      : (quote.original_quote_value || 0);
+
+    const normalizedRequestedDiscount = normalizePercentage(quote.requested_discount);
+    const normalizedApprovedDiscount = typeof quote.approved_discount === 'number'
+      ? normalizePercentage(quote.approved_discount)
+      : undefined;
+
+    const effectiveDiscountPercent = typeof normalizedApprovedDiscount === 'number'
+      ? normalizedApprovedDiscount
+      : normalizedRequestedDiscount;
+
+    const hasEffectivePercent = effectiveDiscountPercent > 0;
+
+    const discountedValueFromQuote = typeof quote.discounted_value === 'number' && quote.discounted_value > 0
+      ? quote.discounted_value
+      : undefined;
+
+    const derivedFinalValue = discountedValueFromQuote !== undefined
+      ? discountedValueFromQuote
+      : hasEffectivePercent
+        ? originalValue * (1 - (effectiveDiscountPercent / 100))
+        : originalValue;
+
+    const finalValue = Number.isFinite(derivedFinalValue)
+      ? Math.max(derivedFinalValue, 0)
+      : originalValue;
+
+    const discountAmount = Math.max(originalValue - finalValue, 0);
+    const hasDiscount = discountAmount > 0.01 || effectiveDiscountPercent > 0.01;
+    const displayDiscountPercent = hasDiscount ? effectiveDiscountPercent : 0;
+
+    return {
+      id: quote.id, // Use unique ID for React key
+      displayId: quote.id, // Keep original ID for operations
+      displayLabel: isDraftQuote ? 'Draft' : quote.id, // Label to show in UI
+      customer: quote.customer_name || 'Unnamed Customer',
+      oracleCustomerId: quote.oracle_customer_id || 'N/A',
+      currency,
+      value: originalValue,
+      finalValue,
+      discountAmount,
+      requestedDiscountPercent: normalizedRequestedDiscount,
+      approvedDiscountPercent: normalizedApprovedDiscount,
+      displayDiscountPercent,
+      status: quote.status,
+      priority: quote.priority,
+      createdAt: new Date(quote.created_at).toLocaleDateString(),
+      updatedAt: new Date(quote.updated_at).toLocaleDateString(),
+      items: bomCounts[quote.id] || 0,
+      hasDiscount,
+      pdfUrl: quote.status === 'draft' ? null : `/quotes/${quote.id}.pdf`
+    };
+  });
 
   useEffect(() => {
     const fetchBOMCounts = async () => {
@@ -455,6 +509,24 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
     navigate('/bom-new');
   };
 
+  const formatCurrency = (value: number, currency: string) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency,
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(value || 0);
+  };
+
+  const formatPercent = (value: number) => {
+    const absolute = Math.abs(value);
+    const hasFraction = Math.abs(absolute - Math.trunc(absolute)) > 0.001;
+    return new Intl.NumberFormat('en-US', {
+      minimumFractionDigits: hasFraction ? 1 : 0,
+      maximumFractionDigits: 2,
+    }).format(value);
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-8">
@@ -599,20 +671,36 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
                       <p className="text-gray-500 text-xs">Oracle: {quote.oracleCustomerId}</p>
                     </div>
                     
-                    <div>
-                      <p className="text-white font-medium">
-                        {canSeePrices ? `$${quote.value.toLocaleString()}` : '—'}
-                      </p>
-                      <p className="text-gray-400 text-sm">{quote.items} items</p>
+                    <div className="text-right">
+                      {canSeePrices ? (
+                        <div className="flex flex-col items-end">
+                          {quote.hasDiscount && (
+                            <span className="text-sm text-gray-400 line-through">
+                              {formatCurrency(quote.value, quote.currency)}
+                            </span>
+                          )}
+                          <span className="text-white font-semibold">
+                            {formatCurrency(quote.finalValue, quote.currency)}
+                          </span>
+                          {quote.hasDiscount && (
+                            <span className="text-xs text-yellow-400 mt-1">
+                              -{formatCurrency(quote.discountAmount, quote.currency)} ({formatPercent(quote.displayDiscountPercent)}%)
+                            </span>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-white font-medium">—</span>
+                      )}
+                      <p className="text-gray-400 text-sm mt-1">{quote.items} items</p>
                     </div>
                     
                     <div>
                       <Badge className={`${priorityBadge.color} text-white mb-1`}>
                         {priorityBadge.text}
                       </Badge>
-                      {quote.discountRequested > 0 && (
+                      {quote.hasDiscount && (
                         <Badge variant="outline" className="text-yellow-400 border-yellow-400 block w-fit">
-                          {quote.discountRequested}% discount
+                          {formatPercent(quote.displayDiscountPercent)}% discount
                         </Badge>
                       )}
                     </div>

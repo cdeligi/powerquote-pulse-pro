@@ -33,6 +33,13 @@ interface Quote {
   discounted_value: number;
   total_cost: number;
   requested_discount: number;
+  approved_discount?: number;
+  original_margin?: number;
+  discounted_margin?: number;
+  gross_profit?: number;
+  approval_notes?: string | null;
+  rejection_reason?: string | null;
+  reviewed_at?: string | null;
   submitted_at?: string;
   created_at: string;
   updated_at: string;
@@ -49,10 +56,42 @@ const QuoteViewer: React.FC = () => {
   const [bomItems, setBomItems] = useState<BOMItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
+
   const isDraft = quote?.status === 'draft';
   const isExplicitView = mode === 'view';
   const isEditable = isDraft && !isExplicitView;
+
+  const formatCurrency = (value: number) => {
+    const currency = quote?.currency || 'USD';
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency,
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    }).format(value || 0);
+  };
+
+  const formatPercent = (value: number) => {
+    const absolute = Math.abs(value);
+    const hasFraction = Math.abs(absolute - Math.trunc(absolute)) > 0.001;
+    return new Intl.NumberFormat('en-US', {
+      minimumFractionDigits: hasFraction ? 1 : 0,
+      maximumFractionDigits: 2
+    }).format(value);
+  };
+
+  const normalizePercentage = (value?: number | null) => {
+    if (value === null || value === undefined) {
+      return 0;
+    }
+
+    const abs = Math.abs(value);
+    if (abs > 0 && abs <= 1) {
+      return value * 100;
+    }
+
+    return value;
+  };
 
   useEffect(() => {
     if (!id) {
@@ -341,6 +380,24 @@ const QuoteViewer: React.FC = () => {
   }
 
   const statusBadge = getStatusBadge(quote.status);
+  const finalDiscountedValue = quote.discounted_value ?? quote.original_quote_value;
+  const discountAmount = Math.max(quote.original_quote_value - finalDiscountedValue, 0);
+  const normalizedRequestedDiscount = normalizePercentage(quote.requested_discount);
+  const normalizedApprovedDiscount =
+    typeof quote.approved_discount === 'number'
+      ? normalizePercentage(quote.approved_discount)
+      : undefined;
+  const discountDelta =
+    normalizedApprovedDiscount !== undefined
+      ? normalizedApprovedDiscount - normalizedRequestedDiscount
+      : undefined;
+  const effectiveDiscountPercent =
+    normalizedApprovedDiscount !== undefined
+      ? normalizedApprovedDiscount
+      : normalizedRequestedDiscount;
+  const hasDiscount = discountAmount > 0.01 || effectiveDiscountPercent > 0.01;
+  const hasApprovalNotes = Boolean(quote.approval_notes?.trim());
+  const hasRejectionReason = Boolean(quote.rejection_reason?.trim());
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -444,34 +501,159 @@ const QuoteViewer: React.FC = () => {
             <CardTitle>Financial Summary</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div>
-                <label className="text-sm font-medium text-muted-foreground">Original Value</label>
-                <p className="text-xl font-bold text-foreground">
-                  ${quote.original_quote_value.toLocaleString()}
-                </p>
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground">Original Value</label>
+                  <p
+                    className={`text-xl font-bold ${hasDiscount ? 'text-muted-foreground line-through decoration-2' : 'text-foreground'}`}
+                  >
+                    {formatCurrency(quote.original_quote_value)}
+                  </p>
+                  {hasDiscount && (
+                    <p className="text-xs text-muted-foreground">Before discount</p>
+                  )}
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground">
+                    Final Total {hasDiscount ? 'After Discount' : ''}
+                  </label>
+                  <p className="text-2xl font-bold text-emerald-500">
+                    {formatCurrency(finalDiscountedValue)}
+                  </p>
+                  {hasDiscount && (
+                    <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
+                      <div className="rounded-md border border-emerald-600/40 bg-emerald-900/20 p-3">
+                        <p className="text-xs uppercase tracking-wide text-emerald-200">Discount %</p>
+                        <p className="text-lg font-semibold text-emerald-50">
+                          {formatPercent(effectiveDiscountPercent)}%
+                        </p>
+                      </div>
+                      <div className="rounded-md border border-emerald-600/40 bg-emerald-900/20 p-3">
+                        <p className="text-xs uppercase tracking-wide text-emerald-200">Discount Value</p>
+                        <p className="text-lg font-semibold text-emerald-50">
+                          -{formatCurrency(discountAmount)}
+                        </p>
+                      </div>
+                      <div className="rounded-md border border-emerald-600/40 bg-emerald-900/20 p-3">
+                        <p className="text-xs uppercase tracking-wide text-emerald-200">Final Total</p>
+                        <p className="text-lg font-semibold text-emerald-50">
+                          {formatCurrency(finalDiscountedValue)}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
-              <div>
-                <label className="text-sm font-medium text-muted-foreground">Discounted Value</label>
-                <p className="text-xl font-bold text-foreground">
-                  ${quote.discounted_value.toLocaleString()}
-                </p>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground">Total Cost</label>
+                  <p className="text-xl font-bold text-foreground">
+                    {formatCurrency(quote.total_cost)}
+                  </p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground">Gross Profit (Before Discount)</label>
+                  <p className="text-xl font-bold text-foreground">
+                    {formatCurrency(
+                      typeof quote.gross_profit === 'number'
+                        ? quote.gross_profit
+                        : quote.original_quote_value - quote.total_cost
+                    )}
+                  </p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground">Gross Profit After Discount</label>
+                  <p className="text-xl font-bold text-emerald-500">
+                    {formatCurrency(finalDiscountedValue - quote.total_cost)}
+                  </p>
+                </div>
               </div>
-              <div>
-                <label className="text-sm font-medium text-muted-foreground">Total Cost</label>
-                <p className="text-xl font-bold text-foreground">
-                  ${quote.total_cost.toLocaleString()}
-                </p>
-              </div>
-              <div>
-                <label className="text-sm font-medium text-muted-foreground">Requested Discount</label>
-                <p className="text-xl font-bold text-foreground">
-                  {quote.requested_discount}%
-                </p>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground">Requested Discount</label>
+                  <p className="text-xl font-bold text-foreground">
+                    {formatPercent(normalizedRequestedDiscount)}%
+                  </p>
+                </div>
+                {normalizedApprovedDiscount !== undefined && (
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground">Approved Discount</label>
+                    <p className="text-xl font-bold text-foreground">
+                      {formatPercent(normalizedApprovedDiscount)}%
+                    </p>
+                  </div>
+                )}
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground">Final Margin</label>
+                  <p className="text-xl font-bold text-foreground">
+                    {normalizePercentage(
+                      typeof quote.discounted_margin === 'number'
+                        ? quote.discounted_margin
+                        : finalDiscountedValue > 0
+                          ? ((finalDiscountedValue - quote.total_cost) / finalDiscountedValue) * 100
+                          : 0
+                    ).toFixed(1)}%
+                  </p>
+                </div>
               </div>
             </div>
           </CardContent>
         </Card>
+
+        {quote.status !== 'draft' && quote.status !== 'pending_approval' && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Review Outcome</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+                  <Badge variant="secondary" className="uppercase tracking-wide">
+                    {quote.status.replace('_', ' ')}
+                  </Badge>
+                  {quote.reviewed_at && (
+                    <span>Reviewed on {new Date(quote.reviewed_at).toLocaleString()}</span>
+                  )}
+                  {normalizedApprovedDiscount !== undefined && (
+                    <span>Approved discount: {formatPercent(normalizedApprovedDiscount)}%</span>
+                  )}
+                </div>
+
+                {discountDelta !== undefined && Math.abs(discountDelta) >= 0.01 && (
+                  <p className="text-sm text-muted-foreground">
+                    The approved discount differs from the requested amount by {discountDelta > 0 ? '+' : '-'}
+                    {Math.abs(discountDelta).toFixed(2)}%.
+                  </p>
+                )}
+
+                <div className="space-y-3">
+                  {hasApprovalNotes && (
+                    <div className="space-y-1">
+                      <label className="text-sm font-medium text-muted-foreground">Approval Notes</label>
+                      <p className="rounded-md bg-muted/40 p-3 text-sm text-foreground whitespace-pre-line">
+                        {quote.approval_notes.trim()}
+                      </p>
+                    </div>
+                  )}
+                  {hasRejectionReason && (
+                    <div className="space-y-1">
+                      <label className="text-sm font-medium text-muted-foreground">Rejection Reason</label>
+                      <p className="rounded-md bg-muted/40 p-3 text-sm text-foreground whitespace-pre-line">
+                        {quote.rejection_reason.trim()}
+                      </p>
+                    </div>
+                  )}
+                  {!hasApprovalNotes && !hasRejectionReason && (
+                    <p className="text-sm italic text-muted-foreground">No comments were provided.</p>
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* BOM Items */}
         <Card>

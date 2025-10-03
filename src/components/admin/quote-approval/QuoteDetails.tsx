@@ -5,7 +5,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { CheckCircle, XCircle, DollarSign, Edit3, Save, X, Settings } from "lucide-react";
+import { CheckCircle, XCircle, Edit3, Save, X, Settings } from "lucide-react";
 import QTMSConfigurationEditor from "@/components/bom/QTMSConfigurationEditor";
 import { consolidateQTMSConfiguration, QTMSConfiguration, ConsolidatedQTMS } from "@/utils/qtmsConsolidation";
 import { useState, useEffect, useMemo } from "react";
@@ -15,7 +15,11 @@ import { useConfiguredQuoteFields } from "@/hooks/useConfiguredQuoteFields";
 
 interface QuoteDetailsProps {
   quote: Quote;
-  onApprove: (notes?: string, updatedBOMItems?: BOMItemWithDetails[]) => void;
+  onApprove: (payload: {
+    notes?: string;
+    updatedBOMItems?: BOMItemWithDetails[];
+    approvedDiscount?: number;
+  }) => void;
   onReject: (notes?: string) => void;
   isLoading: boolean;
   user: User | null;
@@ -32,8 +36,8 @@ const QuoteDetails = ({
   const [rejectionReason, setRejectionReason] = useState('');
   const [selectedAction, setSelectedAction] = useState<'approve' | 'reject' | null>(null);
   const [editingPrices, setEditingPrices] = useState<Record<string, string>>({});
-  const [bomItems, setBomItems] = useState<BOMItemWithDetails[]>(
-    (quote.bom_items || []).map((item, index) => {
+  const initialBOMItems = useMemo(() => {
+    return (quote.bom_items || []).map((item, index) => {
       const persistedId = item.id ? String(item.id) : undefined;
       const fallbackId = `local-${index}-${Math.random().toString(36).slice(2, 8)}`;
 
@@ -46,17 +50,45 @@ const QuoteDetails = ({
         part_number: item.part_number || item.partNumber || '',
         unit_price: item.unit_price || item.product?.price || 0,
         unit_cost: item.unit_cost || item.product?.cost || 0,
-        total_price: item.total_price || (item.product?.price || 0) * item.quantity,
+        total_price: item.total_price || (item.product?.price || 0) * (item.quantity || 1),
         margin: item.margin || 0,
         quantity: item.quantity || 1,
         product: item.product
       } as BOMItemWithDetails;
-    })
-  );
+    });
+  }, [quote]);
+  const [bomItems, setBomItems] = useState<BOMItemWithDetails[]>(initialBOMItems);
   const [qtmsConfig, setQtmsConfig] = useState<ConsolidatedQTMS | null>(null);
   const [editingQTMS, setEditingQTMS] = useState(false);
+  const [approvedDiscountInput, setApprovedDiscountInput] = useState('0');
   const { formattedFields: formattedConfiguredFields, unmappedFields: unmappedQuoteFields } =
     useConfiguredQuoteFields(quote.quote_fields);
+
+  useEffect(() => {
+    setBomItems(initialBOMItems);
+    setEditingPrices({});
+    setEditingQTMS(false);
+  }, [initialBOMItems]);
+
+  const normalizeDiscountPercentage = (value: number | null | undefined) => {
+    if (value === null || value === undefined) {
+      return 0;
+    }
+
+    return Math.abs(value) <= 1 ? value * 100 : value;
+  };
+
+  useEffect(() => {
+    const normalizedApproved = typeof quote.approved_discount === 'number'
+      ? normalizeDiscountPercentage(quote.approved_discount)
+      : null;
+    const normalizedRequested = normalizeDiscountPercentage(quote.requested_discount);
+    const initialDiscount =
+      normalizedApproved !== null ? normalizedApproved : normalizedRequested;
+    setApprovedDiscountInput(initialDiscount.toFixed(2));
+    setApprovalNotes(quote.approval_notes || '');
+    setRejectionReason(quote.rejection_reason || '');
+  }, [quote.id, quote.approved_discount, quote.requested_discount, quote.approval_notes, quote.rejection_reason]);
 
   useEffect(() => {
     const item = bomItems.find(i => i.product.type === 'QTMS' && i.configuration);
@@ -66,7 +98,7 @@ const QuoteDetails = ({
         config.chassis,
         config.slotAssignments,
         config.hasRemoteDisplay,
-        config.analogConfigurations as any,
+        config.analogConfigurations,
         config.bushingConfigurations
       );
       setQtmsConfig({ ...consolidated, id: item.id, price: item.unit_price, name: item.name, description: item.description || '' });
@@ -76,13 +108,21 @@ const QuoteDetails = ({
   }, [bomItems]);
 
   const handleApprove = () => {
-    onApprove(approvalNotes, bomItems);
-    setApprovalNotes('');
+    const parsedDiscount = parseFloat(approvedDiscountInput);
+    const sanitizedDiscount = Number.isFinite(parsedDiscount)
+      ? Math.min(Math.max(parsedDiscount, 0), 100)
+      : 0;
+    onApprove({
+      notes: approvalNotes,
+      updatedBOMItems: bomItems,
+      approvedDiscount: sanitizedDiscount / 100
+    });
     setSelectedAction(null);
   };
 
   const handleReject = () => {
-    onReject(rejectionReason);
+    const trimmedReason = rejectionReason.trim();
+    onReject(trimmedReason);
     setRejectionReason('');
     setSelectedAction(null);
   };
@@ -143,28 +183,40 @@ const QuoteDetails = ({
     setEditingQTMS(false);
   };
 
-  const calculateTotals = () => {
-    const totalRevenue = bomItems.reduce((sum, item) => sum + item.total_price, 0);
+  const totals = useMemo(() => {
+    const totalRevenue = bomItems.reduce((sum, item) => sum + (item.unit_price * item.quantity), 0);
     const totalCost = bomItems.reduce((sum, item) => sum + (item.unit_cost * item.quantity), 0);
     const grossProfit = totalRevenue - totalCost;
     const marginPercentage = totalRevenue > 0 ? (grossProfit / totalRevenue) * 100 : 0;
-    
-    return { totalRevenue, totalCost, grossProfit, marginPercentage };
-  };
 
-  const totals = calculateTotals();
+    return { totalRevenue, totalCost, grossProfit, marginPercentage };
+  }, [bomItems]);
+
+  const requestedDiscountPercentage = normalizeDiscountPercentage(quote.requested_discount);
+  const approvedDiscountFromQuote = typeof quote.approved_discount === 'number'
+    ? normalizeDiscountPercentage(quote.approved_discount)
+    : null;
+  const parsedDiscount = parseFloat(approvedDiscountInput);
+  const effectiveDiscountPercentage = Number.isFinite(parsedDiscount)
+    ? Math.min(Math.max(parsedDiscount, 0), 100)
+    : 0;
+  const discountFraction = effectiveDiscountPercentage / 100;
+  const discountAmount = totals.totalRevenue * discountFraction;
+  const discountedTotal = totals.totalRevenue - discountAmount;
+  const discountedGrossProfit = discountedTotal - totals.totalCost;
+  const discountedMargin = discountedTotal > 0 ? (discountedGrossProfit / discountedTotal) * 100 : 0;
+  const showDiscountBreakdown =
+    quote.status === 'pending_approval' ||
+    effectiveDiscountPercentage > 0 ||
+    requestedDiscountPercentage > 0 ||
+    (approvedDiscountFromQuote !== null && approvedDiscountFromQuote > 0);
+  const discountDelta = effectiveDiscountPercentage - requestedDiscountPercentage;
 
   const formatCurrency = (value: number) => {
-    return `${quote.currency} ${value.toLocaleString()}`;
-  };
-
-  const formatPercentage = (value: number | null | undefined) => {
-    if (value === null || value === undefined) {
-      return '—';
-    }
-
-    const normalized = value <= 1 && value >= -1 ? value * 100 : value;
-    return `${normalized.toFixed(1)}%`;
+    return `${quote.currency} ${value.toLocaleString(undefined, {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    })}`;
   };
 
   const getStatusBadge = () => {
@@ -256,183 +308,221 @@ const QuoteDetails = ({
         </Card>
       )}
 
-      {/* Financial Summary */}
+      {/* Bill of Materials */}
       <Card className="bg-gray-900 border-gray-800">
         <CardHeader>
-          <CardTitle className="text-white">Project Financial Analysis</CardTitle>
+          <CardTitle className="text-white">Bill of Materials ({bomItems.length})</CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="text-center p-4 bg-gray-800 rounded">
-              <p className="text-gray-400 text-sm">Original Value</p>
-              <p className="text-white text-xl font-bold">{formatCurrency(quote.original_quote_value)}</p>
-            </div>
-            <div className="text-center p-4 bg-gray-800 rounded">
-              <p className="text-gray-400 text-sm">Current Total</p>
-              <p className="text-white text-xl font-bold">{formatCurrency(totals.totalRevenue)}</p>
-            </div>
-            <div className="text-center p-4 bg-gray-800 rounded">
-              <p className="text-gray-400 text-sm">Total Cost</p>
-              <p className="text-orange-400 text-xl font-bold">{formatCurrency(totals.totalCost)}</p>
-            </div>
-            <div className="text-center p-4 bg-gray-800 rounded">
-              <p className="text-gray-400 text-sm">Margin</p>
-              <p className={`text-xl font-bold ${
-                totals.marginPercentage >= 25 ? 'text-green-400' :
-                totals.marginPercentage >= 15 ? 'text-yellow-400' : 'text-red-400'
-              }`}>
-                {totals.marginPercentage.toFixed(1)}%
-              </p>
-            </div>
-          </div>
-          <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            <div className="text-center p-4 bg-gray-800 rounded">
-              <p className="text-gray-400 text-sm">Discounted Value</p>
-              <p className="text-white text-xl font-bold">{formatCurrency(quote.discounted_value)}</p>
-            </div>
-            <div className="text-center p-4 bg-gray-800 rounded">
-              <p className="text-gray-400 text-sm">Requested Discount</p>
-              <p className="text-blue-400 text-xl font-bold">{formatPercentage(quote.requested_discount)}</p>
-            </div>
-            <div className="text-center p-4 bg-gray-800 rounded">
-              <p className="text-gray-400 text-sm">Approved Discount</p>
-              <p className="text-emerald-400 text-xl font-bold">{formatPercentage(quote.approved_discount)}</p>
-            </div>
-          </div>
-          <div className="mt-4 p-4 bg-gray-800 rounded space-y-3">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-              <span className="text-gray-400">Gross Profit</span>
-              <span className="text-green-400 text-lg font-bold">
-                {formatCurrency(totals.grossProfit)}
-              </span>
-            </div>
-            {quote.discount_justification && (
-              <div>
-                <Label className="text-gray-400">Discount Justification</Label>
-                <p className="text-gray-200 mt-1 whitespace-pre-line">{quote.discount_justification}</p>
-              </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* BOM Items with Editing */}
-      <Card className="bg-gray-900 border-gray-800">
-        <CardHeader>
-          <CardTitle className="text-white flex items-center">
-            <DollarSign className="h-5 w-5 mr-2" />
-            BOM Items ({bomItems.length}) - Real-time Price Editing
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-6">
           {bomItems.length > 0 ? (
             <div className="space-y-4">
-              {bomItems.map((item) => (
-                <div key={item.id} className="p-4 bg-gray-800 rounded border border-gray-700">
-                  <div className="flex justify-between items-start mb-3">
-                    <div className="flex-1">
-                      <h4 className="text-white font-medium">{item.name}</h4>
-                      {item.description && (
-                        <p className="text-gray-400 text-sm">{item.description}</p>
-                      )}
-                      {item.part_number && (
-                        <Badge variant="outline" className="text-xs font-mono text-white border-gray-600 mt-1 break-all">
-                          P/N: {item.part_number}
-                        </Badge>
-                      )}
-                    </div>
-                    <div className="flex space-x-1">
-                      {item.product?.type === 'QTMS' && item.configuration && (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => {
-                            setEditingQTMS(true);
-                          }}
-                          className="h-6 w-6 p-0 text-purple-400 hover:text-purple-300"
-                          title="Edit configuration"
-                        >
-                          <Settings className="h-3 w-3" />
-                        </Button>
-                      )}
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => handlePriceEdit(item.id, item.unit_price.toString())}
-                        className="h-6 w-6 p-0 text-gray-400 hover:text-white"
-                        title="Edit unit price"
-                      >
-                        <Edit3 className="h-3 w-3" />
-                      </Button>
-                    </div>
-                  </div>
-                  
-                  <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
-                    <div>
-                      <span className="text-gray-400">Quantity:</span>
-                      <div className="text-white font-medium">{item.quantity}</div>
-                    </div>
-                    
-                    <div>
-                      <span className="text-gray-400">Unit Price:</span>
-                      {editingPrices[item.id] ? (
-                        <div className="flex items-center space-x-1 mt-1">
-                          <Input
-                            type="number"
-                            step="0.01"
-                            value={editingPrices[item.id]}
-                            onChange={(e) => handlePriceEdit(item.id, e.target.value)}
-                            className="w-24 h-6 text-xs bg-gray-700 border-gray-600 text-white"
-                          />
-                          <Button
-                            size="sm"
-                            onClick={() => handlePriceUpdate(item.id)}
-                            className="h-5 w-5 p-0 bg-green-600 hover:bg-green-700"
-                          >
-                            <Save className="h-3 w-3" />
-                          </Button>
+              {bomItems.map((item) => {
+                const marginColor = item.margin >= 25 ? 'text-green-400' : item.margin >= 15 ? 'text-yellow-400' : 'text-red-400';
+
+                return (
+                  <div key={item.id} className="p-4 bg-gray-800/80 rounded-lg border border-gray-700">
+                    <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
+                      <div className="space-y-1">
+                        <h4 className="text-white font-semibold">{item.name}</h4>
+                        {item.description && (
+                          <p className="text-gray-400 text-sm">{item.description}</p>
+                        )}
+                        {item.part_number && (
+                          <Badge variant="outline" className="text-xs font-mono text-white border-gray-600">
+                            P/N: {item.part_number}
+                          </Badge>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-1 self-start">
+                        {item.product?.type === 'QTMS' && item.configuration && (
                           <Button
                             size="sm"
                             variant="ghost"
-                            onClick={() => handlePriceEditCancel(item.id)}
-                            className="h-5 w-5 p-0 text-gray-400 hover:text-white"
+                            onClick={() => setEditingQTMS(true)}
+                            className="h-7 w-7 p-0 text-purple-400 hover:text-purple-300 hover:bg-purple-900/20"
+                            title="Edit configuration"
                           >
-                            <X className="h-3 w-3" />
+                            <Settings className="h-3 w-3" />
                           </Button>
-                        </div>
-                      ) : (
-                        <div className="text-white font-medium">
-                          ${item.unit_price.toLocaleString()}
-                        </div>
-                      )}
+                        )}
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handlePriceEdit(item.id, item.unit_price.toString())}
+                          className="h-7 w-7 p-0 text-gray-400 hover:text-white hover:bg-gray-700"
+                          title="Edit unit price"
+                        >
+                          <Edit3 className="h-3 w-3" />
+                        </Button>
+                      </div>
                     </div>
-                    
-                    <div>
-                      <span className="text-gray-400">Unit Cost:</span>
-                      <div className="text-orange-400 font-medium">${item.unit_cost.toLocaleString()}</div>
-                    </div>
-                    
-                    <div>
-                      <span className="text-gray-400">Total Price:</span>
-                      <div className="text-white font-medium">${item.total_price.toLocaleString()}</div>
-                    </div>
-                    
-                    <div>
-                      <span className="text-gray-400">Margin:</span>
-                      <div className={`font-medium ${
-                        item.margin >= 25 ? 'text-green-400' : 
-                        item.margin >= 15 ? 'text-yellow-400' : 'text-red-400'
-                      }`}>
-                        {item.margin.toFixed(1)}%
+
+                    <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 text-sm">
+                      <div>
+                        <span className="text-gray-400">Quantity</span>
+                        <p className="text-white font-medium">{item.quantity}</p>
+                      </div>
+                      <div>
+                        <span className="text-gray-400">Unit Price</span>
+                        {editingPrices[item.id] ? (
+                          <div className="flex items-center gap-2 mt-1">
+                            <Input
+                              type="number"
+                              step="0.01"
+                              value={editingPrices[item.id]}
+                              onChange={(e) => handlePriceEdit(item.id, e.target.value)}
+                              className="w-28 h-7 text-xs bg-gray-700 border-gray-600 text-white"
+                            />
+                            <Button
+                              size="sm"
+                              onClick={() => handlePriceUpdate(item.id)}
+                              className="h-6 w-6 p-0 bg-green-600 hover:bg-green-700"
+                            >
+                              <Save className="h-3 w-3" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => handlePriceEditCancel(item.id)}
+                              className="h-6 w-6 p-0 text-gray-400 hover:text-white"
+                            >
+                              <X className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        ) : (
+                          <p className="text-white font-medium">{formatCurrency(item.unit_price)}</p>
+                        )}
+                      </div>
+                      <div>
+                        <span className="text-gray-400">Unit Cost</span>
+                        <p className="text-orange-400 font-medium">{formatCurrency(item.unit_cost)}</p>
+                      </div>
+                      <div>
+                        <span className="text-gray-400">Extended Price</span>
+                        <p className="text-white font-semibold">{formatCurrency(item.unit_price * item.quantity)}</p>
+                      </div>
+                      <div>
+                        <span className="text-gray-400">Margin</span>
+                        <p className={`font-semibold ${marginColor}`}>{item.margin.toFixed(1)}%</p>
                       </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           ) : (
-            <div className="text-gray-400 text-center py-4">
-              No BOM items found for this quote.
+            <div className="text-gray-400 text-center py-6">No BOM items found for this quote.</div>
+          )}
+
+          {bomItems.length > 0 && (
+            <div className="space-y-4 bg-gray-800/60 border border-gray-700 rounded-lg p-4">
+              <div className="flex flex-col gap-3">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-gray-400">Subtotal</span>
+                  <span className="text-white font-medium">{formatCurrency(totals.totalRevenue)}</span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-gray-400">Total Cost</span>
+                  <span className="text-orange-400 font-medium">{formatCurrency(totals.totalCost)}</span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-gray-400">Gross Profit</span>
+                  <span className="text-green-400 font-medium">{formatCurrency(totals.grossProfit)}</span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-gray-400">Margin</span>
+                  <span className={`${
+                    totals.marginPercentage >= 25 ? 'text-green-400' :
+                    totals.marginPercentage >= 15 ? 'text-yellow-400' : 'text-red-400'
+                  } font-semibold`}>
+                    {totals.marginPercentage.toFixed(1)}%
+                  </span>
+                </div>
+              </div>
+
+              {showDiscountBreakdown && (
+                <div className="space-y-3 pt-3 border-t border-gray-700">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-gray-400">Discount ({effectiveDiscountPercentage.toFixed(2)}%)</span>
+                    <span className="text-red-400 font-medium">-{formatCurrency(Math.abs(discountAmount))}</span>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-xs text-gray-400">
+                      <span>Requested Discount</span>
+                      <span>{requestedDiscountPercentage.toFixed(2)}%</span>
+                    </div>
+                    {approvedDiscountFromQuote !== null && quote.status !== 'pending_approval' && (
+                      <div className="flex items-center justify-between text-xs text-gray-400">
+                        <span>Approved Discount</span>
+                        <span>{approvedDiscountFromQuote.toFixed(2)}%</span>
+                      </div>
+                    )}
+                    {quote.status === 'pending_approval' && (
+                      <div className="space-y-1">
+                        <Label className="text-gray-400 text-xs uppercase">Approved Discount to Apply</Label>
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                          <div className="flex items-center gap-1">
+                            <Input
+                              type="number"
+                              step="0.1"
+                              min="0"
+                              max="100"
+                              value={approvedDiscountInput}
+                              onChange={(e) => setApprovedDiscountInput(e.target.value)}
+                              className="w-28 h-8 bg-gray-800 border-gray-700 text-white text-right"
+                            />
+                            <span className="text-gray-400 text-sm">%</span>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 px-2 text-xs text-gray-300 border border-gray-700 hover:bg-gray-800"
+                            onClick={() => setApprovedDiscountInput(requestedDiscountPercentage.toFixed(2))}
+                            disabled={Math.abs(effectiveDiscountPercentage - requestedDiscountPercentage) < 0.01}
+                          >
+                            Use Requested
+                          </Button>
+                        </div>
+                        {approvedDiscountFromQuote !== null && Math.abs(effectiveDiscountPercentage - approvedDiscountFromQuote) > 0.01 && (
+                          <p className="text-xs text-gray-500">
+                            Previous approved value: {approvedDiscountFromQuote.toFixed(2)}%
+                          </p>
+                        )}
+                      </div>
+                    )}
+                    {quote.status === 'pending_approval' && Math.abs(discountDelta) > 0.01 && (
+                      <div className="text-xs text-gray-400">
+                        {discountDelta > 0 ? 'Increasing' : 'Decreasing'} discount by {Math.abs(discountDelta).toFixed(2)}% from request.
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex items-center justify-between text-base font-semibold">
+                    <span className="text-gray-200">Final Total</span>
+                    <span className="text-green-400">{formatCurrency(discountedTotal)}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-gray-400">Gross Profit After Discount</span>
+                    <span className="text-emerald-400 font-medium">{formatCurrency(discountedGrossProfit)}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-gray-400">Final Margin</span>
+                    <span className={`${
+                      discountedMargin >= 25 ? 'text-green-400' :
+                      discountedMargin >= 15 ? 'text-yellow-400' : 'text-red-400'
+                    } font-semibold`}>
+                      {discountedMargin.toFixed(1)}%
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {quote.discount_justification && (
+                <div className="pt-3 border-t border-gray-700">
+                  <Label className="text-gray-400 text-xs uppercase">Discount Justification</Label>
+                  <p className="text-gray-200 mt-1 text-sm whitespace-pre-line">{quote.discount_justification}</p>
+                </div>
+              )}
             </div>
           )}
         </CardContent>
