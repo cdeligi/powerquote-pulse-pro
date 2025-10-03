@@ -102,10 +102,33 @@ export const generateQuotePDF = async (
   const discountAmount = Math.max(originalTotal - finalTotal, 0);
   const hasDiscount = discountAmount > 0.01 || effectiveDiscountPercent > 0.01;
 
-  const formatCurrency = (value: number) => value.toLocaleString(undefined, {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
+  const resolvedCurrency = (() => {
+    const raw = typeof quoteInfo?.currency === 'string' ? quoteInfo.currency.trim().toUpperCase() : '';
+    return /^[A-Z]{3}$/.test(raw) ? raw : 'USD';
+  })();
+
+  const currencyFormatter = (() => {
+    try {
+      return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: resolvedCurrency,
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      });
+    } catch {
+      return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD',
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      });
+    }
+  })();
+
+  const formatCurrency = (value: number) => {
+    const numeric = Number.isFinite(value) ? value : 0;
+    return currencyFormatter.format(numeric);
+  };
 
   const formatPercent = (value: number) => {
     const absolute = Math.abs(value);
@@ -1130,74 +1153,104 @@ export const generateQuotePDF = async (
     <head>
       <title>Quote - ${quoteIdDisplay}</title>
       <style>
-        body { font-family: Arial, sans-serif; margin: 20px; color: #333; }
-        .header { border-bottom: 2px solid #dc2626; padding-bottom: 20px; margin-bottom: 30px; display: flex; justify-content: space-between; align-items: center; }
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        * { box-sizing: border-box; }
+        body {
+          font-family: 'Inter', sans-serif;
+          background: #f1f5f9;
+          color: #0f172a;
+          margin: 0;
+          padding: 36px;
+          font-size: 12px;
+          line-height: 1.55;
+        }
+        .page-container {
+          max-width: 1080px;
+          margin: 0 auto;
+          background: #ffffff;
+          border-radius: 20px;
+          padding: 40px 44px;
+          box-shadow: 0 30px 60px -28px rgba(15, 23, 42, 0.3);
+        }
+        .header {
+          border-bottom: 1px solid #e2e8f0;
+          padding-bottom: 24px;
+          margin-bottom: 28px;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        }
         .header-left { display: flex; align-items: center; gap: 20px; }
-        .logo-img { max-height: 60px; max-width: 200px; object-fit: contain; }
-        .logo-text { color: #dc2626; font-size: 24px; font-weight: bold; }
+        .logo-img { max-height: 56px; max-width: 200px; object-fit: contain; }
+        .logo-text { color: #0f172a; font-size: 22px; font-weight: 700; letter-spacing: -0.02em; }
         .header-right { text-align: right; }
-        .quote-id { font-size: 20px; font-weight: bold; color: #dc2626; }
-        .draft-warning { background: #fef3c7; border: 2px solid #f59e0b; padding: 15px; margin: 20px 0; border-radius: 8px; }
-        .draft-warning strong { color: #b45309; display: block; margin-bottom: 5px; font-size: 16px; }
-        .quote-header-fields { background: #f8f9fa; padding: 15px; margin-bottom: 20px; border-radius: 8px; }
-        .quote-header-fields h3 { color: #dc2626; margin-top: 0; margin-bottom: 10px; }
-        .field-row { display: grid; grid-template-columns: 200px 1fr; gap: 10px; margin-bottom: 8px; }
-        .field-label { font-weight: bold; color: #555; }
-        .field-value { color: #333; }
-        .quote-info { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 30px; }
-        .info-section { background: #f8f9fa; padding: 15px; border-radius: 8px; }
-        .info-title { font-weight: bold; color: #dc2626; margin-bottom: 10px; }
-        .date-info { margin-bottom: 20px; padding: 10px; background: #e5e7eb; border-radius: 6px; }
-        .date-info strong { color: #dc2626; }
-        .bom-table { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
-        .bom-table th, .bom-table td { border: 1px solid #ddd; padding: 12px; text-align: left; }
-        .bom-table th { background-color: #dc2626; color: white; }
-        .bom-table tr:nth-child(even) { background-color: #f2f2f2; }
-        .total-section { text-align: right; margin-top: 10px; }
-        .total-line { font-size: 18px; font-weight: 600; margin: 4px 0; display: flex; justify-content: flex-end; gap: 12px; }
-        .total-line .label { font-weight: 500; color: #4b5563; }
-        .total-line.discount { color: #dc2626; }
-        .total-line.final { color: #059669; font-size: 20px; }
-        .footer { margin-top: 40px; padding-top: 20px; border-top: 1px solid #ddd; font-size: 12px; color: #666; }
-        .level4-section { margin-top: 25px; background: #f8f9fa; padding: 20px; border-radius: 8px; border-left: 4px solid #dc2626; }
-        .level4-heading { margin: 0; color: #111827; font-size: 16px; font-weight: 600; }
-        .level4-subheading { margin-top: 4px; color: #6b7280; font-size: 13px; }
-        .level4-meta { margin-top: 6px; color: #6b7280; font-size: 12px; }
-        .level4-table { width: 100%; border-collapse: collapse; margin-top: 15px; background: white; border: 1px solid #e5e7eb; }
-        .level4-table th, .level4-table td { border: 1px solid #e5e7eb; padding: 10px; text-align: left; font-size: 13px; vertical-align: top; }
-        .level4-table th { background-color: #dc2626; color: white; font-weight: 600; }
-        .level4-option-label { font-weight: 600; color: #1f2937; }
-        .level4-option-meta { margin-top: 4px; color: #6b7280; font-size: 12px; }
-        .level4-empty { color: #6b7280; font-style: italic; background: white; border: 1px dashed #d1d5db; padding: 12px; border-radius: 6px; margin-top: 15px; }
-        .level4-raw { white-space: pre-wrap; font-family: 'Courier New', monospace; font-size: 12px; background: white; padding: 12px; border-radius: 6px; border: 1px solid #e5e7eb; margin-top: 15px; }
-        @media print { body { margin: 0; } }
+        .quote-id { font-size: 18px; font-weight: 600; color: #0f172a; margin: 0; }
+        .header-meta { font-size: 12px; color: #64748b; margin-top: 6px; }
+        .draft-warning { background: #fef3c7; border: 1px solid #f59e0b; padding: 16px 20px; border-radius: 12px; margin-bottom: 28px; color: #92400e; font-size: 12px; }
+        .draft-warning strong { display: block; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 6px; }
+        .draft-warning p { margin: 4px 0 0; }
+        .date-info { display: inline-flex; flex-wrap: wrap; gap: 14px; align-items: center; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 14px 18px; margin-bottom: 32px; color: #475569; font-size: 12px; }
+        .date-info strong { color: #0f172a; font-weight: 600; }
+        .date-info .note { color: #64748b; font-style: italic; }
+        .quote-header-fields { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 16px; padding: 24px 28px; margin-bottom: 36px; }
+        .quote-header-fields h3 { color: #0f172a; margin: 0 0 18px; font-size: 16px; font-weight: 600; }
+        .field-row { display: grid; grid-template-columns: minmax(180px, 220px) 1fr; gap: 14px; padding: 10px 0; border-bottom: 1px solid #e2e8f0; }
+        .field-row:last-of-type { border-bottom: none; }
+        .field-label { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: #64748b; font-weight: 600; }
+        .field-value { font-size: 13px; color: #0f172a; font-weight: 500; }
+        h2 { color: #0f172a; font-size: 18px; font-weight: 600; margin: 28px 0 18px; }
+        .bom-table { width: 100%; border-collapse: collapse; margin-bottom: 12px; }
+        .bom-table th { background: #f1f5f9; color: #0f172a; padding: 12px 14px; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; border-bottom: 1px solid #e2e8f0; }
+        .bom-table td { padding: 14px; border-bottom: 1px solid #e2e8f0; color: #0f172a; font-size: 12px; vertical-align: top; }
+        .bom-table tbody tr:nth-child(even) { background: #f8fafc; }
+        .total-section { margin-top: 20px; border-top: 1px solid #e2e8f0; padding-top: 16px; display: flex; flex-direction: column; gap: 8px; align-items: flex-end; }
+        .total-line { display: flex; gap: 16px; font-size: 13px; font-weight: 600; color: #0f172a; }
+        .total-line .label { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: #64748b; font-weight: 500; }
+        .total-line.discount { color: #b45309; }
+        .total-line.final { font-size: 16px; color: #0f172a; }
+        .level4-section { margin-top: 40px; border: 1px solid #e2e8f0; border-radius: 16px; padding: 26px; background: linear-gradient(135deg, rgba(241,245,249,0.88), rgba(248,250,252,0.96)); }
+        .level4-heading { margin: 0; font-size: 16px; font-weight: 600; color: #0f172a; }
+        .level4-subheading { margin-top: 6px; color: #64748b; font-size: 12px; }
+        .level4-meta { margin-top: 10px; color: #64748b; font-size: 11px; }
+        .level4-table { width: 100%; border-collapse: collapse; margin-top: 18px; border-radius: 12px; overflow: hidden; border: 1px solid #e2e8f0; background: #ffffff; }
+        .level4-table th { background: #0f172a; color: #f8fafc; padding: 12px; text-align: left; font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; }
+        .level4-table td { padding: 12px; border-bottom: 1px solid #e2e8f0; font-size: 12px; color: #0f172a; }
+        .level4-option-label { font-weight: 600; color: #0f172a; }
+        .level4-option-meta { margin-top: 4px; font-size: 11px; color: #64748b; }
+        .level4-empty { color: #64748b; font-style: italic; background: #ffffff; border: 1px dashed #cbd5f5; padding: 14px; border-radius: 12px; margin-top: 16px; }
+        .level4-raw { white-space: pre-wrap; font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', monospace; font-size: 11px; background: #0f172a; color: #f8fafc; padding: 16px; border-radius: 12px; margin-top: 18px; }
+        .footer { margin-top: 48px; border-top: 1px solid #e2e8f0; padding-top: 18px; font-size: 11px; color: #64748b; }
+        @media print {
+          body { background: #ffffff; padding: 0; }
+          .page-container { box-shadow: none; border-radius: 0; margin: 0; padding: 32px; }
+          .draft-warning, .level4-section { page-break-inside: avoid; }
+        }
       </style>
     </head>
     <body>
-      <div class="header">
-        <div class="header-left">
-          ${companyLogoUrl ? `<img src="${companyLogoUrl}" alt="${companyName} Logo" class="logo-img" />` : `<div class="logo-text">${companyName}</div>`}
-        </div>
-        <div class="header-right">
-          <div class="quote-id">Quote ID: ${quoteIdDisplay}</div>
-          <div style="color: #666; font-size: 14px; margin-top: 5px;">
-            Generated on: ${createdDate.toLocaleDateString()}
+      <div class="page-container">
+        <div class="header">
+          <div class="header-left">
+            ${companyLogoUrl ? `<img src="${companyLogoUrl}" alt="${companyName} Logo" class="logo-img" />` : `<div class="logo-text">${companyName}</div>`}
+          </div>
+          <div class="header-right">
+            <div class="quote-id">Quote ID: ${quoteIdDisplay}</div>
+            <div class="header-meta">Generated on: ${createdDate.toLocaleDateString()}</div>
           </div>
         </div>
-      </div>
 
-      ${isDraft ? `
-        <div class="draft-warning">
-          <strong>⚠️ DRAFT</strong>
-          <p style="margin: 5px 0 0 0;">Draft is a budgetary informative reference value; to purchase the materials, please request a formal offer with final configuration and a valid quotation ID.</p>
+        ${isDraft ? `
+          <div class="draft-warning">
+            <strong>⚠️ Draft</strong>
+            <p>Draft values are informational. Please request a formal quotation with a finalized configuration and quote ID before purchasing.</p>
+          </div>
+        ` : ''}
+
+        <div class="date-info">
+          <span><strong>Created:</strong> ${createdDate.toLocaleDateString()}</span>
+          <span><strong>Valid Until:</strong> ${expiryDate.toLocaleDateString()}</span>
+          <span class="note">Valid for ${expiresDays} days</span>
         </div>
-      ` : ''}
-
-      <div class="date-info">
-        <strong>Created:</strong> ${createdDate.toLocaleDateString()} | 
-        <strong>Valid Until:</strong> ${expiryDate.toLocaleDateString()} 
-        <span style="color: #666;">(${expiresDays} days validity)</span>
-      </div>
 
       <div class="quote-header-fields">
         <h3>Quote Information</h3>
@@ -1293,8 +1346,8 @@ export const generateQuotePDF = async (
                 <td>${item.partNumber || 'TBD'}</td>
                 <td>${item.quantity}</td>
                 ${canSeePrices ? `
-                  <td>$${item.product.price.toLocaleString()}</td>
-                  <td>$${(item.product.price * item.quantity).toLocaleString()}</td>
+                  <td>${formatCurrency(item.product.price)}</td>
+                  <td>${formatCurrency(item.product.price * item.quantity)}</td>
                 ` : ''}
               </tr>
             `).join('')}
@@ -1306,20 +1359,20 @@ export const generateQuotePDF = async (
           ${hasDiscount ? `
             <p class="total-line">
               <span class="label">Original Total:</span>
-              <span>$${formatCurrency(originalTotal)}</span>
+              <span>${formatCurrency(originalTotal)}</span>
             </p>
             <p class="total-line discount">
               <span class="label">Discount (${formatPercent(effectiveDiscountPercent)}%):</span>
-              <span>-$${formatCurrency(discountAmount)}</span>
+              <span>- ${formatCurrency(discountAmount)}</span>
             </p>
             <p class="total-line final">
               <span class="label">Final Total:</span>
-              <span>$${formatCurrency(finalTotal)}</span>
+              <span>${formatCurrency(finalTotal)}</span>
             </p>
           ` : `
             <p class="total-line final">
               <span class="label">Total:</span>
-              <span>$${formatCurrency(finalTotal)}</span>
+              <span>${formatCurrency(finalTotal)}</span>
             </p>
           `}
         </div>
@@ -1340,35 +1393,35 @@ export const generateQuotePDF = async (
         }
 
         let rackConfigHTML = '<div style="page-break-before: always; margin-top: 40px;">';
-        rackConfigHTML += '<h2 style="color: #dc2626; border-bottom: 2px solid #dc2626; padding-bottom: 10px;">Rack Configuration Layout</h2>';
+        rackConfigHTML += '<h2 style="color: #0f172a; border-bottom: 1px solid #e2e8f0; padding-bottom: 12px;">Rack Configuration</h2>';
 
         const renderRackLayout = (title: string, partNumber: string | undefined, slots: any[]) => {
           rackConfigHTML += `
-            <div style="margin-top: 30px; margin-bottom: 30px; background: #f8f9fa; padding: 20px; border-radius: 8px; border: 1px solid #ddd;">
-              <h3 style="color: #dc2626; margin-top: 0;">${title}${partNumber ? ` - ${partNumber}` : ''}</h3>
-              <div style="margin-top: 15px;">`;
+            <div style="margin-top: 30px; margin-bottom: 30px; background: #f8fafc; padding: 24px; border-radius: 16px; border: 1px solid #e2e8f0; box-shadow: 0 12px 32px -18px rgba(15,23,42,0.25);">
+              <h3 style="color: #0f172a; margin-top: 0; font-size: 16px; font-weight: 600;">${title}${partNumber ? ` · ${partNumber}` : ''}</h3>
+              <div style="margin-top: 18px;">`;
 
           if (Array.isArray(slots) && slots.length > 0) {
-            rackConfigHTML += '<table style="width: 100%; border-collapse: collapse; margin-top: 10px; background: white;">';
-            rackConfigHTML += '<thead><tr style="background: #dc2626; color: white;"><th style="padding: 10px; border: 1px solid #ddd; text-align: left;">Slot</th><th style="padding: 10px; border: 1px solid #ddd; text-align: left;">Card Type</th><th style="padding: 10px; border: 1px solid #ddd; text-align: left;">Part Number</th></tr></thead>';
+            rackConfigHTML += '<table style="width: 100%; border-collapse: collapse; margin-top: 12px; background: #ffffff; border-radius: 12px; overflow: hidden; border: 1px solid #e2e8f0;">';
+            rackConfigHTML += '<thead><tr style="background: #0f172a; color: #f8fafc;"><th style="padding: 12px; border-bottom: 1px solid #1f2937; text-align: left; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase;">Slot</th><th style="padding: 12px; border-bottom: 1px solid #1f2937; text-align: left; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase;">Card Type</th><th style="padding: 12px; border-bottom: 1px solid #1f2937; text-align: left; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase;">Part Number</th></tr></thead>';
             rackConfigHTML += '<tbody>';
 
             slots.forEach((slot: any, idx: number) => {
               const slotNumber = slot?.slot ?? slot?.slotNumber ?? slot?.position ?? (idx + 1);
               const cardName = slot?.cardName || slot?.name || slot?.product?.name || 'Empty';
               const slotPartNumber = slot?.partNumber || slot?.product?.partNumber || '-';
-              const rowStyle = idx % 2 === 0 ? 'background: #f9fafb;' : 'background: white;';
+              const rowStyle = idx % 2 === 0 ? 'background: #f8fafc;' : 'background: #ffffff;';
               rackConfigHTML += `
                 <tr style="${rowStyle}">
-                  <td style="padding: 10px; border: 1px solid #ddd; font-weight: 600;">Slot ${slotNumber}</td>
-                  <td style="padding: 10px; border: 1px solid #ddd;">${cardName}</td>
-                  <td style="padding: 10px; border: 1px solid #ddd; font-family: 'Courier New', monospace; font-size: 13px;">${slotPartNumber}</td>
+                  <td style="padding: 12px; border-bottom: 1px solid #e2e8f0; font-weight: 600; color: #0f172a;">Slot ${slotNumber}</td>
+                  <td style="padding: 12px; border-bottom: 1px solid #e2e8f0; color: #0f172a;">${cardName}</td>
+                  <td style="padding: 12px; border-bottom: 1px solid #e2e8f0; font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', monospace; font-size: 11px; color: #0f172a;">${slotPartNumber}</td>
                 </tr>`;
             });
 
             rackConfigHTML += '</tbody></table>';
           } else {
-            rackConfigHTML += '<p style="color: #666; font-style: italic; padding: 15px; background: white; border-radius: 4px;">No rack configuration data available</p>';
+            rackConfigHTML += '<p style="color: #64748b; font-style: italic; padding: 18px; background: #ffffff; border-radius: 12px; border: 1px dashed #cbd5f5;">No rack configuration data available</p>';
           }
 
           rackConfigHTML += '</div></div>';
@@ -1391,9 +1444,9 @@ export const generateQuotePDF = async (
         // Also check draft_bom for any raw rack configuration data
         if (quoteInfo.draft_bom?.rackConfiguration) {
           rackConfigHTML += `
-            <div style="margin-top: 30px; margin-bottom: 30px; background: #f8f9fa; padding: 20px; border-radius: 8px; border: 1px solid #ddd;">
-              <h3 style="color: #dc2626; margin-top: 0;">Draft Rack Configuration</h3>
-              <pre style="white-space: pre-wrap; font-family: monospace; font-size: 11px; background: white; padding: 10px; border-radius: 4px; overflow-x: auto;">${JSON.stringify(quoteInfo.draft_bom.rackConfiguration, null, 2)}</pre>
+            <div style="margin-top: 30px; margin-bottom: 30px; background: #f8fafc; padding: 24px; border-radius: 16px; border: 1px solid #e2e8f0;">
+              <h3 style="color: #0f172a; margin-top: 0; font-size: 16px; font-weight: 600;">Draft Rack Configuration</h3>
+              <pre style="white-space: pre-wrap; font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', monospace; font-size: 11px; background: #0f172a; color: #f8fafc; padding: 16px; border-radius: 12px; overflow-x: auto;">${JSON.stringify(quoteInfo.draft_bom.rackConfiguration, null, 2)}</pre>
             </div>`;
         }
         
@@ -1407,17 +1460,18 @@ export const generateQuotePDF = async (
 
       ${termsAndConditions ? `
         <div style="page-break-before: always; margin-top: 40px;">
-          <h2>Terms & Conditions</h2>
-          <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px; white-space: pre-wrap; font-size: 12px; line-height: 1.5;">
+          <h2 style="color: #0f172a; border-bottom: 1px solid #e2e8f0; padding-bottom: 12px;">Terms & Conditions</h2>
+          <div style="background: #f8fafc; padding: 24px; border-radius: 16px; border: 1px solid #e2e8f0; margin-bottom: 20px; white-space: pre-wrap; font-size: 11px; line-height: 1.55; color: #475569;">
             ${termsAndConditions}
           </div>
         </div>
       ` : ''}
 
-      <div class="footer">
-        <p>${isDraft ? 'This is a draft quote and is subject to final approval and terms & conditions.' : 'This quote is subject to the terms & conditions outlined above.'}</p>
-        <p>Generated by PowerQuotePro Quote System | ${companyName}</p>
-        ${!isDraft ? `<p><strong>Quote ID:</strong> ${quoteInfo.id}</p>` : ''}
+        <div class="footer">
+          <p>${isDraft ? 'This is a draft quote and is subject to final approval and terms & conditions.' : 'This quote is subject to the terms & conditions outlined above.'}</p>
+          <p>Generated by PowerQuotePro Quote System | ${companyName}</p>
+          ${!isDraft ? `<p><strong>Quote ID:</strong> ${quoteInfo.id}</p>` : ''}
+        </div>
       </div>
     </body>
     </html>
