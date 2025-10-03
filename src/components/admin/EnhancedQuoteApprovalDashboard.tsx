@@ -154,17 +154,47 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
 
     try {
       const client = supabaseAdmin ?? supabase;
+      const quote = quotes.find(q => q.id === quoteId);
+
       const updates: any = {
         status: action === 'approve' ? 'approved' : 'rejected',
-        reviewed_by: user?.id,
         reviewed_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       };
+
+      if (user?.id) {
+        updates.reviewed_by = user.id;
+      }
 
       if (action === 'approve') {
         updates.approval_notes = notes || '';
       } else if (action === 'reject') {
         updates.rejection_reason = notes || '';
+      }
+
+      if (updatedBOMItems && updatedBOMItems.length > 0) {
+        const totalRevenue = updatedBOMItems.reduce((sum, item) => sum + (item.unit_price * item.quantity), 0);
+        const totalCost = updatedBOMItems.reduce((sum, item) => sum + (item.unit_cost * item.quantity), 0);
+        const grossProfit = totalRevenue - totalCost;
+        const margin = totalRevenue > 0 ? (grossProfit / totalRevenue) * 100 : 0;
+
+        const requestedDiscount = quote?.requested_discount ?? 0;
+        const normalizedDiscount = Math.abs(requestedDiscount) <= 1 ? requestedDiscount * 100 : requestedDiscount;
+        const discountFraction = normalizedDiscount / 100;
+        const discountedValue = totalRevenue - (totalRevenue * discountFraction);
+        const discountedGrossProfit = discountedValue - totalCost;
+        const discountedMargin = discountedValue > 0 ? (discountedGrossProfit / discountedValue) * 100 : 0;
+
+        updates.total_cost = totalCost;
+        updates.gross_profit = grossProfit;
+        updates.original_quote_value = totalRevenue;
+        updates.original_margin = margin;
+        updates.discounted_value = discountedValue;
+        updates.discounted_margin = discountedMargin;
+
+        if (action === 'approve') {
+          updates.approved_discount = requestedDiscount;
+        }
       }
 
       if (updatedBOMItems && updatedBOMItems.length > 0) {
@@ -177,18 +207,27 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
 
         const persistedItems = updatedBOMItems.filter((item) => item.persisted_id);
 
-        for (const item of persistedItems) {
+        await Promise.all(persistedItems.map(async (item) => {
+          const updatedUnitPrice = Number(item.unit_price) || 0;
+          const updatedTotalPrice = updatedUnitPrice * item.quantity;
+          const updatedMargin = updatedUnitPrice > 0
+            ? ((updatedUnitPrice - (item.unit_cost || 0)) / updatedUnitPrice) * 100
+            : 0;
+          const updatedTotalCost = (item.unit_cost || 0) * item.quantity;
+
           const { error: bomError } = await client
             .from('bom_items')
             .update({
-              approved_unit_price: item.unit_price,
-              total_price: item.unit_price * item.quantity,
-              margin: item.margin
+              unit_price: updatedUnitPrice,
+              approved_unit_price: updatedUnitPrice,
+              total_price: updatedTotalPrice,
+              total_cost: updatedTotalCost,
+              margin: updatedMargin
             })
             .eq('id', item.persisted_id);
 
           if (bomError) throw bomError;
-        }
+        }));
       } else {
         const { error } = await client
           .from('quotes')
