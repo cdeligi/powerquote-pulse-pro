@@ -34,7 +34,7 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
   const [statusFilter, setStatusFilter] = useState<"all" | Quote['status']>("all");
   const [expandedQuotes, setExpandedQuotes] = useState<ExpandedQuoteState>({});
 
-  const fetchData = async () => {
+  const fetchData = async (): Promise<Quote[]> => {
     console.log('Fetching quotes for approval dashboard...');
     setLoading(true);
     try {
@@ -50,7 +50,7 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
           description: "Failed to fetch quotes. Please try again.",
           variant: "destructive",
         });
-        return;
+        return [];
       }
 
       console.log(`Fetched ${quotesData?.length || 0} quotes from database`);
@@ -89,6 +89,7 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
 
       console.log('Quotes with BOM items:', quotesWithBOM);
       setQuotes(quotesWithBOM);
+      return quotesWithBOM;
     } catch (error) {
       console.error('Unexpected error fetching quotes:', error);
       toast({
@@ -96,6 +97,7 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
         description: "An unexpected error occurred. Please try again.",
         variant: "destructive",
       });
+      return [];
     } finally {
       setLoading(false);
     }
@@ -147,9 +149,13 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
   const handleQuoteAction = async (
     quoteId: string,
     action: 'approve' | 'reject',
-    notes?: string,
-    updatedBOMItems?: BOMItemWithDetails[]
+    payload: {
+      notes?: string;
+      updatedBOMItems?: BOMItemWithDetails[];
+      approvedDiscount?: number;
+    } = {}
   ) => {
+    const { notes, updatedBOMItems, approvedDiscount } = payload;
     console.log(`Processing ${action} for quote ${quoteId} with notes:`, notes);
     setActionLoading(prev => ({ ...prev, [quoteId]: true }));
 
@@ -157,7 +163,10 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
       const client = supabaseAdmin ?? supabase;
       const quote = quotes.find(q => q.id === quoteId);
 
-      const appliedDiscount = quote?.approved_discount ?? quote?.requested_discount ?? 0;
+      const appliedDiscount =
+        typeof approvedDiscount === 'number'
+          ? approvedDiscount
+          : quote?.approved_discount ?? quote?.requested_discount ?? 0;
 
       const updates: any = {
         status: action === 'approve' ? 'approved' : 'rejected',
@@ -170,18 +179,24 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
       }
 
       if (action === 'approve') {
-        updates.approval_notes = notes || '';
+        updates.approval_notes = notes?.trim() ? notes.trim() : null;
+        updates.rejection_reason = null;
       } else if (action === 'reject') {
-        updates.rejection_reason = notes || '';
+        updates.rejection_reason = notes?.trim() ? notes.trim() : null;
+        updates.approval_notes = null;
       }
 
       if (action === 'approve') {
         updates.approved_discount = appliedDiscount;
       }
 
-      if (updatedBOMItems && updatedBOMItems.length > 0) {
-        const totalRevenue = updatedBOMItems.reduce((sum, item) => sum + (item.unit_price * item.quantity), 0);
-        const totalCost = updatedBOMItems.reduce((sum, item) => sum + (item.unit_cost * item.quantity), 0);
+      const bomItemsForTotals = (updatedBOMItems && updatedBOMItems.length > 0)
+        ? updatedBOMItems
+        : ((quote?.bom_items as BOMItemWithDetails[] | undefined) ?? []);
+
+      if (bomItemsForTotals.length > 0) {
+        const totalRevenue = bomItemsForTotals.reduce((sum, item) => sum + (item.unit_price * item.quantity), 0);
+        const totalCost = bomItemsForTotals.reduce((sum, item) => sum + (item.unit_cost * item.quantity), 0);
         const grossProfit = totalRevenue - totalCost;
         const margin = totalRevenue > 0 ? (grossProfit / totalRevenue) * 100 : 0;
 
@@ -245,8 +260,12 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
           : `Quote ${action === 'approve' ? 'approved' : 'rejected'} successfully`,
       });
 
-      await refetch();
-      
+      const refreshedQuotes = await fetchData();
+      const refreshedQuote = refreshedQuotes.find(q => q.id === quoteId);
+      if (refreshedQuote) {
+        setSelectedQuote(refreshedQuote);
+      }
+
     } catch (error) {
       console.error(`Error ${action}ing quote:`, error);
       toast({
@@ -412,8 +431,8 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
                       <CardContent className="p-6">
                         <QuoteDetails
                           quote={selectedQuote}
-                          onApprove={(notes, updatedBOMItems) => handleQuoteAction(quote.id, 'approve', notes, updatedBOMItems)}
-                          onReject={notes => handleQuoteAction(quote.id, 'reject', notes)}
+                          onApprove={(payload) => handleQuoteAction(quote.id, 'approve', payload)}
+                          onReject={notes => handleQuoteAction(quote.id, 'reject', { notes })}
                           isLoading={actionLoading[quote.id] || false}
                           user={user}
                         />
@@ -490,8 +509,8 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
                       <CardContent className="p-6">
                         <QuoteDetails
                           quote={selectedQuote}
-                          onApprove={(notes, updatedBOMItems) => handleQuoteAction(quote.id, 'approve', notes, updatedBOMItems)}
-                          onReject={notes => handleQuoteAction(quote.id, 'reject', notes)}
+                          onApprove={(payload) => handleQuoteAction(quote.id, 'approve', payload)}
+                          onReject={notes => handleQuoteAction(quote.id, 'reject', { notes })}
                           isLoading={actionLoading[quote.id] || false}
                           user={user}
                         />

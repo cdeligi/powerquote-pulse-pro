@@ -37,6 +37,9 @@ interface Quote {
   original_margin?: number;
   discounted_margin?: number;
   gross_profit?: number;
+  approval_notes?: string | null;
+  rejection_reason?: string | null;
+  reviewed_at?: string | null;
   submitted_at?: string;
   created_at: string;
   updated_at: string;
@@ -368,6 +371,19 @@ const QuoteViewer: React.FC = () => {
   }
 
   const statusBadge = getStatusBadge(quote.status);
+  const finalDiscountedValue = quote.discounted_value ?? quote.original_quote_value;
+  const discountAmount = Math.max(quote.original_quote_value - finalDiscountedValue, 0);
+  const normalizedRequestedDiscount = normalizePercentage(quote.requested_discount);
+  const normalizedApprovedDiscount =
+    typeof quote.approved_discount === 'number'
+      ? normalizePercentage(quote.approved_discount)
+      : undefined;
+  const discountDelta =
+    normalizedApprovedDiscount !== undefined
+      ? normalizedApprovedDiscount - normalizedRequestedDiscount
+      : undefined;
+  const hasApprovalNotes = Boolean(quote.approval_notes?.trim());
+  const hasRejectionReason = Boolean(quote.rejection_reason?.trim());
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -482,13 +498,13 @@ const QuoteViewer: React.FC = () => {
                 <div>
                   <label className="text-sm font-medium text-muted-foreground">Discount Amount</label>
                   <p className="text-xl font-bold text-destructive">
-                    -{formatCurrency(Math.max(quote.original_quote_value - quote.discounted_value, 0))}
+                    -{formatCurrency(discountAmount)}
                   </p>
                 </div>
                 <div>
                   <label className="text-sm font-medium text-muted-foreground">Final Total After Discount</label>
                   <p className="text-xl font-bold text-emerald-500">
-                    {formatCurrency(quote.discounted_value)}
+                    {formatCurrency(finalDiscountedValue)}
                   </p>
                 </div>
               </div>
@@ -513,7 +529,7 @@ const QuoteViewer: React.FC = () => {
                 <div>
                   <label className="text-sm font-medium text-muted-foreground">Gross Profit After Discount</label>
                   <p className="text-xl font-bold text-emerald-500">
-                    {formatCurrency(quote.discounted_value - quote.total_cost)}
+                    {formatCurrency(finalDiscountedValue - quote.total_cost)}
                   </p>
                 </div>
               </div>
@@ -522,14 +538,14 @@ const QuoteViewer: React.FC = () => {
                 <div>
                   <label className="text-sm font-medium text-muted-foreground">Requested Discount</label>
                   <p className="text-xl font-bold text-foreground">
-                    {normalizePercentage(quote.requested_discount).toFixed(1)}%
+                    {normalizedRequestedDiscount.toFixed(1)}%
                   </p>
                 </div>
-                {typeof quote.approved_discount === 'number' && (
+                {normalizedApprovedDiscount !== undefined && (
                   <div>
                     <label className="text-sm font-medium text-muted-foreground">Approved Discount</label>
                     <p className="text-xl font-bold text-foreground">
-                      {normalizePercentage(quote.approved_discount).toFixed(1)}%
+                      {normalizedApprovedDiscount.toFixed(1)}%
                     </p>
                   </div>
                 )}
@@ -539,8 +555,8 @@ const QuoteViewer: React.FC = () => {
                     {normalizePercentage(
                       typeof quote.discounted_margin === 'number'
                         ? quote.discounted_margin
-                        : quote.discounted_value > 0
-                          ? ((quote.discounted_value - quote.total_cost) / quote.discounted_value) * 100
+                        : finalDiscountedValue > 0
+                          ? ((finalDiscountedValue - quote.total_cost) / finalDiscountedValue) * 100
                           : 0
                     ).toFixed(1)}%
                   </p>
@@ -549,6 +565,58 @@ const QuoteViewer: React.FC = () => {
             </div>
           </CardContent>
         </Card>
+
+        {quote.status !== 'draft' && quote.status !== 'pending_approval' && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Review Outcome</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+                  <Badge variant="secondary" className="uppercase tracking-wide">
+                    {quote.status.replace('_', ' ')}
+                  </Badge>
+                  {quote.reviewed_at && (
+                    <span>Reviewed on {new Date(quote.reviewed_at).toLocaleString()}</span>
+                  )}
+                  {normalizedApprovedDiscount !== undefined && (
+                    <span>Approved discount: {normalizedApprovedDiscount.toFixed(2)}%</span>
+                  )}
+                </div>
+
+                {discountDelta !== undefined && Math.abs(discountDelta) >= 0.01 && (
+                  <p className="text-sm text-muted-foreground">
+                    The approved discount differs from the requested amount by {discountDelta > 0 ? '+' : '-'}
+                    {Math.abs(discountDelta).toFixed(2)}%.
+                  </p>
+                )}
+
+                <div className="space-y-3">
+                  {hasApprovalNotes && (
+                    <div className="space-y-1">
+                      <label className="text-sm font-medium text-muted-foreground">Approval Notes</label>
+                      <p className="rounded-md bg-muted/40 p-3 text-sm text-foreground whitespace-pre-line">
+                        {quote.approval_notes.trim()}
+                      </p>
+                    </div>
+                  )}
+                  {hasRejectionReason && (
+                    <div className="space-y-1">
+                      <label className="text-sm font-medium text-muted-foreground">Rejection Reason</label>
+                      <p className="rounded-md bg-muted/40 p-3 text-sm text-foreground whitespace-pre-line">
+                        {quote.rejection_reason.trim()}
+                      </p>
+                    </div>
+                  )}
+                  {!hasApprovalNotes && !hasRejectionReason && (
+                    <p className="text-sm italic text-muted-foreground">No comments were provided.</p>
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* BOM Items */}
         <Card>

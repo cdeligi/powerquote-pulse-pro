@@ -15,7 +15,11 @@ import { useConfiguredQuoteFields } from "@/hooks/useConfiguredQuoteFields";
 
 interface QuoteDetailsProps {
   quote: Quote;
-  onApprove: (notes?: string, updatedBOMItems?: BOMItemWithDetails[]) => void;
+  onApprove: (payload: {
+    notes?: string;
+    updatedBOMItems?: BOMItemWithDetails[];
+    approvedDiscount?: number;
+  }) => void;
   onReject: (notes?: string) => void;
   isLoading: boolean;
   user: User | null;
@@ -32,8 +36,8 @@ const QuoteDetails = ({
   const [rejectionReason, setRejectionReason] = useState('');
   const [selectedAction, setSelectedAction] = useState<'approve' | 'reject' | null>(null);
   const [editingPrices, setEditingPrices] = useState<Record<string, string>>({});
-  const [bomItems, setBomItems] = useState<BOMItemWithDetails[]>(
-    (quote.bom_items || []).map((item, index) => {
+  const initialBOMItems = useMemo(() => {
+    return (quote.bom_items || []).map((item, index) => {
       const persistedId = item.id ? String(item.id) : undefined;
       const fallbackId = `local-${index}-${Math.random().toString(36).slice(2, 8)}`;
 
@@ -46,17 +50,45 @@ const QuoteDetails = ({
         part_number: item.part_number || item.partNumber || '',
         unit_price: item.unit_price || item.product?.price || 0,
         unit_cost: item.unit_cost || item.product?.cost || 0,
-        total_price: item.total_price || (item.product?.price || 0) * item.quantity,
+        total_price: item.total_price || (item.product?.price || 0) * (item.quantity || 1),
         margin: item.margin || 0,
         quantity: item.quantity || 1,
         product: item.product
       } as BOMItemWithDetails;
-    })
-  );
+    });
+  }, [quote]);
+  const [bomItems, setBomItems] = useState<BOMItemWithDetails[]>(initialBOMItems);
   const [qtmsConfig, setQtmsConfig] = useState<ConsolidatedQTMS | null>(null);
   const [editingQTMS, setEditingQTMS] = useState(false);
+  const [approvedDiscountInput, setApprovedDiscountInput] = useState('0');
   const { formattedFields: formattedConfiguredFields, unmappedFields: unmappedQuoteFields } =
     useConfiguredQuoteFields(quote.quote_fields);
+
+  useEffect(() => {
+    setBomItems(initialBOMItems);
+    setEditingPrices({});
+    setEditingQTMS(false);
+  }, [initialBOMItems]);
+
+  const normalizeDiscountPercentage = (value: number | null | undefined) => {
+    if (value === null || value === undefined) {
+      return 0;
+    }
+
+    return Math.abs(value) <= 1 ? value * 100 : value;
+  };
+
+  useEffect(() => {
+    const normalizedApproved = typeof quote.approved_discount === 'number'
+      ? normalizeDiscountPercentage(quote.approved_discount)
+      : null;
+    const normalizedRequested = normalizeDiscountPercentage(quote.requested_discount);
+    const initialDiscount =
+      normalizedApproved !== null ? normalizedApproved : normalizedRequested;
+    setApprovedDiscountInput(initialDiscount.toFixed(2));
+    setApprovalNotes(quote.approval_notes || '');
+    setRejectionReason(quote.rejection_reason || '');
+  }, [quote.id, quote.approved_discount, quote.requested_discount, quote.approval_notes, quote.rejection_reason]);
 
   useEffect(() => {
     const item = bomItems.find(i => i.product.type === 'QTMS' && i.configuration);
@@ -66,7 +98,7 @@ const QuoteDetails = ({
         config.chassis,
         config.slotAssignments,
         config.hasRemoteDisplay,
-        config.analogConfigurations as any,
+        config.analogConfigurations,
         config.bushingConfigurations
       );
       setQtmsConfig({ ...consolidated, id: item.id, price: item.unit_price, name: item.name, description: item.description || '' });
@@ -76,13 +108,21 @@ const QuoteDetails = ({
   }, [bomItems]);
 
   const handleApprove = () => {
-    onApprove(approvalNotes, bomItems);
-    setApprovalNotes('');
+    const parsedDiscount = parseFloat(approvedDiscountInput);
+    const sanitizedDiscount = Number.isFinite(parsedDiscount)
+      ? Math.min(Math.max(parsedDiscount, 0), 100)
+      : 0;
+    onApprove({
+      notes: approvalNotes,
+      updatedBOMItems: bomItems,
+      approvedDiscount: sanitizedDiscount / 100
+    });
     setSelectedAction(null);
   };
 
   const handleReject = () => {
-    onReject(rejectionReason);
+    const trimmedReason = rejectionReason.trim();
+    onReject(trimmedReason);
     setRejectionReason('');
     setSelectedAction(null);
   };
@@ -143,34 +183,34 @@ const QuoteDetails = ({
     setEditingQTMS(false);
   };
 
-  const calculateTotals = () => {
+  const totals = useMemo(() => {
     const totalRevenue = bomItems.reduce((sum, item) => sum + (item.unit_price * item.quantity), 0);
     const totalCost = bomItems.reduce((sum, item) => sum + (item.unit_cost * item.quantity), 0);
     const grossProfit = totalRevenue - totalCost;
     const marginPercentage = totalRevenue > 0 ? (grossProfit / totalRevenue) * 100 : 0;
 
     return { totalRevenue, totalCost, grossProfit, marginPercentage };
-  };
-
-  const totals = calculateTotals();
-
-  const normalizeDiscountPercentage = (value: number | null | undefined) => {
-    if (!value) {
-      return 0;
-    }
-
-    return Math.abs(value) <= 1 ? value * 100 : value;
-  };
+  }, [bomItems]);
 
   const requestedDiscountPercentage = normalizeDiscountPercentage(quote.requested_discount);
-  const approvedDiscountPercentage = normalizeDiscountPercentage(quote.approved_discount);
-  const effectiveDiscountPercentage = approvedDiscountPercentage > 0 ? approvedDiscountPercentage : requestedDiscountPercentage;
+  const approvedDiscountFromQuote = typeof quote.approved_discount === 'number'
+    ? normalizeDiscountPercentage(quote.approved_discount)
+    : null;
+  const parsedDiscount = parseFloat(approvedDiscountInput);
+  const effectiveDiscountPercentage = Number.isFinite(parsedDiscount)
+    ? Math.min(Math.max(parsedDiscount, 0), 100)
+    : 0;
   const discountFraction = effectiveDiscountPercentage / 100;
   const discountAmount = totals.totalRevenue * discountFraction;
   const discountedTotal = totals.totalRevenue - discountAmount;
   const discountedGrossProfit = discountedTotal - totals.totalCost;
   const discountedMargin = discountedTotal > 0 ? (discountedGrossProfit / discountedTotal) * 100 : 0;
-  const hasDiscount = effectiveDiscountPercentage > 0;
+  const showDiscountBreakdown =
+    quote.status === 'pending_approval' ||
+    effectiveDiscountPercentage > 0 ||
+    requestedDiscountPercentage > 0 ||
+    (approvedDiscountFromQuote !== null && approvedDiscountFromQuote > 0);
+  const discountDelta = effectiveDiscountPercentage - requestedDiscountPercentage;
 
   const formatCurrency = (value: number) => {
     return `${quote.currency} ${value.toLocaleString(undefined, {
@@ -401,24 +441,62 @@ const QuoteDetails = ({
                 </div>
               </div>
 
-              {hasDiscount && (
+              {showDiscountBreakdown && (
                 <div className="space-y-3 pt-3 border-t border-gray-700">
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-gray-400">Discount ({effectiveDiscountPercentage.toFixed(1)}%)</span>
+                    <span className="text-gray-400">Discount ({effectiveDiscountPercentage.toFixed(2)}%)</span>
                     <span className="text-red-400 font-medium">-{formatCurrency(Math.abs(discountAmount))}</span>
                   </div>
-                  {requestedDiscountPercentage > 0 && (
+                  <div className="space-y-2">
                     <div className="flex items-center justify-between text-xs text-gray-400">
                       <span>Requested Discount</span>
-                      <span>{requestedDiscountPercentage.toFixed(1)}%</span>
+                      <span>{requestedDiscountPercentage.toFixed(2)}%</span>
                     </div>
-                  )}
-                  {typeof quote.approved_discount === 'number' && approvedDiscountPercentage > 0 && (
-                    <div className="flex items-center justify-between text-xs text-gray-400">
-                      <span>Approved Discount</span>
-                      <span>{approvedDiscountPercentage.toFixed(1)}%</span>
-                    </div>
-                  )}
+                    {approvedDiscountFromQuote !== null && quote.status !== 'pending_approval' && (
+                      <div className="flex items-center justify-between text-xs text-gray-400">
+                        <span>Approved Discount</span>
+                        <span>{approvedDiscountFromQuote.toFixed(2)}%</span>
+                      </div>
+                    )}
+                    {quote.status === 'pending_approval' && (
+                      <div className="space-y-1">
+                        <Label className="text-gray-400 text-xs uppercase">Approved Discount to Apply</Label>
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                          <div className="flex items-center gap-1">
+                            <Input
+                              type="number"
+                              step="0.1"
+                              min="0"
+                              max="100"
+                              value={approvedDiscountInput}
+                              onChange={(e) => setApprovedDiscountInput(e.target.value)}
+                              className="w-28 h-8 bg-gray-800 border-gray-700 text-white text-right"
+                            />
+                            <span className="text-gray-400 text-sm">%</span>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 px-2 text-xs text-gray-300 border border-gray-700 hover:bg-gray-800"
+                            onClick={() => setApprovedDiscountInput(requestedDiscountPercentage.toFixed(2))}
+                            disabled={Math.abs(effectiveDiscountPercentage - requestedDiscountPercentage) < 0.01}
+                          >
+                            Use Requested
+                          </Button>
+                        </div>
+                        {approvedDiscountFromQuote !== null && Math.abs(effectiveDiscountPercentage - approvedDiscountFromQuote) > 0.01 && (
+                          <p className="text-xs text-gray-500">
+                            Previous approved value: {approvedDiscountFromQuote.toFixed(2)}%
+                          </p>
+                        )}
+                      </div>
+                    )}
+                    {quote.status === 'pending_approval' && Math.abs(discountDelta) > 0.01 && (
+                      <div className="text-xs text-gray-400">
+                        {discountDelta > 0 ? 'Increasing' : 'Decreasing'} discount by {Math.abs(discountDelta).toFixed(2)}% from request.
+                      </div>
+                    )}
+                  </div>
                   <div className="flex items-center justify-between text-base font-semibold">
                     <span className="text-gray-200">Final Total</span>
                     <span className="text-green-400">{formatCurrency(discountedTotal)}</span>
