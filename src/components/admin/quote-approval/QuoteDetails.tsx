@@ -5,7 +5,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { CheckCircle, XCircle, DollarSign, Edit3, Save, X, Settings } from "lucide-react";
+import { CheckCircle, XCircle, Edit3, Save, X, Settings } from "lucide-react";
 import QTMSConfigurationEditor from "@/components/bom/QTMSConfigurationEditor";
 import { consolidateQTMSConfiguration, QTMSConfiguration, ConsolidatedQTMS } from "@/utils/qtmsConsolidation";
 import { useState, useEffect, useMemo } from "react";
@@ -144,27 +144,33 @@ const QuoteDetails = ({
   };
 
   const calculateTotals = () => {
-    const totalRevenue = bomItems.reduce((sum, item) => sum + item.total_price, 0);
+    const totalRevenue = bomItems.reduce((sum, item) => sum + (item.unit_price * item.quantity), 0);
     const totalCost = bomItems.reduce((sum, item) => sum + (item.unit_cost * item.quantity), 0);
     const grossProfit = totalRevenue - totalCost;
     const marginPercentage = totalRevenue > 0 ? (grossProfit / totalRevenue) * 100 : 0;
-    
+
     return { totalRevenue, totalCost, grossProfit, marginPercentage };
   };
 
   const totals = calculateTotals();
 
-  const formatCurrency = (value: number) => {
-    return `${quote.currency} ${value.toLocaleString()}`;
-  };
-
-  const formatPercentage = (value: number | null | undefined) => {
-    if (value === null || value === undefined) {
-      return '—';
+  const normalizeDiscountPercentage = (value: number | null | undefined) => {
+    if (!value) {
+      return 0;
     }
 
-    const normalized = value <= 1 && value >= -1 ? value * 100 : value;
-    return `${normalized.toFixed(1)}%`;
+    return Math.abs(value) <= 1 ? value * 100 : value;
+  };
+
+  const requestedDiscountPercentage = normalizeDiscountPercentage(quote.requested_discount);
+  const discountFraction = requestedDiscountPercentage / 100;
+  const discountAmount = totals.totalRevenue * discountFraction;
+  const discountedTotal = totals.totalRevenue - discountAmount;
+  const discountedGrossProfit = discountedTotal - totals.totalCost;
+  const discountedMargin = discountedTotal > 0 ? (discountedGrossProfit / discountedTotal) * 100 : 0;
+
+  const formatCurrency = (value: number) => {
+    return `${quote.currency} ${value.toLocaleString()}`;
   };
 
   const getStatusBadge = () => {
@@ -256,183 +262,173 @@ const QuoteDetails = ({
         </Card>
       )}
 
-      {/* Financial Summary */}
+      {/* Bill of Materials */}
       <Card className="bg-gray-900 border-gray-800">
         <CardHeader>
-          <CardTitle className="text-white">Project Financial Analysis</CardTitle>
+          <CardTitle className="text-white">Bill of Materials ({bomItems.length})</CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="text-center p-4 bg-gray-800 rounded">
-              <p className="text-gray-400 text-sm">Original Value</p>
-              <p className="text-white text-xl font-bold">{formatCurrency(quote.original_quote_value)}</p>
-            </div>
-            <div className="text-center p-4 bg-gray-800 rounded">
-              <p className="text-gray-400 text-sm">Current Total</p>
-              <p className="text-white text-xl font-bold">{formatCurrency(totals.totalRevenue)}</p>
-            </div>
-            <div className="text-center p-4 bg-gray-800 rounded">
-              <p className="text-gray-400 text-sm">Total Cost</p>
-              <p className="text-orange-400 text-xl font-bold">{formatCurrency(totals.totalCost)}</p>
-            </div>
-            <div className="text-center p-4 bg-gray-800 rounded">
-              <p className="text-gray-400 text-sm">Margin</p>
-              <p className={`text-xl font-bold ${
-                totals.marginPercentage >= 25 ? 'text-green-400' :
-                totals.marginPercentage >= 15 ? 'text-yellow-400' : 'text-red-400'
-              }`}>
-                {totals.marginPercentage.toFixed(1)}%
-              </p>
-            </div>
-          </div>
-          <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            <div className="text-center p-4 bg-gray-800 rounded">
-              <p className="text-gray-400 text-sm">Discounted Value</p>
-              <p className="text-white text-xl font-bold">{formatCurrency(quote.discounted_value)}</p>
-            </div>
-            <div className="text-center p-4 bg-gray-800 rounded">
-              <p className="text-gray-400 text-sm">Requested Discount</p>
-              <p className="text-blue-400 text-xl font-bold">{formatPercentage(quote.requested_discount)}</p>
-            </div>
-            <div className="text-center p-4 bg-gray-800 rounded">
-              <p className="text-gray-400 text-sm">Approved Discount</p>
-              <p className="text-emerald-400 text-xl font-bold">{formatPercentage(quote.approved_discount)}</p>
-            </div>
-          </div>
-          <div className="mt-4 p-4 bg-gray-800 rounded space-y-3">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-              <span className="text-gray-400">Gross Profit</span>
-              <span className="text-green-400 text-lg font-bold">
-                {formatCurrency(totals.grossProfit)}
-              </span>
-            </div>
-            {quote.discount_justification && (
-              <div>
-                <Label className="text-gray-400">Discount Justification</Label>
-                <p className="text-gray-200 mt-1 whitespace-pre-line">{quote.discount_justification}</p>
-              </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* BOM Items with Editing */}
-      <Card className="bg-gray-900 border-gray-800">
-        <CardHeader>
-          <CardTitle className="text-white flex items-center">
-            <DollarSign className="h-5 w-5 mr-2" />
-            BOM Items ({bomItems.length}) - Real-time Price Editing
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-6">
           {bomItems.length > 0 ? (
             <div className="space-y-4">
-              {bomItems.map((item) => (
-                <div key={item.id} className="p-4 bg-gray-800 rounded border border-gray-700">
-                  <div className="flex justify-between items-start mb-3">
-                    <div className="flex-1">
-                      <h4 className="text-white font-medium">{item.name}</h4>
-                      {item.description && (
-                        <p className="text-gray-400 text-sm">{item.description}</p>
-                      )}
-                      {item.part_number && (
-                        <Badge variant="outline" className="text-xs font-mono text-white border-gray-600 mt-1 break-all">
-                          P/N: {item.part_number}
-                        </Badge>
-                      )}
-                    </div>
-                    <div className="flex space-x-1">
-                      {item.product?.type === 'QTMS' && item.configuration && (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => {
-                            setEditingQTMS(true);
-                          }}
-                          className="h-6 w-6 p-0 text-purple-400 hover:text-purple-300"
-                          title="Edit configuration"
-                        >
-                          <Settings className="h-3 w-3" />
-                        </Button>
-                      )}
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => handlePriceEdit(item.id, item.unit_price.toString())}
-                        className="h-6 w-6 p-0 text-gray-400 hover:text-white"
-                        title="Edit unit price"
-                      >
-                        <Edit3 className="h-3 w-3" />
-                      </Button>
-                    </div>
-                  </div>
-                  
-                  <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
-                    <div>
-                      <span className="text-gray-400">Quantity:</span>
-                      <div className="text-white font-medium">{item.quantity}</div>
-                    </div>
-                    
-                    <div>
-                      <span className="text-gray-400">Unit Price:</span>
-                      {editingPrices[item.id] ? (
-                        <div className="flex items-center space-x-1 mt-1">
-                          <Input
-                            type="number"
-                            step="0.01"
-                            value={editingPrices[item.id]}
-                            onChange={(e) => handlePriceEdit(item.id, e.target.value)}
-                            className="w-24 h-6 text-xs bg-gray-700 border-gray-600 text-white"
-                          />
-                          <Button
-                            size="sm"
-                            onClick={() => handlePriceUpdate(item.id)}
-                            className="h-5 w-5 p-0 bg-green-600 hover:bg-green-700"
-                          >
-                            <Save className="h-3 w-3" />
-                          </Button>
+              {bomItems.map((item) => {
+                const marginColor = item.margin >= 25 ? 'text-green-400' : item.margin >= 15 ? 'text-yellow-400' : 'text-red-400';
+
+                return (
+                  <div key={item.id} className="p-4 bg-gray-800/80 rounded-lg border border-gray-700">
+                    <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
+                      <div className="space-y-1">
+                        <h4 className="text-white font-semibold">{item.name}</h4>
+                        {item.description && (
+                          <p className="text-gray-400 text-sm">{item.description}</p>
+                        )}
+                        {item.part_number && (
+                          <Badge variant="outline" className="text-xs font-mono text-white border-gray-600">
+                            P/N: {item.part_number}
+                          </Badge>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-1 self-start">
+                        {item.product?.type === 'QTMS' && item.configuration && (
                           <Button
                             size="sm"
                             variant="ghost"
-                            onClick={() => handlePriceEditCancel(item.id)}
-                            className="h-5 w-5 p-0 text-gray-400 hover:text-white"
+                            onClick={() => setEditingQTMS(true)}
+                            className="h-7 w-7 p-0 text-purple-400 hover:text-purple-300 hover:bg-purple-900/20"
+                            title="Edit configuration"
                           >
-                            <X className="h-3 w-3" />
+                            <Settings className="h-3 w-3" />
                           </Button>
-                        </div>
-                      ) : (
-                        <div className="text-white font-medium">
-                          ${item.unit_price.toLocaleString()}
-                        </div>
-                      )}
+                        )}
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handlePriceEdit(item.id, item.unit_price.toString())}
+                          className="h-7 w-7 p-0 text-gray-400 hover:text-white hover:bg-gray-700"
+                          title="Edit unit price"
+                        >
+                          <Edit3 className="h-3 w-3" />
+                        </Button>
+                      </div>
                     </div>
-                    
-                    <div>
-                      <span className="text-gray-400">Unit Cost:</span>
-                      <div className="text-orange-400 font-medium">${item.unit_cost.toLocaleString()}</div>
-                    </div>
-                    
-                    <div>
-                      <span className="text-gray-400">Total Price:</span>
-                      <div className="text-white font-medium">${item.total_price.toLocaleString()}</div>
-                    </div>
-                    
-                    <div>
-                      <span className="text-gray-400">Margin:</span>
-                      <div className={`font-medium ${
-                        item.margin >= 25 ? 'text-green-400' : 
-                        item.margin >= 15 ? 'text-yellow-400' : 'text-red-400'
-                      }`}>
-                        {item.margin.toFixed(1)}%
+
+                    <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 text-sm">
+                      <div>
+                        <span className="text-gray-400">Quantity</span>
+                        <p className="text-white font-medium">{item.quantity}</p>
+                      </div>
+                      <div>
+                        <span className="text-gray-400">Unit Price</span>
+                        {editingPrices[item.id] ? (
+                          <div className="flex items-center gap-2 mt-1">
+                            <Input
+                              type="number"
+                              step="0.01"
+                              value={editingPrices[item.id]}
+                              onChange={(e) => handlePriceEdit(item.id, e.target.value)}
+                              className="w-28 h-7 text-xs bg-gray-700 border-gray-600 text-white"
+                            />
+                            <Button
+                              size="sm"
+                              onClick={() => handlePriceUpdate(item.id)}
+                              className="h-6 w-6 p-0 bg-green-600 hover:bg-green-700"
+                            >
+                              <Save className="h-3 w-3" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => handlePriceEditCancel(item.id)}
+                              className="h-6 w-6 p-0 text-gray-400 hover:text-white"
+                            >
+                              <X className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        ) : (
+                          <p className="text-white font-medium">{formatCurrency(item.unit_price)}</p>
+                        )}
+                      </div>
+                      <div>
+                        <span className="text-gray-400">Unit Cost</span>
+                        <p className="text-orange-400 font-medium">{formatCurrency(item.unit_cost)}</p>
+                      </div>
+                      <div>
+                        <span className="text-gray-400">Extended Price</span>
+                        <p className="text-white font-semibold">{formatCurrency(item.unit_price * item.quantity)}</p>
+                      </div>
+                      <div>
+                        <span className="text-gray-400">Margin</span>
+                        <p className={`font-semibold ${marginColor}`}>{item.margin.toFixed(1)}%</p>
                       </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           ) : (
-            <div className="text-gray-400 text-center py-4">
-              No BOM items found for this quote.
+            <div className="text-gray-400 text-center py-6">No BOM items found for this quote.</div>
+          )}
+
+          {bomItems.length > 0 && (
+            <div className="space-y-4 bg-gray-800/60 border border-gray-700 rounded-lg p-4">
+              <div className="flex flex-col gap-3">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-gray-400">Subtotal</span>
+                  <span className="text-white font-medium">{formatCurrency(totals.totalRevenue)}</span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-gray-400">Total Cost</span>
+                  <span className="text-orange-400 font-medium">{formatCurrency(totals.totalCost)}</span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-gray-400">Gross Profit</span>
+                  <span className="text-green-400 font-medium">{formatCurrency(totals.grossProfit)}</span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-gray-400">Margin</span>
+                  <span className={`${
+                    totals.marginPercentage >= 25 ? 'text-green-400' :
+                    totals.marginPercentage >= 15 ? 'text-yellow-400' : 'text-red-400'
+                  } font-semibold`}>
+                    {totals.marginPercentage.toFixed(1)}%
+                  </span>
+                </div>
+              </div>
+
+              {requestedDiscountPercentage > 0 && (
+                <div className="space-y-3 pt-3 border-t border-gray-700">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-gray-400">Discount ({requestedDiscountPercentage.toFixed(1)}%)</span>
+                    <span className="text-red-400 font-medium">-{formatCurrency(discountAmount)}</span>
+                  </div>
+                  {typeof quote.approved_discount === 'number' && (
+                    <div className="flex items-center justify-between text-xs text-gray-400">
+                      <span>Approved Discount</span>
+                      <span>{normalizeDiscountPercentage(quote.approved_discount).toFixed(1)}%</span>
+                    </div>
+                  )}
+                  <div className="flex items-center justify-between text-base font-semibold">
+                    <span className="text-gray-200">Final Total</span>
+                    <span className="text-green-400">{formatCurrency(discountedTotal)}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-gray-400">Final Margin</span>
+                    <span className={`${
+                      discountedMargin >= 25 ? 'text-green-400' :
+                      discountedMargin >= 15 ? 'text-yellow-400' : 'text-red-400'
+                    } font-semibold`}>
+                      {discountedMargin.toFixed(1)}%
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {quote.discount_justification && (
+                <div className="pt-3 border-t border-gray-700">
+                  <Label className="text-gray-400 text-xs uppercase">Discount Justification</Label>
+                  <p className="text-gray-200 mt-1 text-sm whitespace-pre-line">{quote.discount_justification}</p>
+                </div>
+              )}
             </div>
           )}
         </CardContent>
