@@ -465,9 +465,8 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
     }
 
     try {
-      // Use displayId which contains the actual database ID
       const actualQuoteId = quote.displayId || quote.id;
-      
+
       const { data: newQuoteId, error } = await supabase
         .rpc('clone_quote', {
           source_quote_id: actualQuoteId,
@@ -478,12 +477,176 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
         throw new Error(error.message);
       }
 
+      if (!newQuoteId || typeof newQuoteId !== 'string') {
+        throw new Error('Clone operation did not return a new quote ID.');
+      }
+
+      const { data: clonedQuote, error: clonedQuoteError } = await supabase
+        .from('quotes')
+        .select('id, draft_bom, quote_fields')
+        .eq('id', newQuoteId)
+        .maybeSingle();
+
+      if (clonedQuoteError) {
+        throw new Error(clonedQuoteError.message);
+      }
+
+      if (!clonedQuote) {
+        throw new Error('Unable to load newly cloned quote.');
+      }
+
+      const hasDraftItems = Array.isArray(clonedQuote.draft_bom?.items) && clonedQuote.draft_bom.items.length > 0;
+
+      if (!hasDraftItems) {
+        const { data: bomRows, error: bomError } = await supabase
+          .from('bom_items')
+          .select(`
+            *,
+            bom_level4_values (
+              level4_config_id,
+              entries
+            )
+          `)
+          .eq('quote_id', newQuoteId);
+
+        if (bomError) {
+          throw new Error(bomError.message);
+        }
+
+        const normalizedDraftItems = (bomRows || []).map(item => {
+          const rawConfig = (() => {
+            const source = item.configuration_data;
+            if (!source) return {} as Record<string, any>;
+            if (typeof source === 'object') return source as Record<string, any>;
+            if (typeof source === 'string') {
+              try {
+                return JSON.parse(source) as Record<string, any>;
+              } catch {
+                return {} as Record<string, any>;
+              }
+            }
+            return {} as Record<string, any>;
+          })();
+
+          const rawSlotAssignments =
+            rawConfig.slotAssignments ||
+            rawConfig.slot_assignments ||
+            undefined;
+
+          const normalizedSlotAssignments = Array.isArray(rawSlotAssignments)
+            ? rawSlotAssignments
+            : rawSlotAssignments && typeof rawSlotAssignments === 'object'
+              ? Object.entries(rawSlotAssignments).map(([slotKey, slotData]) => {
+                  const slotNumber = Number.parseInt(slotKey, 10);
+                  const card = (slotData || {}) as Record<string, any>;
+                  const productSource = (card.product || card.card || {}) as Record<string, any>;
+                  return {
+                    slot: Number.isNaN(slotNumber) ? undefined : slotNumber,
+                    productId:
+                      card.productId ||
+                      card.product_id ||
+                      productSource.id ||
+                      undefined,
+                    name:
+                      card.displayName ||
+                      card.name ||
+                      productSource.displayName ||
+                      productSource.name ||
+                      `Slot ${slotKey}`,
+                    partNumber:
+                      card.partNumber ||
+                      card.part_number ||
+                      productSource.partNumber ||
+                      productSource.part_number ||
+                      undefined,
+                    level4Config: card.level4Config || null,
+                    level4Selections: card.level4Selections || null,
+                  } as SerializedSlotAssignment;
+                }).filter(entry => entry.slot !== undefined)
+              : undefined;
+
+          const rackConfiguration =
+            rawConfig.rackConfiguration ||
+            rawConfig.rack_configuration ||
+            (normalizedSlotAssignments ? buildRackLayoutFromAssignments(normalizedSlotAssignments) : undefined);
+
+          const level4Config = rawConfig.level4Config || rawConfig.level4_config || null;
+          const level4Selections = rawConfig.level4Selections || rawConfig.level4_selections || null;
+
+          return {
+            id: item.id,
+            name: item.name,
+            description: item.description || '',
+            quantity: item.quantity || 1,
+            unit_price: item.unit_price || 0,
+            unit_cost: item.unit_cost || 0,
+            total_price: item.total_price || (item.unit_price || 0) * (item.quantity || 1),
+            total_cost: item.total_cost || (item.unit_cost || 0) * (item.quantity || 1),
+            partNumber: item.part_number || undefined,
+            part_number: item.part_number || undefined,
+            productId: item.product_id || undefined,
+            product_id: item.product_id || undefined,
+            enabled: item.enabled !== false,
+            product: {
+              id: item.product_id || undefined,
+              name: item.name,
+              description: item.description || '',
+              price: item.unit_price || 0,
+              cost: item.unit_cost || 0,
+              partNumber: item.part_number || undefined,
+            },
+            configuration: rawConfig.configuration || null,
+            configuration_data: rawConfig,
+            slotAssignments: normalizedSlotAssignments,
+            rackConfiguration,
+            level4Config,
+            level4Selections,
+            level4Values: item.bom_level4_values || [],
+            approved_unit_price: item.approved_unit_price || item.unit_price || 0,
+            original_unit_price: item.original_unit_price || item.unit_price || 0,
+          };
+        });
+
+        const rackLayouts = normalizedDraftItems
+          .map(item => ({
+            productId: item.product_id || item.productId,
+            productName: item.name,
+            partNumber: item.partNumber,
+            layout: item.rackConfiguration,
+          }))
+          .filter(entry => entry.layout && typeof entry.layout === 'object' && Array.isArray(entry.layout.slots));
+
+        const level4Configurations = normalizedDraftItems
+          .map(item => ({
+            productId: item.product_id || item.productId,
+            partNumber: item.partNumber,
+            configuration: item.level4Config,
+            selections: item.level4Selections,
+          }))
+          .filter(entry => entry.configuration || entry.selections);
+
+        const draftPayload = {
+          ...(clonedQuote.draft_bom && typeof clonedQuote.draft_bom === 'object' ? clonedQuote.draft_bom : {}),
+          items: normalizedDraftItems,
+          rackLayouts,
+          level4Configurations,
+          quoteFields:
+            (clonedQuote.draft_bom && (clonedQuote.draft_bom as Record<string, any>)?.quoteFields) ||
+            clonedQuote.quote_fields ||
+            {},
+        };
+
+        await supabase
+          .from('quotes')
+          .update({ draft_bom: draftPayload })
+          .eq('id', newQuoteId);
+      }
+
       toast({
         title: 'Quote Cloned',
         description: `Successfully created new draft quote ${newQuoteId}`,
       });
 
-      // Navigate to the new cloned quote in edit mode
       navigate(`/bom-edit/${newQuoteId}`);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to clone quote';
