@@ -1161,8 +1161,8 @@ export const generateQuotePDF = async (
           color: #0f172a;
           margin: 0;
           padding: 36px;
-          font-size: 14px;
-          line-height: 1.6;
+          font-size: 12px;
+          line-height: 1.55;
         }
         .page-container {
           max-width: 1080px;
@@ -1182,44 +1182,44 @@ export const generateQuotePDF = async (
         }
         .header-left { display: flex; align-items: center; gap: 20px; }
         .logo-img { max-height: 56px; max-width: 200px; object-fit: contain; }
-        .logo-text { color: #0f172a; font-size: 26px; font-weight: 700; letter-spacing: -0.02em; }
+        .logo-text { color: #0f172a; font-size: 22px; font-weight: 700; letter-spacing: -0.02em; }
         .header-right { text-align: right; }
-        .quote-id { font-size: 22px; font-weight: 600; color: #0f172a; margin: 0; }
-        .header-meta { font-size: 13px; color: #64748b; margin-top: 6px; }
-        .draft-warning { background: #fef3c7; border: 1px solid #f59e0b; padding: 16px 20px; border-radius: 12px; margin-bottom: 28px; color: #92400e; font-size: 13px; }
-        .draft-warning strong { display: block; font-size: 13px; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 6px; }
+        .quote-id { font-size: 18px; font-weight: 600; color: #0f172a; margin: 0; }
+        .header-meta { font-size: 12px; color: #64748b; margin-top: 6px; }
+        .draft-warning { background: #fef3c7; border: 1px solid #f59e0b; padding: 16px 20px; border-radius: 12px; margin-bottom: 28px; color: #92400e; font-size: 12px; }
+        .draft-warning strong { display: block; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 6px; }
         .draft-warning p { margin: 4px 0 0; }
-        .date-info { display: inline-flex; flex-wrap: wrap; gap: 14px; align-items: center; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 14px 18px; margin-bottom: 32px; color: #475569; font-size: 13px; }
+        .date-info { display: inline-flex; flex-wrap: wrap; gap: 14px; align-items: center; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 14px 18px; margin-bottom: 32px; color: #475569; font-size: 12px; }
         .date-info strong { color: #0f172a; font-weight: 600; }
         .date-info .note { color: #64748b; font-style: italic; }
         .quote-header-fields { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 16px; padding: 24px 28px; margin-bottom: 36px; }
-        .quote-header-fields h3 { color: #0f172a; margin: 0 0 18px; font-size: 18px; font-weight: 600; }
+        .quote-header-fields h3 { color: #0f172a; margin: 0 0 18px; font-size: 16px; font-weight: 600; }
         .field-row { display: grid; grid-template-columns: minmax(180px, 220px) 1fr; gap: 14px; padding: 10px 0; border-bottom: 1px solid #e2e8f0; }
         .field-row:last-of-type { border-bottom: none; }
-        .field-label { font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: #64748b; font-weight: 600; }
-        .field-value { font-size: 15px; color: #0f172a; font-weight: 500; }
-        h2 { color: #0f172a; font-size: 20px; font-weight: 600; margin: 28px 0 18px; }
+        .field-label { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: #64748b; font-weight: 600; }
+        .field-value { font-size: 13px; color: #0f172a; font-weight: 500; }
+        h2 { color: #0f172a; font-size: 18px; font-weight: 600; margin: 28px 0 18px; }
         .bom-table { width: 100%; border-collapse: collapse; margin-bottom: 12px; }
-        .bom-table th { background: #f1f5f9; color: #0f172a; padding: 12px 14px; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; border-bottom: 1px solid #e2e8f0; }
-        .bom-table td { padding: 14px; border-bottom: 1px solid #e2e8f0; color: #0f172a; font-size: 13px; vertical-align: top; }
+        .bom-table th { background: #f1f5f9; color: #0f172a; padding: 12px 14px; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; border-bottom: 1px solid #e2e8f0; }
+        .bom-table td { padding: 14px; border-bottom: 1px solid #e2e8f0; color: #0f172a; font-size: 12px; vertical-align: top; }
         .bom-table tbody tr:nth-child(even) { background: #f8fafc; }
         .total-section { margin-top: 20px; border-top: 1px solid #e2e8f0; padding-top: 16px; display: flex; flex-direction: column; gap: 8px; align-items: flex-end; }
-        .total-line { display: flex; gap: 16px; font-size: 15px; font-weight: 600; color: #0f172a; }
-        .total-line .label { font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: #64748b; font-weight: 500; }
+        .total-line { display: flex; gap: 16px; font-size: 13px; font-weight: 600; color: #0f172a; }
+        .total-line .label { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: #64748b; font-weight: 500; }
         .total-line.discount { color: #b45309; }
-        .total-line.final { font-size: 18px; color: #0f172a; }
+        .total-line.final { font-size: 16px; color: #0f172a; }
         .level4-section { margin-top: 40px; border: 1px solid #e2e8f0; border-radius: 16px; padding: 26px; background: linear-gradient(135deg, rgba(241,245,249,0.88), rgba(248,250,252,0.96)); }
-        .level4-heading { margin: 0; font-size: 18px; font-weight: 600; color: #0f172a; }
-        .level4-subheading { margin-top: 6px; color: #64748b; font-size: 13px; }
-        .level4-meta { margin-top: 10px; color: #64748b; font-size: 12px; }
+        .level4-heading { margin: 0; font-size: 16px; font-weight: 600; color: #0f172a; }
+        .level4-subheading { margin-top: 6px; color: #64748b; font-size: 12px; }
+        .level4-meta { margin-top: 10px; color: #64748b; font-size: 11px; }
         .level4-table { width: 100%; border-collapse: collapse; margin-top: 18px; border-radius: 12px; overflow: hidden; border: 1px solid #e2e8f0; background: #ffffff; }
-        .level4-table th { background: #0f172a; color: #f8fafc; padding: 12px; text-align: left; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; }
-        .level4-table td { padding: 12px; border-bottom: 1px solid #e2e8f0; font-size: 13px; color: #0f172a; }
+        .level4-table th { background: #0f172a; color: #f8fafc; padding: 12px; text-align: left; font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; }
+        .level4-table td { padding: 12px; border-bottom: 1px solid #e2e8f0; font-size: 12px; color: #0f172a; }
         .level4-option-label { font-weight: 600; color: #0f172a; }
-        .level4-option-meta { margin-top: 4px; font-size: 12px; color: #64748b; }
+        .level4-option-meta { margin-top: 4px; font-size: 11px; color: #64748b; }
         .level4-empty { color: #64748b; font-style: italic; background: #ffffff; border: 1px dashed #cbd5f5; padding: 14px; border-radius: 12px; margin-top: 16px; }
-        .level4-raw { white-space: pre-wrap; font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', monospace; font-size: 12px; background: #0f172a; color: #f8fafc; padding: 16px; border-radius: 12px; margin-top: 18px; }
-        .footer { margin-top: 48px; border-top: 1px solid #e2e8f0; padding-top: 18px; font-size: 12px; color: #64748b; }
+        .level4-raw { white-space: pre-wrap; font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', monospace; font-size: 11px; background: #0f172a; color: #f8fafc; padding: 16px; border-radius: 12px; margin-top: 18px; }
+        .footer { margin-top: 48px; border-top: 1px solid #e2e8f0; padding-top: 18px; font-size: 11px; color: #64748b; }
         @media print {
           body { background: #ffffff; padding: 0; }
           .page-container { box-shadow: none; border-radius: 0; margin: 0; padding: 32px; }
@@ -1398,12 +1398,12 @@ export const generateQuotePDF = async (
         const renderRackLayout = (title: string, partNumber: string | undefined, slots: any[]) => {
           rackConfigHTML += `
             <div style="margin-top: 30px; margin-bottom: 30px; background: #f8fafc; padding: 24px; border-radius: 16px; border: 1px solid #e2e8f0; box-shadow: 0 12px 32px -18px rgba(15,23,42,0.25);">
-              <h3 style="color: #0f172a; margin-top: 0; font-size: 18px; font-weight: 600;">${title}${partNumber ? ` · ${partNumber}` : ''}</h3>
+              <h3 style="color: #0f172a; margin-top: 0; font-size: 16px; font-weight: 600;">${title}${partNumber ? ` · ${partNumber}` : ''}</h3>
               <div style="margin-top: 18px;">`;
 
           if (Array.isArray(slots) && slots.length > 0) {
             rackConfigHTML += '<table style="width: 100%; border-collapse: collapse; margin-top: 12px; background: #ffffff; border-radius: 12px; overflow: hidden; border: 1px solid #e2e8f0;">';
-            rackConfigHTML += '<thead><tr style="background: #0f172a; color: #f8fafc;"><th style="padding: 12px; border-bottom: 1px solid #1f2937; text-align: left; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase;">Slot</th><th style="padding: 12px; border-bottom: 1px solid #1f2937; text-align: left; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase;">Card Type</th><th style="padding: 12px; border-bottom: 1px solid #1f2937; text-align: left; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase;">Part Number</th></tr></thead>';
+            rackConfigHTML += '<thead><tr style="background: #0f172a; color: #f8fafc;"><th style="padding: 12px; border-bottom: 1px solid #1f2937; text-align: left; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase;">Slot</th><th style="padding: 12px; border-bottom: 1px solid #1f2937; text-align: left; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase;">Card Type</th><th style="padding: 12px; border-bottom: 1px solid #1f2937; text-align: left; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase;">Part Number</th></tr></thead>';
             rackConfigHTML += '<tbody>';
 
             slots.forEach((slot: any, idx: number) => {
@@ -1415,7 +1415,7 @@ export const generateQuotePDF = async (
                 <tr style="${rowStyle}">
                   <td style="padding: 12px; border-bottom: 1px solid #e2e8f0; font-weight: 600; color: #0f172a;">Slot ${slotNumber}</td>
                   <td style="padding: 12px; border-bottom: 1px solid #e2e8f0; color: #0f172a;">${cardName}</td>
-                  <td style="padding: 12px; border-bottom: 1px solid #e2e8f0; font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', monospace; font-size: 12px; color: #0f172a;">${slotPartNumber}</td>
+                  <td style="padding: 12px; border-bottom: 1px solid #e2e8f0; font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', monospace; font-size: 11px; color: #0f172a;">${slotPartNumber}</td>
                 </tr>`;
             });
 
@@ -1445,8 +1445,8 @@ export const generateQuotePDF = async (
         if (quoteInfo.draft_bom?.rackConfiguration) {
           rackConfigHTML += `
             <div style="margin-top: 30px; margin-bottom: 30px; background: #f8fafc; padding: 24px; border-radius: 16px; border: 1px solid #e2e8f0;">
-              <h3 style="color: #0f172a; margin-top: 0; font-size: 18px; font-weight: 600;">Draft Rack Configuration</h3>
-              <pre style="white-space: pre-wrap; font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', monospace; font-size: 12px; background: #0f172a; color: #f8fafc; padding: 16px; border-radius: 12px; overflow-x: auto;">${JSON.stringify(quoteInfo.draft_bom.rackConfiguration, null, 2)}</pre>
+              <h3 style="color: #0f172a; margin-top: 0; font-size: 16px; font-weight: 600;">Draft Rack Configuration</h3>
+              <pre style="white-space: pre-wrap; font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', monospace; font-size: 11px; background: #0f172a; color: #f8fafc; padding: 16px; border-radius: 12px; overflow-x: auto;">${JSON.stringify(quoteInfo.draft_bom.rackConfiguration, null, 2)}</pre>
             </div>`;
         }
         
@@ -1461,7 +1461,7 @@ export const generateQuotePDF = async (
       ${termsAndConditions ? `
         <div style="page-break-before: always; margin-top: 40px;">
           <h2 style="color: #0f172a; border-bottom: 1px solid #e2e8f0; padding-bottom: 12px;">Terms & Conditions</h2>
-          <div style="background: #f8fafc; padding: 24px; border-radius: 16px; border: 1px solid #e2e8f0; margin-bottom: 20px; white-space: pre-wrap; font-size: 12px; line-height: 1.6; color: #475569;">
+          <div style="background: #f8fafc; padding: 24px; border-radius: 16px; border: 1px solid #e2e8f0; margin-bottom: 20px; white-space: pre-wrap; font-size: 11px; line-height: 1.55; color: #475569;">
             ${termsAndConditions}
           </div>
         </div>
