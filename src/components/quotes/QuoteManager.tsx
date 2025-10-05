@@ -11,6 +11,7 @@ import { useQuotes } from "@/hooks/useQuotes";
 import { toast } from "@/hooks/use-toast";
 import { QuoteShareDialog } from './QuoteShareDialog';
 import { supabase } from "@/integrations/supabase/client";
+import { cloneQuoteWithFallback } from "@/utils/cloneQuote";
 import {
   deserializeSlotAssignments,
   buildRackLayoutFromAssignments,
@@ -467,19 +468,10 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
     try {
       const actualQuoteId = quote.displayId || quote.id;
 
-      const { data: newQuoteId, error } = await supabase
-        .rpc('clone_quote', {
-          source_quote_id: actualQuoteId,
-          new_user_id: user.id
-        });
-
-      if (error) {
-        throw new Error(error.message);
-      }
-
-      if (!newQuoteId || typeof newQuoteId !== 'string') {
-        throw new Error('Clone operation did not return a new quote ID.');
-      }
+      const newQuoteId = await cloneQuoteWithFallback(actualQuoteId, user.id, {
+        newUserEmail: user.email,
+        newUserName: user.name,
+      });
 
       const { data: clonedQuote, error: clonedQuoteError } = await supabase
         .from('quotes')
