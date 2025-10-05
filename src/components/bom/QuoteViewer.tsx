@@ -15,6 +15,7 @@ import {
   buildRackLayoutFromAssignments,
   type SerializedSlotAssignment,
 } from '@/utils/slotAssignmentUtils';
+import { cloneQuoteWithFallback } from '@/utils/cloneQuote';
 
 interface Quote {
   id: string;
@@ -302,23 +303,18 @@ const QuoteViewer: React.FC = () => {
     }
 
     try {
-      const { data: newQuoteId, error } = await supabase
-        .rpc('clone_quote', {
-          source_quote_id: quote.id,
-          new_user_id: user.id
-        });
-
-      if (error) {
-        throw new Error(error.message);
-      }
+      const newQuoteId = await cloneQuoteWithFallback(quote.id, user.id, {
+        newUserEmail: user.email,
+        newUserName: user.name,
+      });
 
       toast({
         title: 'Quote Cloned',
         description: `Successfully created new draft quote ${newQuoteId}`,
       });
 
-      // Navigate to the new cloned quote in edit mode
-      navigate(`/quote/${newQuoteId}?mode=edit`);
+      // Navigate to the BOM builder for the newly cloned quote
+      navigate(`/bom-edit/${newQuoteId}`);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to clone quote';
       toast({
