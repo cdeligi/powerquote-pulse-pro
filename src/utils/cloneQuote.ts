@@ -1,10 +1,24 @@
 import { supabase } from '@/integrations/supabase/client';
+import type { Database } from '@/integrations/supabase/types';
+
+type QuoteRow = Database['public']['Tables']['quotes']['Row'];
+type BomItemRow = Database['public']['Tables']['bom_items']['Row'];
+type BomLevel4Row = Database['public']['Tables']['bom_level4_values']['Row'];
+type ProfileRow = Database['public']['Tables']['profiles']['Row'];
 
 const SCHEMA_CACHE_ERROR_FRAGMENT = 'schema cache';
+const LEGACY_NOT_FOUND_FRAGMENT = 'Could not find the function public.clone_quote(';
+const AMBIGUOUS_COLUMN_FRAGMENT = 'column reference "source_quote_id" is ambiguous';
+
+interface CloneQuoteOptions {
+  newUserEmail?: string;
+  newUserName?: string;
+}
 
 export async function cloneQuoteWithFallback(
   sourceQuoteId: string,
-  newUserId: string
+  newUserId: string,
+  options?: CloneQuoteOptions
 ): Promise<string> {
   const firstAttempt = await supabase.rpc('clone_quote', {
     p_source_quote_id: sourceQuoteId,
@@ -12,32 +26,295 @@ export async function cloneQuoteWithFallback(
   });
 
   if (!firstAttempt.error) {
-    if (typeof firstAttempt.data === 'string' && firstAttempt.data.length > 0) {
-      return firstAttempt.data;
+    return ensureQuoteId(firstAttempt.data);
+  }
+
+  const firstMessage = firstAttempt.error.message || '';
+  const needsLegacyRetry =
+    firstMessage.includes(SCHEMA_CACHE_ERROR_FRAGMENT) ||
+    firstMessage.includes(LEGACY_NOT_FOUND_FRAGMENT);
+
+  if (needsLegacyRetry) {
+    const legacyAttempt = await supabase.rpc('clone_quote', {
+      source_quote_id: sourceQuoteId,
+      new_user_id: newUserId,
+    });
+
+    if (!legacyAttempt.error) {
+      return ensureQuoteId(legacyAttempt.data);
     }
 
-    throw new Error('Clone operation did not return a new quote ID.');
+    const legacyMessage = legacyAttempt.error.message || '';
+    if (!shouldFallbackToClientClone(legacyMessage)) {
+      throw new Error(legacyMessage || 'Failed to clone quote');
+    }
+
+    return cloneQuoteClientSide(sourceQuoteId, newUserId, options);
   }
 
-  const message = firstAttempt.error.message || '';
-  const shouldRetryWithLegacyParams = message.includes(SCHEMA_CACHE_ERROR_FRAGMENT);
-
-  if (!shouldRetryWithLegacyParams) {
-    throw new Error(message || 'Failed to clone quote');
+  if (shouldFallbackToClientClone(firstMessage)) {
+    return cloneQuoteClientSide(sourceQuoteId, newUserId, options);
   }
 
-  const fallbackAttempt = await supabase.rpc('clone_quote', {
-    source_quote_id: sourceQuoteId,
-    new_user_id: newUserId,
-  });
+  throw new Error(firstMessage || 'Failed to clone quote');
+}
 
-  if (fallbackAttempt.error) {
-    throw new Error(fallbackAttempt.error.message || 'Failed to clone quote');
-  }
-
-  if (typeof fallbackAttempt.data === 'string' && fallbackAttempt.data.length > 0) {
-    return fallbackAttempt.data;
+function ensureQuoteId(result: unknown): string {
+  if (typeof result === 'string' && result.length > 0) {
+    return result;
   }
 
   throw new Error('Clone operation did not return a new quote ID.');
+}
+
+function shouldFallbackToClientClone(message: string): boolean {
+  if (!message) return false;
+  return (
+    message.includes(AMBIGUOUS_COLUMN_FRAGMENT) ||
+    message.includes(LEGACY_NOT_FOUND_FRAGMENT)
+  );
+}
+
+async function resolveUserIdentity(
+  newUserId: string,
+  options?: CloneQuoteOptions
+): Promise<{ email: string; name: string }> {
+  const resolved: { email?: string; name?: string } = {
+    email: options?.newUserEmail,
+    name: options?.newUserName,
+  };
+
+  if (resolved.email && resolved.name) {
+    return { email: resolved.email, name: resolved.name };
+  }
+
+  const { data: profileData, error } = await supabase
+    .from('profiles')
+    .select('email, first_name, last_name')
+    .eq('id', newUserId)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error('Failed to load user information for the clone operation.');
+  }
+
+  const profile = profileData as (Pick<ProfileRow, 'email'> & {
+    first_name: string | null;
+    last_name: string | null;
+  }) | null;
+
+  if (profile) {
+    if (!resolved.email) {
+      resolved.email = profile.email ?? undefined;
+    }
+
+    if (!resolved.name) {
+      const first = profile.first_name?.trim() ?? '';
+      const last = profile.last_name?.trim() ?? '';
+      const combined = `${first} ${last}`.trim();
+      resolved.name = combined || profile.email || undefined;
+    }
+  }
+
+  if (!resolved.email) {
+    throw new Error('Unable to determine the user email required to clone the quote.');
+  }
+
+  const finalName = resolved.name ?? resolved.email;
+
+  return { email: resolved.email, name: finalName };
+}
+
+async function cloneQuoteClientSide(
+  sourceQuoteId: string,
+  newUserId: string,
+  options?: CloneQuoteOptions
+): Promise<string> {
+  const identity = await resolveUserIdentity(newUserId, options);
+
+  const { data: sourceQuoteData, error: sourceQuoteError } = await supabase
+    .from('quotes')
+    .select('*')
+    .eq('id', sourceQuoteId)
+    .maybeSingle();
+
+  if (sourceQuoteError) {
+    throw new Error(sourceQuoteError.message || 'Failed to load the source quote.');
+  }
+
+  const sourceQuote = sourceQuoteData as QuoteRow | null;
+
+  if (!sourceQuote) {
+    throw new Error('Source quote not found.');
+  }
+
+  const { data: newQuoteId, error: generateIdError } = await supabase.rpc('generate_quote_id', {
+    user_email: identity.email,
+    is_draft: true,
+  });
+
+  if (generateIdError || !newQuoteId || typeof newQuoteId !== 'string') {
+    throw new Error(generateIdError?.message || 'Failed to generate a new draft quote ID.');
+  }
+
+  const newQuotePayload: Database['public']['Tables']['quotes']['Insert'] = {
+    id: newQuoteId,
+    user_id: newUserId,
+    customer_name: sourceQuote.customer_name,
+    oracle_customer_id: sourceQuote.oracle_customer_id,
+    sfdc_opportunity: sourceQuote.sfdc_opportunity,
+    priority: sourceQuote.priority ?? 'Medium',
+    shipping_terms: sourceQuote.shipping_terms ?? 'TBD',
+    payment_terms: sourceQuote.payment_terms ?? 'TBD',
+    currency: sourceQuote.currency ?? 'USD',
+    is_rep_involved: sourceQuote.is_rep_involved,
+    status: 'draft',
+    quote_fields: (sourceQuote.quote_fields ?? null) as QuoteRow['quote_fields'],
+    draft_bom: (sourceQuote.draft_bom ?? null) as QuoteRow['draft_bom'],
+    source_quote_id: sourceQuoteId,
+    app_version: sourceQuote.app_version ?? '1.0.0',
+    original_quote_value: sourceQuote.original_quote_value ?? 0,
+    discounted_value: sourceQuote.discounted_value ?? 0,
+    total_cost: sourceQuote.total_cost ?? 0,
+    requested_discount: sourceQuote.requested_discount ?? 0,
+    original_margin: sourceQuote.original_margin ?? 0,
+    discounted_margin: sourceQuote.discounted_margin ?? 0,
+    gross_profit: sourceQuote.gross_profit ?? 0,
+    submitted_by_email: identity.email,
+    submitted_by_name: identity.name,
+    discount_justification: sourceQuote.discount_justification ?? null,
+    requires_finance_approval: sourceQuote.requires_finance_approval ?? null,
+    updated_at: new Date().toISOString(),
+  };
+
+  let insertedBomItems: { id: string }[] = [];
+
+  try {
+    const { error: insertQuoteError } = await supabase
+      .from('quotes')
+      .insert(newQuotePayload);
+
+    if (insertQuoteError) {
+      throw new Error(insertQuoteError.message || 'Failed to create the cloned quote.');
+    }
+
+    const { data: sourceBomItemsData, error: sourceBomError } = await supabase
+      .from('bom_items')
+      .select('*')
+      .eq('quote_id', sourceQuoteId);
+
+    if (sourceBomError) {
+      throw new Error(sourceBomError.message || 'Failed to load BOM items from the source quote.');
+    }
+
+    const sourceBomItems = (sourceBomItemsData ?? []) as BomItemRow[];
+
+    if (sourceBomItems && sourceBomItems.length > 0) {
+      const bomInsertPayload = sourceBomItems.map((item) => ({
+        quote_id: newQuoteId,
+        product_id: item.product_id,
+        name: item.name,
+        description: item.description ?? null,
+        part_number: item.part_number ?? null,
+        quantity: item.quantity,
+        unit_price: item.unit_price,
+        unit_cost: item.unit_cost,
+        total_price: item.total_price,
+        total_cost: item.total_cost,
+        margin: item.margin,
+        product_type: item.product_type ?? null,
+        configuration_data: item.configuration_data ?? null,
+        approved_unit_price: item.approved_unit_price ?? null,
+        original_unit_price: item.original_unit_price ?? null,
+        price_adjustment_history: item.price_adjustment_history ?? null,
+        parent_quote_item_id: item.parent_quote_item_id ?? null,
+      })) satisfies Database['public']['Tables']['bom_items']['Insert'][];
+
+      const { data: insertedBomRows, error: insertBomError } = await supabase
+        .from('bom_items')
+        .insert(bomInsertPayload)
+        .select('id');
+
+      if (insertBomError) {
+        throw new Error(insertBomError.message || 'Failed to clone BOM items.');
+      }
+
+      insertedBomItems = insertedBomRows ?? [];
+
+      const oldToNewMap = new Map<string, string>();
+      sourceBomItems.forEach((item, index) => {
+        const inserted = insertedBomRows?.[index];
+        if (inserted?.id) {
+          oldToNewMap.set(item.id, inserted.id);
+        }
+      });
+
+      const sourceBomIds = sourceBomItems.map((item) => item.id);
+      const { data: level4RowsData, error: level4Error } = await supabase
+        .from('bom_level4_values')
+        .select('*')
+        .in('bom_item_id', sourceBomIds);
+
+      if (level4Error) {
+        throw new Error(level4Error.message || 'Failed to load Level 4 configuration values.');
+      }
+
+      const level4Rows = (level4RowsData ?? []) as BomLevel4Row[];
+
+      const level4InsertPayload = level4Rows
+        .map((row) => {
+          const targetId = oldToNewMap.get(row.bom_item_id);
+          if (!targetId) return null;
+          return {
+            bom_item_id: targetId,
+            level4_config_id: row.level4_config_id,
+            entries: row.entries,
+          } as Database['public']['Tables']['bom_level4_values']['Insert'];
+        })
+        .filter((value): value is Database['public']['Tables']['bom_level4_values']['Insert'] => value !== null);
+
+      if (level4InsertPayload.length > 0) {
+        const { error: insertLevel4Error } = await supabase
+          .from('bom_level4_values')
+          .insert(level4InsertPayload);
+
+        if (insertLevel4Error) {
+          throw new Error(insertLevel4Error.message || 'Failed to clone Level 4 configuration values.');
+        }
+      }
+    }
+
+    return newQuoteId;
+  } catch (error) {
+    await cleanupFailedClone(newQuoteId, insertedBomItems);
+    throw error instanceof Error ? error : new Error('Failed to clone quote');
+  }
+}
+
+async function cleanupFailedClone(
+  newQuoteId: string,
+  insertedBomItems: { id: string }[]
+) {
+  try {
+    const bomItemIds = insertedBomItems.map((item) => item.id).filter(Boolean);
+
+    if (bomItemIds.length > 0) {
+      await supabase
+        .from('bom_level4_values')
+        .delete()
+        .in('bom_item_id', bomItemIds);
+
+      await supabase
+        .from('bom_items')
+        .delete()
+        .in('id', bomItemIds);
+    }
+
+    await supabase
+      .from('quotes')
+      .delete()
+      .eq('id', newQuoteId);
+  } catch (cleanupError) {
+    console.error('Failed to clean up after unsuccessful clone:', cleanupError);
+  }
 }

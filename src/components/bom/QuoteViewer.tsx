@@ -303,7 +303,10 @@ const QuoteViewer: React.FC = () => {
     }
 
     try {
-      const newQuoteId = await cloneQuoteWithFallback(quote.id, user.id);
+      const newQuoteId = await cloneQuoteWithFallback(quote.id, user.id, {
+        newUserEmail: user.email,
+        newUserName: user.name,
+      });
 
       toast({
         title: 'Quote Cloned',

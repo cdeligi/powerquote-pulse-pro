@@ -468,7 +468,10 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
     try {
       const actualQuoteId = quote.displayId || quote.id;
 
-      const newQuoteId = await cloneQuoteWithFallback(actualQuoteId, user.id);
+      const newQuoteId = await cloneQuoteWithFallback(actualQuoteId, user.id, {
+        newUserEmail: user.email,
+        newUserName: user.name,
+      });
 
       const { data: clonedQuote, error: clonedQuoteError } = await supabase
         .from('quotes')
