@@ -1834,7 +1834,7 @@ export type Database = {
         Returns: number
       }
       clone_quote: {
-        Args: { new_user_id: string; source_quote_id: string }
+        Args: { p_new_user_id: string; p_source_quote_id: string }
         Returns: string
       }
       create_user: {

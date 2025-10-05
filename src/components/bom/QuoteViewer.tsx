@@ -304,8 +304,8 @@ const QuoteViewer: React.FC = () => {
     try {
       const { data: newQuoteId, error } = await supabase
         .rpc('clone_quote', {
-          source_quote_id: quote.id,
-          new_user_id: user.id
+          p_source_quote_id: quote.id,
+          p_new_user_id: user.id
         });
 
       if (error) {
