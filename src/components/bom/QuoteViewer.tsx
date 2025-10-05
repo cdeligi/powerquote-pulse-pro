@@ -15,6 +15,7 @@ import {
   buildRackLayoutFromAssignments,
   type SerializedSlotAssignment,
 } from '@/utils/slotAssignmentUtils';
+import { cloneQuoteWithFallback } from '@/utils/cloneQuote';
 
 interface Quote {
   id: string;
@@ -302,15 +303,7 @@ const QuoteViewer: React.FC = () => {
     }
 
     try {
-      const { data: newQuoteId, error } = await supabase
-        .rpc('clone_quote', {
-          p_source_quote_id: quote.id,
-          p_new_user_id: user.id
-        });
-
-      if (error) {
-        throw new Error(error.message);
-      }
+      const newQuoteId = await cloneQuoteWithFallback(quote.id, user.id);
 
       toast({
         title: 'Quote Cloned',
