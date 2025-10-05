@@ -469,8 +469,8 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
 
       const { data: newQuoteId, error } = await supabase
         .rpc('clone_quote', {
-          source_quote_id: actualQuoteId,
-          new_user_id: user.id
+          p_source_quote_id: actualQuoteId,
+          p_new_user_id: user.id
         });
 
       if (error) {
