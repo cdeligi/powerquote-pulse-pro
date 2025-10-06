@@ -902,8 +902,13 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
                         </Badge>
                       </div>
                       <p className="text-gray-400 text-sm mt-1">
-                        Account: {quote.account || '—'}
+                        Quote ID: {actualQuoteId}
                       </p>
+                      {quote.account && (
+                        <p className="text-gray-400 text-sm">
+                          Account: {quote.account}
+                        </p>
+                      )}
                     </div>
                     
                     <div className="text-right">
