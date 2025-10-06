@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import type { PostgrestError } from '@supabase/supabase-js';
 import { getSupabaseClient, getSupabaseAdminClient } from "@/integrations/supabase/client";
+import { normalizeQuoteId, persistNormalizedQuoteId } from '@/utils/quoteIdGenerator';
 
 const supabase = getSupabaseClient();
 const supabaseAdmin = getSupabaseAdminClient();
@@ -159,9 +160,33 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
     console.log(`Processing ${action} for quote ${quoteId} with notes:`, notes);
     setActionLoading(prev => ({ ...prev, [quoteId]: true }));
 
+    let targetQuoteId = quoteId;
+
     try {
       const client = supabaseAdmin ?? supabase;
       const quote = quotes.find(q => q.id === quoteId);
+
+      if (action === 'approve' && quote) {
+        const normalizedQuoteId = normalizeQuoteId(quote.id);
+
+        if (normalizedQuoteId && normalizedQuoteId !== quote.id) {
+          await persistNormalizedQuoteId(quote.id, normalizedQuoteId, client);
+          targetQuoteId = normalizedQuoteId;
+
+          setQuotes(prevQuotes => prevQuotes.map(current => (
+            current.id === quoteId
+              ? { ...current, id: normalizedQuoteId }
+              : current
+          )));
+
+          setActionLoading(prev => {
+            const updated = { ...prev };
+            delete updated[quoteId];
+            updated[normalizedQuoteId] = true;
+            return updated;
+          });
+        }
+      }
 
       const appliedDiscount =
         typeof approvedDiscount === 'number'
@@ -217,7 +242,7 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
       const { error: quoteError } = await client
         .from('quotes')
         .update(updates)
-        .eq('id', quoteId);
+        .eq('id', targetQuoteId);
 
       if (quoteError) throw quoteError;
 
@@ -248,7 +273,7 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
 
           if (bomError) {
             bomUpdateError = bomError;
-            console.error('Error updating BOM items for quote', quoteId, bomError);
+            console.error('Error updating BOM items for quote', targetQuoteId, bomError);
           }
         }
       }
@@ -261,7 +286,7 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
       });
 
       const refreshedQuotes = await fetchData();
-      const refreshedQuote = refreshedQuotes.find(q => q.id === quoteId);
+      const refreshedQuote = refreshedQuotes.find(q => q.id === targetQuoteId);
       if (refreshedQuote) {
         setSelectedQuote(refreshedQuote);
       }
@@ -274,7 +299,13 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
         variant: "destructive",
       });
     } finally {
-      setActionLoading(prev => ({ ...prev, [quoteId]: false }));
+      setActionLoading(prev => {
+        const updated = { ...prev, [targetQuoteId]: false };
+        if (targetQuoteId !== quoteId) {
+          delete updated[quoteId];
+        }
+        return updated;
+      });
     }
   };
 
