@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { generateUniqueDraftName } from '@/utils/draftName';
 import type { Database } from '@/integrations/supabase/types';
 
 type QuoteRow = Database['public']['Tables']['quotes']['Row'];
@@ -157,10 +158,52 @@ async function cloneQuoteClientSide(
     throw new Error(generateIdError?.message || 'Failed to generate a new draft quote ID.');
   }
 
+  const customerName =
+    sourceQuote.status === 'draft'
+      ? await generateUniqueDraftName(newUserId, identity.email)
+      : sourceQuote.customer_name;
+
+  const clonedQuoteFields = (() => {
+    const original = sourceQuote.quote_fields;
+    if (!original || typeof original !== 'object') {
+      return original;
+    }
+
+    return {
+      ...(original as Record<string, unknown>),
+      customer_name: customerName,
+    } as QuoteRow['quote_fields'];
+  })();
+
+  const clonedDraftBom = (() => {
+    const original = sourceQuote.draft_bom;
+    if (!original || typeof original !== 'object') {
+      return original;
+    }
+
+    const cloned = {
+      ...(original as Record<string, unknown>),
+    } as Record<string, unknown>;
+
+    const existingQuoteFields = cloned.quoteFields;
+    if (existingQuoteFields && typeof existingQuoteFields === 'object') {
+      cloned.quoteFields = {
+        ...(existingQuoteFields as Record<string, unknown>),
+        customer_name: customerName,
+      };
+    } else {
+      cloned.quoteFields = { customer_name: customerName };
+    }
+
+    cloned.draftName = customerName;
+
+    return cloned as QuoteRow['draft_bom'];
+  })();
+
   const newQuotePayload: Database['public']['Tables']['quotes']['Insert'] = {
     id: newQuoteId,
     user_id: newUserId,
-    customer_name: sourceQuote.customer_name,
+    customer_name: customerName,
     oracle_customer_id: sourceQuote.oracle_customer_id,
     sfdc_opportunity: sourceQuote.sfdc_opportunity,
     priority: sourceQuote.priority ?? 'Medium',
@@ -169,8 +212,8 @@ async function cloneQuoteClientSide(
     currency: sourceQuote.currency ?? 'USD',
     is_rep_involved: sourceQuote.is_rep_involved,
     status: 'draft',
-    quote_fields: (sourceQuote.quote_fields ?? null) as QuoteRow['quote_fields'],
-    draft_bom: (sourceQuote.draft_bom ?? null) as QuoteRow['draft_bom'],
+    quote_fields: clonedQuoteFields,
+    draft_bom: (clonedDraftBom ?? null) as QuoteRow['draft_bom'],
     source_quote_id: sourceQuoteId,
     app_version: sourceQuote.app_version ?? '1.0.0',
     original_quote_value: sourceQuote.original_quote_value ?? 0,
