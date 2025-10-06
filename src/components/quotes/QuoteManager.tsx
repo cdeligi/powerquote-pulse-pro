@@ -55,6 +55,75 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
     const currency = quote.currency || 'USD';
     const isDraftQuote = quote.status === 'draft';
 
+    const quoteFields = (quote.quote_fields && typeof quote.quote_fields === 'object')
+      ? quote.quote_fields as Record<string, unknown>
+      : {};
+
+    const draftQuoteFields = (() => {
+      if (!quote.draft_bom || typeof quote.draft_bom !== 'object') {
+        return {} as Record<string, unknown>;
+      }
+
+      const rawFields = (quote.draft_bom as Record<string, unknown>).quoteFields;
+      if (rawFields && typeof rawFields === 'object' && !Array.isArray(rawFields)) {
+        return rawFields as Record<string, unknown>;
+      }
+
+      return {} as Record<string, unknown>;
+    })();
+
+    const combinedFields = { ...draftQuoteFields, ...quoteFields };
+
+    const getFieldAsString = (...keys: string[]): string | undefined => {
+      for (const key of keys) {
+        const value = combinedFields[key];
+        if (typeof value === 'string') {
+          const trimmed = value.trim();
+          if (trimmed.length > 0) {
+            return trimmed;
+          }
+        }
+        if (typeof value === 'number' && Number.isFinite(value)) {
+          return String(value);
+        }
+      }
+      return undefined;
+    };
+
+    const normalizedDraftName = typeof quote.customer_name === 'string' && quote.customer_name.trim().length > 0
+      ? quote.customer_name.trim()
+      : undefined;
+
+    const configuredQuoteName = getFieldAsString('quote_name', 'quoteName', 'name');
+    const configuredCustomerName = getFieldAsString('customer_name', 'customerName', 'customer');
+    const configuredAccount = getFieldAsString(
+      'account',
+      'Account',
+      'account_id',
+      'accountId',
+      'accountID',
+      'account_name',
+      'accountName',
+      'account_number',
+      'accountNumber',
+      'customer_account',
+      'customerAccount',
+      'customer_account_name',
+      'customerAccountName',
+      'customer_account_number',
+      'customerAccountNumber'
+    );
+
+    const inferredAccountFromCustomer = configuredCustomerName && normalizedDraftName && configuredCustomerName !== normalizedDraftName
+      ? configuredCustomerName
+      : undefined;
+
+    const accountValue = configuredAccount || inferredAccountFromCustomer || null;
+
+    const primaryCustomerLabel = isDraftQuote
+      ? (configuredQuoteName || normalizedDraftName || configuredCustomerName || quote.id)
+      : (configuredCustomerName || normalizedDraftName || configuredQuoteName || quote.id);
+
     const originalValue = isDraftQuote && quote.draft_bom?.items
       ? quote.draft_bom.items.reduce((sum: number, item: any) =>
           sum + ((item.unit_price || item.total_price || item.product?.price || 0) * (item.quantity || 1)), 0)
@@ -92,9 +161,10 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
     return {
       id: quote.id, // Use unique ID for React key
       displayId: quote.id, // Keep original ID for operations
-      displayLabel: isDraftQuote ? 'Draft' : quote.id, // Label to show in UI
-      customer: quote.customer_name || 'Unnamed Customer',
+      displayLabel: primaryCustomerLabel,
+      customer: primaryCustomerLabel,
       oracleCustomerId: quote.oracle_customer_id || 'N/A',
+      account: accountValue,
       currency,
       value: originalValue,
       finalValue,
@@ -182,9 +252,12 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
   };
 
   const filteredQuotes = processedQuotes.filter(quote => {
-    const matchesSearch = quote.customer.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         quote.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         quote.oracleCustomerId.toLowerCase().includes(searchTerm.toLowerCase());
+    const lowerSearch = searchTerm.toLowerCase();
+    const matchesSearch = quote.customer.toLowerCase().includes(lowerSearch) ||
+                         quote.id.toLowerCase().includes(lowerSearch) ||
+                         quote.oracleCustomerId.toLowerCase().includes(lowerSearch) ||
+                         (quote.displayLabel?.toLowerCase().includes(lowerSearch)) ||
+                         (quote.account ? quote.account.toLowerCase().includes(lowerSearch) : false);
     const matchesPriority = priorityFilter === 'All' || 
                            (priorityFilter === 'Draft' && quote.status === 'draft') ||
                            (priorityFilter !== 'Draft' && quote.priority === priorityFilter);
@@ -828,10 +901,9 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
                           {statusBadge.text}
                         </Badge>
                       </div>
-                      {quote.status !== 'draft' && (
-                        <p className="text-gray-400 text-sm mt-1">{quote.customer}</p>
-                      )}
-                      <p className="text-gray-500 text-xs">Oracle: {quote.oracleCustomerId}</p>
+                      <p className="text-gray-400 text-sm mt-1">
+                        Account: {quote.account || '—'}
+                      </p>
                     </div>
                     
                     <div className="text-right">
