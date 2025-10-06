@@ -59,11 +59,17 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
       ? quote.quote_fields as Record<string, unknown>
       : {};
 
-    const getStringField = (...keys: string[]): string | undefined => {
+    const getFieldAsString = (...keys: string[]): string | undefined => {
       for (const key of keys) {
         const value = quoteFields[key];
-        if (typeof value === 'string' && value.trim().length > 0) {
-          return value.trim();
+        if (typeof value === 'string') {
+          const trimmed = value.trim();
+          if (trimmed.length > 0) {
+            return trimmed;
+          }
+        }
+        if (typeof value === 'number' && Number.isFinite(value)) {
+          return String(value);
         }
       }
       return undefined;
@@ -73,15 +79,29 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
       ? quote.customer_name.trim()
       : undefined;
 
-    const configuredQuoteName = getStringField('quote_name', 'quoteName', 'name');
-    const configuredCustomerName = getStringField('customer_name', 'customerName', 'customer');
-    const configuredAccount = getStringField(
+    const configuredQuoteName = getFieldAsString('quote_name', 'quoteName', 'name');
+    const configuredCustomerName = getFieldAsString('customer_name', 'customerName', 'customer');
+    const configuredAccount = getFieldAsString(
       'account',
       'account_name',
       'accountName',
       'customer_account_name',
-      'customerAccountName'
+      'customerAccountName',
+      'account_number',
+      'accountNumber',
+      'customer_account_number',
+      'customerAccountNumber'
     );
+
+    const inferredAccountFromCustomer = configuredCustomerName && normalizedDraftName && configuredCustomerName !== normalizedDraftName
+      ? configuredCustomerName
+      : undefined;
+
+    const accountValue = configuredAccount || inferredAccountFromCustomer || null;
+
+    const primaryCustomerLabel = isDraftQuote
+      ? (normalizedDraftName || configuredQuoteName || configuredCustomerName || quote.id)
+      : (configuredCustomerName || normalizedDraftName || configuredQuoteName || quote.id);
 
     const originalValue = isDraftQuote && quote.draft_bom?.items
       ? quote.draft_bom.items.reduce((sum: number, item: any) =>
@@ -120,12 +140,10 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
     return {
       id: quote.id, // Use unique ID for React key
       displayId: quote.id, // Keep original ID for operations
-      displayLabel: isDraftQuote
-        ? (configuredCustomerName || normalizedDraftName || configuredQuoteName || quote.id)
-        : (configuredQuoteName || normalizedDraftName || configuredCustomerName || quote.id),
-      customer: configuredCustomerName || quote.customer_name || 'Unnamed Customer',
+      displayLabel: primaryCustomerLabel,
+      customer: primaryCustomerLabel,
       oracleCustomerId: quote.oracle_customer_id || 'N/A',
-      account: configuredAccount || null,
+      account: accountValue,
       currency,
       value: originalValue,
       finalValue,
@@ -864,9 +882,6 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
                       </div>
                       <p className="text-gray-400 text-sm mt-1">
                         Account: {quote.account || '—'}
-                      </p>
-                      <p className="text-gray-400 text-sm">
-                        Customer: {quote.customer}
                       </p>
                     </div>
                     
