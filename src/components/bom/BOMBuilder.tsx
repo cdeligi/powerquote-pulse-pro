@@ -24,7 +24,7 @@ import QuoteFieldsSection from './QuoteFieldsSection';
 import { toast } from '@/components/ui/use-toast';
 import { getSupabaseClient, getSupabaseAdminClient, isAdminAvailable } from "@/integrations/supabase/client";
 import { generateUniqueDraftName } from '@/utils/draftName';
-import { normalizeQuoteId } from '@/utils/quoteIdGenerator';
+import { generateSubmittedQuoteId, normalizeQuoteId, persistNormalizedQuoteId } from '@/utils/quoteIdGenerator';
 import QTMSConfigurationEditor from './QTMSConfigurationEditor';
 import { consolidateQTMSConfiguration, createQTMSBOMItem, ConsolidatedQTMS, QTMSConfiguration } from '@/utils/qtmsConsolidation';
 import { buildQTMSPartNumber } from '@/utils/qtmsPartNumberBuilder';
@@ -2564,45 +2564,25 @@ main
     setIsSubmitting(true);
 
     try {
-      // Generate or finalize quote ID based on whether we're submitting a draft
+      if (!user?.email || !user?.id) {
+        throw new Error('A valid user account is required to submit a quote.');
+      }
+
       let quoteId: string;
       let isSubmittingExistingDraft = false;
-      
+
+      const generatedQuoteId = await generateSubmittedQuoteId(user.email, user.id);
+      const normalizedQuoteId = normalizeQuoteId(generatedQuoteId);
+
+      if (!normalizedQuoteId) {
+        throw new Error('Failed to generate a valid quote ID.');
+      }
+
+      quoteId = normalizedQuoteId;
+
       if (currentQuoteId && currentQuoteId.includes('-Draft')) {
-        // We're submitting an existing draft - finalize the ID
-        const { data: finalizedId, error: finalizeError } = await supabase
-          .rpc('finalize_draft_quote_id', { draft_quote_id: currentQuoteId });
-
-        if (finalizeError) {
-          console.error('Error finalizing draft quote ID:', finalizeError);
-          throw finalizeError;
-        }
-
-        const normalizedFinalId = normalizeQuoteId(finalizedId);
-
-        if (!normalizedFinalId) {
-          throw new Error('Failed to normalize finalized quote ID.');
-        }
-
-        quoteId = normalizedFinalId;
         isSubmittingExistingDraft = true;
-      } else {
-        // Generate new quote ID for final submission
-        const { data: newQuoteId, error: generateError } = await supabase
-          .rpc('generate_quote_id', { user_email: user.email, is_draft: false });
-
-        if (generateError) {
-          console.error('Error generating quote ID:', generateError);
-          throw generateError;
-        }
-
-        const normalizedQuoteId = normalizeQuoteId(newQuoteId);
-
-        if (!normalizedQuoteId) {
-          throw new Error('Failed to normalize generated quote ID.');
-        }
-
-        quoteId = normalizedQuoteId;
+        await persistNormalizedQuoteId(currentQuoteId, quoteId);
       }
 
       const customerNameValue = getStringFieldValue('customer_name', 'Unnamed Customer');
@@ -2663,7 +2643,7 @@ main
             quote_fields: quoteFields,
             updated_at: new Date().toISOString()
           })
-          .eq('id', currentQuoteId);
+          .eq('id', quoteId);
         quoteError = error;
       } else {
         // Insert new quote
@@ -2710,23 +2690,7 @@ main
         return;
       }
 
-      if (isSubmittingExistingDraft) {
-        // Update existing BOM items with new quote ID
-        const { error: updateBomError } = await supabase
-          .from('bom_items')
-          .update({ quote_id: quoteId })
-          .eq('quote_id', currentQuoteId);
-        
-        if (updateBomError) {
-          console.error('SUPABASE BOM UPDATE ERROR:', updateBomError);
-          toast({
-            title: 'BOM Update Error',
-            description: updateBomError.message || 'Failed to update BOM items',
-            variant: 'destructive',
-          });
-          throw updateBomError;
-        }
-      } else {
+      if (!isSubmittingExistingDraft) {
         // Insert new BOM items
         for (const item of bomItems) {
           const serializedAssignments = item.slotAssignments
