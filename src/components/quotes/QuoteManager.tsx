@@ -59,9 +59,24 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
       ? quote.quote_fields as Record<string, unknown>
       : {};
 
+    const draftQuoteFields = (() => {
+      if (!quote.draft_bom || typeof quote.draft_bom !== 'object') {
+        return {} as Record<string, unknown>;
+      }
+
+      const rawFields = (quote.draft_bom as Record<string, unknown>).quoteFields;
+      if (rawFields && typeof rawFields === 'object' && !Array.isArray(rawFields)) {
+        return rawFields as Record<string, unknown>;
+      }
+
+      return {} as Record<string, unknown>;
+    })();
+
+    const combinedFields = { ...draftQuoteFields, ...quoteFields };
+
     const getFieldAsString = (...keys: string[]): string | undefined => {
       for (const key of keys) {
-        const value = quoteFields[key];
+        const value = combinedFields[key];
         if (typeof value === 'string') {
           const trimmed = value.trim();
           if (trimmed.length > 0) {
@@ -83,12 +98,18 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
     const configuredCustomerName = getFieldAsString('customer_name', 'customerName', 'customer');
     const configuredAccount = getFieldAsString(
       'account',
+      'Account',
+      'account_id',
+      'accountId',
+      'accountID',
       'account_name',
       'accountName',
-      'customer_account_name',
-      'customerAccountName',
       'account_number',
       'accountNumber',
+      'customer_account',
+      'customerAccount',
+      'customer_account_name',
+      'customerAccountName',
       'customer_account_number',
       'customerAccountNumber'
     );
@@ -100,7 +121,7 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
     const accountValue = configuredAccount || inferredAccountFromCustomer || null;
 
     const primaryCustomerLabel = isDraftQuote
-      ? (normalizedDraftName || configuredQuoteName || configuredCustomerName || quote.id)
+      ? (configuredQuoteName || normalizedDraftName || configuredCustomerName || quote.id)
       : (configuredCustomerName || normalizedDraftName || configuredQuoteName || quote.id);
 
     const originalValue = isDraftQuote && quote.draft_bom?.items
