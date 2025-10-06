@@ -1,4 +1,63 @@
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { supabase } from "@/integrations/supabase/client";
+import type { Database } from '@/integrations/supabase/types';
+
+export function normalizeQuoteId(rawId: string | null | undefined): string {
+  if (!rawId) {
+    return "";
+  }
+
+  const trimmed = rawId.trim();
+
+  if (!trimmed) {
+    return "";
+  }
+
+  const structuredMatch = trimmed.match(/^(?<user>[^-]+)-(?<prefix>[A-Za-z0-9]+)-(?<counter>\d+)(?<draft>-Draft)?$/);
+
+  if (structuredMatch?.groups?.prefix && structuredMatch.groups.counter) {
+    const { prefix, counter, draft } = structuredMatch.groups;
+    return `${prefix}-${counter}${draft ?? ""}`;
+  }
+
+  return trimmed;
+}
+
+export async function persistNormalizedQuoteId(
+  originalId: string | null | undefined,
+  normalizedId: string | null | undefined,
+  client: SupabaseClient<Database> = supabase
+): Promise<void> {
+  const oldId = typeof originalId === 'string' ? originalId.trim() : '';
+  const newId = typeof normalizedId === 'string' ? normalizedId.trim() : '';
+
+  if (!oldId || !newId || oldId === newId) {
+    return;
+  }
+
+  const { error: quoteUpdateError } = await client
+    .from('quotes')
+    .update({ id: newId })
+    .eq('id', oldId);
+
+  if (quoteUpdateError) {
+    throw quoteUpdateError;
+  }
+
+  const referenceUpdates = [
+    client.from('bom_items').update({ quote_id: newId }).eq('quote_id', oldId),
+    client.from('quote_shares').update({ quote_id: newId }).eq('quote_id', oldId),
+    client.from('admin_notifications').update({ quote_id: newId }).eq('quote_id', oldId)
+  ];
+
+  for (const updatePromise of referenceUpdates) {
+    const { error } = await updatePromise;
+
+    if (error) {
+      throw error;
+    }
+  }
+}
 
 /**
  * Generate a formatted quote ID for submitted quotes only
@@ -65,13 +124,13 @@ export const generateSubmittedQuoteId = async (userEmail: string, userId: string
       }
     }
     
-    return `${emailPrefix}-${quotePrefix}-${sequence}`;
+    return normalizeQuoteId(`${emailPrefix}-${quotePrefix}-${sequence}`);
   } catch (error) {
     console.error('Error generating submitted quote ID:', error);
     // Fallback to simple format
     const emailPrefix = userEmail.split('@')[0];
     const timestamp = Math.floor(Date.now() / 1000) % 10000;
-    return `${emailPrefix}-QLT-${timestamp}`;
+    return normalizeQuoteId(`${emailPrefix}-QLT-${timestamp}`);
   }
 };
 

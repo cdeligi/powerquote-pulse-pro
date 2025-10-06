@@ -23,6 +23,8 @@ import QuoteFieldsSection from './QuoteFieldsSection';
 
 import { toast } from '@/components/ui/use-toast';
 import { getSupabaseClient, getSupabaseAdminClient, isAdminAvailable } from "@/integrations/supabase/client";
+import { generateUniqueDraftName } from '@/utils/draftName';
+import { normalizeQuoteId } from '@/utils/quoteIdGenerator';
 import QTMSConfigurationEditor from './QTMSConfigurationEditor';
 import { consolidateQTMSConfiguration, createQTMSBOMItem, ConsolidatedQTMS, QTMSConfiguration } from '@/utils/qtmsConsolidation';
 import { buildQTMSPartNumber } from '@/utils/qtmsPartNumberBuilder';
@@ -500,38 +502,6 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
     }
   }, [quoteId]);
 
-  // Generate unique draft name function with timestamp to prevent duplicates
-  const generateUniqueDraftName = async (): Promise<string> => {
-    if (!user?.email) return 'Draft 1';
-    
-    try {
-      // Use timestamp-based approach to prevent race conditions
-      const timestamp = Date.now();
-      const timestampSuffix = timestamp.toString().slice(-6); // Last 6 digits for uniqueness
-      
-      // Count existing drafts for this user to get sequence number
-      const { count, error } = await supabase
-        .from('quotes')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', user.id)
-        .eq('status', 'draft')
-        // Exclude temporary Level 4 configuration quotes so they don't affect numbering
-        .not('id', 'like', 'TEMP-%');
-
-      if (error) {
-        console.error('Error counting drafts:', error);
-        return `Draft ${timestampSuffix}`;
-      }
-
-      const draftNumber = (count || 0) + 1;
-      return `${user.email?.split('@')[0] || 'User'} Draft ${draftNumber}`;
-    } catch (error) {
-      console.error('Error generating draft name:', error);
-      const fallback = Date.now().toString().slice(-6);
-      return `Draft ${fallback}`;
-    }
-  };
-
   const createDraftQuote = async () => {
     if (!user?.id) {
       console.error('No user ID available for draft quote creation');
@@ -551,7 +521,7 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
       const draftCustomerName =
         typeof providedCustomerName === 'string' && providedCustomerName.trim().length > 0
           ? providedCustomerName
-          : await generateUniqueDraftName();
+          : await generateUniqueDraftName(user.id, user.email);
 
       // Use simple UUID for draft quotes - no complex ID generation
       const draftQuoteId = crypto.randomUUID();
@@ -1064,7 +1034,7 @@ if (
         
         console.log('Generated new draft quote ID:', newQuoteId);
         
-        const draftName = await generateUniqueDraftName();
+        const draftName = await generateUniqueDraftName(user.id, user.email);
 
         // Calculate totals from BOM items
         const totalValue = bomItems.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
@@ -1294,7 +1264,7 @@ if (
       const draftCustomerName =
         typeof providedDraftName === 'string' && providedDraftName.trim().length > 0
           ? providedDraftName
-          : await generateUniqueDraftName();
+          : await generateUniqueDraftName(user.id, user.email);
 
       const timestampFallback = `DRAFT-${Date.now()}`;
       const resolvedOracleCustomerId = getStringFieldValue('oracle_customer_id', 'DRAFT', 'DRAFT');
@@ -2602,25 +2572,37 @@ main
         // We're submitting an existing draft - finalize the ID
         const { data: finalizedId, error: finalizeError } = await supabase
           .rpc('finalize_draft_quote_id', { draft_quote_id: currentQuoteId });
-        
+
         if (finalizeError) {
           console.error('Error finalizing draft quote ID:', finalizeError);
           throw finalizeError;
         }
-        
-        quoteId = finalizedId;
+
+        const normalizedFinalId = normalizeQuoteId(finalizedId);
+
+        if (!normalizedFinalId) {
+          throw new Error('Failed to normalize finalized quote ID.');
+        }
+
+        quoteId = normalizedFinalId;
         isSubmittingExistingDraft = true;
       } else {
         // Generate new quote ID for final submission
         const { data: newQuoteId, error: generateError } = await supabase
           .rpc('generate_quote_id', { user_email: user.email, is_draft: false });
-        
-      if (generateError) {
-        console.error('Error generating quote ID:', generateError);
-        throw generateError;
-      }
 
-      quoteId = newQuoteId;
+        if (generateError) {
+          console.error('Error generating quote ID:', generateError);
+          throw generateError;
+        }
+
+        const normalizedQuoteId = normalizeQuoteId(newQuoteId);
+
+        if (!normalizedQuoteId) {
+          throw new Error('Failed to normalize generated quote ID.');
+        }
+
+        quoteId = normalizedQuoteId;
       }
 
       const customerNameValue = getStringFieldValue('customer_name', 'Unnamed Customer');
