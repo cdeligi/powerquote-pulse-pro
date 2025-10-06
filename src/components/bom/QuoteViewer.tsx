@@ -4,10 +4,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { ArrowLeft, Edit, Copy, Download, FileText } from 'lucide-react';
+import { ArrowLeft, FileText } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
-import { useAuth } from '@/hooks/useAuth';
 import { BOMItem } from '@/types/product';
 import { EnhancedBOMDisplay } from './EnhancedBOMDisplay';
 import {
@@ -15,7 +14,6 @@ import {
   buildRackLayoutFromAssignments,
   type SerializedSlotAssignment,
 } from '@/utils/slotAssignmentUtils';
-import { cloneQuoteWithFallback } from '@/utils/cloneQuote';
 
 interface Quote {
   id: string;
@@ -50,8 +48,6 @@ const QuoteViewer: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { user } = useAuth();
-  
   const mode = searchParams.get('mode') || 'view';
   const [quote, setQuote] = useState<Quote | null>(null);
   const [bomItems, setBomItems] = useState<BOMItem[]>([]);
@@ -292,51 +288,6 @@ const QuoteViewer: React.FC = () => {
     }
   };
 
-  const handleCloneQuote = async () => {
-    if (!quote || !user?.id) {
-      toast({
-        title: 'Error',
-        description: 'Unable to clone quote. Please try again.',
-        variant: 'destructive'
-      });
-      return;
-    }
-
-    try {
-      const newQuoteId = await cloneQuoteWithFallback(quote.id, user.id, {
-        newUserEmail: user.email,
-        newUserName: user.name,
-      });
-
-      toast({
-        title: 'Quote Cloned',
-        description: `Successfully created new draft quote ${newQuoteId}`,
-      });
-
-      // Navigate to the BOM builder for the newly cloned quote
-      navigate(`/bom-edit/${newQuoteId}`);
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to clone quote';
-      toast({
-        title: 'Clone Failed',
-        description: errorMessage,
-        variant: 'destructive'
-      });
-    }
-  };
-
-  const handleEditQuote = () => {
-    if (isDraft) {
-      navigate(`/quote/${quote!.id}?mode=edit`);
-    } else {
-      toast({
-        title: 'Quote Not Editable',
-        description: 'This quote cannot be edited. Use Clone to create an editable copy.',
-        variant: 'default'
-      });
-    }
-  };
-
   const getStatusBadge = (status: string) => {
     const statusConfig: Record<string, { color: string; text: string }> = {
       draft: { color: 'bg-gray-600', text: 'Draft' },
@@ -402,8 +353,8 @@ const QuoteViewer: React.FC = () => {
         <div className="container mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
-              <Button 
-                variant="ghost" 
+              <Button
+                variant="ghost"
                 onClick={() => navigate('/quotes')}
                 className="text-muted-foreground hover:text-foreground"
               >
@@ -419,25 +370,6 @@ const QuoteViewer: React.FC = () => {
               <Badge className={`${statusBadge.color} text-white`}>
                 {statusBadge.text}
               </Badge>
-            </div>
-            
-            <div className="flex items-center space-x-2">
-              {!isEditable && (
-                <Button onClick={handleCloneQuote} variant="outline">
-                  <Copy className="mr-2 h-4 w-4" />
-                  Clone
-                </Button>
-              )}
-              {isDraft && (
-                <Button onClick={handleEditQuote} className="bg-primary hover:bg-primary/90">
-                  <Edit className="mr-2 h-4 w-4" />
-                  Edit
-                </Button>
-              )}
-              <Button variant="outline">
-                <Download className="mr-2 h-4 w-4" />
-                Export
-              </Button>
             </div>
           </div>
         </div>
@@ -487,6 +419,32 @@ const QuoteViewer: React.FC = () => {
                 <label className="text-sm font-medium text-muted-foreground">Rep Involved</label>
                 <p className="text-foreground">{quote.is_rep_involved ? 'Yes' : 'No'}</p>
               </div>
+              <div>
+                <label className="text-sm font-medium text-muted-foreground">Shipping Terms</label>
+                <p className="text-foreground">{quote.shipping_terms || '—'}</p>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-muted-foreground">Payment Terms</label>
+                <p className="text-foreground">{quote.payment_terms || '—'}</p>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-muted-foreground">Created</label>
+                <p className="text-foreground">
+                  {new Date(quote.created_at).toLocaleString()}
+                </p>
+              </div>
+              {quote.submitted_at && (
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground">Submitted</label>
+                  <p className="text-foreground">{new Date(quote.submitted_at).toLocaleString()}</p>
+                </div>
+              )}
+              {quote.reviewed_at && (
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground">Reviewed</label>
+                  <p className="text-foreground">{new Date(quote.reviewed_at).toLocaleString()}</p>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -544,31 +502,6 @@ const QuoteViewer: React.FC = () => {
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
-                  <label className="text-sm font-medium text-muted-foreground">Total Cost</label>
-                  <p className="text-xl font-bold text-foreground">
-                    {formatCurrency(quote.total_cost)}
-                  </p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-muted-foreground">Gross Profit (Before Discount)</label>
-                  <p className="text-xl font-bold text-foreground">
-                    {formatCurrency(
-                      typeof quote.gross_profit === 'number'
-                        ? quote.gross_profit
-                        : quote.original_quote_value - quote.total_cost
-                    )}
-                  </p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-muted-foreground">Gross Profit After Discount</label>
-                  <p className="text-xl font-bold text-emerald-500">
-                    {formatCurrency(finalDiscountedValue - quote.total_cost)}
-                  </p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
                   <label className="text-sm font-medium text-muted-foreground">Requested Discount</label>
                   <p className="text-xl font-bold text-foreground">
                     {formatPercent(normalizedRequestedDiscount)}%
@@ -583,15 +516,9 @@ const QuoteViewer: React.FC = () => {
                   </div>
                 )}
                 <div>
-                  <label className="text-sm font-medium text-muted-foreground">Final Margin</label>
+                  <label className="text-sm font-medium text-muted-foreground">Discount Value</label>
                   <p className="text-xl font-bold text-foreground">
-                    {normalizePercentage(
-                      typeof quote.discounted_margin === 'number'
-                        ? quote.discounted_margin
-                        : finalDiscountedValue > 0
-                          ? ((finalDiscountedValue - quote.total_cost) / finalDiscountedValue) * 100
-                          : 0
-                    ).toFixed(1)}%
+                    -{formatCurrency(discountAmount)}
                   </p>
                 </div>
               </div>
