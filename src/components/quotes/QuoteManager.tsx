@@ -74,10 +74,11 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
       : undefined;
 
     const configuredQuoteName = getStringField('quote_name', 'quoteName', 'name');
-    const configuredAccountName = getStringField(
+    const configuredCustomerName = getStringField('customer_name', 'customerName', 'customer');
+    const configuredAccount = getStringField(
+      'account',
       'account_name',
       'accountName',
-      'account',
       'customer_account_name',
       'customerAccountName'
     );
@@ -120,11 +121,11 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
       id: quote.id, // Use unique ID for React key
       displayId: quote.id, // Keep original ID for operations
       displayLabel: isDraftQuote
-        ? (normalizedDraftName || configuredQuoteName || quote.id)
-        : (configuredQuoteName || normalizedDraftName || quote.id),
-      customer: quote.customer_name || 'Unnamed Customer',
+        ? (configuredCustomerName || normalizedDraftName || configuredQuoteName || quote.id)
+        : (configuredQuoteName || normalizedDraftName || configuredCustomerName || quote.id),
+      customer: configuredCustomerName || quote.customer_name || 'Unnamed Customer',
       oracleCustomerId: quote.oracle_customer_id || 'N/A',
-      accountName: configuredAccountName || null,
+      account: configuredAccount || null,
       currency,
       value: originalValue,
       finalValue,
@@ -217,7 +218,7 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
                          quote.id.toLowerCase().includes(lowerSearch) ||
                          quote.oracleCustomerId.toLowerCase().includes(lowerSearch) ||
                          (quote.displayLabel?.toLowerCase().includes(lowerSearch)) ||
-                         (quote.accountName ? quote.accountName.toLowerCase().includes(lowerSearch) : false);
+                         (quote.account ? quote.account.toLowerCase().includes(lowerSearch) : false);
     const matchesPriority = priorityFilter === 'All' || 
                            (priorityFilter === 'Draft' && quote.status === 'draft') ||
                            (priorityFilter !== 'Draft' && quote.priority === priorityFilter);
@@ -861,14 +862,12 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
                           {statusBadge.text}
                         </Badge>
                       </div>
-                      <p className="text-gray-500 text-xs mt-1">Quote ID: {quote.displayId}</p>
                       <p className="text-gray-400 text-sm mt-1">
-                        Account Name: {quote.accountName || '—'}
+                        Account: {quote.account || '—'}
                       </p>
                       <p className="text-gray-400 text-sm">
                         Customer: {quote.customer}
                       </p>
-                      <p className="text-gray-500 text-xs">Oracle: {quote.oracleCustomerId}</p>
                     </div>
                     
                     <div className="text-right">
