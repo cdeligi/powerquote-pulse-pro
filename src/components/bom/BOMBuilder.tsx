@@ -514,7 +514,9 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
         .from('quotes')
         .select('*', { count: 'exact', head: true })
         .eq('user_id', user.id)
-        .eq('status', 'draft');
+        .eq('status', 'draft')
+        // Exclude temporary Level 4 configuration quotes so they don't affect numbering
+        .not('id', 'like', 'TEMP-%');
 
       if (error) {
         console.error('Error counting drafts:', error);
