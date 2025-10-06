@@ -24,6 +24,7 @@ import QuoteFieldsSection from './QuoteFieldsSection';
 import { toast } from '@/components/ui/use-toast';
 import { getSupabaseClient, getSupabaseAdminClient, isAdminAvailable } from "@/integrations/supabase/client";
 import { generateUniqueDraftName } from '@/utils/draftName';
+import { normalizeQuoteId } from '@/utils/quoteIdGenerator';
 import QTMSConfigurationEditor from './QTMSConfigurationEditor';
 import { consolidateQTMSConfiguration, createQTMSBOMItem, ConsolidatedQTMS, QTMSConfiguration } from '@/utils/qtmsConsolidation';
 import { buildQTMSPartNumber } from '@/utils/qtmsPartNumberBuilder';
@@ -2571,25 +2572,37 @@ main
         // We're submitting an existing draft - finalize the ID
         const { data: finalizedId, error: finalizeError } = await supabase
           .rpc('finalize_draft_quote_id', { draft_quote_id: currentQuoteId });
-        
+
         if (finalizeError) {
           console.error('Error finalizing draft quote ID:', finalizeError);
           throw finalizeError;
         }
-        
-        quoteId = finalizedId;
+
+        const normalizedFinalId = normalizeQuoteId(finalizedId);
+
+        if (!normalizedFinalId) {
+          throw new Error('Failed to normalize finalized quote ID.');
+        }
+
+        quoteId = normalizedFinalId;
         isSubmittingExistingDraft = true;
       } else {
         // Generate new quote ID for final submission
         const { data: newQuoteId, error: generateError } = await supabase
           .rpc('generate_quote_id', { user_email: user.email, is_draft: false });
-        
-      if (generateError) {
-        console.error('Error generating quote ID:', generateError);
-        throw generateError;
-      }
 
-      quoteId = newQuoteId;
+        if (generateError) {
+          console.error('Error generating quote ID:', generateError);
+          throw generateError;
+        }
+
+        const normalizedQuoteId = normalizeQuoteId(newQuoteId);
+
+        if (!normalizedQuoteId) {
+          throw new Error('Failed to normalize generated quote ID.');
+        }
+
+        quoteId = normalizedQuoteId;
       }
 
       const customerNameValue = getStringFieldValue('customer_name', 'Unnamed Customer');
