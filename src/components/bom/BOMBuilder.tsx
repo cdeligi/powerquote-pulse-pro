@@ -300,6 +300,37 @@ const normalizeDraftBomValue = (value: unknown): Record<string, any> | null => {
   return null;
 };
 
+const getDerivedCustomerName = (
+  fields: Record<string, any> | null | undefined,
+  fallback?: string | null,
+): string | null => {
+  const derived = deriveCustomerNameFromFields(fields ?? undefined, fallback ?? null);
+  if (typeof derived === 'string') {
+    const trimmed = derived.trim();
+    if (trimmed.length > 0) {
+      return trimmed;
+    }
+  }
+
+  return null;
+};
+
+const resolveCustomerNameFromFields = (
+  fields: Record<string, any> | null | undefined,
+  fallback?: string | null,
+): string => {
+  const derived = getDerivedCustomerName(fields, fallback);
+  if (derived) {
+    return derived;
+  }
+
+  if (typeof fallback === 'string' && fallback.trim().length > 0) {
+    return fallback.trim();
+  }
+
+  return 'Pending Customer';
+};
+
 const mergeQuoteFieldsIntoDraftBom = (
   draftBom: unknown,
   fields: Record<string, any>,
@@ -635,11 +666,10 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
       console.log('Creating draft quote for user:', user.id);
       
       // Generate identifiers for the draft quote
-      const providedCustomerName = getQuoteFieldValue('customer_name');
-      const resolvedCustomerName =
-        typeof providedCustomerName === 'string' && providedCustomerName.trim().length > 0
-          ? providedCustomerName.trim()
-          : 'Pending Customer';
+      const resolvedCustomerName = resolveCustomerNameFromFields(
+        quoteFields,
+        getStringFieldValue('customer_name', 'Pending Customer'),
+      );
 
       const draftQuoteId = await generateUniqueDraftName(user.id, user.email);
 
@@ -1274,23 +1304,10 @@ if (
     try {
       console.log('Starting draft save process...');
 
-      // Extract account value from quoteFields (prioritize fields with "account" in the key)
-      const accountFromFields = (() => {
-        for (const [key, value] of Object.entries(quoteFields)) {
-          const lowerKey = key.toLowerCase();
-          if (lowerKey.includes('account') && typeof value === 'string' && value.trim()) {
-            return value.trim();
-          }
-        }
-        // Fall back to customer_name field
-        const customerNameValue = getQuoteFieldValue('customer_name');
-        if (typeof customerNameValue === 'string' && customerNameValue.trim().length > 0) {
-          return customerNameValue.trim();
-        }
-        return null;
-      })();
-      
-      const resolvedCustomerName = accountFromFields || 'Pending Customer';
+      const resolvedCustomerName = resolveCustomerNameFromFields(
+        quoteFields,
+        currentQuote?.customer_name ?? 'Pending Customer',
+      );
 
       const defaultOracleCustomerId =
         typeof currentQuote?.oracle_customer_id === 'string' && currentQuote.oracle_customer_id.trim().length > 0
@@ -1446,11 +1463,10 @@ if (
       } = totals;
 
       // Update quote with draft BOM data
-      const providedCustomerName = getQuoteFieldValue('customer_name');
-      const draftCustomerName =
-        typeof providedCustomerName === 'string' && providedCustomerName.trim().length > 0
-          ? providedCustomerName.trim()
-          : (currentQuote?.customer_name?.trim() || 'Pending Customer');
+      const updatedCustomerName = resolveCustomerNameFromFields(
+        quoteFields,
+        currentQuote?.customer_name ?? 'Pending Customer',
+      );
 
       const timestampFallback = `DRAFT-${Date.now()}`;
       const resolvedOracleCustomerId = getStringFieldValue('oracle_customer_id', 'DRAFT', 'DRAFT');
@@ -1459,9 +1475,6 @@ if (
       // Use the same normalization logic as the auto-sync path so any account
       // style field (including select objects) can drive the persisted
       // customer name.
-      const updatedCustomerName =
-        deriveCustomerNameFromFields(quoteFields, draftCustomerName) ?? draftCustomerName;
-      
       const { error: quoteError } = await supabase
         .from('quotes')
         .update({
@@ -1549,7 +1562,7 @@ if (
       }
 
       try {
-        const derivedCustomerName = deriveCustomerNameFromFields(fields, currentQuote?.customer_name);
+        const derivedCustomerName = getDerivedCustomerName(fields, currentQuote?.customer_name ?? null);
         const draftBomUpdate = mergeQuoteFieldsIntoDraftBom(currentQuote?.draft_bom, fields);
         const updatePayload: Record<string, any> = {
           quote_fields: fields,
@@ -2901,7 +2914,10 @@ if (
         setIsDraftMode(false);
       }
 
-      const customerNameValue = getStringFieldValue('customer_name', 'Unnamed Customer');
+      const customerNameValue = resolveCustomerNameFromFields(
+        quoteFields,
+        getStringFieldValue('customer_name', 'Unnamed Customer'),
+      );
       const oracleCustomerIdValue = getStringFieldValue('oracle_customer_id', 'TBD', 'N/A');
       const sfdcOpportunityValue = getStringFieldValue('sfdc_opportunity', 'TBD', 'N/A');
       const priorityValue = getStringFieldValue('priority', 'Medium');
@@ -3006,54 +3022,72 @@ if (
         return;
       }
 
-      if (!isSubmittingExistingDraft) {
-        // Insert new BOM items
-        for (const item of bomItems) {
-          const serializedAssignments = item.slotAssignments
-            ? serializeSlotAssignments(item.slotAssignments)
-            : undefined;
-          const rackLayout = item.rackConfiguration || buildRackLayoutFromAssignments(serializedAssignments);
-          const configurationData = {
-            ...(item.configuration || {}),
-            slotAssignments: serializedAssignments,
-            rackConfiguration: rackLayout,
-            level4Config: item.level4Config || null,
-            level4Selections: item.level4Selections || null,
-            partNumberContext: item.partNumberContext ? deepClone(item.partNumberContext) : undefined,
-          };
+      const bomInsertPayload = bomItems.map(item => {
+        const serializedAssignments = item.slotAssignments
+          ? serializeSlotAssignments(item.slotAssignments)
+          : undefined;
+        const rackLayout = item.rackConfiguration || buildRackLayoutFromAssignments(serializedAssignments);
 
-          const { error: bomError } = await supabase.from('bom_items').insert({
-            quote_id: quoteId,
-            product_id: item.product.id,
-            name: item.product.name,
-            description: item.product.description || '',
-            part_number: item.product.partNumber || item.partNumber || '',
-            quantity: item.quantity,
-            unit_price: item.product.price,
-            unit_cost: item.product.cost || 0,
-            total_price: item.product.price * item.quantity,
-            total_cost: (item.product.cost || 0) * item.quantity,
-            margin:
-              item.product.price > 0
-                ? ((item.product.price - (item.product.cost || 0)) /
-                    item.product.price) *
-                  100
-                : 0,
-            original_unit_price: item.original_unit_price || item.product.price,
-            approved_unit_price: item.approved_unit_price || item.product.price,
-            configuration_data: configurationData,
-            product_type: 'standard',
+        const configurationData = {
+          ...(item.configuration || {}),
+          slotAssignments: serializedAssignments,
+          rackConfiguration: rackLayout,
+          level4Config: item.level4Config || null,
+          level4Selections: item.level4Selections || null,
+        } as Record<string, any>;
+
+        if (item.partNumberContext) {
+          configurationData.partNumberContext = deepClone(item.partNumberContext);
+        }
+
+        return {
+          quote_id: quoteId,
+          product_id: item.product.id,
+          name: item.product.name,
+          description: item.product.description || '',
+          part_number: item.product.partNumber || item.partNumber || '',
+          quantity: item.quantity,
+          unit_price: item.product.price,
+          unit_cost: item.product.cost || 0,
+          total_price: item.product.price * item.quantity,
+          total_cost: (item.product.cost || 0) * item.quantity,
+          margin:
+            item.product.price > 0
+              ? ((item.product.price - (item.product.cost || 0)) / item.product.price) * 100
+              : 0,
+          original_unit_price: item.original_unit_price || item.product.price,
+          approved_unit_price: item.approved_unit_price || item.product.price,
+          configuration_data: configurationData,
+          product_type: 'standard',
+        };
+      });
+
+      if (bomInsertPayload.length > 0) {
+        const { error: deleteError } = await supabase
+          .from('bom_items')
+          .delete()
+          .eq('quote_id', quoteId);
+
+        if (deleteError) {
+          console.error('Failed to clear existing BOM items:', deleteError);
+          toast({
+            title: 'BOM Item Error',
+            description: deleteError.message || 'Failed to prepare BOM items for submission',
+            variant: 'destructive',
           });
+          throw deleteError;
+        }
 
-          if (bomError) {
-            console.error('SUPABASE BOM ERROR:', bomError);
-            toast({
-              title: 'BOM Item Error',
-              description: bomError.message || 'Failed to create BOM item',
-              variant: 'destructive',
-            });
-            throw bomError;
-          }
+        const { error: bomError } = await supabase.from('bom_items').insert(bomInsertPayload);
+
+        if (bomError) {
+          console.error('SUPABASE BOM ERROR:', bomError);
+          toast({
+            title: 'BOM Item Error',
+            description: bomError.message || 'Failed to create BOM item',
+            variant: 'destructive',
+          });
+          throw bomError;
         }
       }
 
