@@ -1022,6 +1022,25 @@ if (
 
     try {
       console.log('Starting draft save process...');
+
+      const providedCustomerName = getQuoteFieldValue('customer_name');
+      const resolvedCustomerName =
+        typeof providedCustomerName === 'string' && providedCustomerName.trim().length > 0
+          ? providedCustomerName.trim()
+          : 'Pending Customer';
+
+      const defaultOracleCustomerId =
+        typeof currentQuote?.oracle_customer_id === 'string' && currentQuote.oracle_customer_id.trim().length > 0
+          ? currentQuote.oracle_customer_id.trim()
+          : 'DRAFT';
+      const resolvedOracleCustomerId = getStringFieldValue('oracle_customer_id', defaultOracleCustomerId, defaultOracleCustomerId);
+
+      const defaultSfdcOpportunity =
+        typeof currentQuote?.sfdc_opportunity === 'string' && currentQuote.sfdc_opportunity.trim().length > 0
+          ? currentQuote.sfdc_opportunity.trim()
+          : `DRAFT-${Date.now()}`;
+      const resolvedSfdcOpportunity = getStringFieldValue('sfdc_opportunity', defaultSfdcOpportunity, defaultSfdcOpportunity);
+
       let quoteId = currentQuoteId;
       
       // Create new draft if none exists
@@ -1032,21 +1051,12 @@ if (
 
         console.log('Generated new draft quote ID:', newQuoteId);
 
-        const providedCustomerName = getQuoteFieldValue('customer_name');
-        const resolvedCustomerName =
-          typeof providedCustomerName === 'string' && providedCustomerName.trim().length > 0
-            ? providedCustomerName.trim()
-            : 'Pending Customer';
-
         // Calculate totals from BOM items
         const totalValue = bomItems.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
         const totalCost = bomItems.reduce((sum, item) => sum + ((item.product.cost || 0) * item.quantity), 0);
         const grossProfit = totalValue - totalCost;
         const originalMargin = totalValue > 0 ? ((totalValue - totalCost) / totalValue) * 100 : 0;
 
-        const timestampFallback = `DRAFT-${Date.now()}`;
-        const resolvedOracleCustomerId = getStringFieldValue('oracle_customer_id', 'DRAFT', 'DRAFT');
-        const resolvedSfdcOpportunity = getStringFieldValue('sfdc_opportunity', timestampFallback, timestampFallback);
         const resolvedPriority = getStringFieldValue('priority', 'Medium');
         const resolvedShippingTerms = getStringFieldValue('shipping_terms', 'Ex-Works', 'Ex-Works');
         const resolvedPaymentTerms = getStringFieldValue('payment_terms', 'Net 30', 'Net 30');
@@ -1098,6 +1108,8 @@ if (
         setCurrentQuote({
           id: newQuoteId,
           customer_name: resolvedCustomerName,
+          oracle_customer_id: resolvedOracleCustomerId,
+          sfdc_opportunity: resolvedSfdcOpportunity,
           status: 'draft'
         });
         quoteId = newQuoteId;
@@ -1111,10 +1123,13 @@ if (
         const totalCost = bomItems.reduce((sum, item) => sum + ((item.product.cost || 0) * item.quantity), 0);
         const grossProfit = totalValue - totalCost;
         const originalMargin = totalValue > 0 ? ((totalValue - totalCost) / totalValue) * 100 : 0;
-        
+
         const { error: updateError } = await supabase
           .from('quotes')
           .update({
+            customer_name: resolvedCustomerName,
+            oracle_customer_id: resolvedOracleCustomerId,
+            sfdc_opportunity: resolvedSfdcOpportunity,
             quote_fields: quoteFields,
             draft_bom: {
               items: bomItems,
@@ -1135,15 +1150,21 @@ if (
           console.error('Quote update error:', updateError);
           throw new Error(`Failed to update draft: ${updateError.message}`);
         }
-        
+
+        setCurrentQuote(prev => prev ? {
+          ...prev,
+          customer_name: resolvedCustomerName,
+          oracle_customer_id: resolvedOracleCustomerId,
+          sfdc_opportunity: resolvedSfdcOpportunity,
+        } : prev);
         console.log('Draft quote updated successfully:', quoteId);
       }
-      
+
       toast({
         title: 'Draft Saved',
-        description: `Draft ${quoteId} saved successfully with ${bomItems.length} items for ${currentQuote?.customer_name || 'Pending Customer'}`,
+        description: `Draft ${quoteId} saved successfully with ${bomItems.length} items for ${resolvedCustomerName}`,
       });
-      
+
     } catch (error) {
       console.error('Error saving draft:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
