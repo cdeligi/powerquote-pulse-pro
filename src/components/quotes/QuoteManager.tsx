@@ -422,10 +422,10 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
 
     const accountCandidates = [
       draftAccountFieldValue,
+      draftBomAccountFieldValue,
       combinedAccountFieldValue,
       configuredAccount,
       persistedAccountFieldValue,
-      draftBomAccountFieldValue,
       ...topLevelAccountCandidates,
       configuredCustomerName,
       normalizedDraftName,
