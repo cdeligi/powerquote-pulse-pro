@@ -12,6 +12,7 @@ import { toast } from "@/hooks/use-toast";
 import { QuoteShareDialog } from './QuoteShareDialog';
 import { supabase } from "@/integrations/supabase/client";
 import { cloneQuoteWithFallback } from "@/utils/cloneQuote";
+import { normalizeQuoteId } from "@/utils/quoteIdGenerator";
 import {
   deserializeSlotAssignments,
   buildRackLayoutFromAssignments,
@@ -21,6 +22,27 @@ import {
 interface QuoteManagerProps {
   user: User;
 }
+
+const extractAccountSegments = (rawValue?: string | null): string[] => {
+  if (!rawValue) {
+    return [];
+  }
+
+  return String(rawValue)
+    .split(/\r?\n+/)
+    .flatMap((segment) => segment.split(/[;,]+/))
+    .map((segment) => segment.replace(/^account\s*:?\s*/i, "").trim())
+    .filter(Boolean);
+};
+
+const formatAccountDisplay = (rawValue?: string | null): string | null => {
+  const segments = extractAccountSegments(rawValue);
+  if (segments.length === 0) {
+    return null;
+  }
+
+  return segments[0];
+};
 
 const QuoteManager = ({ user }: QuoteManagerProps) => {
   const navigate = useNavigate();
@@ -114,15 +136,43 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
       'customerAccountNumber'
     );
 
-    const inferredAccountFromCustomer = configuredCustomerName && normalizedDraftName && configuredCustomerName !== normalizedDraftName
-      ? configuredCustomerName
-      : undefined;
+    const accountCandidates = [
+      configuredAccount,
+      configuredCustomerName,
+      normalizedDraftName,
+    ];
 
-    const accountValue = configuredAccount || inferredAccountFromCustomer || null;
+    const accountValue = (() => {
+      const seen = new Set<string>();
 
-    const primaryCustomerLabel = isDraftQuote
-      ? (configuredQuoteName || normalizedDraftName || configuredCustomerName || quote.id)
-      : (configuredCustomerName || normalizedDraftName || configuredQuoteName || quote.id);
+      for (const candidate of accountCandidates) {
+        if (typeof candidate !== 'string') {
+          continue;
+        }
+
+        for (const segment of extractAccountSegments(candidate)) {
+          const normalizedKey = segment.toLowerCase();
+          if (seen.has(normalizedKey)) {
+            continue;
+          }
+
+          seen.add(normalizedKey);
+          return segment;
+        }
+      }
+
+      return null;
+    })();
+
+    const normalizedQuoteId = normalizeQuoteId(quote.id) || quote.id;
+    const formalQuoteId = normalizedQuoteId;
+
+    const draftOrConfiguredLabel = configuredQuoteName || normalizedDraftName || configuredCustomerName;
+    const customerDisplayName = configuredCustomerName || normalizedDraftName || configuredQuoteName || quote.id;
+
+    const accountDisplayValue = accountValue || null;
+
+    const primaryDisplayLabel = formalQuoteId;
 
     const originalValue = isDraftQuote && quote.draft_bom?.items
       ? quote.draft_bom.items.reduce((sum: number, item: any) =>
@@ -161,10 +211,12 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
     return {
       id: quote.id, // Use unique ID for React key
       displayId: quote.id, // Keep original ID for operations
-      displayLabel: primaryCustomerLabel,
-      customer: primaryCustomerLabel,
+      displayLabel: primaryDisplayLabel,
+      formalQuoteId,
+      quoteId: normalizedQuoteId,
+      customer: customerDisplayName,
       oracleCustomerId: quote.oracle_customer_id || 'N/A',
-      account: accountValue,
+      account: accountDisplayValue,
       currency,
       value: originalValue,
       finalValue,
@@ -520,12 +572,14 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
 
   const handleViewQuote = (quote: any) => {
     const actualQuoteId = quote.displayId || quote.id;
-    navigate(`/quote/${actualQuoteId}?mode=view`);
+    const encodedQuoteId = encodeURIComponent(actualQuoteId);
+    navigate(`/quote/${encodedQuoteId}?mode=view`);
   };
 
   const handleEditDraft = (quote: any) => {
     const actualQuoteId = quote.displayId || quote.id;
-    navigate(`/bom-edit/${actualQuoteId}`);
+    const encodedQuoteId = encodeURIComponent(actualQuoteId);
+    navigate(`/bom-edit/${encodedQuoteId}`);
   };
 
   const handleCloneQuote = async (quote: any) => {
@@ -712,7 +766,7 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
         description: `Successfully created new draft quote ${newQuoteId}`,
       });
 
-      navigate(`/bom-edit/${newQuoteId}`);
+      navigate(`/bom-edit/${encodeURIComponent(newQuoteId)}`);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to clone quote';
       toast({
@@ -894,15 +948,15 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
                   <div className="flex-1 grid grid-cols-1 md:grid-cols-5 gap-4">
                     <div>
                       <div className="flex items-center space-x-3">
-                        <span className="text-white font-medium">
-                          {quote.displayLabel}
+                        <span className="text-white font-bold">
+                          {quote.quoteId ?? quote.displayLabel}
                         </span>
                         <Badge className={`${statusBadge.color} text-white`}>
                           {statusBadge.text}
                         </Badge>
                       </div>
                       <p className="text-gray-400 text-sm mt-1">
-                        Account: {quote.account || '—'}
+                        Account: {formatAccountDisplay(quote.account) ?? '—'}
                       </p>
                     </div>
                     
