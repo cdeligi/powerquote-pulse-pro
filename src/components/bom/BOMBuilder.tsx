@@ -276,6 +276,46 @@ const deepClone = <T,>(value: T): T => {
   }
 };
 
+const normalizeDraftBomValue = (value: unknown): Record<string, any> | null => {
+  if (!value) {
+    return null;
+  }
+
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value);
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        return parsed as Record<string, any>;
+      }
+    } catch (error) {
+      console.warn('Failed to parse draft BOM string. Skipping draft BOM merge.', error);
+      return null;
+    }
+  }
+
+  if (typeof value === 'object' && !Array.isArray(value)) {
+    return value as Record<string, any>;
+  }
+
+  return null;
+};
+
+const mergeQuoteFieldsIntoDraftBom = (
+  draftBom: unknown,
+  fields: Record<string, any>,
+): Record<string, any> | null => {
+  const base = normalizeDraftBomValue(draftBom);
+  if (!base) {
+    return null;
+  }
+
+  return {
+    ...base,
+    quoteFields: fields,
+    quote_fields: fields,
+  };
+};
+
 const resolvePartNumberContext = (...candidates: Array<any>) => {
   for (const candidate of candidates) {
     if (!candidate) continue;
@@ -1175,10 +1215,7 @@ if (
           is_rep_involved: resolvedRepInvolved,
           status: 'draft' as const,
           quote_fields: quoteFields,
-          draft_bom: {
-            items: bomItems,
-            lastSaved: new Date().toISOString()
-          },
+          draft_bom: draftBomData,
           original_quote_value: totalValue,
           discounted_value: totalValue,
           total_cost: totalCost,
@@ -1205,7 +1242,9 @@ if (
           customer_name: resolvedCustomerName,
           oracle_customer_id: resolvedOracleCustomerId,
           sfdc_opportunity: resolvedSfdcOpportunity,
-          status: 'draft'
+          status: 'draft',
+          quote_fields: quoteFields,
+          draft_bom: draftBomData,
         });
         quoteId = newQuoteId;
 
@@ -1227,10 +1266,7 @@ if (
             oracle_customer_id: resolvedOracleCustomerId,
             sfdc_opportunity: resolvedSfdcOpportunity,
             quote_fields: quoteFields,
-            draft_bom: {
-              items: bomItems,
-              lastSaved: new Date().toISOString()
-            },
+            draft_bom: draftBomData,
             original_quote_value: totalValue,
             discounted_value: totalValue,
             total_cost: totalCost,
@@ -1252,6 +1288,8 @@ if (
           customer_name: resolvedCustomerName,
           oracle_customer_id: resolvedOracleCustomerId,
           sfdc_opportunity: resolvedSfdcOpportunity,
+          quote_fields: quoteFields,
+          draft_bom: draftBomData,
         } : prev);
         console.log('Draft quote updated successfully:', quoteId);
         lastSyncedQuoteFieldsRef.current = JSON.stringify(quoteFields ?? {});
@@ -1423,9 +1461,23 @@ if (
 
       lastSyncedQuoteFieldsRef.current = JSON.stringify(quoteFields ?? {});
 
-      if (updatedCustomerName && updatedCustomerName !== currentQuote?.customer_name) {
-        setCurrentQuote(prev => (prev ? { ...prev, customer_name: updatedCustomerName } : prev));
-      }
+      setCurrentQuote(prev => {
+        if (!prev) {
+          return prev;
+        }
+
+        const nextQuote: Record<string, any> = {
+          ...prev,
+          quote_fields: quoteFields,
+          draft_bom: draftBomData,
+        };
+
+        if (updatedCustomerName) {
+          nextQuote.customer_name = updatedCustomerName;
+        }
+
+        return nextQuote;
+      });
 
       if (!autoSave) {
         toast({
@@ -1472,6 +1524,7 @@ if (
 
       try {
         const derivedCustomerName = deriveCustomerNameFromFields(fields, currentQuote?.customer_name);
+        const draftBomUpdate = mergeQuoteFieldsIntoDraftBom(currentQuote?.draft_bom, fields);
         const updatePayload: Record<string, any> = {
           quote_fields: fields,
           updated_at: new Date().toISOString(),
@@ -1479,6 +1532,10 @@ if (
 
         if (derivedCustomerName) {
           updatePayload.customer_name = derivedCustomerName;
+        }
+
+        if (draftBomUpdate) {
+          updatePayload.draft_bom = draftBomUpdate;
         }
 
         const { error } = await supabase
@@ -1493,14 +1550,32 @@ if (
 
         lastSyncedQuoteFieldsRef.current = serializedSnapshot;
 
-        if (derivedCustomerName && derivedCustomerName !== currentQuote?.customer_name) {
-          setCurrentQuote(prev => prev ? { ...prev, customer_name: derivedCustomerName } : prev);
-        }
+        setCurrentQuote(prev => {
+          if (!prev) {
+            return prev;
+          }
+
+          const nextDraftBom = mergeQuoteFieldsIntoDraftBom(prev.draft_bom, fields);
+          const nextQuote: Record<string, any> = {
+            ...prev,
+            quote_fields: fields,
+          };
+
+          if (derivedCustomerName) {
+            nextQuote.customer_name = derivedCustomerName;
+          }
+
+          if (nextDraftBom) {
+            nextQuote.draft_bom = nextDraftBom;
+          }
+
+          return nextQuote;
+        });
       } catch (error) {
         console.error('Failed to sync quote fields to Supabase:', error);
       }
     },
-    [currentQuoteId, isDraftMode, currentQuote?.customer_name]
+    [currentQuoteId, isDraftMode, currentQuote?.customer_name, currentQuote?.draft_bom]
   );
 
   useEffect(() => {
