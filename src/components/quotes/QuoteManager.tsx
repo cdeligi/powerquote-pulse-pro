@@ -109,6 +109,48 @@ const coerceFieldValueToString = (value: unknown): string | undefined => {
   return undefined;
 };
 
+const ACCOUNT_KEY_PRIORITIES: Array<{ test: (key: string) => boolean; priority: number }> = [
+  {
+    test: (key) => /account[^a-z0-9]*display/i.test(key) || (/account/i.test(key) && /name/i.test(key)),
+    priority: 0,
+  },
+  {
+    test: (key) => /customer/i.test(key) && /name/i.test(key),
+    priority: 1,
+  },
+  {
+    test: (key) => /^account$/i.test(key) || /customer[^a-z0-9]*account/i.test(key),
+    priority: 2,
+  },
+  {
+    test: (key) => /account/i.test(key) && /number/i.test(key),
+    priority: 3,
+  },
+  {
+    test: (key) => /account/i.test(key) && /id/i.test(key),
+    priority: 4,
+  },
+  {
+    test: (key) => /account/i.test(key),
+    priority: 5,
+  },
+];
+
+const getAccountPriorityForKey = (keyHint?: string): number => {
+  if (!keyHint) {
+    return ACCOUNT_KEY_PRIORITIES.length;
+  }
+
+  const normalizedKey = keyHint.trim().toLowerCase();
+  for (const { test, priority } of ACCOUNT_KEY_PRIORITIES) {
+    if (test(normalizedKey)) {
+      return priority;
+    }
+  }
+
+  return ACCOUNT_KEY_PRIORITIES.length + 1;
+};
+
 const findAccountFieldValue = (
   record?: Record<string, unknown>
 ): string | undefined => {
@@ -116,47 +158,27 @@ const findAccountFieldValue = (
     return undefined;
   }
 
-  const prioritizedKeys = [
-    "account",
-    "Account",
-    "account_id",
-    "accountId",
-    "accountID",
-    "account_name",
-    "accountName",
-    "account_number",
-    "accountNumber",
-    "customer_account",
-    "customerAccount",
-    "customer_account_name",
-    "customerAccountName",
-    "customer_account_number",
-    "customerAccountNumber",
-  ];
-
   const visited = new Set<unknown>();
   const queue: unknown[] = [record];
+  let bestCandidate: { value: string; priority: number } | null = null;
 
-  const inspectObject = (candidateRecord: Record<string, unknown>): string | undefined => {
-    for (const key of prioritizedKeys) {
-      if (key in candidateRecord) {
-        const candidate = coerceFieldValueToString(candidateRecord[key]);
-        if (candidate) {
-          return candidate;
-        }
-      }
+  const considerCandidate = (value: unknown, keyHint?: string) => {
+    const stringValue = coerceFieldValueToString(value);
+    if (!stringValue) {
+      return;
     }
 
-    for (const [key, value] of Object.entries(candidateRecord)) {
-      if (typeof key === "string" && key.toLowerCase().includes("account")) {
-        const candidate = coerceFieldValueToString(value);
-        if (candidate) {
-          return candidate;
-        }
-      }
+    const segments = extractAccountSegments(stringValue);
+    if (segments.length === 0) {
+      return;
     }
 
-    return undefined;
+    const prioritizedValue = segments[segments.length - 1];
+    const priority = getAccountPriorityForKey(keyHint);
+
+    if (!bestCandidate || priority < bestCandidate.priority || (priority === bestCandidate.priority && prioritizedValue !== bestCandidate.value)) {
+      bestCandidate = { value: prioritizedValue, priority };
+    }
   };
 
   while (queue.length > 0) {
@@ -173,14 +195,11 @@ const findAccountFieldValue = (
     if (Array.isArray(current)) {
       for (const entry of current) {
         if (typeof entry === "string" && entry.toLowerCase().includes("account")) {
-          const segments = extractAccountSegments(entry);
-          if (segments.length > 0) {
-            return segments[0];
-          }
-        }
-
-        if (entry && typeof entry === "object" && !visited.has(entry)) {
+          considerCandidate(entry);
+        } else if (entry && typeof entry === "object" && !visited.has(entry)) {
           queue.push(entry);
+        } else {
+          considerCandidate(entry);
         }
       }
       continue;
@@ -188,20 +207,26 @@ const findAccountFieldValue = (
 
     if (typeof current === "object") {
       const recordCandidate = current as Record<string, unknown>;
-      const directMatch = inspectObject(recordCandidate);
-      if (directMatch) {
-        return directMatch;
+
+      for (const [key, value] of Object.entries(recordCandidate)) {
+        if (typeof key === "string" && key.toLowerCase().includes("account")) {
+          considerCandidate(value, key);
+        }
       }
 
       for (const value of Object.values(recordCandidate)) {
         if (value && typeof value === "object" && !visited.has(value)) {
           queue.push(value);
+        } else {
+          considerCandidate(value);
         }
       }
+    } else {
+      considerCandidate(current);
     }
   }
 
-  return undefined;
+  return bestCandidate?.value;
 };
 
 const QuoteManager = ({ user }: QuoteManagerProps) => {
@@ -279,21 +304,23 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
     const configuredQuoteName = getFieldAsString('quote_name', 'quoteName', 'name');
     const configuredCustomerName = getFieldAsString('customer_name', 'customerName', 'customer');
     const configuredAccount = getFieldAsString(
-      'account',
-      'Account',
-      'account_id',
-      'accountId',
-      'accountID',
       'account_name',
       'accountName',
-      'account_number',
-      'accountNumber',
-      'customer_account',
-      'customerAccount',
       'customer_account_name',
       'customerAccountName',
+      'customer_account',
+      'customerAccount',
+      'account',
+      'Account',
+      'customer_name',
+      'customerName',
+      'account_number',
+      'accountNumber',
       'customer_account_number',
-      'customerAccountNumber'
+      'customerAccountNumber',
+      'account_id',
+      'accountId',
+      'accountID'
     );
 
     const draftAccountFieldValue = findAccountFieldValue(draftQuoteFields);
@@ -304,14 +331,21 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
     const rawQuoteRecord = quote as Record<string, unknown>;
     const rawQuoteAccountFieldValue = findAccountFieldValue(rawQuoteRecord);
     const topLevelAccountCandidates = [
-      coerceFieldValueToString(rawQuoteRecord?.["account"]),
       coerceFieldValueToString(rawQuoteRecord?.["account_name"]),
       coerceFieldValueToString(rawQuoteRecord?.["accountName"]),
+      coerceFieldValueToString(rawQuoteRecord?.["customer_account_name"]),
+      coerceFieldValueToString(rawQuoteRecord?.["customerAccountName"]),
+      coerceFieldValueToString(rawQuoteRecord?.["customer_account"]),
+      coerceFieldValueToString(rawQuoteRecord?.["customerAccount"]),
+      coerceFieldValueToString(rawQuoteRecord?.["account"]),
+      coerceFieldValueToString(rawQuoteRecord?.["Account"]),
       coerceFieldValueToString(rawQuoteRecord?.["account_number"]),
       coerceFieldValueToString(rawQuoteRecord?.["accountNumber"]),
-      coerceFieldValueToString(rawQuoteRecord?.["customer_account"]),
-      coerceFieldValueToString(rawQuoteRecord?.["customer_account_name"]),
       coerceFieldValueToString(rawQuoteRecord?.["customer_account_number"]),
+      coerceFieldValueToString(rawQuoteRecord?.["customerAccountNumber"]),
+      coerceFieldValueToString(rawQuoteRecord?.["account_id"]),
+      coerceFieldValueToString(rawQuoteRecord?.["accountId"]),
+      coerceFieldValueToString(rawQuoteRecord?.["accountID"]),
     ].filter(isNonEmptyString);
 
     const accountCandidates = [
