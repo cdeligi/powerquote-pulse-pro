@@ -235,7 +235,16 @@ const findAccountFieldValue = (
     const prioritizedValue = segments[segments.length - 1];
     const priority = getAccountPriorityForKey(keyHint);
 
-    if (!bestCandidate || priority < bestCandidate.priority || (priority === bestCandidate.priority && prioritizedValue !== bestCandidate.value)) {
+    if (!bestCandidate || priority < bestCandidate.priority) {
+      bestCandidate = { value: prioritizedValue, priority };
+      return;
+    }
+
+    if (
+      bestCandidate &&
+      priority === bestCandidate.priority &&
+      prioritizedValue.localeCompare(bestCandidate.value, undefined, { sensitivity: 'base' }) === 0
+    ) {
       bestCandidate = { value: prioritizedValue, priority };
     }
   };
@@ -422,10 +431,10 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
 
     const accountCandidates = [
       draftAccountFieldValue,
+      draftBomAccountFieldValue,
       combinedAccountFieldValue,
       configuredAccount,
       persistedAccountFieldValue,
-      draftBomAccountFieldValue,
       ...topLevelAccountCandidates,
       configuredCustomerName,
       normalizedDraftName,
