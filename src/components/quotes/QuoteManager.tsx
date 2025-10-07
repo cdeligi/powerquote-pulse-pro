@@ -115,21 +115,42 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
       'customerAccountNumber'
     );
 
-    const inferredAccountFromCustomer = configuredCustomerName && normalizedDraftName && configuredCustomerName !== normalizedDraftName
-      ? configuredCustomerName
-      : undefined;
+    const accountCandidates = [
+      configuredAccount,
+      configuredCustomerName,
+      normalizedDraftName,
+    ];
 
-    const accountValue = configuredAccount || inferredAccountFromCustomer || null;
+    const accountValue = (() => {
+      const normalizedCandidates = accountCandidates
+        .flatMap(value => {
+          if (typeof value !== 'string') {
+            return [] as string[];
+          }
+
+          return value
+            .split(/\r?\n+/)
+            .map(segment => segment.replace(/^account\s*:?\s*/i, '').trim())
+            .filter(Boolean);
+        });
+
+      if (normalizedCandidates.length === 0) {
+        return null;
+      }
+
+      const uniqueValues = Array.from(new Set(normalizedCandidates));
+      return uniqueValues[0] ?? null;
+    })();
 
     const normalizedQuoteId = normalizeQuoteId(quote.id) || quote.id;
-    const formalQuoteId = isDraftQuote ? null : normalizedQuoteId;
+    const formalQuoteId = normalizedQuoteId;
 
     const draftOrConfiguredLabel = configuredQuoteName || normalizedDraftName || configuredCustomerName;
     const customerDisplayName = configuredCustomerName || normalizedDraftName || configuredQuoteName || quote.id;
 
-    const primaryDisplayLabel = isDraftQuote
-      ? (draftOrConfiguredLabel || normalizedQuoteId)
-      : (formalQuoteId || customerDisplayName);
+    const accountDisplayValue = accountValue || null;
+
+    const primaryDisplayLabel = formalQuoteId;
 
     const originalValue = isDraftQuote && quote.draft_bom?.items
       ? quote.draft_bom.items.reduce((sum: number, item: any) =>
@@ -170,9 +191,10 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
       displayId: quote.id, // Keep original ID for operations
       displayLabel: primaryDisplayLabel,
       formalQuoteId,
+      quoteId: normalizedQuoteId,
       customer: customerDisplayName,
       oracleCustomerId: quote.oracle_customer_id || 'N/A',
-      account: accountValue,
+      account: accountDisplayValue,
       currency,
       value: originalValue,
       finalValue,
@@ -528,12 +550,14 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
 
   const handleViewQuote = (quote: any) => {
     const actualQuoteId = quote.displayId || quote.id;
-    navigate(`/quote/${actualQuoteId}?mode=view`);
+    const encodedQuoteId = encodeURIComponent(actualQuoteId);
+    navigate(`/quote/${encodedQuoteId}?mode=view`);
   };
 
   const handleEditDraft = (quote: any) => {
     const actualQuoteId = quote.displayId || quote.id;
-    navigate(`/bom-edit/${actualQuoteId}`);
+    const encodedQuoteId = encodeURIComponent(actualQuoteId);
+    navigate(`/bom-edit/${encodedQuoteId}`);
   };
 
   const handleCloneQuote = async (quote: any) => {
@@ -720,7 +744,7 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
         description: `Successfully created new draft quote ${newQuoteId}`,
       });
 
-      navigate(`/bom-edit/${newQuoteId}`);
+      navigate(`/bom-edit/${encodeURIComponent(newQuoteId)}`);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to clone quote';
       toast({
@@ -903,7 +927,7 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
                     <div>
                       <div className="flex items-center space-x-3">
                         <span className="text-white font-bold">
-                          {quote.displayLabel}
+                          {quote.quoteId ?? quote.displayLabel}
                         </span>
                         <Badge className={`${statusBadge.color} text-white`}>
                           {statusBadge.text}

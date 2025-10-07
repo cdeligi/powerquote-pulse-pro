@@ -9,29 +9,51 @@ export async function generateUniqueDraftName(
   userEmail: string | null | undefined
 ): Promise<string> {
   const fallbackSuffix = Date.now().toString().slice(-6);
-  const emailPrefix = userEmail?.split('@')[0] || 'User';
+  const rawPrefix = userEmail?.split('@')[0]?.trim() || 'User';
+  const sanitizedPrefix = rawPrefix.replace(/[^A-Za-z0-9._-]/g, '') || 'User';
 
   if (!userId) {
-    return `${emailPrefix} Draft ${fallbackSuffix}`;
+    return `${sanitizedPrefix} Draft ${fallbackSuffix}`;
   }
 
   try {
-    const { count, error } = await supabase
+    const { data, error } = await supabase
       .from('quotes')
-      .select('*', { count: 'exact', head: true })
+      .select('id')
       .eq('user_id', userId)
-      .eq('status', 'draft')
-      .not('id', 'like', 'TEMP-%');
+      .ilike('id', `${sanitizedPrefix} Draft%`);
 
     if (error) {
-      console.error('Error counting drafts for unique name generation:', error);
-      return `${emailPrefix} Draft ${fallbackSuffix}`;
+      console.error('Error fetching drafts for unique name generation:', error);
+      return `${sanitizedPrefix} Draft ${fallbackSuffix}`;
     }
 
-    const draftNumber = (count || 0) + 1;
-    return `${emailPrefix} Draft ${draftNumber}`;
+    const prefixPattern = sanitizedPrefix.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&');
+    const draftPattern = new RegExp(`^${prefixPattern}\\s+Draft\\s+(\\d+)$`, 'i');
+
+    const usedNumbers = new Set<number>();
+
+    for (const row of data || []) {
+      const candidateId = typeof row.id === 'string' ? row.id.trim() : '';
+      if (!candidateId) continue;
+
+      const match = candidateId.match(draftPattern);
+      if (match?.[1]) {
+        const numericValue = Number.parseInt(match[1], 10);
+        if (Number.isFinite(numericValue)) {
+          usedNumbers.add(numericValue);
+        }
+      }
+    }
+
+    let counter = 1;
+    while (usedNumbers.has(counter)) {
+      counter += 1;
+    }
+
+    return `${sanitizedPrefix} Draft ${counter}`;
   } catch (error) {
     console.error('Unexpected error generating unique draft name:', error);
-    return `${emailPrefix} Draft ${fallbackSuffix}`;
+    return `${sanitizedPrefix} Draft ${fallbackSuffix}`;
   }
 }
