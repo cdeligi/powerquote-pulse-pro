@@ -46,6 +46,19 @@ const normalizeKeyToTokens = (key: string): string[] =>
     .split(/\s+/)
     .filter(Boolean);
 
+const DATE_TIME_INDICATOR_TOKENS = new Set([
+  "date",
+  "time",
+  "expiration",
+  "expires",
+  "effective",
+  "start",
+  "end",
+  "timestamp",
+]);
+
+const ISO_DATE_PATTERN = /^(\d{4}-\d{2}-\d{2})(?:[T\s]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?)?$/;
+
 const isLikelyAccountKey = (key: string | undefined): key is string => {
   if (!key) {
     return false;
@@ -63,6 +76,11 @@ const isLikelyAccountKey = (key: string | undefined): key is string => {
 
   const hasExcludedToken = tokens.some((token) => token.startsWith("accounting") || token.startsWith("unaccount"));
   if (hasExcludedToken) {
+    return false;
+  }
+
+  const hasDateTimeToken = tokens.some((token) => DATE_TIME_INDICATOR_TOKENS.has(token));
+  if (hasDateTimeToken) {
     return false;
   }
 
@@ -202,6 +220,10 @@ const findAccountFieldValue = (
   const considerCandidate = (value: unknown, keyHint?: string) => {
     const stringValue = coerceFieldValueToString(value);
     if (!stringValue) {
+      return;
+    }
+
+    if (ISO_DATE_PATTERN.test(stringValue)) {
       return;
     }
 
