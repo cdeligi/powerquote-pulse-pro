@@ -23,6 +23,8 @@ import QuoteFieldsSection from './QuoteFieldsSection';
 
 import { toast } from '@/components/ui/use-toast';
 import { getSupabaseClient, getSupabaseAdminClient, isAdminAvailable } from "@/integrations/supabase/client";
+import { generateUniqueDraftName } from '@/utils/draftName';
+import { generateSubmittedQuoteId, normalizeQuoteId, persistNormalizedQuoteId } from '@/utils/quoteIdGenerator';
 import QTMSConfigurationEditor from './QTMSConfigurationEditor';
 import { consolidateQTMSConfiguration, createQTMSBOMItem, ConsolidatedQTMS, QTMSConfiguration } from '@/utils/qtmsConsolidation';
 import { buildQTMSPartNumber } from '@/utils/qtmsPartNumberBuilder';
@@ -500,38 +502,6 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
     }
   }, [quoteId]);
 
-  // Generate unique draft name function with timestamp to prevent duplicates
-  const generateUniqueDraftName = async (): Promise<string> => {
-    if (!user?.email) return 'Draft 1';
-    
-    try {
-      // Use timestamp-based approach to prevent race conditions
-      const timestamp = Date.now();
-      const timestampSuffix = timestamp.toString().slice(-6); // Last 6 digits for uniqueness
-      
-      // Count existing drafts for this user to get sequence number
-      const { count, error } = await supabase
-        .from('quotes')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', user.id)
-        .eq('status', 'draft')
-        // Exclude temporary Level 4 configuration quotes so they don't affect numbering
-        .not('id', 'like', 'TEMP-%');
-
-      if (error) {
-        console.error('Error counting drafts:', error);
-        return `Draft ${timestampSuffix}`;
-      }
-
-      const draftNumber = (count || 0) + 1;
-      return `${user.email?.split('@')[0] || 'User'} Draft ${draftNumber}`;
-    } catch (error) {
-      console.error('Error generating draft name:', error);
-      const fallback = Date.now().toString().slice(-6);
-      return `Draft ${fallback}`;
-    }
-  };
-
   const createDraftQuote = async () => {
     if (!user?.id) {
       console.error('No user ID available for draft quote creation');
@@ -546,17 +516,16 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
     try {
       console.log('Creating draft quote for user:', user.id);
       
-      // Generate unique customer name for draft
+      // Generate identifiers for the draft quote
       const providedCustomerName = getQuoteFieldValue('customer_name');
-      const draftCustomerName =
+      const resolvedCustomerName =
         typeof providedCustomerName === 'string' && providedCustomerName.trim().length > 0
-          ? providedCustomerName
-          : await generateUniqueDraftName();
+          ? providedCustomerName.trim()
+          : 'Pending Customer';
 
-      // Use simple UUID for draft quotes - no complex ID generation
-      const draftQuoteId = crypto.randomUUID();
+      const draftQuoteId = await generateUniqueDraftName(user.id, user.email);
 
-      console.log('Generated simple draft quote ID:', draftQuoteId);
+      console.log('Generated human-readable draft quote ID:', draftQuoteId);
 
       const resolvedOracleCustomerId = getStringFieldValue('oracle_customer_id', 'TBD', 'TBD');
       const resolvedSfdcOpportunity = getStringFieldValue('sfdc_opportunity', 'TBD', 'TBD');
@@ -574,7 +543,7 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
       const quoteData = {
         id: draftQuoteId,
         user_id: user.id,
-        customer_name: draftCustomerName,
+        customer_name: resolvedCustomerName,
         oracle_customer_id: resolvedOracleCustomerId,
         sfdc_opportunity: resolvedSfdcOpportunity,
         priority: (resolvedPriority as any) || 'Medium',
@@ -607,19 +576,19 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
       }
       
       setCurrentQuoteId(draftQuoteId);
-      setCurrentQuote({ 
-        id: draftQuoteId, 
-        customer_name: draftCustomerName, 
-        status: 'draft' 
+      setCurrentQuote({
+        id: draftQuoteId,
+        customer_name: resolvedCustomerName,
+        status: 'draft'
       });
       setIsDraftMode(true);
-      
+
       // Update URL without page reload
-      window.history.replaceState({}, '', `/#configure?quoteId=${draftQuoteId}`);
-      
+      window.history.replaceState({}, '', `/#configure?quoteId=${encodeURIComponent(draftQuoteId)}`);
+
       toast({
         title: 'Quote Created',
-        description: `${currentQuote?.customer_name || draftCustomerName} ready for configuration. Your progress will be automatically saved.`
+        description: `Draft ${draftQuoteId} for ${resolvedCustomerName} is ready for configuration. Your progress will be automatically saved.`
       });
       
       console.log('Draft quote created successfully:', draftQuoteId);
@@ -1058,13 +1027,16 @@ if (
       // Create new draft if none exists
       if (!quoteId) {
         console.log('No current quote ID, creating new draft quote');
-        
-        // Use simple UUID for draft quotes - no complex ID generation
-        const newQuoteId = crypto.randomUUID();
-        
+
+        const newQuoteId = await generateUniqueDraftName(user.id, user.email);
+
         console.log('Generated new draft quote ID:', newQuoteId);
-        
-        const draftName = await generateUniqueDraftName();
+
+        const providedCustomerName = getQuoteFieldValue('customer_name');
+        const resolvedCustomerName =
+          typeof providedCustomerName === 'string' && providedCustomerName.trim().length > 0
+            ? providedCustomerName.trim()
+            : 'Pending Customer';
 
         // Calculate totals from BOM items
         const totalValue = bomItems.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
@@ -1088,7 +1060,7 @@ if (
         const quoteData = {
           id: newQuoteId,
           user_id: user.id,
-          customer_name: draftName,
+          customer_name: resolvedCustomerName,
           oracle_customer_id: resolvedOracleCustomerId,
           sfdc_opportunity: resolvedSfdcOpportunity,
           priority: (resolvedPriority as any) || 'Medium',
@@ -1123,13 +1095,15 @@ if (
         }
         
         setCurrentQuoteId(newQuoteId);
-        setCurrentQuote({ 
-          id: newQuoteId, 
-          customer_name: draftName, 
-          status: 'draft' 
+        setCurrentQuote({
+          id: newQuoteId,
+          customer_name: resolvedCustomerName,
+          status: 'draft'
         });
         quoteId = newQuoteId;
-        
+
+        window.history.replaceState({}, '', `/#configure?quoteId=${encodeURIComponent(newQuoteId)}`);
+
         console.log('Draft quote created successfully:', quoteId);
       } else {
         // Update existing draft - also calculate and update totals
@@ -1167,7 +1141,7 @@ if (
       
       toast({
         title: 'Draft Saved',
-        description: `Draft ${currentQuote?.customer_name || 'Quote'} saved successfully with ${bomItems.length} items`,
+        description: `Draft ${quoteId} saved successfully with ${bomItems.length} items for ${currentQuote?.customer_name || 'Pending Customer'}`,
       });
       
     } catch (error) {
@@ -1290,11 +1264,11 @@ if (
       };
 
       // Update quote with draft BOM data
-      const providedDraftName = getQuoteFieldValue('customer_name');
+      const providedCustomerName = getQuoteFieldValue('customer_name');
       const draftCustomerName =
-        typeof providedDraftName === 'string' && providedDraftName.trim().length > 0
-          ? providedDraftName
-          : await generateUniqueDraftName();
+        typeof providedCustomerName === 'string' && providedCustomerName.trim().length > 0
+          ? providedCustomerName.trim()
+          : (currentQuote?.customer_name?.trim() || 'Pending Customer');
 
       const timestampFallback = `DRAFT-${Date.now()}`;
       const resolvedOracleCustomerId = getStringFieldValue('oracle_customer_id', 'DRAFT', 'DRAFT');
@@ -2594,33 +2568,40 @@ main
     setIsSubmitting(true);
 
     try {
-      // Generate or finalize quote ID based on whether we're submitting a draft
-      let quoteId: string;
-      let isSubmittingExistingDraft = false;
-      
-      if (currentQuoteId && currentQuoteId.includes('-Draft')) {
-        // We're submitting an existing draft - finalize the ID
-        const { data: finalizedId, error: finalizeError } = await supabase
-          .rpc('finalize_draft_quote_id', { draft_quote_id: currentQuoteId });
-        
-        if (finalizeError) {
-          console.error('Error finalizing draft quote ID:', finalizeError);
-          throw finalizeError;
-        }
-        
-        quoteId = finalizedId;
-        isSubmittingExistingDraft = true;
-      } else {
-        // Generate new quote ID for final submission
-        const { data: newQuoteId, error: generateError } = await supabase
-          .rpc('generate_quote_id', { user_email: user.email, is_draft: false });
-        
-      if (generateError) {
-        console.error('Error generating quote ID:', generateError);
-        throw generateError;
+      if (!user?.email || !user?.id) {
+        throw new Error('A valid user account is required to submit a quote.');
       }
 
-      quoteId = newQuoteId;
+      let quoteId: string;
+      let isSubmittingExistingDraft = false;
+
+      const generatedQuoteId = await generateSubmittedQuoteId(user.email, user.id);
+      const normalizedQuoteId = normalizeQuoteId(generatedQuoteId);
+
+      if (!normalizedQuoteId) {
+        throw new Error('Failed to generate a valid quote ID.');
+      }
+
+      quoteId = normalizedQuoteId;
+
+      const isCurrentQuoteDraft =
+        (currentQuote?.status === 'draft') ||
+        (typeof currentQuoteId === 'string' && currentQuoteId.trim().length > 0 && isDraftMode);
+
+      if (currentQuoteId && isCurrentQuoteDraft) {
+        isSubmittingExistingDraft = true;
+        await persistNormalizedQuoteId(currentQuoteId, quoteId);
+        setCurrentQuoteId(quoteId);
+        setCurrentQuote(prev => (
+          prev
+            ? {
+                ...prev,
+                id: quoteId,
+                status: 'pending_approval'
+              }
+            : prev
+        ));
+        setIsDraftMode(false);
       }
 
       const customerNameValue = getStringFieldValue('customer_name', 'Unnamed Customer');
@@ -2681,7 +2662,7 @@ main
             quote_fields: quoteFields,
             updated_at: new Date().toISOString()
           })
-          .eq('id', currentQuoteId);
+          .eq('id', quoteId);
         quoteError = error;
       } else {
         // Insert new quote
@@ -2728,23 +2709,7 @@ main
         return;
       }
 
-      if (isSubmittingExistingDraft) {
-        // Update existing BOM items with new quote ID
-        const { error: updateBomError } = await supabase
-          .from('bom_items')
-          .update({ quote_id: quoteId })
-          .eq('quote_id', currentQuoteId);
-        
-        if (updateBomError) {
-          console.error('SUPABASE BOM UPDATE ERROR:', updateBomError);
-          toast({
-            title: 'BOM Update Error',
-            description: updateBomError.message || 'Failed to update BOM items',
-            variant: 'destructive',
-          });
-          throw updateBomError;
-        }
-      } else {
+      if (!isSubmittingExistingDraft) {
         // Insert new BOM items
         for (const item of bomItems) {
           const serializedAssignments = item.slotAssignments
@@ -3190,7 +3155,7 @@ main
               isSubmitting={isSubmitting}
               isDraftMode={isDraftMode}
               currentQuoteId={currentQuoteId}
-              draftName={currentQuote?.status === 'draft' ? currentQuote?.customer_name : null}
+              draftName={currentQuote?.status === 'draft' ? currentQuoteId : null}
               quoteFields={quoteFields}
               quoteMetadata={currentQuote}
               discountPercentage={discountPercentage}
