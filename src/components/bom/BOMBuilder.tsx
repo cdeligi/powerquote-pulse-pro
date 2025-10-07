@@ -1391,18 +1391,11 @@ if (
       const resolvedOracleCustomerId = getStringFieldValue('oracle_customer_id', 'DRAFT', 'DRAFT');
       const resolvedSfdcOpportunity = getStringFieldValue('sfdc_opportunity', timestampFallback, timestampFallback);
       
-      // Extract account value from quoteFields for customer_name update
-      const accountFromFields = (() => {
-        for (const [key, value] of Object.entries(quoteFields)) {
-          const lowerKey = key.toLowerCase();
-          if (lowerKey.includes('account') && typeof value === 'string' && value.trim()) {
-            return value.trim();
-          }
-        }
-        return null;
-      })();
-      
-      const updatedCustomerName = accountFromFields || draftCustomerName;
+      // Use the same normalization logic as the auto-sync path so any account
+      // style field (including select objects) can drive the persisted
+      // customer name.
+      const updatedCustomerName =
+        deriveCustomerNameFromFields(quoteFields, draftCustomerName) ?? draftCustomerName;
       
       const { error: quoteError } = await supabase
         .from('quotes')
@@ -1428,6 +1421,10 @@ if (
       if (quoteError) throw quoteError;
 
       lastSyncedQuoteFieldsRef.current = JSON.stringify(quoteFields ?? {});
+
+      if (updatedCustomerName && updatedCustomerName !== currentQuote?.customer_name) {
+        setCurrentQuote(prev => (prev ? { ...prev, customer_name: updatedCustomerName } : prev));
+      }
 
       if (!autoSave) {
         toast({
