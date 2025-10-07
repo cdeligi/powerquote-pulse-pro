@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
@@ -29,6 +29,7 @@ import QTMSConfigurationEditor from './QTMSConfigurationEditor';
 import { consolidateQTMSConfiguration, createQTMSBOMItem, ConsolidatedQTMS, QTMSConfiguration } from '@/utils/qtmsConsolidation';
 import { buildQTMSPartNumber } from '@/utils/qtmsPartNumberBuilder';
 import { findOptimalBushingPlacement, findExistingBushingSlots, isBushingCard } from '@/utils/bushingValidation';
+import { deriveCustomerNameFromFields } from '@/utils/customerName';
 import { useAuth } from '@/hooks/useAuth';
 import { useQuoteValidation } from './QuoteFieldValidation';
 import { usePermissions, FEATURES } from '@/hooks/usePermissions';
@@ -201,6 +202,46 @@ const deepClone = <T,>(value: T): T => {
   }
 };
 
+const normalizeDraftBomValue = (value: unknown): Record<string, any> | null => {
+  if (!value) {
+    return null;
+  }
+
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value);
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        return parsed as Record<string, any>;
+      }
+    } catch (error) {
+      console.warn('Failed to parse draft BOM string. Skipping draft BOM merge.', error);
+      return null;
+    }
+  }
+
+  if (typeof value === 'object' && !Array.isArray(value)) {
+    return value as Record<string, any>;
+  }
+
+  return null;
+};
+
+const mergeQuoteFieldsIntoDraftBom = (
+  draftBom: unknown,
+  fields: Record<string, any>,
+): Record<string, any> | null => {
+  const base = normalizeDraftBomValue(draftBom);
+  if (!base) {
+    return null;
+  }
+
+  return {
+    ...base,
+    quoteFields: fields,
+    quote_fields: fields,
+  };
+};
+
 const resolvePartNumberContext = (...candidates: Array<any>) => {
   for (const candidate of candidates) {
     if (!candidate) continue;
@@ -310,6 +351,9 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
   const [currentQuoteId, setCurrentQuoteId] = useState<string | null>(quoteId || null);
   const [currentQuote, setCurrentQuote] = useState<any>(null);
   const [isDraftMode, setIsDraftMode] = useState(mode === 'edit' || mode === 'new');
+
+  const pendingQuoteFieldSyncRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastSyncedQuoteFieldsRef = useRef<string>(JSON.stringify({}));
 
   // Admin-driven part number config and codes for the selected chassis
   const [pnConfig, setPnConfig] = useState<any | null>(null);
@@ -590,8 +634,9 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
         title: 'Quote Created',
         description: `Draft ${draftQuoteId} for ${resolvedCustomerName} is ready for configuration. Your progress will be automatically saved.`
       });
-      
+
       console.log('Draft quote created successfully:', draftQuoteId);
+      lastSyncedQuoteFieldsRef.current = JSON.stringify(quoteFields ?? {});
     } catch (error) {
       console.error('Error creating draft quote:', error);
       toast({
@@ -952,6 +997,10 @@ if (
       // Restore quote fields
       if (quote.quote_fields) {
         setQuoteFields(quote.quote_fields);
+        lastSyncedQuoteFieldsRef.current = JSON.stringify(quote.quote_fields ?? {});
+      } else {
+        setQuoteFields({});
+        lastSyncedQuoteFieldsRef.current = JSON.stringify({});
       }
       
       // Restore discount settings
@@ -998,6 +1047,134 @@ if (
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const buildDraftBomSnapshot = () => {
+    const rackLayoutSummaries: Array<Record<string, any>> = [];
+    const level4Summaries: Array<Record<string, any>> = [];
+
+    let totalValue = 0;
+    let totalCost = 0;
+
+    const items = bomItems.map(item => {
+      const price = item.product.price || 0;
+      const cost = item.product.cost || 0;
+
+      totalValue += price * item.quantity;
+      totalCost += cost * item.quantity;
+
+      if (price === 0) {
+        console.warn(`Item ${item.product.name} has 0 price - this may cause issues`);
+      }
+
+      const serializedSlots = item.slotAssignments
+        ? serializeSlotAssignments(item.slotAssignments)
+        : undefined;
+
+      const rackLayout = item.rackConfiguration || buildRackLayoutFromAssignments(serializedSlots);
+
+      const partNumberContext =
+        item.partNumberContext ||
+        resolvePartNumberContext(item.configuration, item.product);
+
+      if (rackLayout?.slots && rackLayout.slots.length > 0) {
+        rackLayoutSummaries.push({
+          productId: item.product.id,
+          productName: item.product.name,
+          partNumber: item.partNumber || item.product.partNumber,
+          layout: rackLayout,
+        });
+      }
+
+      const slotLevel4 = serializedSlots?.filter(slot => slot.level4Config || slot.level4Selections) || [];
+
+      if (slotLevel4.length > 0) {
+        level4Summaries.push({
+          productId: item.product.id,
+          productName: item.product.name,
+          partNumber: item.partNumber || item.product.partNumber,
+          slots: slotLevel4.map(slot => ({
+            slot: slot.slot,
+            cardName: slot.displayName || slot.name,
+            configuration: slot.level4Config || slot.level4Selections,
+          })),
+        });
+      }
+
+      if (item.level4Config) {
+        level4Summaries.push({
+          productId: item.product.id,
+          productName: item.product.name,
+          partNumber: item.partNumber || item.product.partNumber,
+          configuration: item.level4Config,
+        });
+      }
+
+      return {
+        product_id: item.product.id,
+        name: item.product.name,
+        description: item.product.description,
+        part_number: item.partNumber || item.product.partNumber,
+        quantity: item.quantity,
+        unit_price: price,
+        unit_cost: cost,
+        total_price: price * item.quantity,
+        total_cost: cost * item.quantity,
+        margin: cost > 0 ? ((price - cost) / price) * 100 : 100,
+        configuration_data: {
+          ...item.product,
+          price,
+          cost,
+          partNumberContext: partNumberContext ? deepClone(partNumberContext) : undefined,
+        },
+        product_type: 'standard',
+        slotAssignments: serializedSlots,
+        rackConfiguration: rackLayout,
+        level4Config: item.level4Config || null,
+        level4Selections: item.level4Selections || null,
+        partNumberContext: partNumberContext ? deepClone(partNumberContext) : undefined,
+      };
+    });
+
+    const grossProfit = totalValue - totalCost;
+    const quoteOriginalMargin = totalValue > 0 ? (grossProfit / totalValue) * 100 : 0;
+    const draftOriginalMargin =
+      totalCost > 0 && totalValue > 0 ? (grossProfit / totalValue) * 100 : 100;
+    const discountedValue = totalValue * (1 - discountPercentage / 100);
+    const discountedMargin =
+      totalCost > 0 && discountedValue > 0
+        ? ((discountedValue - totalCost) / discountedValue) * 100
+        : 100;
+
+    const draftBomData = {
+      items,
+      quoteFields,
+      discountPercentage,
+      discountJustification,
+      totals: {
+        totalValue,
+        totalCost,
+        grossProfit,
+        originalMargin: draftOriginalMargin,
+        discountedValue,
+        discountedMargin,
+      },
+      rackLayouts: rackLayoutSummaries,
+      level4Configurations: level4Summaries,
+    };
+
+    return {
+      draftBomData,
+      totals: {
+        totalValue,
+        totalCost,
+        grossProfit,
+        originalMargin: quoteOriginalMargin,
+        draftOriginalMargin,
+        discountedValue,
+        discountedMargin,
+      },
+    };
   };
 
   // Manual save as draft function with better error handling and feedback
@@ -1055,6 +1232,9 @@ if (
 
       let quoteId = currentQuoteId;
       
+      const { draftBomData, totals } = buildDraftBomSnapshot();
+      const { totalValue, totalCost, grossProfit, originalMargin } = totals;
+
       // Create new draft if none exists
       if (!quoteId) {
         console.log('No current quote ID, creating new draft quote');
@@ -1062,12 +1242,6 @@ if (
         const newQuoteId = await generateUniqueDraftName(user.id, user.email);
 
         console.log('Generated new draft quote ID:', newQuoteId);
-
-        // Calculate totals from BOM items
-        const totalValue = bomItems.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
-        const totalCost = bomItems.reduce((sum, item) => sum + ((item.product.cost || 0) * item.quantity), 0);
-        const grossProfit = totalValue - totalCost;
-        const originalMargin = totalValue > 0 ? ((totalValue - totalCost) / totalValue) * 100 : 0;
 
         const resolvedPriority = getStringFieldValue('priority', 'Medium');
         const resolvedShippingTerms = getStringFieldValue('shipping_terms', 'Ex-Works', 'Ex-Works');
@@ -1092,10 +1266,7 @@ if (
           is_rep_involved: resolvedRepInvolved,
           status: 'draft' as const,
           quote_fields: quoteFields,
-          draft_bom: {
-            items: bomItems,
-            lastSaved: new Date().toISOString()
-          },
+          draft_bom: draftBomData,
           original_quote_value: totalValue,
           discounted_value: totalValue,
           total_cost: totalCost,
@@ -1122,20 +1293,18 @@ if (
           customer_name: resolvedCustomerName,
           oracle_customer_id: resolvedOracleCustomerId,
           sfdc_opportunity: resolvedSfdcOpportunity,
-          status: 'draft'
+          status: 'draft',
+          quote_fields: quoteFields,
+          draft_bom: draftBomData,
         });
         quoteId = newQuoteId;
 
         window.history.replaceState({}, '', `/#configure?quoteId=${encodeURIComponent(newQuoteId)}`);
 
         console.log('Draft quote created successfully:', quoteId);
+        lastSyncedQuoteFieldsRef.current = JSON.stringify(quoteFields ?? {});
       } else {
         // Update existing draft - also calculate and update totals
-        const totalValue = bomItems.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
-        const totalCost = bomItems.reduce((sum, item) => sum + ((item.product.cost || 0) * item.quantity), 0);
-        const grossProfit = totalValue - totalCost;
-        const originalMargin = totalValue > 0 ? ((totalValue - totalCost) / totalValue) * 100 : 0;
-
         const { error: updateError } = await supabase
           .from('quotes')
           .update({
@@ -1143,10 +1312,7 @@ if (
             oracle_customer_id: resolvedOracleCustomerId,
             sfdc_opportunity: resolvedSfdcOpportunity,
             quote_fields: quoteFields,
-            draft_bom: {
-              items: bomItems,
-              lastSaved: new Date().toISOString()
-            },
+            draft_bom: draftBomData,
             original_quote_value: totalValue,
             discounted_value: totalValue,
             total_cost: totalCost,
@@ -1168,8 +1334,11 @@ if (
           customer_name: resolvedCustomerName,
           oracle_customer_id: resolvedOracleCustomerId,
           sfdc_opportunity: resolvedSfdcOpportunity,
+          quote_fields: quoteFields,
+          draft_bom: draftBomData,
         } : prev);
         console.log('Draft quote updated successfully:', quoteId);
+        lastSyncedQuoteFieldsRef.current = JSON.stringify(quoteFields ?? {});
       }
 
       toast({
@@ -1192,109 +1361,15 @@ if (
     if (!currentQuoteId || !user?.id) return;
     
     try {
-      // Calculate totals
-      const totalValue = bomItems.reduce((sum, item) => 
-        sum + (item.product.price * item.quantity), 0
-      );
-      
-      const totalCost = bomItems.reduce((sum, item) => 
-        sum + ((item.product.cost || 0) * item.quantity), 0
-      );
-      
-      // Validate and prepare draft BOM data
-      const rackLayoutSummaries: Array<Record<string, any>> = [];
-      const level4Summaries: Array<Record<string, any>> = [];
-
-      const draftBomData = {
-        items: bomItems.map(item => {
-          const price = item.product.price || 0;
-          const cost = item.product.cost || 0;
-
-          // Log warning if prices are missing
-          if (price === 0) {
-            console.warn(`Item ${item.product.name} has 0 price - this may cause issues`);
-          }
-
-          const serializedSlots = item.slotAssignments ? serializeSlotAssignments(item.slotAssignments) : undefined;
-        const rackLayout = item.rackConfiguration || buildRackLayoutFromAssignments(serializedSlots);
-
-        const partNumberContext =
-          item.partNumberContext ||
-          resolvePartNumberContext(item.configuration, item.product);
-
-        if (rackLayout?.slots && rackLayout.slots.length > 0) {
-          rackLayoutSummaries.push({
-            productId: item.product.id,
-            productName: item.product.name,
-              partNumber: item.partNumber || item.product.partNumber,
-              layout: rackLayout,
-            });
-          }
-
-          const slotLevel4 = serializedSlots?.filter(slot => slot.level4Config || slot.level4Selections) || [];
-          if (slotLevel4.length > 0) {
-            level4Summaries.push({
-              productId: item.product.id,
-              productName: item.product.name,
-              partNumber: item.partNumber || item.product.partNumber,
-              slots: slotLevel4.map(slot => ({
-                slot: slot.slot,
-                cardName: slot.displayName || slot.name,
-                configuration: slot.level4Config || slot.level4Selections,
-              })),
-            });
-          }
-
-          if (item.level4Config) {
-            level4Summaries.push({
-              productId: item.product.id,
-              productName: item.product.name,
-              partNumber: item.partNumber || item.product.partNumber,
-              configuration: item.level4Config,
-            });
-          }
-
-          return {
-            product_id: item.product.id,
-            name: item.product.name,
-            description: item.product.description,
-            part_number: item.partNumber || item.product.partNumber,
-            quantity: item.quantity,
-            unit_price: price,
-            unit_cost: cost,
-            total_price: price * item.quantity,
-            total_cost: cost * item.quantity,
-            margin: cost > 0
-              ? ((price - cost) / price) * 100
-              : 100,
-            configuration_data: {
-              ...item.product,
-              price,
-              cost,
-              partNumberContext: partNumberContext ? deepClone(partNumberContext) : undefined,
-            },
-            product_type: 'standard',
-            slotAssignments: serializedSlots,
-            rackConfiguration: rackLayout,
-            level4Config: item.level4Config || null,
-            level4Selections: item.level4Selections || null,
-            partNumberContext: partNumberContext ? deepClone(partNumberContext) : undefined,
-          };
-        }),
-        quoteFields,
-        discountPercentage,
-        discountJustification,
-        totals: {
-          totalValue,
-          totalCost,
-          grossProfit: totalValue - totalCost,
-          originalMargin: totalCost > 0 ? ((totalValue - totalCost) / totalValue) * 100 : 100,
-          discountedValue: totalValue * (1 - discountPercentage / 100),
-          discountedMargin: totalCost > 0 ? (((totalValue * (1 - discountPercentage / 100)) - totalCost) / (totalValue * (1 - discountPercentage / 100))) * 100 : 100
-        },
-        rackLayouts: rackLayoutSummaries,
-        level4Configurations: level4Summaries,
-      };
+      const { draftBomData, totals } = buildDraftBomSnapshot();
+      const {
+        totalValue,
+        totalCost,
+        discountedValue,
+        discountedMargin,
+        grossProfit,
+        draftOriginalMargin,
+      } = totals;
 
       // Update quote with draft BOM data
       const providedCustomerName = getQuoteFieldValue('customer_name');
@@ -1307,18 +1382,11 @@ if (
       const resolvedOracleCustomerId = getStringFieldValue('oracle_customer_id', 'DRAFT', 'DRAFT');
       const resolvedSfdcOpportunity = getStringFieldValue('sfdc_opportunity', timestampFallback, timestampFallback);
       
-      // Extract account value from quoteFields for customer_name update
-      const accountFromFields = (() => {
-        for (const [key, value] of Object.entries(quoteFields)) {
-          const lowerKey = key.toLowerCase();
-          if (lowerKey.includes('account') && typeof value === 'string' && value.trim()) {
-            return value.trim();
-          }
-        }
-        return null;
-      })();
-      
-      const updatedCustomerName = accountFromFields || draftCustomerName;
+      // Use the same normalization logic as the auto-sync path so any account
+      // style field (including select objects) can drive the persisted
+      // customer name.
+      const updatedCustomerName =
+        deriveCustomerNameFromFields(quoteFields, draftCustomerName) ?? draftCustomerName;
       
       const { error: quoteError } = await supabase
         .from('quotes')
@@ -1327,12 +1395,12 @@ if (
           oracle_customer_id: resolvedOracleCustomerId,
           sfdc_opportunity: resolvedSfdcOpportunity,
           original_quote_value: totalValue,
-          discounted_value: totalValue * (1 - discountPercentage / 100),
+          discounted_value: discountedValue,
           requested_discount: discountPercentage,
           total_cost: totalCost,
-          gross_profit: totalValue - totalCost,
-          original_margin: totalCost > 0 ? ((totalValue - totalCost) / totalValue) * 100 : 100,
-          discounted_margin: totalCost > 0 ? (((totalValue * (1 - discountPercentage / 100)) - totalCost) / (totalValue * (1 - discountPercentage / 100))) * 100 : 100,
+          gross_profit: grossProfit,
+          original_margin: draftOriginalMargin,
+          discounted_margin: discountedMargin,
           quote_fields: quoteFields,
           discount_justification: discountJustification,
           draft_bom: draftBomData,
@@ -1340,9 +1408,29 @@ if (
           updated_at: new Date().toISOString()
         })
         .eq('id', currentQuoteId);
-        
+
       if (quoteError) throw quoteError;
-      
+
+      lastSyncedQuoteFieldsRef.current = JSON.stringify(quoteFields ?? {});
+
+      setCurrentQuote(prev => {
+        if (!prev) {
+          return prev;
+        }
+
+        const nextQuote: Record<string, any> = {
+          ...prev,
+          quote_fields: quoteFields,
+          draft_bom: draftBomData,
+        };
+
+        if (updatedCustomerName) {
+          nextQuote.customer_name = updatedCustomerName;
+        }
+
+        return nextQuote;
+      });
+
       if (!autoSave) {
         toast({
           title: 'Draft Saved',
@@ -1379,6 +1467,95 @@ if (
   const handleQuoteFieldChange = (fieldId: string, value: any) => {
     setQuoteFields(prev => ({ ...prev, [fieldId]: value }));
   };
+
+  const syncQuoteFieldsToSupabase = useCallback(
+    async (fields: Record<string, any>, serializedSnapshot: string) => {
+      if (!currentQuoteId || !isDraftMode) {
+        return;
+      }
+
+      try {
+        const derivedCustomerName = deriveCustomerNameFromFields(fields, currentQuote?.customer_name);
+        const draftBomUpdate = mergeQuoteFieldsIntoDraftBom(currentQuote?.draft_bom, fields);
+        const updatePayload: Record<string, any> = {
+          quote_fields: fields,
+          updated_at: new Date().toISOString(),
+        };
+
+        if (derivedCustomerName) {
+          updatePayload.customer_name = derivedCustomerName;
+        }
+
+        if (draftBomUpdate) {
+          updatePayload.draft_bom = draftBomUpdate;
+        }
+
+        const { error } = await supabase
+          .from('quotes')
+          .update(updatePayload)
+          .eq('id', currentQuoteId);
+
+        if (error) {
+          console.error('Error syncing quote fields to Supabase:', error);
+          return;
+        }
+
+        lastSyncedQuoteFieldsRef.current = serializedSnapshot;
+
+        setCurrentQuote(prev => {
+          if (!prev) {
+            return prev;
+          }
+
+          const nextDraftBom = mergeQuoteFieldsIntoDraftBom(prev.draft_bom, fields);
+          const nextQuote: Record<string, any> = {
+            ...prev,
+            quote_fields: fields,
+          };
+
+          if (derivedCustomerName) {
+            nextQuote.customer_name = derivedCustomerName;
+          }
+
+          if (nextDraftBom) {
+            nextQuote.draft_bom = nextDraftBom;
+          }
+
+          return nextQuote;
+        });
+      } catch (error) {
+        console.error('Failed to sync quote fields to Supabase:', error);
+      }
+    },
+    [currentQuoteId, isDraftMode, currentQuote?.customer_name, currentQuote?.draft_bom]
+  );
+
+  useEffect(() => {
+    if (!currentQuoteId || !isDraftMode) {
+      return;
+    }
+
+    const serialized = JSON.stringify(quoteFields ?? {});
+    if (serialized === lastSyncedQuoteFieldsRef.current) {
+      return;
+    }
+
+    if (pendingQuoteFieldSyncRef.current) {
+      clearTimeout(pendingQuoteFieldSyncRef.current);
+    }
+
+    pendingQuoteFieldSyncRef.current = setTimeout(() => {
+      pendingQuoteFieldSyncRef.current = null;
+      syncQuoteFieldsToSupabase(quoteFields ?? {}, serialized);
+    }, 750);
+
+    return () => {
+      if (pendingQuoteFieldSyncRef.current) {
+        clearTimeout(pendingQuoteFieldSyncRef.current);
+        pendingQuoteFieldSyncRef.current = null;
+      }
+    };
+  }, [quoteFields, currentQuoteId, isDraftMode, syncQuoteFieldsToSupabase]);
 
   // Load Level 1 products for dynamic tabs - use real Supabase data
   const [level1Products, setLevel1Products] = useState<Level1Product[]>([]);
@@ -2571,6 +2748,7 @@ if (
     console.log('Quote submitted with ID:', quoteId);
     setBomItems([]);
     setQuoteFields({});
+    lastSyncedQuoteFieldsRef.current = JSON.stringify({});
     setDiscountPercentage(0);
     setDiscountJustification('');
     onBOMUpdate([]);
