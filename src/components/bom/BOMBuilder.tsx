@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
@@ -57,6 +57,80 @@ const toCamelCase = (value: string) =>
 const toPascalCase = (value: string) => {
   const camel = toCamelCase(value);
   return camel.charAt(0).toUpperCase() + camel.slice(1);
+};
+
+const CANDIDATE_VALUE_KEYS = ['value', 'label', 'name', 'display', 'displayValue', 'text'] as const;
+
+const coerceFieldEntryToString = (value: unknown): string | null => {
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : null;
+  }
+
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return String(value);
+  }
+
+  if (Array.isArray(value)) {
+    for (const entry of value) {
+      const coerced = coerceFieldEntryToString(entry);
+      if (coerced) {
+        return coerced;
+      }
+    }
+    return null;
+  }
+
+  if (value && typeof value === 'object') {
+    const record = value as Record<string, unknown>;
+    for (const key of CANDIDATE_VALUE_KEYS) {
+      if (key in record) {
+        const coerced = coerceFieldEntryToString(record[key]);
+        if (coerced) {
+          return coerced;
+        }
+      }
+    }
+  }
+
+  return null;
+};
+
+const findAccountLikeValue = (fields: Record<string, any>): string | null => {
+  for (const [key, rawValue] of Object.entries(fields)) {
+    const normalizedKey = key.toLowerCase();
+    if (!normalizedKey.includes('account')) {
+      continue;
+    }
+
+    const coerced = coerceFieldEntryToString(rawValue);
+    if (coerced) {
+      return coerced.trim();
+    }
+  }
+
+  return null;
+};
+
+const deriveCustomerNameFromFields = (
+  fields: Record<string, any>,
+  fallback?: string | null,
+): string | null => {
+  const accountValue = findAccountLikeValue(fields);
+  if (accountValue) {
+    return accountValue;
+  }
+
+  const directCustomerName = coerceFieldEntryToString(fields.customer_name);
+  if (directCustomerName) {
+    return directCustomerName.trim();
+  }
+
+  if (typeof fallback === 'string' && fallback.trim().length > 0) {
+    return fallback.trim();
+  }
+
+  return null;
 };
 
 interface BOMBuilderProps {
@@ -310,6 +384,9 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
   const [currentQuoteId, setCurrentQuoteId] = useState<string | null>(quoteId || null);
   const [currentQuote, setCurrentQuote] = useState<any>(null);
   const [isDraftMode, setIsDraftMode] = useState(mode === 'edit' || mode === 'new');
+
+  const pendingQuoteFieldSyncRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastSyncedQuoteFieldsRef = useRef<string>(JSON.stringify({}));
 
   // Admin-driven part number config and codes for the selected chassis
   const [pnConfig, setPnConfig] = useState<any | null>(null);
@@ -590,8 +667,9 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
         title: 'Quote Created',
         description: `Draft ${draftQuoteId} for ${resolvedCustomerName} is ready for configuration. Your progress will be automatically saved.`
       });
-      
+
       console.log('Draft quote created successfully:', draftQuoteId);
+      lastSyncedQuoteFieldsRef.current = JSON.stringify(quoteFields ?? {});
     } catch (error) {
       console.error('Error creating draft quote:', error);
       toast({
@@ -952,6 +1030,10 @@ if (
       // Restore quote fields
       if (quote.quote_fields) {
         setQuoteFields(quote.quote_fields);
+        lastSyncedQuoteFieldsRef.current = JSON.stringify(quote.quote_fields ?? {});
+      } else {
+        setQuoteFields({});
+        lastSyncedQuoteFieldsRef.current = JSON.stringify({});
       }
       
       // Restore discount settings
@@ -1129,6 +1211,7 @@ if (
         window.history.replaceState({}, '', `/#configure?quoteId=${encodeURIComponent(newQuoteId)}`);
 
         console.log('Draft quote created successfully:', quoteId);
+        lastSyncedQuoteFieldsRef.current = JSON.stringify(quoteFields ?? {});
       } else {
         // Update existing draft - also calculate and update totals
         const totalValue = bomItems.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
@@ -1170,6 +1253,7 @@ if (
           sfdc_opportunity: resolvedSfdcOpportunity,
         } : prev);
         console.log('Draft quote updated successfully:', quoteId);
+        lastSyncedQuoteFieldsRef.current = JSON.stringify(quoteFields ?? {});
       }
 
       toast({
@@ -1340,9 +1424,11 @@ if (
           updated_at: new Date().toISOString()
         })
         .eq('id', currentQuoteId);
-        
+
       if (quoteError) throw quoteError;
-      
+
+      lastSyncedQuoteFieldsRef.current = JSON.stringify(quoteFields ?? {});
+
       if (!autoSave) {
         toast({
           title: 'Draft Saved',
@@ -1379,6 +1465,72 @@ if (
   const handleQuoteFieldChange = (fieldId: string, value: any) => {
     setQuoteFields(prev => ({ ...prev, [fieldId]: value }));
   };
+
+  const syncQuoteFieldsToSupabase = useCallback(
+    async (fields: Record<string, any>, serializedSnapshot: string) => {
+      if (!currentQuoteId || !isDraftMode) {
+        return;
+      }
+
+      try {
+        const derivedCustomerName = deriveCustomerNameFromFields(fields, currentQuote?.customer_name);
+        const updatePayload: Record<string, any> = {
+          quote_fields: fields,
+          updated_at: new Date().toISOString(),
+        };
+
+        if (derivedCustomerName) {
+          updatePayload.customer_name = derivedCustomerName;
+        }
+
+        const { error } = await supabase
+          .from('quotes')
+          .update(updatePayload)
+          .eq('id', currentQuoteId);
+
+        if (error) {
+          console.error('Error syncing quote fields to Supabase:', error);
+          return;
+        }
+
+        lastSyncedQuoteFieldsRef.current = serializedSnapshot;
+
+        if (derivedCustomerName && derivedCustomerName !== currentQuote?.customer_name) {
+          setCurrentQuote(prev => prev ? { ...prev, customer_name: derivedCustomerName } : prev);
+        }
+      } catch (error) {
+        console.error('Failed to sync quote fields to Supabase:', error);
+      }
+    },
+    [currentQuoteId, isDraftMode, currentQuote?.customer_name]
+  );
+
+  useEffect(() => {
+    if (!currentQuoteId || !isDraftMode) {
+      return;
+    }
+
+    const serialized = JSON.stringify(quoteFields ?? {});
+    if (serialized === lastSyncedQuoteFieldsRef.current) {
+      return;
+    }
+
+    if (pendingQuoteFieldSyncRef.current) {
+      clearTimeout(pendingQuoteFieldSyncRef.current);
+    }
+
+    pendingQuoteFieldSyncRef.current = setTimeout(() => {
+      pendingQuoteFieldSyncRef.current = null;
+      syncQuoteFieldsToSupabase(quoteFields ?? {}, serialized);
+    }, 750);
+
+    return () => {
+      if (pendingQuoteFieldSyncRef.current) {
+        clearTimeout(pendingQuoteFieldSyncRef.current);
+        pendingQuoteFieldSyncRef.current = null;
+      }
+    };
+  }, [quoteFields, currentQuoteId, isDraftMode, syncQuoteFieldsToSupabase]);
 
   // Load Level 1 products for dynamic tabs - use real Supabase data
   const [level1Products, setLevel1Products] = useState<Level1Product[]>([]);
@@ -2571,6 +2723,7 @@ if (
     console.log('Quote submitted with ID:', quoteId);
     setBomItems([]);
     setQuoteFields({});
+    lastSyncedQuoteFieldsRef.current = JSON.stringify({});
     setDiscountPercentage(0);
     setDiscountJustification('');
     onBOMUpdate([]);
