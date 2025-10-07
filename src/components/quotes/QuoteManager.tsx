@@ -23,6 +23,27 @@ interface QuoteManagerProps {
   user: User;
 }
 
+const extractAccountSegments = (rawValue?: string | null): string[] => {
+  if (!rawValue) {
+    return [];
+  }
+
+  return String(rawValue)
+    .split(/\r?\n+/)
+    .flatMap((segment) => segment.split(/[;,]+/))
+    .map((segment) => segment.replace(/^account\s*:?\s*/i, "").trim())
+    .filter(Boolean);
+};
+
+const formatAccountDisplay = (rawValue?: string | null): string | null => {
+  const segments = extractAccountSegments(rawValue);
+  if (segments.length === 0) {
+    return null;
+  }
+
+  return segments[0];
+};
+
 const QuoteManager = ({ user }: QuoteManagerProps) => {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState("");
@@ -122,24 +143,25 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
     ];
 
     const accountValue = (() => {
-      const normalizedCandidates = accountCandidates
-        .flatMap(value => {
-          if (typeof value !== 'string') {
-            return [] as string[];
+      const seen = new Set<string>();
+
+      for (const candidate of accountCandidates) {
+        if (typeof candidate !== 'string') {
+          continue;
+        }
+
+        for (const segment of extractAccountSegments(candidate)) {
+          const normalizedKey = segment.toLowerCase();
+          if (seen.has(normalizedKey)) {
+            continue;
           }
 
-          return value
-            .split(/\r?\n+/)
-            .map(segment => segment.replace(/^account\s*:?\s*/i, '').trim())
-            .filter(Boolean);
-        });
-
-      if (normalizedCandidates.length === 0) {
-        return null;
+          seen.add(normalizedKey);
+          return segment;
+        }
       }
 
-      const uniqueValues = Array.from(new Set(normalizedCandidates));
-      return uniqueValues[0] ?? null;
+      return null;
     })();
 
     const normalizedQuoteId = normalizeQuoteId(quote.id) || quote.id;
@@ -939,7 +961,7 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
                         </p>
                       )}
                       <p className="text-gray-400 text-sm mt-1">
-                        Account: {quote.account ?? '—'}
+                        Account: {formatAccountDisplay(quote.account) ?? '—'}
                       </p>
                       {quote.account && (
                         <p className="text-gray-400 text-sm">
