@@ -47,6 +47,33 @@ const formatAccountDisplay = (rawValue?: string | null): string | null => {
   return segments[0];
 };
 
+const parseJsonValue = (value: unknown): unknown => {
+  if (typeof value === "string") {
+    try {
+      return JSON.parse(value);
+    } catch (error) {
+      console.warn("Failed to parse JSON string while normalizing quote data.", error);
+      return value;
+    }
+  }
+
+  return value;
+};
+
+const ensureRecord = (value: unknown): Record<string, unknown> | null => {
+  const parsed = parseJsonValue(value);
+  if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+    return parsed as Record<string, unknown>;
+  }
+
+  return null;
+};
+
+const ensureArray = (value: unknown): unknown[] | null => {
+  const parsed = parseJsonValue(value);
+  return Array.isArray(parsed) ? parsed : null;
+};
+
 const coerceFieldValueToString = (value: unknown): string | undefined => {
   if (isNonEmptyString(value)) {
     return value.trim();
@@ -210,22 +237,21 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
     const currency = quote.currency || 'USD';
     const isDraftQuote = quote.status === 'draft';
 
-    const quoteFields = (quote.quote_fields && typeof quote.quote_fields === 'object')
-      ? quote.quote_fields as Record<string, unknown>
-      : {};
+    const quoteFields = ensureRecord(quote.quote_fields) ?? {};
+    const normalizedDraftBom = ensureRecord(quote.draft_bom);
 
     const draftQuoteFields = (() => {
-      if (!quote.draft_bom || typeof quote.draft_bom !== 'object') {
+      const source = normalizedDraftBom;
+      if (!source) {
         return {} as Record<string, unknown>;
       }
 
-      const rawFields = (quote.draft_bom as Record<string, unknown>).quoteFields;
-      if (rawFields && typeof rawFields === 'object' && !Array.isArray(rawFields)) {
-        return rawFields as Record<string, unknown>;
-      }
+      const rawFields = source['quoteFields'] ?? source['quote_fields'];
 
-      return {} as Record<string, unknown>;
+      return ensureRecord(rawFields) ?? {};
     })();
+
+    const draftItems = ensureArray(normalizedDraftBom ? normalizedDraftBom['items'] : undefined) ?? undefined;
 
     // When a user resumes editing a draft quote, the latest field values live in
     // the draft payload. Ensure those values take precedence over the persisted
@@ -273,8 +299,10 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
     const draftAccountFieldValue = findAccountFieldValue(draftQuoteFields);
     const persistedAccountFieldValue = findAccountFieldValue(quoteFields);
     const combinedAccountFieldValue = findAccountFieldValue(combinedFields);
+    const draftBomAccountFieldValue = findAccountFieldValue(normalizedDraftBom ?? undefined);
 
     const rawQuoteRecord = quote as Record<string, unknown>;
+    const rawQuoteAccountFieldValue = findAccountFieldValue(rawQuoteRecord);
     const topLevelAccountCandidates = [
       coerceFieldValueToString(rawQuoteRecord?.["account"]),
       coerceFieldValueToString(rawQuoteRecord?.["account_name"]),
@@ -291,9 +319,11 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
       combinedAccountFieldValue,
       configuredAccount,
       persistedAccountFieldValue,
+      draftBomAccountFieldValue,
       ...topLevelAccountCandidates,
       configuredCustomerName,
       normalizedDraftName,
+      rawQuoteAccountFieldValue,
     ].filter(isNonEmptyString);
 
     const accountValue = (() => {
@@ -324,9 +354,9 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
 
     const primaryDisplayLabel = formalQuoteId;
 
-    const originalValue = isDraftQuote && quote.draft_bom?.items
-      ? quote.draft_bom.items.reduce((sum: number, item: any) =>
-          sum + ((item.unit_price || item.total_price || item.product?.price || 0) * (item.quantity || 1)), 0)
+    const originalValue = isDraftQuote && Array.isArray(draftItems)
+      ? (draftItems as any[]).reduce((sum: number, item: any) =>
+          sum + ((item?.unit_price || item?.total_price || item?.product?.price || 0) * (item?.quantity || 1)), 0)
       : (quote.original_quote_value || 0);
 
     const normalizedRequestedDiscount = normalizePercentage(quote.requested_discount);
@@ -393,8 +423,11 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
         quotes.forEach(quote => {
           try {
             // For draft quotes, check draft_bom data first
-            if (quote.status === 'draft' && quote.draft_bom && quote.draft_bom.items && Array.isArray(quote.draft_bom.items)) {
-              counts[quote.id] = quote.draft_bom.items.length;
+            const normalizedDraftBom = ensureRecord(quote.draft_bom);
+            const draftBomItems = ensureArray(normalizedDraftBom ? normalizedDraftBom['items'] : undefined);
+
+            if (quote.status === 'draft' && Array.isArray(draftBomItems)) {
+              counts[quote.id] = draftBomItems.length;
             } else {
               // For non-draft quotes, we'll fetch from database
               counts[quote.id] = 0; // Default to 0, will be updated below
@@ -570,8 +603,11 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
       let bomItems: any[] = [];
       
       // Get BOM items
-      if (fullQuote.status === 'draft' && fullQuote.draft_bom?.items) {
-        bomItems = fullQuote.draft_bom.items.map((item: any) => {
+      const normalizedDraftBom = ensureRecord(fullQuote?.draft_bom);
+      const draftBomItems = ensureArray(normalizedDraftBom ? normalizedDraftBom['items'] : undefined);
+
+      if (fullQuote.status === 'draft' && Array.isArray(draftBomItems)) {
+        bomItems = (draftBomItems as any[]).map((item: any) => {
           const productPrice = item.unit_price || item.product?.price || 0;
           const storedSlotAssignments = item.slotAssignments as SerializedSlotAssignment[] | undefined;
           const slotAssignments = deserializeSlotAssignments(storedSlotAssignments);
@@ -764,7 +800,9 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
         throw new Error('Unable to load newly cloned quote.');
       }
 
-      const hasDraftItems = Array.isArray(clonedQuote.draft_bom?.items) && clonedQuote.draft_bom.items.length > 0;
+      const normalizedClonedDraftBom = ensureRecord(clonedQuote.draft_bom);
+      const clonedDraftItems = ensureArray(normalizedClonedDraftBom ? normalizedClonedDraftBom['items'] : undefined);
+      const hasDraftItems = Array.isArray(clonedDraftItems) && clonedDraftItems.length > 0;
 
       if (!hasDraftItems) {
         const { data: bomRows, error: bomError } = await supabase
@@ -894,15 +932,18 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
           }))
           .filter(entry => entry.configuration || entry.selections);
 
+        const existingDraftQuoteFields = ensureRecord(
+          normalizedClonedDraftBom
+            ? normalizedClonedDraftBom['quoteFields'] ?? normalizedClonedDraftBom['quote_fields']
+            : undefined,
+        ) ?? ensureRecord(clonedQuote.quote_fields) ?? {};
+
         const draftPayload = {
-          ...(clonedQuote.draft_bom && typeof clonedQuote.draft_bom === 'object' ? clonedQuote.draft_bom : {}),
+          ...(normalizedClonedDraftBom ?? {}),
           items: normalizedDraftItems,
           rackLayouts,
           level4Configurations,
-          quoteFields:
-            (clonedQuote.draft_bom && (clonedQuote.draft_bom as Record<string, any>)?.quoteFields) ||
-            clonedQuote.quote_fields ||
-            {},
+          quoteFields: existingDraftQuoteFields,
         };
 
         await supabase
