@@ -115,21 +115,21 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
       'customerAccountNumber'
     );
 
-    const accountValue =
-      configuredAccount ||
-      configuredCustomerName ||
-      normalizedDraftName ||
-      null;
+    const inferredAccountFromCustomer = configuredCustomerName && normalizedDraftName && configuredCustomerName !== normalizedDraftName
+      ? configuredCustomerName
+      : undefined;
+
+    const accountValue = configuredAccount || inferredAccountFromCustomer || null;
 
     const normalizedQuoteId = normalizeQuoteId(quote.id) || quote.id;
-    const formalQuoteId = normalizedQuoteId;
+    const formalQuoteId = isDraftQuote ? null : normalizedQuoteId;
 
     const draftOrConfiguredLabel = configuredQuoteName || normalizedDraftName || configuredCustomerName;
     const customerDisplayName = configuredCustomerName || normalizedDraftName || configuredQuoteName || quote.id;
 
-    const accountDisplayValue = accountValue || null;
-
-    const primaryDisplayLabel = formalQuoteId;
+    const primaryDisplayLabel = isDraftQuote
+      ? (draftOrConfiguredLabel || normalizedQuoteId)
+      : (formalQuoteId || customerDisplayName);
 
     const originalValue = isDraftQuote && quote.draft_bom?.items
       ? quote.draft_bom.items.reduce((sum: number, item: any) =>
@@ -170,10 +170,9 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
       displayId: quote.id, // Keep original ID for operations
       displayLabel: primaryDisplayLabel,
       formalQuoteId,
-      quoteId: normalizedQuoteId,
       customer: customerDisplayName,
       oracleCustomerId: quote.oracle_customer_id || 'N/A',
-      account: accountDisplayValue,
+      account: accountValue,
       currency,
       value: originalValue,
       finalValue,
@@ -904,7 +903,7 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
                     <div>
                       <div className="flex items-center space-x-3">
                         <span className="text-white font-bold">
-                          {quote.quoteId ?? quote.displayLabel}
+                          {quote.displayLabel}
                         </span>
                         <Badge className={`${statusBadge.color} text-white`}>
                           {statusBadge.text}
