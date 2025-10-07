@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
@@ -29,6 +29,7 @@ import QTMSConfigurationEditor from './QTMSConfigurationEditor';
 import { consolidateQTMSConfiguration, createQTMSBOMItem, ConsolidatedQTMS, QTMSConfiguration } from '@/utils/qtmsConsolidation';
 import { buildQTMSPartNumber } from '@/utils/qtmsPartNumberBuilder';
 import { findOptimalBushingPlacement, findExistingBushingSlots, isBushingCard } from '@/utils/bushingValidation';
+import { deriveCustomerNameFromFields } from '@/utils/customerName';
 import { useAuth } from '@/hooks/useAuth';
 import { useQuoteValidation } from './QuoteFieldValidation';
 import { usePermissions, FEATURES } from '@/hooks/usePermissions';
@@ -311,6 +312,9 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
   const [currentQuote, setCurrentQuote] = useState<any>(null);
   const [isDraftMode, setIsDraftMode] = useState(mode === 'edit' || mode === 'new');
 
+  const pendingQuoteFieldSyncRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastSyncedQuoteFieldsRef = useRef<string>(JSON.stringify({}));
+
   // Admin-driven part number config and codes for the selected chassis
   const [pnConfig, setPnConfig] = useState<any | null>(null);
   const [codeMap, setCodeMap] = useState<Record<string, { template: string; slot_span: number; is_standard?: boolean; standard_position?: number | null; designated_only?: boolean; designated_positions?: number[]; outside_chassis?: boolean; notes?: string | null; exclusive_in_slots?: boolean; color?: string | null }>>({});
@@ -590,8 +594,9 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
         title: 'Quote Created',
         description: `Draft ${draftQuoteId} for ${resolvedCustomerName} is ready for configuration. Your progress will be automatically saved.`
       });
-      
+
       console.log('Draft quote created successfully:', draftQuoteId);
+      lastSyncedQuoteFieldsRef.current = JSON.stringify(quoteFields ?? {});
     } catch (error) {
       console.error('Error creating draft quote:', error);
       toast({
@@ -952,6 +957,10 @@ if (
       // Restore quote fields
       if (quote.quote_fields) {
         setQuoteFields(quote.quote_fields);
+        lastSyncedQuoteFieldsRef.current = JSON.stringify(quote.quote_fields ?? {});
+      } else {
+        setQuoteFields({});
+        lastSyncedQuoteFieldsRef.current = JSON.stringify({});
       }
       
       // Restore discount settings
@@ -1129,6 +1138,7 @@ if (
         window.history.replaceState({}, '', `/#configure?quoteId=${encodeURIComponent(newQuoteId)}`);
 
         console.log('Draft quote created successfully:', quoteId);
+        lastSyncedQuoteFieldsRef.current = JSON.stringify(quoteFields ?? {});
       } else {
         // Update existing draft - also calculate and update totals
         const totalValue = bomItems.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
@@ -1170,6 +1180,7 @@ if (
           sfdc_opportunity: resolvedSfdcOpportunity,
         } : prev);
         console.log('Draft quote updated successfully:', quoteId);
+        lastSyncedQuoteFieldsRef.current = JSON.stringify(quoteFields ?? {});
       }
 
       toast({
@@ -1307,18 +1318,11 @@ if (
       const resolvedOracleCustomerId = getStringFieldValue('oracle_customer_id', 'DRAFT', 'DRAFT');
       const resolvedSfdcOpportunity = getStringFieldValue('sfdc_opportunity', timestampFallback, timestampFallback);
       
-      // Extract account value from quoteFields for customer_name update
-      const accountFromFields = (() => {
-        for (const [key, value] of Object.entries(quoteFields)) {
-          const lowerKey = key.toLowerCase();
-          if (lowerKey.includes('account') && typeof value === 'string' && value.trim()) {
-            return value.trim();
-          }
-        }
-        return null;
-      })();
-      
-      const updatedCustomerName = accountFromFields || draftCustomerName;
+      // Use the same normalization logic as the auto-sync path so any account
+      // style field (including select objects) can drive the persisted
+      // customer name.
+      const updatedCustomerName =
+        deriveCustomerNameFromFields(quoteFields, draftCustomerName) ?? draftCustomerName;
       
       const { error: quoteError } = await supabase
         .from('quotes')
@@ -1340,9 +1344,15 @@ if (
           updated_at: new Date().toISOString()
         })
         .eq('id', currentQuoteId);
-        
+
       if (quoteError) throw quoteError;
-      
+
+      lastSyncedQuoteFieldsRef.current = JSON.stringify(quoteFields ?? {});
+
+      if (updatedCustomerName && updatedCustomerName !== currentQuote?.customer_name) {
+        setCurrentQuote(prev => (prev ? { ...prev, customer_name: updatedCustomerName } : prev));
+      }
+
       if (!autoSave) {
         toast({
           title: 'Draft Saved',
@@ -1379,6 +1389,72 @@ if (
   const handleQuoteFieldChange = (fieldId: string, value: any) => {
     setQuoteFields(prev => ({ ...prev, [fieldId]: value }));
   };
+
+  const syncQuoteFieldsToSupabase = useCallback(
+    async (fields: Record<string, any>, serializedSnapshot: string) => {
+      if (!currentQuoteId || !isDraftMode) {
+        return;
+      }
+
+      try {
+        const derivedCustomerName = deriveCustomerNameFromFields(fields, currentQuote?.customer_name);
+        const updatePayload: Record<string, any> = {
+          quote_fields: fields,
+          updated_at: new Date().toISOString(),
+        };
+
+        if (derivedCustomerName) {
+          updatePayload.customer_name = derivedCustomerName;
+        }
+
+        const { error } = await supabase
+          .from('quotes')
+          .update(updatePayload)
+          .eq('id', currentQuoteId);
+
+        if (error) {
+          console.error('Error syncing quote fields to Supabase:', error);
+          return;
+        }
+
+        lastSyncedQuoteFieldsRef.current = serializedSnapshot;
+
+        if (derivedCustomerName && derivedCustomerName !== currentQuote?.customer_name) {
+          setCurrentQuote(prev => prev ? { ...prev, customer_name: derivedCustomerName } : prev);
+        }
+      } catch (error) {
+        console.error('Failed to sync quote fields to Supabase:', error);
+      }
+    },
+    [currentQuoteId, isDraftMode, currentQuote?.customer_name]
+  );
+
+  useEffect(() => {
+    if (!currentQuoteId || !isDraftMode) {
+      return;
+    }
+
+    const serialized = JSON.stringify(quoteFields ?? {});
+    if (serialized === lastSyncedQuoteFieldsRef.current) {
+      return;
+    }
+
+    if (pendingQuoteFieldSyncRef.current) {
+      clearTimeout(pendingQuoteFieldSyncRef.current);
+    }
+
+    pendingQuoteFieldSyncRef.current = setTimeout(() => {
+      pendingQuoteFieldSyncRef.current = null;
+      syncQuoteFieldsToSupabase(quoteFields ?? {}, serialized);
+    }, 750);
+
+    return () => {
+      if (pendingQuoteFieldSyncRef.current) {
+        clearTimeout(pendingQuoteFieldSyncRef.current);
+        pendingQuoteFieldSyncRef.current = null;
+      }
+    };
+  }, [quoteFields, currentQuoteId, isDraftMode, syncQuoteFieldsToSupabase]);
 
   // Load Level 1 products for dynamic tabs - use real Supabase data
   const [level1Products, setLevel1Products] = useState<Level1Product[]>([]);
@@ -2571,6 +2647,7 @@ if (
     console.log('Quote submitted with ID:', quoteId);
     setBomItems([]);
     setQuoteFields({});
+    lastSyncedQuoteFieldsRef.current = JSON.stringify({});
     setDiscountPercentage(0);
     setDiscountJustification('');
     onBOMUpdate([]);
