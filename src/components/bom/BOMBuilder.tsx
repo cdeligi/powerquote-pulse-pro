@@ -1023,11 +1023,23 @@ if (
     try {
       console.log('Starting draft save process...');
 
-      const providedCustomerName = getQuoteFieldValue('customer_name');
-      const resolvedCustomerName =
-        typeof providedCustomerName === 'string' && providedCustomerName.trim().length > 0
-          ? providedCustomerName.trim()
-          : 'Pending Customer';
+      // Extract account value from quoteFields (prioritize fields with "account" in the key)
+      const accountFromFields = (() => {
+        for (const [key, value] of Object.entries(quoteFields)) {
+          const lowerKey = key.toLowerCase();
+          if (lowerKey.includes('account') && typeof value === 'string' && value.trim()) {
+            return value.trim();
+          }
+        }
+        // Fall back to customer_name field
+        const customerNameValue = getQuoteFieldValue('customer_name');
+        if (typeof customerNameValue === 'string' && customerNameValue.trim().length > 0) {
+          return customerNameValue.trim();
+        }
+        return null;
+      })();
+      
+      const resolvedCustomerName = accountFromFields || 'Pending Customer';
 
       const defaultOracleCustomerId =
         typeof currentQuote?.oracle_customer_id === 'string' && currentQuote.oracle_customer_id.trim().length > 0
