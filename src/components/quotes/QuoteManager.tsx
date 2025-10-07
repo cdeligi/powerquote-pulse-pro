@@ -115,11 +115,16 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
       'customerAccountNumber'
     );
 
-    const accountValue =
+    const accountValueRaw =
       configuredAccount ||
       configuredCustomerName ||
       normalizedDraftName ||
       null;
+
+    const accountValue =
+      typeof accountValueRaw === 'string'
+        ? accountValueRaw.replace(/^account:\s*/i, '').trim() || null
+        : accountValueRaw;
 
     const normalizedQuoteId = normalizeQuoteId(quote.id) || quote.id;
     const formalQuoteId = normalizedQuoteId;
