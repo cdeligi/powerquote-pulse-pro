@@ -38,6 +38,37 @@ const extractAccountSegments = (rawValue?: string | null): string[] => {
     .filter(Boolean);
 };
 
+const normalizeKeyToTokens = (key: string): string[] =>
+  key
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .replace(/[_\-.]+/g, " ")
+    .toLowerCase()
+    .split(/\s+/)
+    .filter(Boolean);
+
+const isLikelyAccountKey = (key: string | undefined): key is string => {
+  if (!key) {
+    return false;
+  }
+
+  const tokens = normalizeKeyToTokens(key);
+  if (tokens.length === 0) {
+    return false;
+  }
+
+  const hasAccountToken = tokens.some((token) => token === "account" || token === "accounts" || token === "acct");
+  if (!hasAccountToken) {
+    return false;
+  }
+
+  const hasExcludedToken = tokens.some((token) => token.startsWith("accounting") || token.startsWith("unaccount"));
+  if (hasExcludedToken) {
+    return false;
+  }
+
+  return true;
+};
+
 const formatAccountDisplay = (rawValue?: string | null): string | null => {
   const segments = extractAccountSegments(rawValue);
   if (segments.length === 0) {
@@ -151,6 +182,12 @@ const getAccountPriorityForKey = (keyHint?: string): number => {
   return ACCOUNT_KEY_PRIORITIES.length + 1;
 };
 
+type AccountSearchQueueEntry = {
+  value: unknown;
+  keyHint?: string;
+  fromAccountContext?: boolean;
+};
+
 const findAccountFieldValue = (
   record?: Record<string, unknown>
 ): string | undefined => {
@@ -159,7 +196,7 @@ const findAccountFieldValue = (
   }
 
   const visited = new Set<unknown>();
-  const queue: unknown[] = [record];
+  const queue: AccountSearchQueueEntry[] = [{ value: record }];
   let bestCandidate: { value: string; priority: number } | null = null;
 
   const considerCandidate = (value: unknown, keyHint?: string) => {
@@ -182,24 +219,25 @@ const findAccountFieldValue = (
   };
 
   while (queue.length > 0) {
-    const current = queue.shift();
-    if (!current) {
+    const { value: current, keyHint, fromAccountContext } = queue.shift()!;
+
+    if (current === undefined || current === null) {
       continue;
     }
 
-    if (visited.has(current)) {
-      continue;
+    if (typeof current === "object") {
+      if (visited.has(current)) {
+        continue;
+      }
+      visited.add(current);
     }
-    visited.add(current);
 
     if (Array.isArray(current)) {
       for (const entry of current) {
-        if (typeof entry === "string" && entry.toLowerCase().includes("account")) {
-          considerCandidate(entry);
-        } else if (entry && typeof entry === "object" && !visited.has(entry)) {
-          queue.push(entry);
-        } else {
-          considerCandidate(entry);
+        if (entry && typeof entry === "object" && !visited.has(entry)) {
+          queue.push({ value: entry, keyHint, fromAccountContext });
+        } else if (fromAccountContext || isLikelyAccountKey(keyHint)) {
+          considerCandidate(entry, keyHint);
         }
       }
       continue;
@@ -208,21 +246,33 @@ const findAccountFieldValue = (
     if (typeof current === "object") {
       const recordCandidate = current as Record<string, unknown>;
 
-      for (const [key, value] of Object.entries(recordCandidate)) {
-        if (typeof key === "string" && key.toLowerCase().includes("account")) {
-          considerCandidate(value, key);
-        }
-      }
+      for (const [entryKey, value] of Object.entries(recordCandidate)) {
+        const keyIsAccount = isLikelyAccountKey(entryKey);
+        const nextKeyHint = keyIsAccount ? entryKey : keyHint;
+        const nextContext = Boolean(fromAccountContext || keyIsAccount);
 
-      for (const value of Object.values(recordCandidate)) {
-        if (value && typeof value === "object" && !visited.has(value)) {
-          queue.push(value);
-        } else {
-          considerCandidate(value);
+        if (keyIsAccount) {
+          considerCandidate(value, entryKey);
+        } else if (fromAccountContext && !value) {
+          continue;
+        }
+
+        if (value && typeof value === "object") {
+          if (!visited.has(value)) {
+            queue.push({ value, keyHint: nextKeyHint, fromAccountContext: nextContext });
+          }
+          continue;
+        }
+
+        if (nextContext) {
+          considerCandidate(value, nextKeyHint);
         }
       }
-    } else {
-      considerCandidate(current);
+      continue;
+    }
+
+    if (fromAccountContext || isLikelyAccountKey(keyHint)) {
+      considerCandidate(current, keyHint);
     }
   }
 
