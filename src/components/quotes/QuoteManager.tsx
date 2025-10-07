@@ -38,13 +38,44 @@ const extractAccountSegments = (rawValue?: string | null): string[] => {
     .filter(Boolean);
 };
 
+const normalizeKeyToTokens = (key: string): string[] =>
+  key
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .replace(/[_\-.]+/g, " ")
+    .toLowerCase()
+    .split(/\s+/)
+    .filter(Boolean);
+
+const isLikelyAccountKey = (key: string | undefined): key is string => {
+  if (!key) {
+    return false;
+  }
+
+  const tokens = normalizeKeyToTokens(key);
+  if (tokens.length === 0) {
+    return false;
+  }
+
+  const hasAccountToken = tokens.some((token) => token === "account" || token === "accounts" || token === "acct");
+  if (!hasAccountToken) {
+    return false;
+  }
+
+  const hasExcludedToken = tokens.some((token) => token.startsWith("accounting") || token.startsWith("unaccount"));
+  if (hasExcludedToken) {
+    return false;
+  }
+
+  return true;
+};
+
 const formatAccountDisplay = (rawValue?: string | null): string | null => {
   const segments = extractAccountSegments(rawValue);
   if (segments.length === 0) {
     return null;
   }
 
-  return segments[0];
+  return segments[segments.length - 1];
 };
 
 const parseJsonValue = (value: unknown): unknown => {
@@ -109,6 +140,54 @@ const coerceFieldValueToString = (value: unknown): string | undefined => {
   return undefined;
 };
 
+const ACCOUNT_KEY_PRIORITIES: Array<{ test: (key: string) => boolean; priority: number }> = [
+  {
+    test: (key) => /account[^a-z0-9]*display/i.test(key) || (/account/i.test(key) && /name/i.test(key)),
+    priority: 0,
+  },
+  {
+    test: (key) => /customer/i.test(key) && /name/i.test(key),
+    priority: 1,
+  },
+  {
+    test: (key) => /^account$/i.test(key) || /customer[^a-z0-9]*account/i.test(key),
+    priority: 2,
+  },
+  {
+    test: (key) => /account/i.test(key) && /number/i.test(key),
+    priority: 3,
+  },
+  {
+    test: (key) => /account/i.test(key) && /id/i.test(key),
+    priority: 4,
+  },
+  {
+    test: (key) => /account/i.test(key),
+    priority: 5,
+  },
+];
+
+const getAccountPriorityForKey = (keyHint?: string): number => {
+  if (!keyHint) {
+    return ACCOUNT_KEY_PRIORITIES.length;
+  }
+
+  const normalizedKey = keyHint.trim().toLowerCase();
+  for (const { test, priority } of ACCOUNT_KEY_PRIORITIES) {
+    if (test(normalizedKey)) {
+      return priority;
+    }
+  }
+
+  return ACCOUNT_KEY_PRIORITIES.length + 1;
+};
+
+type AccountSearchQueueEntry = {
+  value: unknown;
+  keyHint?: string;
+  fromAccountContext?: boolean;
+};
+
 const findAccountFieldValue = (
   record?: Record<string, unknown>
 ): string | undefined => {
@@ -116,71 +195,49 @@ const findAccountFieldValue = (
     return undefined;
   }
 
-  const prioritizedKeys = [
-    "account",
-    "Account",
-    "account_id",
-    "accountId",
-    "accountID",
-    "account_name",
-    "accountName",
-    "account_number",
-    "accountNumber",
-    "customer_account",
-    "customerAccount",
-    "customer_account_name",
-    "customerAccountName",
-    "customer_account_number",
-    "customerAccountNumber",
-  ];
-
   const visited = new Set<unknown>();
-  const queue: unknown[] = [record];
+  const queue: AccountSearchQueueEntry[] = [{ value: record }];
+  let bestCandidate: { value: string; priority: number } | null = null;
 
-  const inspectObject = (candidateRecord: Record<string, unknown>): string | undefined => {
-    for (const key of prioritizedKeys) {
-      if (key in candidateRecord) {
-        const candidate = coerceFieldValueToString(candidateRecord[key]);
-        if (candidate) {
-          return candidate;
-        }
-      }
+  const considerCandidate = (value: unknown, keyHint?: string) => {
+    const stringValue = coerceFieldValueToString(value);
+    if (!stringValue) {
+      return;
     }
 
-    for (const [key, value] of Object.entries(candidateRecord)) {
-      if (typeof key === "string" && key.toLowerCase().includes("account")) {
-        const candidate = coerceFieldValueToString(value);
-        if (candidate) {
-          return candidate;
-        }
-      }
+    const segments = extractAccountSegments(stringValue);
+    if (segments.length === 0) {
+      return;
     }
 
-    return undefined;
+    const prioritizedValue = segments[segments.length - 1];
+    const priority = getAccountPriorityForKey(keyHint);
+
+    if (!bestCandidate || priority < bestCandidate.priority || (priority === bestCandidate.priority && prioritizedValue !== bestCandidate.value)) {
+      bestCandidate = { value: prioritizedValue, priority };
+    }
   };
 
   while (queue.length > 0) {
-    const current = queue.shift();
-    if (!current) {
+    const { value: current, keyHint, fromAccountContext } = queue.shift()!;
+
+    if (current === undefined || current === null) {
       continue;
     }
 
-    if (visited.has(current)) {
-      continue;
+    if (typeof current === "object") {
+      if (visited.has(current)) {
+        continue;
+      }
+      visited.add(current);
     }
-    visited.add(current);
 
     if (Array.isArray(current)) {
       for (const entry of current) {
-        if (typeof entry === "string" && entry.toLowerCase().includes("account")) {
-          const segments = extractAccountSegments(entry);
-          if (segments.length > 0) {
-            return segments[0];
-          }
-        }
-
         if (entry && typeof entry === "object" && !visited.has(entry)) {
-          queue.push(entry);
+          queue.push({ value: entry, keyHint, fromAccountContext });
+        } else if (fromAccountContext || isLikelyAccountKey(keyHint)) {
+          considerCandidate(entry, keyHint);
         }
       }
       continue;
@@ -188,20 +245,38 @@ const findAccountFieldValue = (
 
     if (typeof current === "object") {
       const recordCandidate = current as Record<string, unknown>;
-      const directMatch = inspectObject(recordCandidate);
-      if (directMatch) {
-        return directMatch;
-      }
 
-      for (const value of Object.values(recordCandidate)) {
-        if (value && typeof value === "object" && !visited.has(value)) {
-          queue.push(value);
+      for (const [entryKey, value] of Object.entries(recordCandidate)) {
+        const keyIsAccount = isLikelyAccountKey(entryKey);
+        const nextKeyHint = keyIsAccount ? entryKey : keyHint;
+        const nextContext = Boolean(fromAccountContext || keyIsAccount);
+
+        if (keyIsAccount) {
+          considerCandidate(value, entryKey);
+        } else if (fromAccountContext && !value) {
+          continue;
+        }
+
+        if (value && typeof value === "object") {
+          if (!visited.has(value)) {
+            queue.push({ value, keyHint: nextKeyHint, fromAccountContext: nextContext });
+          }
+          continue;
+        }
+
+        if (nextContext) {
+          considerCandidate(value, nextKeyHint);
         }
       }
+      continue;
+    }
+
+    if (fromAccountContext || isLikelyAccountKey(keyHint)) {
+      considerCandidate(current, keyHint);
     }
   }
 
-  return undefined;
+  return bestCandidate?.value;
 };
 
 const QuoteManager = ({ user }: QuoteManagerProps) => {
@@ -279,21 +354,23 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
     const configuredQuoteName = getFieldAsString('quote_name', 'quoteName', 'name');
     const configuredCustomerName = getFieldAsString('customer_name', 'customerName', 'customer');
     const configuredAccount = getFieldAsString(
-      'account',
-      'Account',
-      'account_id',
-      'accountId',
-      'accountID',
       'account_name',
       'accountName',
-      'account_number',
-      'accountNumber',
-      'customer_account',
-      'customerAccount',
       'customer_account_name',
       'customerAccountName',
+      'customer_account',
+      'customerAccount',
+      'account',
+      'Account',
+      'customer_name',
+      'customerName',
+      'account_number',
+      'accountNumber',
       'customer_account_number',
-      'customerAccountNumber'
+      'customerAccountNumber',
+      'account_id',
+      'accountId',
+      'accountID'
     );
 
     const draftAccountFieldValue = findAccountFieldValue(draftQuoteFields);
@@ -304,14 +381,21 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
     const rawQuoteRecord = quote as Record<string, unknown>;
     const rawQuoteAccountFieldValue = findAccountFieldValue(rawQuoteRecord);
     const topLevelAccountCandidates = [
-      coerceFieldValueToString(rawQuoteRecord?.["account"]),
       coerceFieldValueToString(rawQuoteRecord?.["account_name"]),
       coerceFieldValueToString(rawQuoteRecord?.["accountName"]),
+      coerceFieldValueToString(rawQuoteRecord?.["customer_account_name"]),
+      coerceFieldValueToString(rawQuoteRecord?.["customerAccountName"]),
+      coerceFieldValueToString(rawQuoteRecord?.["customer_account"]),
+      coerceFieldValueToString(rawQuoteRecord?.["customerAccount"]),
+      coerceFieldValueToString(rawQuoteRecord?.["account"]),
+      coerceFieldValueToString(rawQuoteRecord?.["Account"]),
       coerceFieldValueToString(rawQuoteRecord?.["account_number"]),
       coerceFieldValueToString(rawQuoteRecord?.["accountNumber"]),
-      coerceFieldValueToString(rawQuoteRecord?.["customer_account"]),
-      coerceFieldValueToString(rawQuoteRecord?.["customer_account_name"]),
       coerceFieldValueToString(rawQuoteRecord?.["customer_account_number"]),
+      coerceFieldValueToString(rawQuoteRecord?.["customerAccountNumber"]),
+      coerceFieldValueToString(rawQuoteRecord?.["account_id"]),
+      coerceFieldValueToString(rawQuoteRecord?.["accountId"]),
+      coerceFieldValueToString(rawQuoteRecord?.["accountID"]),
     ].filter(isNonEmptyString);
 
     const accountCandidates = [
@@ -330,7 +414,10 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
       const seen = new Set<string>();
 
       for (const candidate of accountCandidates) {
-        for (const segment of extractAccountSegments(candidate)) {
+        const segments = extractAccountSegments(candidate);
+
+        for (let index = segments.length - 1; index >= 0; index -= 1) {
+          const segment = segments[index];
           const normalizedKey = segment.toLowerCase();
           if (seen.has(normalizedKey)) {
             continue;
