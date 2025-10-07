@@ -107,20 +107,69 @@ const findAccountFieldValue = (
     "customerAccountNumber",
   ];
 
-  for (const key of prioritizedKeys) {
-    if (key in record) {
-      const candidate = coerceFieldValueToString(record[key]);
-      if (candidate) {
-        return candidate;
+  const visited = new Set<unknown>();
+  const queue: unknown[] = [record];
+
+  const inspectObject = (candidateRecord: Record<string, unknown>): string | undefined => {
+    for (const key of prioritizedKeys) {
+      if (key in candidateRecord) {
+        const candidate = coerceFieldValueToString(candidateRecord[key]);
+        if (candidate) {
+          return candidate;
+        }
       }
     }
-  }
 
-  for (const [key, value] of Object.entries(record)) {
-    if (typeof key === "string" && key.toLowerCase().includes("account")) {
-      const candidate = coerceFieldValueToString(value);
-      if (candidate) {
-        return candidate;
+    for (const [key, value] of Object.entries(candidateRecord)) {
+      if (typeof key === "string" && key.toLowerCase().includes("account")) {
+        const candidate = coerceFieldValueToString(value);
+        if (candidate) {
+          return candidate;
+        }
+      }
+    }
+
+    return undefined;
+  };
+
+  while (queue.length > 0) {
+    const current = queue.shift();
+    if (!current) {
+      continue;
+    }
+
+    if (visited.has(current)) {
+      continue;
+    }
+    visited.add(current);
+
+    if (Array.isArray(current)) {
+      for (const entry of current) {
+        if (typeof entry === "string" && entry.toLowerCase().includes("account")) {
+          const segments = extractAccountSegments(entry);
+          if (segments.length > 0) {
+            return segments[0];
+          }
+        }
+
+        if (entry && typeof entry === "object" && !visited.has(entry)) {
+          queue.push(entry);
+        }
+      }
+      continue;
+    }
+
+    if (typeof current === "object") {
+      const recordCandidate = current as Record<string, unknown>;
+      const directMatch = inspectObject(recordCandidate);
+      if (directMatch) {
+        return directMatch;
+      }
+
+      for (const value of Object.values(recordCandidate)) {
+        if (value && typeof value === "object" && !visited.has(value)) {
+          queue.push(value);
+        }
       }
     }
   }
