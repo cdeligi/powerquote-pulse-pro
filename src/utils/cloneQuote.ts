@@ -164,36 +164,25 @@ async function cloneQuoteClientSide(
     throw new Error('Source quote not found.');
   }
 
-  const generatedDraftId = await generateUniqueDraftName(newUserId, identity.email);
-  const normalizedDraftId = normalizeQuoteId(generatedDraftId);
+  const { data: newQuoteId, error: generateIdError } = await supabase.rpc('generate_quote_id', {
+    user_email: identity.email,
+    is_draft: true,
+  });
+
+  if (generateIdError || !newQuoteId || typeof newQuoteId !== 'string') {
+    throw new Error(generateIdError?.message || 'Failed to generate a new draft quote ID.');
+  }
+
+  const normalizedDraftId = normalizeQuoteId(newQuoteId);
 
   if (!normalizedDraftId) {
     throw new Error('Failed to normalize the generated draft quote ID.');
   }
 
-  const fieldsCustomerName = (() => {
-    const fields = sourceQuote.quote_fields;
-    if (fields && typeof fields === 'object' && !Array.isArray(fields)) {
-      const raw = (fields as Record<string, unknown>).customer_name;
-      if (typeof raw === 'string') {
-        const trimmed = raw.trim();
-        if (trimmed.length > 0) {
-          return trimmed;
-        }
-      }
-    }
-    return undefined;
-  })();
-
-  const baseCustomerName = typeof sourceQuote.customer_name === 'string'
-    ? sourceQuote.customer_name.trim()
-    : '';
-
-  const draftPlaceholderPattern = /\sDraft\s\d+$/i;
-  const resolvedCustomerName =
-    (baseCustomerName && !draftPlaceholderPattern.test(baseCustomerName) ? baseCustomerName : undefined) ||
-    fieldsCustomerName ||
-    'Pending Customer';
+  const customerName =
+    sourceQuote.status === 'draft'
+      ? await generateUniqueDraftName(newUserId, identity.email)
+      : sourceQuote.customer_name;
 
   const clonedQuoteFields = (() => {
     const original = sourceQuote.quote_fields;
@@ -203,7 +192,7 @@ async function cloneQuoteClientSide(
 
     return {
       ...(original as Record<string, unknown>),
-      customer_name: resolvedCustomerName,
+      customer_name: customerName,
     } as QuoteRow['quote_fields'];
   })();
 
@@ -221,13 +210,13 @@ async function cloneQuoteClientSide(
     if (existingQuoteFields && typeof existingQuoteFields === 'object') {
       cloned.quoteFields = {
         ...(existingQuoteFields as Record<string, unknown>),
-        customer_name: resolvedCustomerName,
+        customer_name: customerName,
       };
     } else {
-      cloned.quoteFields = { customer_name: resolvedCustomerName };
+      cloned.quoteFields = { customer_name: customerName };
     }
 
-    cloned.draftName = normalizedDraftId;
+    cloned.draftName = customerName;
 
     return cloned as QuoteRow['draft_bom'];
   })();
@@ -235,7 +224,7 @@ async function cloneQuoteClientSide(
   const newQuotePayload: Database['public']['Tables']['quotes']['Insert'] = {
     id: normalizedDraftId,
     user_id: newUserId,
-    customer_name: resolvedCustomerName,
+    customer_name: customerName,
     oracle_customer_id: sourceQuote.oracle_customer_id,
     sfdc_opportunity: sourceQuote.sfdc_opportunity,
     priority: sourceQuote.priority ?? 'Medium',
