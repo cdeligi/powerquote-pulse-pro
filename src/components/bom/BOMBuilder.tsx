@@ -868,7 +868,7 @@ if (
           (mergedConfigurationData as any)?.displayName ||
           (mergedConfigurationData as any)?.name,
         isAccessory: item.isAccessory ?? (mergedConfigurationData as any)?.isAccessory,
-        partNumberContext: partNumberContext ? deepClone(partNumberContext) : undefined,
+        partNumberContext: partNumberContext ? { pnConfig: partNumberContext, codeMap: {} } : undefined,
       } as BOMItem;
     }),
   );
@@ -942,7 +942,7 @@ if (
             rackConfiguration: rackLayout,
             level4Config: mergedLevel4 || undefined,
             level4Selections: configData.level4Selections || undefined,
-            partNumberContext: partNumberContext ? deepClone(partNumberContext) : undefined,
+            partNumberContext: partNumberContext ? { pnConfig: partNumberContext, codeMap: {} } : undefined,
           };
         });
       }
@@ -1295,10 +1295,23 @@ if (
       const resolvedOracleCustomerId = getStringFieldValue('oracle_customer_id', 'DRAFT', 'DRAFT');
       const resolvedSfdcOpportunity = getStringFieldValue('sfdc_opportunity', timestampFallback, timestampFallback);
       
+      // Extract account value from quoteFields for customer_name update
+      const accountFromFields = (() => {
+        for (const [key, value] of Object.entries(quoteFields)) {
+          const lowerKey = key.toLowerCase();
+          if (lowerKey.includes('account') && typeof value === 'string' && value.trim()) {
+            return value.trim();
+          }
+        }
+        return null;
+      })();
+      
+      const updatedCustomerName = accountFromFields || draftCustomerName;
+      
       const { error: quoteError } = await supabase
         .from('quotes')
         .update({
-          customer_name: draftCustomerName,
+          customer_name: updatedCustomerName,
           oracle_customer_id: resolvedOracleCustomerId,
           sfdc_opportunity: resolvedSfdcOpportunity,
           original_quote_value: totalValue,
@@ -2470,7 +2483,6 @@ if (
       console.log('Detected remote display from part number:', partNumberStr, '-> hasRemote:', hasRemoteSuffix, 'configHasRemote:', configHasRemote);
       setHasRemoteDisplay(hasRemoteSuffix || configHasRemote);
       
-main
       setTimeout(() => {
         const configSection = document.getElementById('chassis-configuration');
         if (configSection) {

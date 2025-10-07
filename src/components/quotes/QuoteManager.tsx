@@ -400,7 +400,7 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
     const combinedAccountFieldValue = findAccountFieldValue(combinedFields);
     const draftBomAccountFieldValue = findAccountFieldValue(normalizedDraftBom ?? undefined);
 
-    const rawQuoteRecord = quote as Record<string, unknown>;
+    const rawQuoteRecord = quote as unknown as Record<string, unknown>;
     const rawQuoteAccountFieldValue = findAccountFieldValue(rawQuoteRecord);
     const topLevelAccountCandidates = [
       coerceFieldValueToString(rawQuoteRecord?.["account_name"]),

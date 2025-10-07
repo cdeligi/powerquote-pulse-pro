@@ -96,8 +96,9 @@ const QuoteDetails = ({
       const config = item.configuration as QTMSConfiguration;
       const consolidated = consolidateQTMSConfiguration(
         config.chassis,
-        config.slotAssignments,
+        config.slotAssignments || {},
         config.hasRemoteDisplay,
+        null, // remoteDisplayProduct
         config.analogConfigurations,
         config.bushingConfigurations
       );
