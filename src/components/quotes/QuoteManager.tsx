@@ -940,6 +940,7 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
               const priorityBadge = getPriorityBadge(quote.priority);
               const actualQuoteId = quote.displayId || quote.id;
               const isPdfLoading = Boolean(pdfLoadingStates[actualQuoteId]);
+              const formattedAccount = formatAccountDisplay(quote.account);
               return (
                 <div
                   key={quote.id}
@@ -961,13 +962,8 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
                         </p>
                       )}
                       <p className="text-gray-400 text-sm mt-1">
-                        Account: {formatAccountDisplay(quote.account) ?? '—'}
+                        Account: {formattedAccount ?? quote.account ?? '—'}
                       </p>
-                      {quote.account && (
-                        <p className="text-gray-400 text-sm">
-                          Account: {quote.account}
-                        </p>
-                      )}
                     </div>
                     
                     <div className="text-right">
