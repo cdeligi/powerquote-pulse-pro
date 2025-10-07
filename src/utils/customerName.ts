@@ -8,7 +8,11 @@ export const extractAccountSegments = (rawValue?: string | null): string[] => {
   return String(rawValue)
     .split(/\r?\n+/)
     .flatMap((segment) => segment.split(/[;,]+/))
-    .map((segment) => segment.replace(/^account\s*:?\s*/i, '').trim())
+    .map((segment) =>
+      segment
+        .replace(/^(account|customer|client)\s*:?\s*/i, '')
+        .trim(),
+    )
     .filter(Boolean);
 };
 
@@ -44,7 +48,10 @@ export const isLikelyAccountKey = (key: string | undefined): key is string => {
   }
 
   const hasAccountToken = tokens.some((token) => token === 'account' || token === 'accounts' || token === 'acct');
-  if (!hasAccountToken) {
+  const hasCustomerNameTokens = tokens.includes('customer') && tokens.includes('name');
+  const hasClientNameTokens = tokens.includes('client') && tokens.includes('name');
+
+  if (!hasAccountToken && !hasCustomerNameTokens && !hasClientNameTokens) {
     return false;
   }
 
@@ -258,9 +265,37 @@ export const deriveCustomerNameFromFields = (
     return accountValue.trim();
   }
 
-  const directCustomer = coerceFieldValueToString((fields ?? {})['customer_name']);
-  if (directCustomer && directCustomer.trim().length > 0) {
-    return directCustomer.trim();
+  if (fields) {
+    const directCustomerKeys = [
+      'customer_name',
+      'customer-name',
+      'customerName',
+      'customer name',
+      'customer',
+      'client_name',
+      'client-name',
+      'clientName',
+      'client name',
+    ];
+
+    for (const key of directCustomerKeys) {
+      const directCustomer = coerceFieldValueToString((fields as Record<string, unknown>)[key]);
+      if (directCustomer && directCustomer.trim().length > 0) {
+        return directCustomer.trim();
+      }
+    }
+
+    for (const [key, value] of Object.entries(fields)) {
+      const candidate = coerceFieldValueToString(value);
+      if (!candidate) {
+        continue;
+      }
+
+      const normalizedKey = key.toLowerCase();
+      if (normalizedKey.includes('customer') || normalizedKey.includes('client')) {
+        return candidate.trim();
+      }
+    }
   }
 
   if (fallback && fallback.trim().length > 0) {

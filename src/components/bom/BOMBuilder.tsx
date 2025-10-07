@@ -1304,6 +1304,8 @@ if (
     try {
       console.log('Starting draft save process...');
 
+      await flushQuoteFieldSync();
+
       const resolvedCustomerName = resolveCustomerNameFromFields(
         quoteFields,
         currentQuote?.customer_name ?? 'Pending Customer',
@@ -1450,8 +1452,10 @@ if (
 
   const saveDraftQuote = async (autoSave = false) => {
     if (!currentQuoteId || !user?.id) return;
-    
+
     try {
+      await flushQuoteFieldSync();
+
       const { draftBomData, totals } = buildDraftBomSnapshot();
       const {
         totalValue,
@@ -1552,7 +1556,29 @@ if (
 
   // Fixed field change handler to match expected signature
   const handleQuoteFieldChange = (fieldId: string, value: any) => {
-    setQuoteFields(prev => ({ ...prev, [fieldId]: value }));
+    setQuoteFields(prev => {
+      const nextFields = { ...prev, [fieldId]: value };
+
+      setCurrentQuote(prevQuote => {
+        if (!prevQuote) {
+          return prevQuote;
+        }
+
+        const nextQuote: Record<string, any> = {
+          ...prevQuote,
+          quote_fields: nextFields,
+        };
+
+        const derivedCustomerName = getDerivedCustomerName(nextFields, prevQuote.customer_name ?? null);
+        if (derivedCustomerName) {
+          nextQuote.customer_name = derivedCustomerName;
+        }
+
+        return nextQuote;
+      });
+
+      return nextFields;
+    });
   };
 
   const syncQuoteFieldsToSupabase = useCallback(
@@ -1617,6 +1643,24 @@ if (
     [currentQuoteId, isDraftMode, currentQuote?.customer_name, currentQuote?.draft_bom]
   );
 
+  const flushQuoteFieldSync = useCallback(async () => {
+    if (!currentQuoteId || !isDraftMode) {
+      return;
+    }
+
+    const serialized = JSON.stringify(quoteFields ?? {});
+    if (serialized === lastSyncedQuoteFieldsRef.current) {
+      return;
+    }
+
+    if (pendingQuoteFieldSyncRef.current) {
+      clearTimeout(pendingQuoteFieldSyncRef.current);
+      pendingQuoteFieldSyncRef.current = null;
+    }
+
+    await syncQuoteFieldsToSupabase(quoteFields ?? {}, serialized);
+  }, [currentQuoteId, isDraftMode, quoteFields, syncQuoteFieldsToSupabase]);
+
   useEffect(() => {
     if (!currentQuoteId || !isDraftMode) {
       return;
@@ -1643,6 +1687,14 @@ if (
       }
     };
   }, [quoteFields, currentQuoteId, isDraftMode, syncQuoteFieldsToSupabase]);
+
+  useEffect(() => {
+    return () => {
+      flushQuoteFieldSync().catch((error) => {
+        console.error('Failed to flush pending quote field sync on unmount:', error);
+      });
+    };
+  }, [flushQuoteFieldSync]);
 
   // Load Level 1 products for dynamic tabs - use real Supabase data
   const [level1Products, setLevel1Products] = useState<Level1Product[]>([]);
@@ -2881,6 +2933,8 @@ if (
       if (!user?.email || !user?.id) {
         throw new Error('A valid user account is required to submit a quote.');
       }
+
+      await flushQuoteFieldSync();
 
       let quoteId: string;
       let isSubmittingExistingDraft = false;
