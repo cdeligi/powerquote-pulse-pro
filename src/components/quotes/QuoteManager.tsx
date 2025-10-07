@@ -23,6 +23,9 @@ interface QuoteManagerProps {
   user: User;
 }
 
+const isNonEmptyString = (value: unknown): value is string =>
+  typeof value === "string" && value.trim().length > 0;
+
 const extractAccountSegments = (rawValue?: string | null): string[] => {
   if (!rawValue) {
     return [];
@@ -42,6 +45,163 @@ const formatAccountDisplay = (rawValue?: string | null): string | null => {
   }
 
   return segments[0];
+};
+
+const parseJsonValue = (value: unknown): unknown => {
+  if (typeof value === "string") {
+    try {
+      return JSON.parse(value);
+    } catch (error) {
+      console.warn("Failed to parse JSON string while normalizing quote data.", error);
+      return value;
+    }
+  }
+
+  return value;
+};
+
+const ensureRecord = (value: unknown): Record<string, unknown> | null => {
+  const parsed = parseJsonValue(value);
+  if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+    return parsed as Record<string, unknown>;
+  }
+
+  return null;
+};
+
+const ensureArray = (value: unknown): unknown[] | null => {
+  const parsed = parseJsonValue(value);
+  return Array.isArray(parsed) ? parsed : null;
+};
+
+const coerceFieldValueToString = (value: unknown): string | undefined => {
+  if (isNonEmptyString(value)) {
+    return value.trim();
+  }
+
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return String(value);
+  }
+
+  if (Array.isArray(value)) {
+    for (const entry of value) {
+      const coerced = coerceFieldValueToString(entry);
+      if (coerced) {
+        return coerced;
+      }
+    }
+    return undefined;
+  }
+
+  if (value && typeof value === "object") {
+    const record = value as Record<string, unknown>;
+    const candidateKeys = ["value", "label", "name", "text", "display", "displayValue"] as const;
+    for (const key of candidateKeys) {
+      if (key in record) {
+        const coerced = coerceFieldValueToString(record[key]);
+        if (coerced) {
+          return coerced;
+        }
+      }
+    }
+  }
+
+  return undefined;
+};
+
+const findAccountFieldValue = (
+  record?: Record<string, unknown>
+): string | undefined => {
+  if (!record) {
+    return undefined;
+  }
+
+  const prioritizedKeys = [
+    "account",
+    "Account",
+    "account_id",
+    "accountId",
+    "accountID",
+    "account_name",
+    "accountName",
+    "account_number",
+    "accountNumber",
+    "customer_account",
+    "customerAccount",
+    "customer_account_name",
+    "customerAccountName",
+    "customer_account_number",
+    "customerAccountNumber",
+  ];
+
+  const visited = new Set<unknown>();
+  const queue: unknown[] = [record];
+
+  const inspectObject = (candidateRecord: Record<string, unknown>): string | undefined => {
+    for (const key of prioritizedKeys) {
+      if (key in candidateRecord) {
+        const candidate = coerceFieldValueToString(candidateRecord[key]);
+        if (candidate) {
+          return candidate;
+        }
+      }
+    }
+
+    for (const [key, value] of Object.entries(candidateRecord)) {
+      if (typeof key === "string" && key.toLowerCase().includes("account")) {
+        const candidate = coerceFieldValueToString(value);
+        if (candidate) {
+          return candidate;
+        }
+      }
+    }
+
+    return undefined;
+  };
+
+  while (queue.length > 0) {
+    const current = queue.shift();
+    if (!current) {
+      continue;
+    }
+
+    if (visited.has(current)) {
+      continue;
+    }
+    visited.add(current);
+
+    if (Array.isArray(current)) {
+      for (const entry of current) {
+        if (typeof entry === "string" && entry.toLowerCase().includes("account")) {
+          const segments = extractAccountSegments(entry);
+          if (segments.length > 0) {
+            return segments[0];
+          }
+        }
+
+        if (entry && typeof entry === "object" && !visited.has(entry)) {
+          queue.push(entry);
+        }
+      }
+      continue;
+    }
+
+    if (typeof current === "object") {
+      const recordCandidate = current as Record<string, unknown>;
+      const directMatch = inspectObject(recordCandidate);
+      if (directMatch) {
+        return directMatch;
+      }
+
+      for (const value of Object.values(recordCandidate)) {
+        if (value && typeof value === "object" && !visited.has(value)) {
+          queue.push(value);
+        }
+      }
+    }
+  }
+
+  return undefined;
 };
 
 const QuoteManager = ({ user }: QuoteManagerProps) => {
@@ -77,36 +237,36 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
     const currency = quote.currency || 'USD';
     const isDraftQuote = quote.status === 'draft';
 
-    const quoteFields = (quote.quote_fields && typeof quote.quote_fields === 'object')
-      ? quote.quote_fields as Record<string, unknown>
-      : {};
+    const quoteFields = ensureRecord(quote.quote_fields) ?? {};
+    const normalizedDraftBom = ensureRecord(quote.draft_bom);
 
     const draftQuoteFields = (() => {
-      if (!quote.draft_bom || typeof quote.draft_bom !== 'object') {
+      const source = normalizedDraftBom;
+      if (!source) {
         return {} as Record<string, unknown>;
       }
 
-      const rawFields = (quote.draft_bom as Record<string, unknown>).quoteFields;
-      if (rawFields && typeof rawFields === 'object' && !Array.isArray(rawFields)) {
-        return rawFields as Record<string, unknown>;
-      }
+      const rawFields = source['quoteFields'] ?? source['quote_fields'];
 
-      return {} as Record<string, unknown>;
+      return ensureRecord(rawFields) ?? {};
     })();
 
-    const combinedFields = { ...draftQuoteFields, ...quoteFields };
+    const draftItems = ensureArray(normalizedDraftBom ? normalizedDraftBom['items'] : undefined) ?? undefined;
+
+    // When a user resumes editing a draft quote, the latest field values live in
+    // the draft payload. Ensure those values take precedence over the persisted
+    // quote fields by spreading the stored fields first and the draft fields
+    // last.
+    const combinedFields = { ...quoteFields, ...draftQuoteFields };
 
     const getFieldAsString = (...keys: string[]): string | undefined => {
       for (const key of keys) {
-        const value = combinedFields[key];
-        if (typeof value === 'string') {
-          const trimmed = value.trim();
-          if (trimmed.length > 0) {
-            return trimmed;
+        if (key in combinedFields) {
+          const value = combinedFields[key];
+          const stringValue = coerceFieldValueToString(value);
+          if (stringValue) {
+            return stringValue;
           }
-        }
-        if (typeof value === 'number' && Number.isFinite(value)) {
-          return String(value);
         }
       }
       return undefined;
@@ -136,20 +296,40 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
       'customerAccountNumber'
     );
 
+    const draftAccountFieldValue = findAccountFieldValue(draftQuoteFields);
+    const persistedAccountFieldValue = findAccountFieldValue(quoteFields);
+    const combinedAccountFieldValue = findAccountFieldValue(combinedFields);
+    const draftBomAccountFieldValue = findAccountFieldValue(normalizedDraftBom ?? undefined);
+
+    const rawQuoteRecord = quote as Record<string, unknown>;
+    const rawQuoteAccountFieldValue = findAccountFieldValue(rawQuoteRecord);
+    const topLevelAccountCandidates = [
+      coerceFieldValueToString(rawQuoteRecord?.["account"]),
+      coerceFieldValueToString(rawQuoteRecord?.["account_name"]),
+      coerceFieldValueToString(rawQuoteRecord?.["accountName"]),
+      coerceFieldValueToString(rawQuoteRecord?.["account_number"]),
+      coerceFieldValueToString(rawQuoteRecord?.["accountNumber"]),
+      coerceFieldValueToString(rawQuoteRecord?.["customer_account"]),
+      coerceFieldValueToString(rawQuoteRecord?.["customer_account_name"]),
+      coerceFieldValueToString(rawQuoteRecord?.["customer_account_number"]),
+    ].filter(isNonEmptyString);
+
     const accountCandidates = [
+      draftAccountFieldValue,
+      combinedAccountFieldValue,
       configuredAccount,
+      persistedAccountFieldValue,
+      draftBomAccountFieldValue,
+      ...topLevelAccountCandidates,
       configuredCustomerName,
       normalizedDraftName,
-    ];
+      rawQuoteAccountFieldValue,
+    ].filter(isNonEmptyString);
 
     const accountValue = (() => {
       const seen = new Set<string>();
 
       for (const candidate of accountCandidates) {
-        if (typeof candidate !== 'string') {
-          continue;
-        }
-
         for (const segment of extractAccountSegments(candidate)) {
           const normalizedKey = segment.toLowerCase();
           if (seen.has(normalizedKey)) {
@@ -174,9 +354,9 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
 
     const primaryDisplayLabel = formalQuoteId;
 
-    const originalValue = isDraftQuote && quote.draft_bom?.items
-      ? quote.draft_bom.items.reduce((sum: number, item: any) =>
-          sum + ((item.unit_price || item.total_price || item.product?.price || 0) * (item.quantity || 1)), 0)
+    const originalValue = isDraftQuote && Array.isArray(draftItems)
+      ? (draftItems as any[]).reduce((sum: number, item: any) =>
+          sum + ((item?.unit_price || item?.total_price || item?.product?.price || 0) * (item?.quantity || 1)), 0)
       : (quote.original_quote_value || 0);
 
     const normalizedRequestedDiscount = normalizePercentage(quote.requested_discount);
@@ -243,8 +423,11 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
         quotes.forEach(quote => {
           try {
             // For draft quotes, check draft_bom data first
-            if (quote.status === 'draft' && quote.draft_bom && quote.draft_bom.items && Array.isArray(quote.draft_bom.items)) {
-              counts[quote.id] = quote.draft_bom.items.length;
+            const normalizedDraftBom = ensureRecord(quote.draft_bom);
+            const draftBomItems = ensureArray(normalizedDraftBom ? normalizedDraftBom['items'] : undefined);
+
+            if (quote.status === 'draft' && Array.isArray(draftBomItems)) {
+              counts[quote.id] = draftBomItems.length;
             } else {
               // For non-draft quotes, we'll fetch from database
               counts[quote.id] = 0; // Default to 0, will be updated below
@@ -420,8 +603,11 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
       let bomItems: any[] = [];
       
       // Get BOM items
-      if (fullQuote.status === 'draft' && fullQuote.draft_bom?.items) {
-        bomItems = fullQuote.draft_bom.items.map((item: any) => {
+      const normalizedDraftBom = ensureRecord(fullQuote?.draft_bom);
+      const draftBomItems = ensureArray(normalizedDraftBom ? normalizedDraftBom['items'] : undefined);
+
+      if (fullQuote.status === 'draft' && Array.isArray(draftBomItems)) {
+        bomItems = (draftBomItems as any[]).map((item: any) => {
           const productPrice = item.unit_price || item.product?.price || 0;
           const storedSlotAssignments = item.slotAssignments as SerializedSlotAssignment[] | undefined;
           const slotAssignments = deserializeSlotAssignments(storedSlotAssignments);
@@ -614,7 +800,9 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
         throw new Error('Unable to load newly cloned quote.');
       }
 
-      const hasDraftItems = Array.isArray(clonedQuote.draft_bom?.items) && clonedQuote.draft_bom.items.length > 0;
+      const normalizedClonedDraftBom = ensureRecord(clonedQuote.draft_bom);
+      const clonedDraftItems = ensureArray(normalizedClonedDraftBom ? normalizedClonedDraftBom['items'] : undefined);
+      const hasDraftItems = Array.isArray(clonedDraftItems) && clonedDraftItems.length > 0;
 
       if (!hasDraftItems) {
         const { data: bomRows, error: bomError } = await supabase
@@ -744,15 +932,18 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
           }))
           .filter(entry => entry.configuration || entry.selections);
 
+        const existingDraftQuoteFields = ensureRecord(
+          normalizedClonedDraftBom
+            ? normalizedClonedDraftBom['quoteFields'] ?? normalizedClonedDraftBom['quote_fields']
+            : undefined,
+        ) ?? ensureRecord(clonedQuote.quote_fields) ?? {};
+
         const draftPayload = {
-          ...(clonedQuote.draft_bom && typeof clonedQuote.draft_bom === 'object' ? clonedQuote.draft_bom : {}),
+          ...(normalizedClonedDraftBom ?? {}),
           items: normalizedDraftItems,
           rackLayouts,
           level4Configurations,
-          quoteFields:
-            (clonedQuote.draft_bom && (clonedQuote.draft_bom as Record<string, any>)?.quoteFields) ||
-            clonedQuote.quote_fields ||
-            {},
+          quoteFields: existingDraftQuoteFields,
         };
 
         await supabase
@@ -940,6 +1131,7 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
               const priorityBadge = getPriorityBadge(quote.priority);
               const actualQuoteId = quote.displayId || quote.id;
               const isPdfLoading = Boolean(pdfLoadingStates[actualQuoteId]);
+              const formattedAccount = formatAccountDisplay(quote.account);
               return (
                 <div
                   key={quote.id}
@@ -961,13 +1153,8 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
                         </p>
                       )}
                       <p className="text-gray-400 text-sm mt-1">
-                        Account: {formatAccountDisplay(quote.account) ?? '—'}
+                        Account: {formattedAccount ?? quote.account ?? '—'}
                       </p>
-                      {quote.account && (
-                        <p className="text-gray-400 text-sm">
-                          Account: {quote.account}
-                        </p>
-                      )}
                     </div>
                     
                     <div className="text-right">
@@ -990,7 +1177,6 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
                       ) : (
                         <span className="text-white font-medium">—</span>
                       )}
-                      <p className="text-gray-400 text-sm mt-1">{quote.items} items</p>
                     </div>
                     
                     <div>
