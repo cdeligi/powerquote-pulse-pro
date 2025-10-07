@@ -955,9 +955,19 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
                           {statusBadge.text}
                         </Badge>
                       </div>
+                      {quote.formalQuoteId && quote.displayLabel !== quote.formalQuoteId && (
+                        <p className="text-gray-400 text-sm mt-1">
+                          Quote ID: {quote.formalQuoteId}
+                        </p>
+                      )}
                       <p className="text-gray-400 text-sm mt-1">
                         Account: {formatAccountDisplay(quote.account) ?? '—'}
                       </p>
+                      {quote.account && (
+                        <p className="text-gray-400 text-sm">
+                          Account: {quote.account}
+                        </p>
+                      )}
                     </div>
                     
                     <div className="text-right">
