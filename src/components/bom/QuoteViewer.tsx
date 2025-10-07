@@ -45,7 +45,9 @@ interface Quote {
 }
 
 const QuoteViewer: React.FC = () => {
-  const { id } = useParams<{ id: string }>();
+  const params = useParams<{ id: string }>();
+  const rawId = params.id;
+  const id = rawId ? decodeURIComponent(rawId) : undefined;
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const mode = searchParams.get('mode') || 'view';
@@ -110,7 +112,8 @@ const QuoteViewer: React.FC = () => {
         description: 'This quote is not editable. Switched to view mode. Use Clone to create an editable copy.',
         variant: 'default'
       });
-      navigate(`/quote/${quote.id}?mode=view`, { replace: true });
+      const encodedQuoteId = encodeURIComponent(quote.id);
+      navigate(`/quote/${encodedQuoteId}?mode=view`, { replace: true });
     }
   }, [quote, mode, isDraft, loading, navigate]);
 
