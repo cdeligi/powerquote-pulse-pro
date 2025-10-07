@@ -1,4 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
+import { generateUniqueDraftName } from '@/utils/draftName';
+import { normalizeQuoteId, persistNormalizedQuoteId } from '@/utils/quoteIdGenerator';
 import type { Database } from '@/integrations/supabase/types';
 
 type QuoteRow = Database['public']['Tables']['quotes']['Row'];
@@ -26,7 +28,12 @@ export async function cloneQuoteWithFallback(
   });
 
   if (!firstAttempt.error) {
-    return ensureQuoteId(firstAttempt.data);
+    const normalizedId = ensureQuoteId(firstAttempt.data);
+    const rawId = typeof firstAttempt.data === 'string' ? firstAttempt.data : normalizedId;
+
+    await persistNormalizedQuoteId(rawId, normalizedId);
+
+    return normalizedId;
   }
 
   const firstMessage = firstAttempt.error.message || '';
@@ -41,7 +48,12 @@ export async function cloneQuoteWithFallback(
     });
 
     if (!legacyAttempt.error) {
-      return ensureQuoteId(legacyAttempt.data);
+      const normalizedId = ensureQuoteId(legacyAttempt.data);
+      const rawId = typeof legacyAttempt.data === 'string' ? legacyAttempt.data : normalizedId;
+
+      await persistNormalizedQuoteId(rawId, normalizedId);
+
+      return normalizedId;
     }
 
     const legacyMessage = legacyAttempt.error.message || '';
@@ -61,7 +73,11 @@ export async function cloneQuoteWithFallback(
 
 function ensureQuoteId(result: unknown): string {
   if (typeof result === 'string' && result.length > 0) {
-    return result;
+    const normalized = normalizeQuoteId(result);
+
+    if (normalized) {
+      return normalized;
+    }
   }
 
   throw new Error('Clone operation did not return a new quote ID.');
@@ -148,19 +164,78 @@ async function cloneQuoteClientSide(
     throw new Error('Source quote not found.');
   }
 
-  const { data: newQuoteId, error: generateIdError } = await supabase.rpc('generate_quote_id', {
-    user_email: identity.email,
-    is_draft: true,
-  });
+  const generatedDraftId = await generateUniqueDraftName(newUserId, identity.email);
+  const normalizedDraftId = normalizeQuoteId(generatedDraftId);
 
-  if (generateIdError || !newQuoteId || typeof newQuoteId !== 'string') {
-    throw new Error(generateIdError?.message || 'Failed to generate a new draft quote ID.');
+  if (!normalizedDraftId) {
+    throw new Error('Failed to normalize the generated draft quote ID.');
   }
 
+  const fieldsCustomerName = (() => {
+    const fields = sourceQuote.quote_fields;
+    if (fields && typeof fields === 'object' && !Array.isArray(fields)) {
+      const raw = (fields as Record<string, unknown>).customer_name;
+      if (typeof raw === 'string') {
+        const trimmed = raw.trim();
+        if (trimmed.length > 0) {
+          return trimmed;
+        }
+      }
+    }
+    return undefined;
+  })();
+
+  const baseCustomerName = typeof sourceQuote.customer_name === 'string'
+    ? sourceQuote.customer_name.trim()
+    : '';
+
+  const draftPlaceholderPattern = /\sDraft\s\d+$/i;
+  const resolvedCustomerName =
+    (baseCustomerName && !draftPlaceholderPattern.test(baseCustomerName) ? baseCustomerName : undefined) ||
+    fieldsCustomerName ||
+    'Pending Customer';
+
+  const clonedQuoteFields = (() => {
+    const original = sourceQuote.quote_fields;
+    if (!original || typeof original !== 'object') {
+      return original;
+    }
+
+    return {
+      ...(original as Record<string, unknown>),
+      customer_name: resolvedCustomerName,
+    } as QuoteRow['quote_fields'];
+  })();
+
+  const clonedDraftBom = (() => {
+    const original = sourceQuote.draft_bom;
+    if (!original || typeof original !== 'object') {
+      return original;
+    }
+
+    const cloned = {
+      ...(original as Record<string, unknown>),
+    } as Record<string, unknown>;
+
+    const existingQuoteFields = cloned.quoteFields;
+    if (existingQuoteFields && typeof existingQuoteFields === 'object') {
+      cloned.quoteFields = {
+        ...(existingQuoteFields as Record<string, unknown>),
+        customer_name: resolvedCustomerName,
+      };
+    } else {
+      cloned.quoteFields = { customer_name: resolvedCustomerName };
+    }
+
+    cloned.draftName = normalizedDraftId;
+
+    return cloned as QuoteRow['draft_bom'];
+  })();
+
   const newQuotePayload: Database['public']['Tables']['quotes']['Insert'] = {
-    id: newQuoteId,
+    id: normalizedDraftId,
     user_id: newUserId,
-    customer_name: sourceQuote.customer_name,
+    customer_name: resolvedCustomerName,
     oracle_customer_id: sourceQuote.oracle_customer_id,
     sfdc_opportunity: sourceQuote.sfdc_opportunity,
     priority: sourceQuote.priority ?? 'Medium',
@@ -169,8 +244,8 @@ async function cloneQuoteClientSide(
     currency: sourceQuote.currency ?? 'USD',
     is_rep_involved: sourceQuote.is_rep_involved,
     status: 'draft',
-    quote_fields: (sourceQuote.quote_fields ?? null) as QuoteRow['quote_fields'],
-    draft_bom: (sourceQuote.draft_bom ?? null) as QuoteRow['draft_bom'],
+    quote_fields: clonedQuoteFields,
+    draft_bom: (clonedDraftBom ?? null) as QuoteRow['draft_bom'],
     source_quote_id: sourceQuoteId,
     app_version: sourceQuote.app_version ?? '1.0.0',
     original_quote_value: sourceQuote.original_quote_value ?? 0,
@@ -211,7 +286,7 @@ async function cloneQuoteClientSide(
 
     if (sourceBomItems && sourceBomItems.length > 0) {
       const bomInsertPayload = sourceBomItems.map((item) => ({
-        quote_id: newQuoteId,
+        quote_id: normalizedDraftId,
         product_id: item.product_id,
         name: item.name,
         description: item.description ?? null,
@@ -284,9 +359,9 @@ async function cloneQuoteClientSide(
       }
     }
 
-    return newQuoteId;
+    return normalizedDraftId;
   } catch (error) {
-    await cleanupFailedClone(newQuoteId, insertedBomItems);
+    await cleanupFailedClone(normalizedDraftId, insertedBomItems);
     throw error instanceof Error ? error : new Error('Failed to clone quote');
   }
 }
