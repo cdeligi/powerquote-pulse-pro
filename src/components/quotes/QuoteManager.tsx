@@ -94,7 +94,11 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
       return {} as Record<string, unknown>;
     })();
 
-    const combinedFields = { ...draftQuoteFields, ...quoteFields };
+    // When a user resumes editing a draft quote, the latest field values live in
+    // the draft payload. Ensure those values take precedence over the persisted
+    // quote fields by spreading the stored fields first and the draft fields
+    // last.
+    const combinedFields = { ...quoteFields, ...draftQuoteFields };
 
     const getFieldAsString = (...keys: string[]): string | undefined => {
       for (const key of keys) {
