@@ -44,7 +44,7 @@ const formatAccountDisplay = (rawValue?: string | null): string | null => {
     return null;
   }
 
-  return segments[0];
+  return segments[segments.length - 1];
 };
 
 const parseJsonValue = (value: unknown): unknown => {
@@ -330,7 +330,10 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
       const seen = new Set<string>();
 
       for (const candidate of accountCandidates) {
-        for (const segment of extractAccountSegments(candidate)) {
+        const segments = extractAccountSegments(candidate);
+
+        for (let index = segments.length - 1; index >= 0; index -= 1) {
+          const segment = segments[index];
           const normalizedKey = segment.toLowerCase();
           if (seen.has(normalizedKey)) {
             continue;
