@@ -86,10 +86,11 @@ const Dashboard = ({ user, onLogout }: DashboardProps) => {
   const renderContent = () => {
     // Handle React Router routes for BOM editing
     if (location.pathname.startsWith('/bom-edit/')) {
-      const quoteId = location.pathname.split('/bom-edit/')[1];
+      const encodedQuoteId = location.pathname.split('/bom-edit/')[1];
+      const quoteId = encodedQuoteId ? decodeURIComponent(encodedQuoteId) : '';
       return (
         <BOMProvider>
-          <BOMBuilder 
+          <BOMBuilder
             onBOMUpdate={handleBOMUpdate}
             canSeePrices={true}
             canSeeCosts={canSeeCosts}
