@@ -23,6 +23,9 @@ interface QuoteManagerProps {
   user: User;
 }
 
+const isNonEmptyString = (value: unknown): value is string =>
+  typeof value === "string" && value.trim().length > 0;
+
 const extractAccountSegments = (rawValue?: string | null): string[] => {
   if (!rawValue) {
     return [];
@@ -42,6 +45,87 @@ const formatAccountDisplay = (rawValue?: string | null): string | null => {
   }
 
   return segments[0];
+};
+
+const coerceFieldValueToString = (value: unknown): string | undefined => {
+  if (isNonEmptyString(value)) {
+    return value.trim();
+  }
+
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return String(value);
+  }
+
+  if (Array.isArray(value)) {
+    for (const entry of value) {
+      const coerced = coerceFieldValueToString(entry);
+      if (coerced) {
+        return coerced;
+      }
+    }
+    return undefined;
+  }
+
+  if (value && typeof value === "object") {
+    const record = value as Record<string, unknown>;
+    const candidateKeys = ["value", "label", "name", "text", "display", "displayValue"] as const;
+    for (const key of candidateKeys) {
+      if (key in record) {
+        const coerced = coerceFieldValueToString(record[key]);
+        if (coerced) {
+          return coerced;
+        }
+      }
+    }
+  }
+
+  return undefined;
+};
+
+const findAccountFieldValue = (
+  record?: Record<string, unknown>
+): string | undefined => {
+  if (!record) {
+    return undefined;
+  }
+
+  const prioritizedKeys = [
+    "account",
+    "Account",
+    "account_id",
+    "accountId",
+    "accountID",
+    "account_name",
+    "accountName",
+    "account_number",
+    "accountNumber",
+    "customer_account",
+    "customerAccount",
+    "customer_account_name",
+    "customerAccountName",
+    "customer_account_number",
+    "customerAccountNumber",
+  ];
+
+  for (const key of prioritizedKeys) {
+    if (key in record) {
+      const candidate = coerceFieldValueToString(record[key]);
+      if (candidate) {
+        return candidate;
+      }
+    }
+  }
+
+  for (const [key, value] of Object.entries(record)) {
+    if (typeof key === "string" && key.toLowerCase().includes("account")) {
+      const candidate = coerceFieldValueToString(value);
+      if (candidate) {
+        return candidate;
+      }
+    }
+  }
+
+  return undefined;
 };
 
 const QuoteManager = ({ user }: QuoteManagerProps) => {
@@ -102,15 +186,12 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
 
     const getFieldAsString = (...keys: string[]): string | undefined => {
       for (const key of keys) {
-        const value = combinedFields[key];
-        if (typeof value === 'string') {
-          const trimmed = value.trim();
-          if (trimmed.length > 0) {
-            return trimmed;
+        if (key in combinedFields) {
+          const value = combinedFields[key];
+          const stringValue = coerceFieldValueToString(value);
+          if (stringValue) {
+            return stringValue;
           }
-        }
-        if (typeof value === 'number' && Number.isFinite(value)) {
-          return String(value);
         }
       }
       return undefined;
@@ -140,20 +221,36 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
       'customerAccountNumber'
     );
 
+    const draftAccountFieldValue = findAccountFieldValue(draftQuoteFields);
+    const persistedAccountFieldValue = findAccountFieldValue(quoteFields);
+    const combinedAccountFieldValue = findAccountFieldValue(combinedFields);
+
+    const rawQuoteRecord = quote as Record<string, unknown>;
+    const topLevelAccountCandidates = [
+      coerceFieldValueToString(rawQuoteRecord?.["account"]),
+      coerceFieldValueToString(rawQuoteRecord?.["account_name"]),
+      coerceFieldValueToString(rawQuoteRecord?.["accountName"]),
+      coerceFieldValueToString(rawQuoteRecord?.["account_number"]),
+      coerceFieldValueToString(rawQuoteRecord?.["accountNumber"]),
+      coerceFieldValueToString(rawQuoteRecord?.["customer_account"]),
+      coerceFieldValueToString(rawQuoteRecord?.["customer_account_name"]),
+      coerceFieldValueToString(rawQuoteRecord?.["customer_account_number"]),
+    ].filter(isNonEmptyString);
+
     const accountCandidates = [
+      draftAccountFieldValue,
+      combinedAccountFieldValue,
       configuredAccount,
+      persistedAccountFieldValue,
+      ...topLevelAccountCandidates,
       configuredCustomerName,
       normalizedDraftName,
-    ];
+    ].filter(isNonEmptyString);
 
     const accountValue = (() => {
       const seen = new Set<string>();
 
       for (const candidate of accountCandidates) {
-        if (typeof candidate !== 'string') {
-          continue;
-        }
-
         for (const segment of extractAccountSegments(candidate)) {
           const normalizedKey = segment.toLowerCase();
           if (seen.has(normalizedKey)) {
@@ -990,7 +1087,6 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
                       ) : (
                         <span className="text-white font-medium">—</span>
                       )}
-                      <p className="text-gray-400 text-sm mt-1">{quote.items} items</p>
                     </div>
                     
                     <div>
