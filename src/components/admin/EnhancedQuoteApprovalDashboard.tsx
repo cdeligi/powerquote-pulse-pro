@@ -217,21 +217,29 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
         const normalizedQuoteId = normalizeQuoteId(quote.id);
 
         if (normalizedQuoteId && normalizedQuoteId !== quote.id) {
-          await persistNormalizedQuoteId(quote.id, normalizedQuoteId, client);
-          targetQuoteId = normalizedQuoteId;
+          try {
+            await persistNormalizedQuoteId(quote.id, normalizedQuoteId, client);
+            targetQuoteId = normalizedQuoteId;
 
-          setQuotes(prevQuotes => prevQuotes.map(current => (
-            current.id === quoteId
-              ? { ...current, id: normalizedQuoteId }
-              : current
-          )));
+            setQuotes(prevQuotes => prevQuotes.map(current => (
+              current.id === quoteId
+                ? { ...current, id: normalizedQuoteId }
+                : current
+            )));
 
-          setActionLoading(prev => {
-            const updated = { ...prev };
-            delete updated[quoteId];
-            updated[normalizedQuoteId] = true;
-            return updated;
-          });
+            setActionLoading(prev => {
+              const updated = { ...prev };
+              delete updated[quoteId];
+              updated[normalizedQuoteId] = true;
+              return updated;
+            });
+          } catch (normalizationError) {
+            console.warn('Failed to normalize quote id during approval:', normalizationError);
+            toast({
+              title: 'Quote ID normalization skipped',
+              description: 'The quote kept its original identifier because it is still referenced elsewhere.',
+            });
+          }
         }
       }
 
