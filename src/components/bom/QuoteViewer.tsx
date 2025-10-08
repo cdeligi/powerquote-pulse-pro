@@ -14,6 +14,7 @@ import {
   buildRackLayoutFromAssignments,
   type SerializedSlotAssignment,
 } from '@/utils/slotAssignmentUtils';
+import { deriveCustomerNameFromFields } from '@/utils/customerName';
 
 interface Quote {
   id: string;
@@ -137,7 +138,12 @@ const QuoteViewer: React.FC = () => {
         throw new Error('Quote not found');
       }
       
-      setQuote(quoteData);
+      const resolvedCustomerName =
+        deriveCustomerNameFromFields(quoteData.quote_fields, quoteData.customer_name ?? null) ??
+        quoteData.customer_name ??
+        'Pending Customer';
+
+      setQuote({ ...quoteData, customer_name: resolvedCustomerName });
 
       if (quoteData.status === 'draft' && quoteData.draft_bom?.items && Array.isArray(quoteData.draft_bom.items)) {
         const loadedItems: BOMItem[] = quoteData.draft_bom.items.map((item: any) => {
