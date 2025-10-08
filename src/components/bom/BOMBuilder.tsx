@@ -60,6 +60,80 @@ const toPascalCase = (value: string) => {
   return camel.charAt(0).toUpperCase() + camel.slice(1);
 };
 
+const CANDIDATE_VALUE_KEYS = ['value', 'label', 'name', 'display', 'displayValue', 'text'] as const;
+
+const coerceFieldEntryToString = (value: unknown): string | null => {
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : null;
+  }
+
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return String(value);
+  }
+
+  if (Array.isArray(value)) {
+    for (const entry of value) {
+      const coerced = coerceFieldEntryToString(entry);
+      if (coerced) {
+        return coerced;
+      }
+    }
+    return null;
+  }
+
+  if (value && typeof value === 'object') {
+    const record = value as Record<string, unknown>;
+    for (const key of CANDIDATE_VALUE_KEYS) {
+      if (key in record) {
+        const coerced = coerceFieldEntryToString(record[key]);
+        if (coerced) {
+          return coerced;
+        }
+      }
+    }
+  }
+
+  return null;
+};
+
+const findAccountLikeValue = (fields: Record<string, any>): string | null => {
+  for (const [key, rawValue] of Object.entries(fields)) {
+    const normalizedKey = key.toLowerCase();
+    if (!normalizedKey.includes('account')) {
+      continue;
+    }
+
+    const coerced = coerceFieldEntryToString(rawValue);
+    if (coerced) {
+      return coerced.trim();
+    }
+  }
+
+  return null;
+};
+
+const deriveCustomerNameFromFields = (
+  fields: Record<string, any>,
+  fallback?: string | null,
+): string | null => {
+  const accountValue = findAccountLikeValue(fields);
+  if (accountValue) {
+    return accountValue;
+  }
+
+  const directCustomerName = coerceFieldEntryToString(fields.customer_name);
+  if (directCustomerName) {
+    return directCustomerName.trim();
+  }
+
+  if (typeof fallback === 'string' && fallback.trim().length > 0) {
+    return fallback.trim();
+  }
+
+  return null;
+};
+
 interface BOMBuilderProps {
   onBOMUpdate: (items: BOMItem[]) => void;
   canSeePrices: boolean;
