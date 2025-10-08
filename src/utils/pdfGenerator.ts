@@ -1362,7 +1362,50 @@ export const generateQuotePDF = async (
         let rackConfigHTML = '<div style="page-break-before: always; margin-top: 40px;">';
         rackConfigHTML += '<h2 style="color: #0f172a; border-bottom: 1px solid #e2e8f0; padding-bottom: 12px;">Rack Configuration</h2>';
 
+        const renderedRackLayoutKeys = new Set<string>();
+
+        const buildRackLayoutKey = (title: string, partNumber: string | undefined, slots: any[]) => {
+          const normalizedTitle = typeof title === 'string' ? title.trim().toLowerCase() : '';
+          const normalizedPart = typeof partNumber === 'string' ? partNumber.trim().toLowerCase() : '';
+          const normalizedSlots = Array.isArray(slots)
+            ? slots.map(slot => ({
+                slot:
+                  slot?.slot ??
+                  slot?.slotNumber ??
+                  slot?.position ??
+                  null,
+                partNumber:
+                  typeof slot?.partNumber === 'string'
+                    ? slot.partNumber.trim().toLowerCase()
+                    : typeof slot?.product?.partNumber === 'string'
+                      ? slot.product.partNumber.trim().toLowerCase()
+                      : null,
+                cardName:
+                  typeof slot?.cardName === 'string'
+                    ? slot.cardName.trim().toLowerCase()
+                    : typeof slot?.name === 'string'
+                      ? slot.name.trim().toLowerCase()
+                      : null,
+              }))
+            : [];
+
+          try {
+            return `${normalizedTitle}|${normalizedPart}|${JSON.stringify(normalizedSlots)}`;
+          } catch {
+            return `${normalizedTitle}|${normalizedPart}`;
+          }
+        };
+
         const renderRackLayout = (title: string, partNumber: string | undefined, slots: any[]) => {
+          const layoutKey = buildRackLayoutKey(title, partNumber, slots);
+          if (layoutKey && renderedRackLayoutKeys.has(layoutKey)) {
+            return;
+          }
+
+          if (layoutKey) {
+            renderedRackLayoutKeys.add(layoutKey);
+          }
+
           rackConfigHTML += `
             <div style="margin-top: 30px; margin-bottom: 30px; background: #f8fafc; padding: 24px; border-radius: 16px; border: 1px solid #e2e8f0; box-shadow: 0 12px 32px -18px rgba(15,23,42,0.25);">
               <h3 style="color: #0f172a; margin-top: 0; font-size: 15px; font-weight: 600;">${title}${partNumber ? ` · ${partNumber}` : ''}</h3>
