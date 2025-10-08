@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import type { PostgrestError } from '@supabase/supabase-js';
 import { getSupabaseClient, getSupabaseAdminClient } from "@/integrations/supabase/client";
 import { normalizeQuoteId, persistNormalizedQuoteId } from '@/utils/quoteIdGenerator';
+import { deriveCustomerNameFromFields } from "@/utils/customerName";
 
 const supabase = getSupabaseClient();
 const supabaseAdmin = getSupabaseAdminClient();
@@ -24,6 +25,46 @@ interface EnhancedQuoteApprovalDashboardProps {
 interface ExpandedQuoteState {
   [quoteId: string]: boolean;
 }
+
+const parseQuoteFields = (rawFields: unknown): Record<string, any> | undefined => {
+  if (!rawFields) {
+    return undefined;
+  }
+
+  if (typeof rawFields === 'string') {
+    try {
+      const parsed = JSON.parse(rawFields);
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        return parsed as Record<string, any>;
+      }
+    } catch (error) {
+      console.warn('Failed to parse quote_fields JSON string for admin dashboard', error);
+      return undefined;
+    }
+  }
+
+  if (typeof rawFields === 'object' && !Array.isArray(rawFields)) {
+    return rawFields as Record<string, any>;
+  }
+
+  return undefined;
+};
+
+const resolveCustomerName = (
+  fields: Record<string, any> | undefined,
+  fallback: string | null | undefined,
+): string => {
+  const derived = deriveCustomerNameFromFields(fields ?? undefined, fallback ?? null);
+  if (derived && derived.trim().length > 0) {
+    return derived.trim();
+  }
+
+  if (fallback && fallback.trim().length > 0) {
+    return fallback.trim();
+  }
+
+  return 'Pending Customer';
+};
 
 const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboardProps) => {
   const [quotes, setQuotes] = useState<Quote[]>([]);
@@ -57,36 +98,41 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
       console.log(`Fetched ${quotesData?.length || 0} quotes from database`);
 
       // Fetch BOM items for each quote
-        const quotesWithBOM = await Promise.all(
-          (quotesData || []).map(async (quote) => {
-            const { data: bomItems, error: bomError } = await supabase
-              .from('bom_items')
-              .select('*')
-              .eq('quote_id', quote.id);
+      const quotesWithBOM = await Promise.all(
+        (quotesData || []).map(async (quote) => {
+          const normalizedFields = parseQuoteFields(quote.quote_fields);
+          const resolvedCustomer = resolveCustomerName(normalizedFields, quote.customer_name);
 
-            if (bomError) {
-              console.error(`Error fetching BOM items for quote ${quote.id}:`, bomError);
-            }
+          const { data: bomItems, error: bomError } = await supabase
+            .from('bom_items')
+            .select('*')
+            .eq('quote_id', quote.id);
 
-            const enrichedItems = (bomItems || []).map((item) => ({
-              ...item,
-              product: {
-                id: item.product_id,
-                type: item.product_type,
-                name: item.name,
-                description: item.description,
-                partNumber: item.part_number,
-                price: item.unit_price,
-                cost: item.unit_cost,
-              },
-            }));
+          if (bomError) {
+            console.error(`Error fetching BOM items for quote ${quote.id}:`, bomError);
+          }
 
-            return {
-              ...quote,
-              bom_items: enrichedItems,
-            } as Quote;
-          })
-        );
+          const enrichedItems = (bomItems || []).map((item) => ({
+            ...item,
+            product: {
+              id: item.product_id,
+              type: item.product_type,
+              name: item.name,
+              description: item.description,
+              partNumber: item.part_number,
+              price: item.unit_price,
+              cost: item.unit_cost,
+            },
+          }));
+
+          return {
+            ...quote,
+            customer_name: resolvedCustomer,
+            quote_fields: normalizedFields,
+            bom_items: enrichedItems,
+          } as Quote;
+        })
+      );
 
       console.log('Quotes with BOM items:', quotesWithBOM);
       setQuotes(quotesWithBOM);
