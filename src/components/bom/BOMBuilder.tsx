@@ -29,7 +29,7 @@ import QTMSConfigurationEditor from './QTMSConfigurationEditor';
 import { consolidateQTMSConfiguration, createQTMSBOMItem, ConsolidatedQTMS, QTMSConfiguration } from '@/utils/qtmsConsolidation';
 import { buildQTMSPartNumber } from '@/utils/qtmsPartNumberBuilder';
 import { findOptimalBushingPlacement, findExistingBushingSlots, isBushingCard } from '@/utils/bushingValidation';
-import { deriveCustomerNameFromFields } from '@/utils/customerName';
+import { deriveCustomerNameFromFields, findAccountFieldValue } from '@/utils/customerName';
 import { useAuth } from '@/hooks/useAuth';
 import { useQuoteValidation } from './QuoteFieldValidation';
 import { usePermissions, FEATURES } from '@/hooks/usePermissions';
@@ -322,6 +322,22 @@ const resolveCustomerNameFromFields = (
   const derived = getDerivedCustomerName(fields, fallback);
   if (derived) {
     return derived;
+  }
+
+  if (typeof fallback === 'string' && fallback.trim().length > 0) {
+    return fallback.trim();
+  }
+
+  return 'Pending Customer';
+};
+
+const resolveToastCustomerName = (
+  fields: Record<string, any> | null | undefined,
+  fallback?: string | null,
+): string => {
+  const accountValue = findAccountFieldValue(fields ?? undefined);
+  if (accountValue && accountValue.trim().length > 0) {
+    return accountValue.trim();
   }
 
   if (typeof fallback === 'string' && fallback.trim().length > 0) {
@@ -670,6 +686,10 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
         quoteFields,
         getStringFieldValue('customer_name', 'Pending Customer'),
       );
+      const toastCustomerName = resolveToastCustomerName(
+        quoteFields,
+        resolvedCustomerName,
+      );
 
       const draftQuoteId = await generateUniqueDraftName(user.id, user.email);
 
@@ -736,7 +756,7 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
 
       toast({
         title: 'Quote Created',
-        description: `Draft ${draftQuoteId} for ${resolvedCustomerName} is ready for configuration. Your progress will be automatically saved.`
+        description: `Draft ${draftQuoteId} for ${toastCustomerName} is ready for configuration. Your progress will be automatically saved.`
       });
 
       console.log('Draft quote created successfully:', draftQuoteId);
@@ -1434,9 +1454,14 @@ if (
         lastSyncedQuoteFieldsRef.current = JSON.stringify(quoteFields ?? {});
       }
 
+      const toastCustomerName = resolveToastCustomerName(
+        quoteFields,
+        resolvedCustomerName,
+      );
+
       toast({
         title: 'Draft Saved',
-        description: `Draft ${quoteId} saved successfully with ${bomItems.length} items for ${resolvedCustomerName}`,
+        description: `Draft ${quoteId} saved successfully with ${bomItems.length} items for ${toastCustomerName}`,
       });
 
     } catch (error) {
@@ -2954,7 +2979,39 @@ if (
 
       if (currentQuoteId && isCurrentQuoteDraft) {
         isSubmittingExistingDraft = true;
-        await persistNormalizedQuoteId(currentQuoteId, quoteId);
+        const { error: clearDraftBomError } = await supabase
+          .from('bom_items')
+          .delete()
+          .eq('quote_id', currentQuoteId);
+
+        if (clearDraftBomError) {
+          console.error('Failed to clear draft BOM items before submission:', clearDraftBomError);
+          toast({
+            title: 'Submission Failed',
+            description:
+              clearDraftBomError.message || 'Failed to prepare the draft for submission. Please try again.',
+            variant: 'destructive',
+          });
+          setIsSubmitting(false);
+          return;
+        }
+
+        try {
+          await persistNormalizedQuoteId(currentQuoteId, quoteId);
+        } catch (persistError) {
+          console.error('Failed to normalize draft quote ID for submission:', persistError);
+          toast({
+            title: 'Submission Failed',
+            description:
+              persistError instanceof Error
+                ? persistError.message
+                : 'Unable to finalize the draft quote identifier. Please try again.',
+            variant: 'destructive',
+          });
+          setIsSubmitting(false);
+          return;
+        }
+
         setCurrentQuoteId(quoteId);
         setCurrentQuote(prev => (
           prev
