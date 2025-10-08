@@ -19,6 +19,7 @@ interface QuoteDetailsProps {
     notes?: string;
     updatedBOMItems?: BOMItemWithDetails[];
     approvedDiscount?: number;
+    additionalQuoteInformation?: string;
   }) => void;
   onReject: (notes?: string) => void;
   isLoading: boolean;
