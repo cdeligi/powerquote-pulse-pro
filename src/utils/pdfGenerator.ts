@@ -198,8 +198,6 @@ export const generateQuotePDF = async (
       ? quoteInfo.quote_fields
       : {}),
   };
-  const combinedFieldKeys = Object.keys(combinedQuoteFields);
-
   const rackLayoutFallbackMap = new Map<string, any>();
   if (Array.isArray(draftBom?.rackLayouts)) {
     draftBom.rackLayouts.forEach((entry: any) => {
@@ -1255,33 +1253,25 @@ export const generateQuotePDF = async (
       <div class="quote-header-fields">
         <h3>Quote Information</h3>
         
-        <!-- Customer Information -->
-        <div class="field-row">
-          <div class="field-label">Customer Name:</div>
-          <div class="field-value">${quoteInfo.customer_name || 'Not specified'}</div>
-        </div>
-        <div class="field-row">
-          <div class="field-label">Oracle Customer ID:</div>
-          <div class="field-value">${quoteInfo.oracle_customer_id || 'Not specified'}</div>
-        </div>
-        
-        <!-- Dynamic PDF Fields -->
         ${quoteFieldsForPDF.map(field => {
           let value: any = 'Not specified';
 
-          if (combinedFieldKeys.length > 0) {
-            const candidates = [
-              combinedQuoteFields[field.id],
-              combinedQuoteFields[field.id?.replace(/-/g, '_')],
-              combinedQuoteFields[field.id?.replace(/_/g, '-')],
-              combinedQuoteFields[field.id?.toLowerCase?.() ?? field.id],
-              combinedQuoteFields[field.label],
-            ];
+          const candidateIds = Array.from(new Set([
+            field.id,
+            field.id?.replace(/-/g, '_'),
+            field.id?.replace(/_/g, '-'),
+            field.id?.toLowerCase?.(),
+            field.label,
+          ].filter(Boolean)));
 
-            const found = candidates.find(candidate => candidate !== undefined && candidate !== null && candidate !== '');
-            if (found !== undefined) {
-              value = found;
-            }
+          const candidates = candidateIds.flatMap(candidateId => [
+            combinedQuoteFields[candidateId as string],
+            (quoteInfo as Record<string, any> | undefined)?.[candidateId as string],
+          ]);
+
+          const found = candidates.find(candidate => candidate !== undefined && candidate !== null && candidate !== '');
+          if (found !== undefined) {
+            value = found;
           }
 
           if (value && typeof value === 'object') {
@@ -1300,29 +1290,6 @@ export const generateQuotePDF = async (
           `;
         }).join('')}
         
-        <!-- Quote Details -->
-        <div class="field-row">
-          <div class="field-label">Priority:</div>
-          <div class="field-value">${quoteInfo.priority || 'Medium'}</div>
-        </div>
-        <div class="field-row">
-          <div class="field-label">Rep Involved:</div>
-          <div class="field-value">${quoteInfo.is_rep_involved ? 'Yes' : 'No'}</div>
-        </div>
-        
-        <!-- Terms & Conditions -->
-        <div class="field-row">
-          <div class="field-label">Shipping Terms:</div>
-          <div class="field-value">${quoteInfo.shipping_terms || 'Not specified'}</div>
-        </div>
-        <div class="field-row">
-          <div class="field-label">Payment Terms:</div>
-          <div class="field-value">${quoteInfo.payment_terms || 'Not specified'}</div>
-        </div>
-        <div class="field-row">
-          <div class="field-label">Currency:</div>
-          <div class="field-value">${quoteInfo.currency || 'USD'}</div>
-        </div>
       </div>
 
       <h2>Bill of Materials</h2>

@@ -61,7 +61,7 @@ const QuoteDetails = ({
   const [qtmsConfig, setQtmsConfig] = useState<ConsolidatedQTMS | null>(null);
   const [editingQTMS, setEditingQTMS] = useState(false);
   const [approvedDiscountInput, setApprovedDiscountInput] = useState('0');
-  const { formattedFields: formattedConfiguredFields, unmappedFields: unmappedQuoteFields } =
+  const { formattedFields: formattedConfiguredFields } =
     useConfiguredQuoteFields(quote.quote_fields);
 
   useEffect(() => {
@@ -286,23 +286,6 @@ const QuoteDetails = ({
               <div key={field.id} className="space-y-1">
                 <Label className="text-gray-400">{field.label}</Label>
                 <p className="text-white font-medium break-words">{field.formattedValue}</p>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Unmapped fields fallback */}
-      {unmappedQuoteFields.length > 0 && (
-        <Card className="bg-gray-900 border-gray-800">
-          <CardHeader>
-            <CardTitle className="text-white">Additional Quote Information</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {unmappedQuoteFields.map(({ key, value }) => (
-              <div key={key} className="grid grid-cols-2 gap-4">
-                <Label className="text-gray-400 capitalize">{key.replace(/_/g, ' ')}</Label>
-                <p className="text-white">{String(value ?? '—')}</p>
               </div>
             ))}
           </CardContent>
