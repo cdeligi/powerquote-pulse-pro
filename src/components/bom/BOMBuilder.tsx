@@ -363,6 +363,28 @@ const mergeQuoteFieldsIntoDraftBom = (
   };
 };
 
+const normalizePartNumberContext = (context: any) => {
+  if (!context || typeof context !== 'object') {
+    return undefined;
+  }
+
+  const base =
+    'pnConfig' in context || 'codeMap' in context
+      ? (context as Record<string, any>)
+      : { pnConfig: context, codeMap: {} };
+
+  const normalized: Record<string, any> = {
+    ...base,
+    pnConfig: base.pnConfig ? deepClone(base.pnConfig) : null,
+    codeMap:
+      base.codeMap && typeof base.codeMap === 'object'
+        ? deepClone(base.codeMap)
+        : {},
+  };
+
+  return normalized;
+};
+
 const resolvePartNumberContext = (...candidates: Array<any>) => {
   for (const candidate of candidates) {
     if (!candidate) continue;
@@ -1037,7 +1059,7 @@ if (
           (mergedConfigurationData as any)?.displayName ||
           (mergedConfigurationData as any)?.name,
         isAccessory: item.isAccessory ?? (mergedConfigurationData as any)?.isAccessory,
-        partNumberContext: partNumberContext ? { pnConfig: partNumberContext, codeMap: {} } : undefined,
+        partNumberContext: normalizePartNumberContext(partNumberContext),
       } as BOMItem;
     }),
   );
@@ -1111,7 +1133,7 @@ if (
             rackConfiguration: rackLayout,
             level4Config: mergedLevel4 || undefined,
             level4Selections: configData.level4Selections || undefined,
-            partNumberContext: partNumberContext ? { pnConfig: partNumberContext, codeMap: {} } : undefined,
+            partNumberContext: normalizePartNumberContext(partNumberContext),
           };
         });
       }
