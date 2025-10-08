@@ -281,9 +281,53 @@ const resolveCardKey = (slot: SpanAwareSlot, cardName: string, partNumber: strin
   return 'unknown-card';
 };
 
+const resolveLevel4BomItemId = (slot: SpanAwareSlot): string | undefined => {
+  const sources = gatherSources(slot);
+  const idCandidate = pickFirstString(sources, [
+    'level4BomItemId',
+    'level4_bom_item_id',
+    'bomItemId',
+    'bom_item_id',
+    'bom_item',
+    'payloadBomItemId',
+    'payload_bom_item_id',
+    'configurationBomItemId',
+    'configuration_bom_item_id',
+    'bomId',
+    'bom_id',
+    'level4ItemId',
+    'level4_item_id',
+  ]);
+
+  if (idCandidate) {
+    return idCandidate;
+  }
+
+  const raw = sources.find(source => typeof source?.id === 'string' && source.id.trim().length > 0) as
+    | { id: string }
+    | undefined;
+  if (raw?.id) {
+    return String(raw.id).trim();
+  }
+
+  return undefined;
+};
+
 const dedupeSpanAwareSlots = <T extends SpanAwareSlot>(slots: T[]): T[] => {
   const seenKeys = new Set<string>();
   const lastPrimaryByCard = new Map<string, number>();
+  const seenLevel4IdsByCard = new Map<string, Set<string>>();
+
+  const markPrimary = (cardKey: string, slotNumber: number, dedupeKey: string, level4Id?: string) => {
+    seenKeys.add(dedupeKey);
+    lastPrimaryByCard.set(cardKey, slotNumber);
+
+    if (!level4Id) return;
+
+    const existing = seenLevel4IdsByCard.get(cardKey) ?? new Set<string>();
+    existing.add(level4Id);
+    seenLevel4IdsByCard.set(cardKey, existing);
+  };
 
   return slots.filter((entry, index) => {
     const slotNumber = resolveSlotNumber(entry, index);
@@ -303,6 +347,7 @@ const dedupeSpanAwareSlots = <T extends SpanAwareSlot>(slots: T[]): T[] => {
     const isSpan = span > 1 || spanIndex !== undefined || sharedFromSlot !== undefined || secondaryFlag;
 
     const cardKey = resolveCardKey(entry, cardName, partNumber);
+    const level4Id = resolveLevel4BomItemId(entry);
 
     const anchorSlot = (() => {
       if (typeof primarySlot === 'number') return primarySlot;
@@ -337,8 +382,22 @@ const dedupeSpanAwareSlots = <T extends SpanAwareSlot>(slots: T[]): T[] => {
     }
 
     if (!isSpan) {
-      lastPrimaryByCard.set(cardKey, slotNumber);
+      if (level4Id) {
+        const seenForCard = seenLevel4IdsByCard.get(cardKey);
+        if (seenForCard?.has(level4Id)) {
+          return false;
+        }
+      }
+
+      markPrimary(cardKey, slotNumber, dedupeKey, level4Id);
       return true;
+    }
+
+    if (level4Id) {
+      const seenForCard = seenLevel4IdsByCard.get(cardKey);
+      if (seenForCard?.has(level4Id)) {
+        return false;
+      }
     }
 
     if (isSecondary) {
@@ -349,8 +408,7 @@ const dedupeSpanAwareSlots = <T extends SpanAwareSlot>(slots: T[]): T[] => {
       return false;
     }
 
-    seenKeys.add(dedupeKey);
-    lastPrimaryByCard.set(cardKey, slotNumber);
+    markPrimary(cardKey, slotNumber, dedupeKey, level4Id);
     return true;
   });
 };
