@@ -33,6 +33,7 @@ export interface Quote {
   };
   counter_offers?: any[];
   approval_notes?: string;
+  additional_quote_information?: string | null;
   rejection_reason?: string;
   reviewed_at?: string;
   reviewed_by?: string;
