@@ -2952,6 +2952,15 @@ if (
       return;
     }
 
+    if (discountPercentage > 0 && !discountJustification.trim()) {
+      toast({
+        title: 'Justification Required',
+        description: 'Please provide a justification for the requested discount before submitting.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
@@ -3025,6 +3034,8 @@ if (
         setIsDraftMode(false);
       }
 
+      const trimmedDiscountJustification = discountJustification.trim();
+
       const customerNameValue = resolveCustomerNameFromFields(
         quoteFields,
         getStringFieldValue('customer_name', 'Unnamed Customer'),
@@ -3074,7 +3085,7 @@ if (
             is_rep_involved: isRepInvolvedFinal,
             original_quote_value: originalQuoteValue,
             requested_discount: discountPercentage,
-            discount_justification: discountJustification,
+            discount_justification: trimmedDiscountJustification,
             discounted_value: discountedValue,
             total_cost: totalCost,
             gross_profit: grossProfit,
@@ -3102,7 +3113,7 @@ if (
             submitted_by_email: user!.email,
             original_quote_value: originalQuoteValue,
             requested_discount: discountPercentage,
-            discount_justification: discountJustification,
+            discount_justification: trimmedDiscountJustification,
             discounted_value: discountedValue,
             total_cost: totalCost,
             gross_profit: grossProfit,
