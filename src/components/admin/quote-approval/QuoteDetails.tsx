@@ -36,6 +36,7 @@ const QuoteDetails = ({
   const [rejectionReason, setRejectionReason] = useState('');
   const [selectedAction, setSelectedAction] = useState<'approve' | 'reject' | null>(null);
   const [editingPrices, setEditingPrices] = useState<Record<string, string>>({});
+  const [quoteAdditionalInfo, setQuoteAdditionalInfo] = useState('');
   const initialBOMItems = useMemo(() => {
     return (quote.bom_items || []).map((item, index) => {
       const persistedId = item.id ? String(item.id) : undefined;
@@ -88,7 +89,15 @@ const QuoteDetails = ({
     setApprovedDiscountInput(initialDiscount.toFixed(2));
     setApprovalNotes(quote.approval_notes || '');
     setRejectionReason(quote.rejection_reason || '');
-  }, [quote.id, quote.approved_discount, quote.requested_discount, quote.approval_notes, quote.rejection_reason]);
+    setQuoteAdditionalInfo(quote.additional_quote_information || '');
+  }, [
+    quote.id,
+    quote.approved_discount,
+    quote.requested_discount,
+    quote.approval_notes,
+    quote.rejection_reason,
+    quote.additional_quote_information
+  ]);
 
   useEffect(() => {
     const item = bomItems.find(i => i.product.type === 'QTMS' && i.configuration);
@@ -113,10 +122,12 @@ const QuoteDetails = ({
     const sanitizedDiscount = Number.isFinite(parsedDiscount)
       ? Math.min(Math.max(parsedDiscount, 0), 100)
       : 0;
+    const trimmedAdditionalInfo = quoteAdditionalInfo.trim();
     onApprove({
       notes: approvalNotes,
       updatedBOMItems: bomItems,
-      approvedDiscount: sanitizedDiscount / 100
+      approvedDiscount: sanitizedDiscount / 100,
+      additionalQuoteInformation: trimmedAdditionalInfo || undefined
     });
     setSelectedAction(null);
   };
@@ -212,6 +223,8 @@ const QuoteDetails = ({
     requestedDiscountPercentage > 0 ||
     (approvedDiscountFromQuote !== null && approvedDiscountFromQuote > 0);
   const discountDelta = effectiveDiscountPercentage - requestedDiscountPercentage;
+  const storedAdditionalQuoteInfo = quote.additional_quote_information?.trim() ?? '';
+  const hasStoredAdditionalQuoteInfo = storedAdditionalQuoteInfo.length > 0;
 
   const formatCurrency = (value: number) => {
     return `${quote.currency} ${value.toLocaleString(undefined, {
@@ -571,6 +584,21 @@ const QuoteDetails = ({
                   placeholder="Add any notes about the approval..."
                   className="bg-gray-800 border-gray-700 text-white min-h-[80px]"
                 />
+                <div className="space-y-2">
+                  <Label htmlFor="additional-quote-info" className="text-white">
+                    Additional Quote Information (Visible on PDF)
+                  </Label>
+                  <Textarea
+                    id="additional-quote-info"
+                    value={quoteAdditionalInfo}
+                    onChange={(e) => setQuoteAdditionalInfo(e.target.value)}
+                    placeholder="Add optional context or special instructions to include on the quote PDF..."
+                    className="bg-gray-800 border-gray-700 text-white min-h-[80px]"
+                  />
+                  <p className="text-xs text-gray-400">
+                    This text will be added to the quote PDF when provided.
+                  </p>
+                </div>
                 <div className="flex space-x-2">
                   <Button
                     onClick={handleApprove}
@@ -580,7 +608,11 @@ const QuoteDetails = ({
                     {isLoading ? 'Processing...' : 'Confirm Approval'}
                   </Button>
                   <Button
-                    onClick={() => setSelectedAction(null)}
+                    onClick={() => {
+                      setSelectedAction(null);
+                      setApprovalNotes(quote.approval_notes || '');
+                      setQuoteAdditionalInfo(quote.additional_quote_information || '');
+                    }}
                     variant="outline"
                     className="border-gray-600 text-gray-300 hover:bg-gray-800"
                     disabled={isLoading}
@@ -645,6 +677,14 @@ const QuoteDetails = ({
                 <div>
                   <Label className="text-gray-400">Approval Notes:</Label>
                   <p className="text-gray-300 bg-gray-800 p-2 rounded mt-1">{quote.approval_notes}</p>
+                </div>
+              )}
+              {hasStoredAdditionalQuoteInfo && (
+                <div>
+                  <Label className="text-gray-400">Additional Quote Information:</Label>
+                  <p className="text-gray-300 bg-gray-800 p-2 rounded mt-1 whitespace-pre-wrap">
+                    {storedAdditionalQuoteInfo}
+                  </p>
                 </div>
               )}
               {quote.rejection_reason && (
