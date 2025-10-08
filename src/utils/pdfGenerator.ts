@@ -25,6 +25,7 @@ type Level4DisplayItem = {
   partNumber?: string;
   level4BomItemId?: string;
   config: any;
+  rawSlot?: any;
 };
 
 type Level4AnalyzedEntry = Level4DisplayItem & {
@@ -40,6 +41,376 @@ type Level4ConfigDefinition = {
   fieldLabel?: string;
   templateType?: 'OPTION_1' | 'OPTION_2';
   options: NormalizedLevel4Option[];
+};
+
+type SpanAwareSlot = {
+  slot?: number;
+  slotNumber?: number;
+  position?: number;
+  cardName?: string;
+  name?: string;
+  partNumber?: string;
+  level4BomItemId?: string;
+  level4_bom_item_id?: string;
+  bomItemId?: string;
+  bom_item_id?: string;
+  configuration?: any;
+  level4Config?: any;
+  level4Selections?: any;
+  product?: { id?: string; name?: string; partNumber?: string; part_number?: string };
+  rawSlot?: any;
+};
+
+const coerceNumber = (value: any): number | undefined => {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? value : undefined;
+  }
+
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) return undefined;
+    const parsed = Number(trimmed);
+    return Number.isFinite(parsed) ? parsed : undefined;
+  }
+
+  return undefined;
+};
+
+const coerceBoolean = (value: any): boolean | undefined => {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+
+  if (typeof value === 'boolean') {
+    return value;
+  }
+
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase();
+    if (!normalized) return undefined;
+    if (['true', '1', 'yes', 'y'].includes(normalized)) return true;
+    if (['false', '0', 'no', 'n'].includes(normalized)) return false;
+  }
+
+  return Boolean(value);
+};
+
+const coerceString = (value: any): string | undefined => {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : undefined;
+  }
+
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return String(value);
+  }
+
+  return undefined;
+};
+
+const gatherSources = (slot: SpanAwareSlot): any[] => {
+  const rawSlot = slot.rawSlot ?? slot;
+  const config = slot.configuration ?? slot.level4Config ?? slot.level4Selections ?? rawSlot?.configuration ?? rawSlot?.level4Config ?? rawSlot?.level4Selections;
+  return [slot, rawSlot, config, rawSlot?.configuration, rawSlot?.level4Config, rawSlot?.level4Selections].filter(Boolean);
+};
+
+const pickFirstNumber = (sources: any[], keys: string[]): number | undefined => {
+  for (const source of sources) {
+    for (const key of keys) {
+      if (Object.prototype.hasOwnProperty.call(source, key)) {
+        const value = coerceNumber(source[key]);
+        if (value !== undefined) {
+          return value;
+        }
+      }
+    }
+  }
+  return undefined;
+};
+
+const pickFirstBoolean = (sources: any[], keys: string[]): boolean | undefined => {
+  for (const source of sources) {
+    for (const key of keys) {
+      if (Object.prototype.hasOwnProperty.call(source, key)) {
+        const value = coerceBoolean(source[key]);
+        if (value !== undefined) {
+          return value;
+        }
+      }
+    }
+  }
+  return undefined;
+};
+
+const pickFirstString = (sources: any[], keys: string[]): string | undefined => {
+  for (const source of sources) {
+    for (const key of keys) {
+      if (Object.prototype.hasOwnProperty.call(source, key)) {
+        const value = coerceString(source[key]);
+        if (value) {
+          return value;
+        }
+      }
+    }
+  }
+  return undefined;
+};
+
+const resolveSlotNumber = (slot: SpanAwareSlot, index: number): number => {
+  const sources = gatherSources(slot);
+  const explicit = pickFirstNumber(sources, ['slot', 'slotNumber', 'position', 'slot_index']);
+  if (explicit !== undefined) {
+    return explicit;
+  }
+  return index + 1;
+};
+
+const resolveSpanDetails = (slot: SpanAwareSlot) => {
+  const sources = gatherSources(slot);
+  const span = pickFirstNumber(sources, [
+    'slotSpan',
+    'slot_span',
+    'span',
+    'spanSize',
+    'span_size',
+    'slotRequirement',
+    'slot_requirement',
+    'slotSpanCount',
+    'slot_span_count',
+    'slotCount',
+    'slot_count',
+    'spanLength',
+    'span_length',
+  ]) ?? 1;
+
+  const spanIndex = pickFirstNumber(sources, [
+    'spanIndex',
+    'span_index',
+    'spanPosition',
+    'span_position',
+    'spanSlotIndex',
+    'span_slot_index',
+    'spanOffset',
+    'span_offset',
+    'slotOffset',
+    'slot_offset',
+  ]);
+
+  const primarySlot = pickFirstNumber(sources, [
+    'primarySlot',
+    'primary_slot',
+    'primarySpanSlot',
+    'primary_span_slot',
+    'spanRootSlot',
+    'span_root_slot',
+    'rootSlot',
+    'root_slot',
+    'originSlot',
+    'origin_slot',
+  ]);
+
+  const sharedFromSlot = pickFirstNumber(sources, [
+    'sharedFromSlot',
+    'shared_from_slot',
+    'bushingPairSlot',
+    'bushing_pair_slot',
+    'spanFromSlot',
+    'span_from_slot',
+    'derivedFromSlot',
+    'derived_from_slot',
+    'sourceSlot',
+    'source_slot',
+  ]);
+
+  const secondaryFlag = pickFirstBoolean(sources, [
+    'isSpanReplica',
+    'is_span_replica',
+    'isSecondarySpanSlot',
+    'is_secondary_span_slot',
+    'isSpanSecondary',
+    'is_span_secondary',
+    'isSpanContinuation',
+    'is_span_continuation',
+    'isSecondarySpan',
+    'is_secondary_span',
+  ]) || false;
+
+  return {
+    span: span > 0 ? span : 1,
+    spanIndex,
+    primarySlot,
+    sharedFromSlot,
+    secondaryFlag,
+  };
+};
+
+const resolveCardKey = (slot: SpanAwareSlot, cardName: string, partNumber: string): string => {
+  const sources = gatherSources(slot);
+  const idCandidate = pickFirstString(sources, [
+    'level4BomItemId',
+    'level4_bom_item_id',
+    'bomItemId',
+    'bom_item_id',
+    'bom_item',
+    'level4BomItem',
+    'level4_bom_item',
+    'level4ItemId',
+    'level4_item_id',
+    'cardId',
+    'card_id',
+    'id',
+    'product_id',
+  ]);
+
+  if (idCandidate) {
+    return idCandidate;
+  }
+
+  if (partNumber || cardName) {
+    return `${partNumber || ''}|${cardName || ''}`.toLowerCase();
+  }
+
+  return 'unknown-card';
+};
+
+const resolveLevel4BomItemId = (slot: SpanAwareSlot): string | undefined => {
+  const sources = gatherSources(slot);
+  const idCandidate = pickFirstString(sources, [
+    'level4BomItemId',
+    'level4_bom_item_id',
+    'bomItemId',
+    'bom_item_id',
+    'bom_item',
+    'payloadBomItemId',
+    'payload_bom_item_id',
+    'configurationBomItemId',
+    'configuration_bom_item_id',
+    'bomId',
+    'bom_id',
+    'level4ItemId',
+    'level4_item_id',
+  ]);
+
+  if (idCandidate) {
+    return idCandidate;
+  }
+
+  const raw = sources.find(source => typeof source?.id === 'string' && source.id.trim().length > 0) as
+    | { id: string }
+    | undefined;
+  if (raw?.id) {
+    return String(raw.id).trim();
+  }
+
+  return undefined;
+};
+
+const dedupeSpanAwareSlots = <T extends SpanAwareSlot>(slots: T[]): T[] => {
+  const seenKeys = new Set<string>();
+  const lastPrimaryByCard = new Map<string, number>();
+  const seenLevel4IdsByCard = new Map<string, Set<string>>();
+
+  const markPrimary = (cardKey: string, slotNumber: number, dedupeKey: string, level4Id?: string) => {
+    seenKeys.add(dedupeKey);
+    lastPrimaryByCard.set(cardKey, slotNumber);
+
+    if (!level4Id) return;
+
+    const existing = seenLevel4IdsByCard.get(cardKey) ?? new Set<string>();
+    existing.add(level4Id);
+    seenLevel4IdsByCard.set(cardKey, existing);
+  };
+
+  return slots.filter((entry, index) => {
+    const slotNumber = resolveSlotNumber(entry, index);
+    const rawSlot = (entry.rawSlot ?? entry) as any;
+    const cardName = coerceString(entry.cardName || rawSlot?.cardName || entry.name || rawSlot?.name || entry.product?.name || rawSlot?.product?.name) || '';
+    const partNumber = coerceString(
+      entry.partNumber ||
+      (entry.product as any)?.partNumber ||
+      (entry.product as any)?.part_number ||
+      rawSlot?.partNumber ||
+      rawSlot?.product?.partNumber ||
+      rawSlot?.product?.part_number
+    ) || '';
+
+    const { span, spanIndex, primarySlot, sharedFromSlot, secondaryFlag } = resolveSpanDetails(entry);
+
+    const isSpan = span > 1 || spanIndex !== undefined || sharedFromSlot !== undefined || secondaryFlag;
+
+    const cardKey = resolveCardKey(entry, cardName, partNumber);
+    const level4Id = resolveLevel4BomItemId(entry);
+
+    const anchorSlot = (() => {
+      if (typeof primarySlot === 'number') return primarySlot;
+      if (typeof sharedFromSlot === 'number') return sharedFromSlot;
+      return slotNumber;
+    })();
+
+    const dedupeKey = `${cardKey}|${anchorSlot}`;
+
+    const priorPrimary = lastPrimaryByCard.get(cardKey);
+
+    let isSecondary = secondaryFlag;
+
+    if (typeof spanIndex === 'number' && spanIndex > 0) {
+      isSecondary = true;
+    }
+
+    if (typeof primarySlot === 'number' && primarySlot !== slotNumber) {
+      isSecondary = true;
+    }
+
+    if (typeof sharedFromSlot === 'number' && sharedFromSlot !== slotNumber) {
+      isSecondary = true;
+    }
+
+    if (isSpan && typeof priorPrimary === 'number' && slotNumber > priorPrimary && slotNumber - priorPrimary < span) {
+      isSecondary = true;
+    }
+
+    if (isSpan && slotNumber !== anchorSlot && slotNumber > anchorSlot) {
+      isSecondary = true;
+    }
+
+    if (!isSpan) {
+      if (level4Id) {
+        const seenForCard = seenLevel4IdsByCard.get(cardKey);
+        if (seenForCard?.has(level4Id)) {
+          return false;
+        }
+      }
+
+      markPrimary(cardKey, slotNumber, dedupeKey, level4Id);
+      return true;
+    }
+
+    if (level4Id) {
+      const seenForCard = seenLevel4IdsByCard.get(cardKey);
+      if (seenForCard?.has(level4Id)) {
+        return false;
+      }
+    }
+
+    if (isSecondary) {
+      return false;
+    }
+
+    if (seenKeys.has(dedupeKey)) {
+      return false;
+    }
+
+    markPrimary(cardKey, slotNumber, dedupeKey, level4Id);
+    return true;
+  });
 };
 
 export const generateQuotePDF = async (
@@ -101,6 +472,9 @@ export const generateQuotePDF = async (
 
   const discountAmount = Math.max(originalTotal - finalTotal, 0);
   const hasDiscount = discountAmount > 0.01 || effectiveDiscountPercent > 0.01;
+  const additionalQuoteInfo = typeof quoteInfo?.additional_quote_information === 'string'
+    ? quoteInfo.additional_quote_information.trim()
+    : '';
 
   const resolvedCurrency = (() => {
     const raw = typeof quoteInfo?.currency === 'string' ? quoteInfo.currency.trim().toUpperCase() : '';
@@ -198,8 +572,6 @@ export const generateQuotePDF = async (
       ? quoteInfo.quote_fields
       : {}),
   };
-  const combinedFieldKeys = Object.keys(combinedQuoteFields);
-
   const rackLayoutFallbackMap = new Map<string, any>();
   if (Array.isArray(draftBom?.rackLayouts)) {
     draftBom.rackLayouts.forEach((entry: any) => {
@@ -964,10 +1336,13 @@ export const generateQuotePDF = async (
       directLevel4 = fallbackLevel4.configuration;
     }
 
-    const slotLevel4Entries: Array<{ slot: number; cardName: string; partNumber?: string; level4BomItemId?: string; configuration: any; }> = [];
+    const slotLevel4Entries: Array<{ slot: number; cardName: string; partNumber?: string; level4BomItemId?: string; configuration: any; rawSlot?: any; }> = [];
     const seenLevel4Keys = new Set<string>();
 
-    const rackSlots = derivedRack?.slots || [];
+    const rackSlots = Array.isArray(derivedRack?.slots)
+      ? dedupeSpanAwareSlots(derivedRack?.slots as SpanAwareSlot[])
+      : [];
+
     rackSlots.forEach(slot => {
       const configuration = slot.level4Config || slot.level4Selections;
       if (!hasConfigData(configuration)) return;
@@ -989,6 +1364,7 @@ export const generateQuotePDF = async (
         partNumber: slot.partNumber,
         level4BomItemId: slot.level4BomItemId,
         configuration,
+        rawSlot: slot,
       });
     });
 
@@ -1027,9 +1403,12 @@ export const generateQuotePDF = async (
           partNumber: normalizedSlot.partNumber,
           level4BomItemId: normalizedSlot.level4BomItemId,
           configuration,
+          rawSlot: slot,
         });
       });
     }
+
+    const normalizedSlotLevel4Entries = dedupeSpanAwareSlots(slotLevel4Entries);
 
     return {
       ...item,
@@ -1038,7 +1417,7 @@ export const generateQuotePDF = async (
       partNumber,
       rackConfiguration: derivedRack,
       level4Config: directLevel4 || undefined,
-      slotLevel4: slotLevel4Entries,
+      slotLevel4: normalizedSlotLevel4Entries,
     };
   });
 
@@ -1066,17 +1445,18 @@ export const generateQuotePDF = async (
           ? slot.slot
           : normalizeSlotNumber(slot.slot, index);
 
-        entries.push({
-          productName: item.product?.name || 'Configured Item',
-          productPartNumber: item.partNumber,
-          slotNumber: resolvedSlotNumber,
-          slotCardName: slot.cardName,
-          partNumber: slot.partNumber || item.partNumber,
-          level4BomItemId: slot.level4BomItemId,
-          config: slot.configuration,
-        });
+      entries.push({
+        productName: item.product?.name || 'Configured Item',
+        productPartNumber: item.partNumber,
+        slotNumber: resolvedSlotNumber,
+        slotCardName: slot.cardName,
+        partNumber: slot.partNumber || item.partNumber,
+        level4BomItemId: slot.level4BomItemId,
+        config: slot.configuration,
+        rawSlot: slot.rawSlot ?? slot,
       });
-    }
+    });
+  }
 
     return entries;
   });
@@ -1255,33 +1635,25 @@ export const generateQuotePDF = async (
       <div class="quote-header-fields">
         <h3>Quote Information</h3>
         
-        <!-- Customer Information -->
-        <div class="field-row">
-          <div class="field-label">Customer Name:</div>
-          <div class="field-value">${quoteInfo.customer_name || 'Not specified'}</div>
-        </div>
-        <div class="field-row">
-          <div class="field-label">Oracle Customer ID:</div>
-          <div class="field-value">${quoteInfo.oracle_customer_id || 'Not specified'}</div>
-        </div>
-        
-        <!-- Dynamic PDF Fields -->
         ${quoteFieldsForPDF.map(field => {
           let value: any = 'Not specified';
 
-          if (combinedFieldKeys.length > 0) {
-            const candidates = [
-              combinedQuoteFields[field.id],
-              combinedQuoteFields[field.id?.replace(/-/g, '_')],
-              combinedQuoteFields[field.id?.replace(/_/g, '-')],
-              combinedQuoteFields[field.id?.toLowerCase?.() ?? field.id],
-              combinedQuoteFields[field.label],
-            ];
+          const candidateIds = Array.from(new Set([
+            field.id,
+            field.id?.replace(/-/g, '_'),
+            field.id?.replace(/_/g, '-'),
+            field.id?.toLowerCase?.(),
+            field.label,
+          ].filter(Boolean)));
 
-            const found = candidates.find(candidate => candidate !== undefined && candidate !== null && candidate !== '');
-            if (found !== undefined) {
-              value = found;
-            }
+          const candidates = candidateIds.flatMap(candidateId => [
+            combinedQuoteFields[candidateId as string],
+            (quoteInfo as Record<string, any> | undefined)?.[candidateId as string],
+          ]);
+
+          const found = candidates.find(candidate => candidate !== undefined && candidate !== null && candidate !== '');
+          if (found !== undefined) {
+            value = found;
           }
 
           if (value && typeof value === 'object') {
@@ -1300,29 +1672,6 @@ export const generateQuotePDF = async (
           `;
         }).join('')}
         
-        <!-- Quote Details -->
-        <div class="field-row">
-          <div class="field-label">Priority:</div>
-          <div class="field-value">${quoteInfo.priority || 'Medium'}</div>
-        </div>
-        <div class="field-row">
-          <div class="field-label">Rep Involved:</div>
-          <div class="field-value">${quoteInfo.is_rep_involved ? 'Yes' : 'No'}</div>
-        </div>
-        
-        <!-- Terms & Conditions -->
-        <div class="field-row">
-          <div class="field-label">Shipping Terms:</div>
-          <div class="field-value">${quoteInfo.shipping_terms || 'Not specified'}</div>
-        </div>
-        <div class="field-row">
-          <div class="field-label">Payment Terms:</div>
-          <div class="field-value">${quoteInfo.payment_terms || 'Not specified'}</div>
-        </div>
-        <div class="field-row">
-          <div class="field-label">Currency:</div>
-          <div class="field-value">${quoteInfo.currency || 'USD'}</div>
-        </div>
       </div>
 
       <h2>Bill of Materials</h2>
@@ -1379,6 +1728,20 @@ export const generateQuotePDF = async (
       ` : ''}
 
       ${(() => {
+        if (!additionalQuoteInfo) {
+          return '';
+        }
+
+        const escaped = escapeHtml(additionalQuoteInfo).replace(/\r?\n/g, '<br />');
+        return `
+          <div style="margin-top: 24px; padding: 18px 20px; border-radius: 12px; background: #f8fafc; border: 1px solid #e2e8f0;">
+            <h3 style="margin-top: 0; margin-bottom: 10px; color: #0f172a; font-size: 14px; font-weight: 600;">Additional Quote Information</h3>
+            <p style="margin: 0; font-size: 11px; color: #334155; line-height: 1.6;">${escaped}</p>
+          </div>
+        `;
+      })()}
+
+      ${(() => {
         // Check if any items have chassis configurations
         const chassisItems = normalizedBomItems.filter(item =>
           item.enabled &&
@@ -1395,18 +1758,63 @@ export const generateQuotePDF = async (
         let rackConfigHTML = '<div style="page-break-before: always; margin-top: 40px;">';
         rackConfigHTML += '<h2 style="color: #0f172a; border-bottom: 1px solid #e2e8f0; padding-bottom: 12px;">Rack Configuration</h2>';
 
+        const renderedRackLayoutKeys = new Set<string>();
+
+        const buildRackLayoutKey = (title: string, partNumber: string | undefined, slots: any[]) => {
+          const normalizedTitle = typeof title === 'string' ? title.trim().toLowerCase() : '';
+          const normalizedPart = typeof partNumber === 'string' ? partNumber.trim().toLowerCase() : '';
+          const normalizedSlots = Array.isArray(slots)
+            ? slots.map(slot => ({
+                slot:
+                  slot?.slot ??
+                  slot?.slotNumber ??
+                  slot?.position ??
+                  null,
+                partNumber:
+                  typeof slot?.partNumber === 'string'
+                    ? slot.partNumber.trim().toLowerCase()
+                    : typeof slot?.product?.partNumber === 'string'
+                      ? slot.product.partNumber.trim().toLowerCase()
+                      : null,
+                cardName:
+                  typeof slot?.cardName === 'string'
+                    ? slot.cardName.trim().toLowerCase()
+                    : typeof slot?.name === 'string'
+                      ? slot.name.trim().toLowerCase()
+                      : null,
+              }))
+            : [];
+
+          try {
+            return `${normalizedTitle}|${normalizedPart}|${JSON.stringify(normalizedSlots)}`;
+          } catch {
+            return `${normalizedTitle}|${normalizedPart}`;
+          }
+        };
+
         const renderRackLayout = (title: string, partNumber: string | undefined, slots: any[]) => {
+          const layoutKey = buildRackLayoutKey(title, partNumber, slots);
+          if (layoutKey && renderedRackLayoutKeys.has(layoutKey)) {
+            return;
+          }
+
+          if (layoutKey) {
+            renderedRackLayoutKeys.add(layoutKey);
+          }
+
           rackConfigHTML += `
             <div style="margin-top: 30px; margin-bottom: 30px; background: #f8fafc; padding: 24px; border-radius: 16px; border: 1px solid #e2e8f0; box-shadow: 0 12px 32px -18px rgba(15,23,42,0.25);">
               <h3 style="color: #0f172a; margin-top: 0; font-size: 15px; font-weight: 600;">${title}${partNumber ? ` · ${partNumber}` : ''}</h3>
               <div style="margin-top: 18px;">`;
 
-          if (Array.isArray(slots) && slots.length > 0) {
+          const normalizedSlots = Array.isArray(slots) ? dedupeSpanAwareSlots(slots as SpanAwareSlot[]) : [];
+
+          if (normalizedSlots.length > 0) {
             rackConfigHTML += '<table style="width: 100%; border-collapse: collapse; margin-top: 12px; background: #ffffff; border-radius: 12px; overflow: hidden; border: 1px solid #e2e8f0;">';
             rackConfigHTML += '<thead><tr style="background: #0f172a; color: #f8fafc;"><th style="padding: 12px; border-bottom: 1px solid #1f2937; text-align: left; font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase;">Slot</th><th style="padding: 12px; border-bottom: 1px solid #1f2937; text-align: left; font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase;">Card Type</th><th style="padding: 12px; border-bottom: 1px solid #1f2937; text-align: left; font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase;">Part Number</th></tr></thead>';
             rackConfigHTML += '<tbody>';
 
-            slots.forEach((slot: any, idx: number) => {
+            normalizedSlots.forEach((slot: any, idx: number) => {
               const slotNumber = slot?.slot ?? slot?.slotNumber ?? slot?.position ?? (idx + 1);
               const cardName = slot?.cardName || slot?.name || slot?.product?.name || 'Empty';
               const slotPartNumber = slot?.partNumber || slot?.product?.partNumber || '-';

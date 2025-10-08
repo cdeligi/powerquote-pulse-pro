@@ -38,6 +38,7 @@ export interface Quote {
     status: 'pending_approval' | 'accepted' | 'rejected';
   }>;
   approval_notes?: string;
+  additional_quote_information?: string | null;
   rejection_reason?: string;
   reviewed_at?: string;
   reviewed_by?: string;
@@ -167,7 +168,8 @@ export const useQuotes = () => {
     status: Quote['status'], 
     approvedDiscount?: number,
     approvalNotes?: string,
-    rejectionReason?: string
+    rejectionReason?: string,
+    additionalQuoteInformation?: string
   ) => {
     console.log(`Updating quote ${quoteId} status to ${status}`);
     
@@ -182,12 +184,19 @@ export const useQuotes = () => {
         updateData.approved_discount = approvedDiscount;
       }
       
-      if (approvalNotes) {
-        updateData.approval_notes = approvalNotes;
+      if (approvalNotes !== undefined) {
+        const trimmedNotes = approvalNotes.trim();
+        updateData.approval_notes = trimmedNotes ? trimmedNotes : null;
       }
-      
-      if (rejectionReason) {
-        updateData.rejection_reason = rejectionReason;
+
+      if (rejectionReason !== undefined) {
+        const trimmedReason = rejectionReason.trim();
+        updateData.rejection_reason = trimmedReason ? trimmedReason : null;
+      }
+
+      if (additionalQuoteInformation !== undefined) {
+        const trimmedInfo = additionalQuoteInformation.trim();
+        updateData.additional_quote_information = trimmedInfo ? trimmedInfo : null;
       }
 
       const { error } = await supabase

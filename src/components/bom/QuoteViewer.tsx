@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Separator } from '@/components/ui/separator';
 import { ArrowLeft, FileText } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
@@ -14,6 +15,8 @@ import {
   buildRackLayoutFromAssignments,
   type SerializedSlotAssignment,
 } from '@/utils/slotAssignmentUtils';
+import { deriveCustomerNameFromFields } from '@/utils/customerName';
+import { useConfiguredQuoteFields } from '@/hooks/useConfiguredQuoteFields';
 
 interface Quote {
   id: string;
@@ -38,6 +41,7 @@ interface Quote {
   gross_profit?: number;
   approval_notes?: string | null;
   rejection_reason?: string | null;
+  additional_quote_information?: string | null;
   reviewed_at?: string | null;
   submitted_at?: string;
   created_at: string;
@@ -59,6 +63,25 @@ const QuoteViewer: React.FC = () => {
   const isDraft = quote?.status === 'draft';
   const isExplicitView = mode === 'view';
   const isEditable = isDraft && !isExplicitView;
+
+  const { formattedFields: quoteInformationFields } = useConfiguredQuoteFields(
+    quote?.quote_fields,
+    { includeInQuoteOnly: true }
+  );
+
+  const timelineEntries = (
+    [
+      quote?.created_at
+        ? { label: 'Created', value: new Date(quote.created_at).toLocaleString() }
+        : null,
+      quote?.submitted_at
+        ? { label: 'Submitted', value: new Date(quote.submitted_at).toLocaleString() }
+        : null,
+      quote?.reviewed_at
+        ? { label: 'Reviewed', value: new Date(quote.reviewed_at).toLocaleString() }
+        : null,
+    ].filter((entry): entry is { label: string; value: string } => Boolean(entry))
+  );
 
   const formatCurrency = (value: number) => {
     const currency = quote?.currency || 'USD';
@@ -137,7 +160,12 @@ const QuoteViewer: React.FC = () => {
         throw new Error('Quote not found');
       }
       
-      setQuote(quoteData);
+      const resolvedCustomerName =
+        deriveCustomerNameFromFields(quoteData.quote_fields, quoteData.customer_name ?? null) ??
+        quoteData.customer_name ??
+        'Pending Customer';
+
+      setQuote({ ...quoteData, customer_name: resolvedCustomerName });
 
       if (quoteData.status === 'draft' && quoteData.draft_bom?.items && Array.isArray(quoteData.draft_bom.items)) {
         const loadedItems: BOMItem[] = quoteData.draft_bom.items.map((item: any) => {
@@ -348,6 +376,8 @@ const QuoteViewer: React.FC = () => {
   const hasDiscount = discountAmount > 0.01 || effectiveDiscountPercent > 0.01;
   const hasApprovalNotes = Boolean(quote.approval_notes?.trim());
   const hasRejectionReason = Boolean(quote.rejection_reason?.trim());
+  const additionalQuoteInfo = quote.additional_quote_information?.trim();
+  const hasAdditionalQuoteInfo = Boolean(additionalQuoteInfo);
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -396,59 +426,36 @@ const QuoteViewer: React.FC = () => {
           <CardHeader>
             <CardTitle>Quote Information</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <label className="text-sm font-medium text-muted-foreground">Customer</label>
-                <p className="text-foreground">{quote.customer_name}</p>
+          <CardContent className="space-y-6">
+            {quoteInformationFields.length > 0 ? (
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                {quoteInformationFields.map((field) => (
+                  <div key={field.id}>
+                    <label className="text-sm font-medium text-muted-foreground">{field.label}</label>
+                    <p className="text-foreground break-words">{field.formattedValue}</p>
+                  </div>
+                ))}
               </div>
-              <div>
-                <label className="text-sm font-medium text-muted-foreground">Oracle Customer ID</label>
-                <p className="text-foreground">{quote.oracle_customer_id}</p>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                No quote information fields are configured to display.
+              </p>
+            )}
+
+            {quoteInformationFields.length > 0 && timelineEntries.length > 0 && (
+              <Separator className="my-2" />
+            )}
+
+            {timelineEntries.length > 0 && (
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                {timelineEntries.map((entry) => (
+                  <div key={entry.label}>
+                    <label className="text-sm font-medium text-muted-foreground">{entry.label}</label>
+                    <p className="text-foreground">{entry.value}</p>
+                  </div>
+                ))}
               </div>
-              <div>
-                <label className="text-sm font-medium text-muted-foreground">SFDC Opportunity</label>
-                <p className="text-foreground">{quote.sfdc_opportunity}</p>
-              </div>
-              <div>
-                <label className="text-sm font-medium text-muted-foreground">Priority</label>
-                <p className="text-foreground">{quote.priority}</p>
-              </div>
-              <div>
-                <label className="text-sm font-medium text-muted-foreground">Currency</label>
-                <p className="text-foreground">{quote.currency}</p>
-              </div>
-              <div>
-                <label className="text-sm font-medium text-muted-foreground">Rep Involved</label>
-                <p className="text-foreground">{quote.is_rep_involved ? 'Yes' : 'No'}</p>
-              </div>
-              <div>
-                <label className="text-sm font-medium text-muted-foreground">Shipping Terms</label>
-                <p className="text-foreground">{quote.shipping_terms || '—'}</p>
-              </div>
-              <div>
-                <label className="text-sm font-medium text-muted-foreground">Payment Terms</label>
-                <p className="text-foreground">{quote.payment_terms || '—'}</p>
-              </div>
-              <div>
-                <label className="text-sm font-medium text-muted-foreground">Created</label>
-                <p className="text-foreground">
-                  {new Date(quote.created_at).toLocaleString()}
-                </p>
-              </div>
-              {quote.submitted_at && (
-                <div>
-                  <label className="text-sm font-medium text-muted-foreground">Submitted</label>
-                  <p className="text-foreground">{new Date(quote.submitted_at).toLocaleString()}</p>
-                </div>
-              )}
-              {quote.reviewed_at && (
-                <div>
-                  <label className="text-sm font-medium text-muted-foreground">Reviewed</label>
-                  <p className="text-foreground">{new Date(quote.reviewed_at).toLocaleString()}</p>
-                </div>
-              )}
-            </div>
+            )}
           </CardContent>
         </Card>
 
@@ -528,6 +535,19 @@ const QuoteViewer: React.FC = () => {
             </div>
           </CardContent>
         </Card>
+
+        {hasAdditionalQuoteInfo && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Additional Quote Information</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-foreground whitespace-pre-wrap">
+                {additionalQuoteInfo}
+              </p>
+            </CardContent>
+          </Card>
+        )}
 
         {quote.status !== 'draft' && quote.status !== 'pending_approval' && (
           <Card>
