@@ -200,9 +200,10 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
       notes?: string;
       updatedBOMItems?: BOMItemWithDetails[];
       approvedDiscount?: number;
+      additionalQuoteInformation?: string;
     } = {}
   ) => {
-    const { notes, updatedBOMItems, approvedDiscount } = payload;
+    const { notes, updatedBOMItems, approvedDiscount, additionalQuoteInformation } = payload;
     console.log(`Processing ${action} for quote ${quoteId} with notes:`, notes);
     setActionLoading(prev => ({ ...prev, [quoteId]: true }));
 
@@ -252,9 +253,13 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
       if (action === 'approve') {
         updates.approval_notes = notes?.trim() ? notes.trim() : null;
         updates.rejection_reason = null;
+        updates.additional_quote_information = additionalQuoteInformation?.trim()
+          ? additionalQuoteInformation.trim()
+          : null;
       } else if (action === 'reject') {
         updates.rejection_reason = notes?.trim() ? notes.trim() : null;
         updates.approval_notes = null;
+        updates.additional_quote_information = null;
       }
 
       if (action === 'approve') {

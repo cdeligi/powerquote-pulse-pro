@@ -472,6 +472,9 @@ export const generateQuotePDF = async (
 
   const discountAmount = Math.max(originalTotal - finalTotal, 0);
   const hasDiscount = discountAmount > 0.01 || effectiveDiscountPercent > 0.01;
+  const additionalQuoteInfo = typeof quoteInfo?.additional_quote_information === 'string'
+    ? quoteInfo.additional_quote_information.trim()
+    : '';
 
   const resolvedCurrency = (() => {
     const raw = typeof quoteInfo?.currency === 'string' ? quoteInfo.currency.trim().toUpperCase() : '';
@@ -1723,6 +1726,20 @@ export const generateQuotePDF = async (
           `}
         </div>
       ` : ''}
+
+      ${(() => {
+        if (!additionalQuoteInfo) {
+          return '';
+        }
+
+        const escaped = escapeHtml(additionalQuoteInfo).replace(/\r?\n/g, '<br />');
+        return `
+          <div style="margin-top: 24px; padding: 18px 20px; border-radius: 12px; background: #f8fafc; border: 1px solid #e2e8f0;">
+            <h3 style="margin-top: 0; margin-bottom: 10px; color: #0f172a; font-size: 14px; font-weight: 600;">Additional Quote Information</h3>
+            <p style="margin: 0; font-size: 11px; color: #334155; line-height: 1.6;">${escaped}</p>
+          </div>
+        `;
+      })()}
 
       ${(() => {
         // Check if any items have chassis configurations

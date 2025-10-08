@@ -41,6 +41,7 @@ interface Quote {
   gross_profit?: number;
   approval_notes?: string | null;
   rejection_reason?: string | null;
+  additional_quote_information?: string | null;
   reviewed_at?: string | null;
   submitted_at?: string;
   created_at: string;
@@ -375,6 +376,8 @@ const QuoteViewer: React.FC = () => {
   const hasDiscount = discountAmount > 0.01 || effectiveDiscountPercent > 0.01;
   const hasApprovalNotes = Boolean(quote.approval_notes?.trim());
   const hasRejectionReason = Boolean(quote.rejection_reason?.trim());
+  const additionalQuoteInfo = quote.additional_quote_information?.trim();
+  const hasAdditionalQuoteInfo = Boolean(additionalQuoteInfo);
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -532,6 +535,19 @@ const QuoteViewer: React.FC = () => {
             </div>
           </CardContent>
         </Card>
+
+        {hasAdditionalQuoteInfo && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Additional Quote Information</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-foreground whitespace-pre-wrap">
+                {additionalQuoteInfo}
+              </p>
+            </CardContent>
+          </Card>
+        )}
 
         {quote.status !== 'draft' && quote.status !== 'pending_approval' && (
           <Card>
