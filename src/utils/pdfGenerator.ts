@@ -120,6 +120,203 @@ const coerceString = (value: any): string | undefined => {
   return undefined;
 };
 
+const PRODUCT_INFO_KEY_VARIANTS = [
+  'productInfoUrl',
+  'product_info_url',
+  'productInfoURL',
+  'product-info-url',
+  'product info url',
+  'productInfo',
+  'product_info',
+  'productInformationUrl',
+  'product_information_url',
+  'productInformation',
+  'product_information',
+  'infoUrl',
+  'info_url',
+  'info-url',
+  'info url',
+  'url',
+  'link',
+];
+
+const normalizeProductInfoKey = (key: string): string => key.replace(/[\s_-]/g, '').toLowerCase();
+
+const PRODUCT_INFO_KEYS = new Set(PRODUCT_INFO_KEY_VARIANTS.map(normalizeProductInfoKey));
+
+const PRODUCT_ID_KEY_HINTS = [
+  'productid',
+  'level2productid',
+  'selectedproductid',
+  'selectedlevel2productid',
+  'level2id',
+  'selectedlevel2id',
+  'chassisid',
+  'chassisproductid',
+  'configurationproductid',
+  'variantid',
+  'optionproductid',
+  'parentproductid',
+];
+
+const PRODUCT_CONTAINER_KEY_HINTS = [
+  'product',
+  'level2product',
+  'selectedproduct',
+  'selectedlevel2product',
+  'configurationproduct',
+  'chassis',
+  'variant',
+  'option',
+];
+
+const resolveProductInfoUrl = (...sources: Array<any>): string | null => {
+  const visited = new WeakSet<object>();
+
+  const searchObject = (value: unknown, depth: number): string | null => {
+    if (depth > 6) return null;
+
+    if (!value || typeof value !== 'object') {
+      return null;
+    }
+
+    if (visited.has(value as object)) {
+      return null;
+    }
+    visited.add(value as object);
+
+    if (Array.isArray(value)) {
+      for (const entry of value) {
+        const foundInArray = searchObject(entry, depth + 1);
+        if (foundInArray) {
+          return foundInArray;
+        }
+      }
+      return null;
+    }
+
+    for (const [key, raw] of Object.entries(value as Record<string, unknown>)) {
+      const normalizedKey = normalizeProductInfoKey(key);
+      if (PRODUCT_INFO_KEYS.has(normalizedKey)) {
+        const resolved = coerceString(raw);
+        if (resolved) {
+          return resolved;
+        }
+      }
+    }
+
+    for (const raw of Object.values(value as Record<string, unknown>)) {
+      if (raw && typeof raw === 'object') {
+        const nestedResult = searchObject(raw, depth + 1);
+        if (nestedResult) {
+          return nestedResult;
+        }
+      }
+    }
+
+    return null;
+  };
+
+  for (const source of sources) {
+    const directString = coerceString(source);
+    if (directString) {
+      return directString;
+    }
+
+    const found = searchObject(source, 0);
+    if (found) {
+      return found;
+    }
+  }
+
+  return null;
+};
+
+const collectProductIdCandidates = (...sources: Array<any>): string[] => {
+  const candidates = new Set<string>();
+  const visited = new WeakSet<object>();
+
+  const addCandidate = (value: unknown) => {
+    const stringValue = coerceString(value);
+    if (stringValue) {
+      candidates.add(stringValue);
+    }
+  };
+
+  const searchObject = (value: unknown, depth: number, parentKey?: string) => {
+    if (!value || typeof value !== 'object' || depth > 6) {
+      return;
+    }
+
+    if (visited.has(value as object)) {
+      return;
+    }
+    visited.add(value as object);
+
+    if (Array.isArray(value)) {
+      for (const entry of value) {
+        if (entry && typeof entry === 'object') {
+          searchObject(entry, depth + 1, parentKey);
+        }
+      }
+      return;
+    }
+
+    const record = value as Record<string, unknown>;
+
+    if (parentKey && PRODUCT_CONTAINER_KEY_HINTS.some(hint => parentKey.includes(hint))) {
+      addCandidate(record.id);
+    }
+
+    const productLevel =
+      coerceNumber(record.productLevel) ??
+      coerceNumber(record.product_level) ??
+      coerceNumber(record.level) ??
+      undefined;
+
+    if (productLevel === 2 || record.parentProductId || record.parent_product_id) {
+      addCandidate(record.id);
+    }
+
+    for (const [key, raw] of Object.entries(record)) {
+      const normalizedKey = normalizeProductInfoKey(key);
+
+      if (PRODUCT_ID_KEY_HINTS.some(hint => normalizedKey.includes(hint))) {
+        addCandidate(raw);
+      }
+
+      if (Array.isArray(raw)) {
+        for (const entry of raw) {
+          if (entry && typeof entry === 'object') {
+            searchObject(entry, depth + 1, normalizedKey);
+          }
+        }
+      } else if (raw && typeof raw === 'object') {
+        searchObject(raw, depth + 1, normalizedKey);
+      } else if (normalizedKey === 'id') {
+        if (PRODUCT_CONTAINER_KEY_HINTS.some(hint => (parentKey ?? '').includes(hint))) {
+          addCandidate(raw);
+        } else if (productLevel === 2) {
+          addCandidate(raw);
+        }
+      }
+    }
+  };
+
+  sources.forEach(source => {
+    if (source == null) return;
+    if (typeof source === 'string' || typeof source === 'number') {
+      addCandidate(source);
+      return;
+    }
+    if (typeof source === 'object') {
+      searchObject(source, 0);
+    }
+  });
+
+  return Array.from(candidates);
+};
+
 const gatherSources = (slot: SpanAwareSlot): any[] => {
   const rawSlot = slot.rawSlot ?? slot;
   const config = slot.configuration ?? slot.level4Config ?? slot.level4Selections ?? rawSlot?.configuration ?? rawSlot?.level4Config ?? rawSlot?.level4Selections;
@@ -1320,11 +1517,48 @@ export const generateQuotePDF = async (
 
   const normalizedBomItems = bomItems.map(item => {
     const product = (item.product || {}) as any;
+    const parentProduct = (item.parentProduct || product?.parentProduct || {}) as any;
+    const grandParentProduct = (parentProduct?.parentProduct || product?.parentProduct?.parentProduct || {}) as any;
+    const configurationProduct = (item.configuration?.product || item.configuration?.selectedProduct || {}) as any;
+    const configurationLevel2 = (item.configuration?.selectedLevel2Product || item.configuration?.level2Product || {}) as any;
+    const directLevel2 = (item.level2Product || item.level2_product || {}) as any;
+    const resolvedProductInfoUrl =
+      resolveProductInfoUrl(
+        product,
+        parentProduct,
+        grandParentProduct,
+        item,
+        item.configuration,
+        configurationProduct,
+        configurationLevel2,
+        directLevel2,
+        configurationProduct?.product,
+        configurationProduct?.parentProduct,
+        configurationLevel2?.parentProduct,
+        directLevel2?.parentProduct
+      );
+
+    const fallbackProductInfoUrl =
+      coerceString(product.productInfoUrl) ||
+      coerceString((product as any).product_info_url) ||
+      coerceString(item.productInfoUrl) ||
+      coerceString((item as any).product_info_url) ||
+      coerceString(configurationProduct?.productInfoUrl) ||
+      coerceString(configurationProduct?.product_info_url) ||
+      coerceString(configurationLevel2?.productInfoUrl) ||
+      coerceString(configurationLevel2?.product_info_url) ||
+      coerceString(directLevel2?.productInfoUrl) ||
+      coerceString(directLevel2?.product_info_url) ||
+      null;
+
+    const productInfoUrl = resolvedProductInfoUrl || fallbackProductInfoUrl;
+
     const normalizedProduct = {
       ...product,
       name: product.name || item.name || 'Configured Item',
       description: product.description || item.description || '',
       price: typeof product.price === 'number' ? product.price : (item.product?.price || item.unit_price || 0),
+      productInfoUrl: productInfoUrl || undefined,
     };
 
     const partNumber = item.partNumber || item.part_number || product.partNumber || product.part_number || 'TBD';
@@ -1424,6 +1658,79 @@ export const generateQuotePDF = async (
       slotLevel4: normalizedSlotLevel4Entries,
     };
   });
+
+  const itemsMissingProductInfo = normalizedBomItems.filter(item => !coerceString((item.product as any)?.productInfoUrl));
+
+  if (itemsMissingProductInfo.length > 0) {
+    const productIdsToFetch = new Set<string>();
+
+    itemsMissingProductInfo.forEach(item => {
+      const candidates = collectProductIdCandidates(
+        item,
+        item.product,
+        item.configuration,
+        item.configuration?.product,
+        item.configuration?.selectedProduct,
+        item.configuration?.selectedLevel2Product,
+        item.configuration?.level2Product,
+        item.configuration?.selectedProducts,
+        item.level2Product,
+        item.level2_product,
+        item.parentProduct,
+        item.configuration?.rackConfiguration,
+        item.rackConfiguration,
+        item.slotAssignments
+      );
+
+      candidates.forEach(candidate => productIdsToFetch.add(candidate));
+    });
+
+    if (productIdsToFetch.size > 0) {
+      const { data: productInfoRows } = await supabase
+        .from('products')
+        .select('id, product_info_url')
+        .in('id', Array.from(productIdsToFetch));
+
+      if (Array.isArray(productInfoRows) && productInfoRows.length > 0) {
+        const infoUrlMap = new Map<string, string>();
+        productInfoRows.forEach(row => {
+          const infoUrl = coerceString((row as any)?.product_info_url);
+          if (infoUrl) {
+            infoUrlMap.set(String((row as any).id), infoUrl);
+          }
+        });
+
+        itemsMissingProductInfo.forEach(item => {
+          const candidates = collectProductIdCandidates(
+            item,
+            item.product,
+            item.configuration,
+            item.configuration?.product,
+            item.configuration?.selectedProduct,
+            item.configuration?.selectedLevel2Product,
+            item.configuration?.level2Product,
+            item.configuration?.selectedProducts,
+            item.level2Product,
+            item.level2_product,
+            item.parentProduct,
+            item.configuration?.rackConfiguration,
+            item.rackConfiguration,
+            item.slotAssignments
+          );
+
+          for (const candidate of candidates) {
+            const matchedUrl = candidate ? infoUrlMap.get(candidate) : undefined;
+            if (matchedUrl) {
+              (item.product as any).productInfoUrl = matchedUrl;
+              (item.product as any).product_info_url = matchedUrl;
+              (item as any).productInfoUrl = matchedUrl;
+              break;
+            }
+          }
+        });
+      }
+    }
+  }
 
   const level4DisplayItems: Level4DisplayItem[] = normalizedBomItems.flatMap(item => {
     const entries: Level4DisplayItem[] = [];
@@ -1587,6 +1894,9 @@ export const generateQuotePDF = async (
         .bom-table th { background: #f1f5f9; color: #0f172a; padding: 12px 14px; font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; border-bottom: 1px solid #e2e8f0; }
         .bom-table td { padding: 14px; border-bottom: 1px solid #e2e8f0; color: #0f172a; font-size: 11px; vertical-align: top; }
         .bom-table tbody tr:nth-child(even) { background: #f8fafc; }
+        .product-info-link { margin-top: 8px; font-size: 10px; }
+        .product-info-link a { color: #2563eb; text-decoration: none; word-break: break-all; }
+        .product-info-link a:hover { text-decoration: underline; }
         .total-section { margin-top: 20px; border-top: 1px solid #e2e8f0; padding-top: 16px; display: flex; flex-direction: column; gap: 8px; align-items: flex-end; }
         .total-line { display: flex; gap: 16px; font-size: 12px; font-weight: 600; color: #0f172a; }
         .total-line .label { font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: #64748b; font-weight: 500; }
@@ -1695,7 +2005,18 @@ export const generateQuotePDF = async (
             .map((item, index) => `
               <tr>
                 <td>${item.product.name}</td>
-                <td>${item.product.description}</td>
+                <td>
+                  ${item.product.description}
+                  ${(() => {
+                    const infoUrl =
+                      coerceString((item.product as any)?.productInfoUrl) ||
+                      coerceString((item.product as any)?.product_info_url) ||
+                      coerceString((item as any)?.productInfoUrl);
+                    return infoUrl
+                      ? `<div class="product-info-link">Product Info: <a href="${escapeHtml(infoUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(infoUrl)}</a></div>`
+                      : '';
+                  })()}
+                </td>
                 <td>${item.partNumber || 'TBD'}</td>
                 <td>${item.quantity}</td>
                 ${canSeePrices ? `
