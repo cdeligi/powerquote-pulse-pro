@@ -27,12 +27,14 @@ export interface Quote {
   gross_profit: number;
   discount_justification?: string;
   quote_fields?: Record<string, any>;
+  price_adjustments?: Record<string, any> | null;
   draft_bom?: {
     items?: any[];
     rackConfiguration?: any;
   };
   counter_offers?: any[];
   approval_notes?: string;
+  additional_quote_information?: string | null;
   rejection_reason?: string;
   reviewed_at?: string;
   reviewed_by?: string;
