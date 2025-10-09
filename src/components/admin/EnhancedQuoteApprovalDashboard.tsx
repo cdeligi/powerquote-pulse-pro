@@ -3,6 +3,12 @@ import { useState, useEffect } from 'react';
 import type { PostgrestError } from '@supabase/supabase-js';
 import { getSupabaseClient, getSupabaseAdminClient } from "@/integrations/supabase/client";
 import { normalizeQuoteId, persistNormalizedQuoteId } from '@/utils/quoteIdGenerator';
+import { deriveCustomerNameFromFields } from "@/utils/customerName";
+import {
+  extractAdditionalQuoteInformation,
+  parseQuoteFieldsValue,
+  prepareAdditionalQuoteInfoUpdates,
+} from '@/utils/additionalQuoteInformation';
 
 const supabase = getSupabaseClient();
 const supabaseAdmin = getSupabaseAdminClient();
@@ -24,6 +30,22 @@ interface EnhancedQuoteApprovalDashboardProps {
 interface ExpandedQuoteState {
   [quoteId: string]: boolean;
 }
+
+const resolveCustomerName = (
+  fields: Record<string, any> | undefined,
+  fallback: string | null | undefined,
+): string => {
+  const derived = deriveCustomerNameFromFields(fields ?? undefined, fallback ?? null);
+  if (derived && derived.trim().length > 0) {
+    return derived.trim();
+  }
+
+  if (fallback && fallback.trim().length > 0) {
+    return fallback.trim();
+  }
+
+  return 'Pending Customer';
+};
 
 const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboardProps) => {
   const [quotes, setQuotes] = useState<Quote[]>([]);
@@ -57,36 +79,43 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
       console.log(`Fetched ${quotesData?.length || 0} quotes from database`);
 
       // Fetch BOM items for each quote
-        const quotesWithBOM = await Promise.all(
-          (quotesData || []).map(async (quote) => {
-            const { data: bomItems, error: bomError } = await supabase
-              .from('bom_items')
-              .select('*')
-              .eq('quote_id', quote.id);
+      const quotesWithBOM = await Promise.all(
+        (quotesData || []).map(async (quote) => {
+          const normalizedFields = parseQuoteFieldsValue(quote.quote_fields) ?? undefined;
+          const additionalInfo = extractAdditionalQuoteInformation(quote, normalizedFields);
+          const resolvedCustomer = resolveCustomerName(normalizedFields, quote.customer_name);
 
-            if (bomError) {
-              console.error(`Error fetching BOM items for quote ${quote.id}:`, bomError);
-            }
+          const { data: bomItems, error: bomError } = await supabase
+            .from('bom_items')
+            .select('*')
+            .eq('quote_id', quote.id);
 
-            const enrichedItems = (bomItems || []).map((item) => ({
-              ...item,
-              product: {
-                id: item.product_id,
-                type: item.product_type,
-                name: item.name,
-                description: item.description,
-                partNumber: item.part_number,
-                price: item.unit_price,
-                cost: item.unit_cost,
-              },
-            }));
+          if (bomError) {
+            console.error(`Error fetching BOM items for quote ${quote.id}:`, bomError);
+          }
 
-            return {
-              ...quote,
-              bom_items: enrichedItems,
-            } as Quote;
-          })
-        );
+          const enrichedItems = (bomItems || []).map((item) => ({
+            ...item,
+            product: {
+              id: item.product_id,
+              type: item.product_type,
+              name: item.name,
+              description: item.description,
+              partNumber: item.part_number,
+              price: item.unit_price,
+              cost: item.unit_cost,
+            },
+          }));
+
+          return {
+            ...quote,
+            customer_name: resolvedCustomer,
+            quote_fields: normalizedFields ?? undefined,
+            additional_quote_information: additionalInfo ?? null,
+            bom_items: enrichedItems,
+          } as Quote;
+        })
+      );
 
       console.log('Quotes with BOM items:', quotesWithBOM);
       setQuotes(quotesWithBOM);
@@ -154,9 +183,10 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
       notes?: string;
       updatedBOMItems?: BOMItemWithDetails[];
       approvedDiscount?: number;
+      additionalQuoteInformation?: string;
     } = {}
   ) => {
-    const { notes, updatedBOMItems, approvedDiscount } = payload;
+    const { notes, updatedBOMItems, approvedDiscount, additionalQuoteInformation } = payload;
     console.log(`Processing ${action} for quote ${quoteId} with notes:`, notes);
     setActionLoading(prev => ({ ...prev, [quoteId]: true }));
 
@@ -170,21 +200,29 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
         const normalizedQuoteId = normalizeQuoteId(quote.id);
 
         if (normalizedQuoteId && normalizedQuoteId !== quote.id) {
-          await persistNormalizedQuoteId(quote.id, normalizedQuoteId, client);
-          targetQuoteId = normalizedQuoteId;
+          try {
+            await persistNormalizedQuoteId(quote.id, normalizedQuoteId, client);
+            targetQuoteId = normalizedQuoteId;
 
-          setQuotes(prevQuotes => prevQuotes.map(current => (
-            current.id === quoteId
-              ? { ...current, id: normalizedQuoteId }
-              : current
-          )));
+            setQuotes(prevQuotes => prevQuotes.map(current => (
+              current.id === quoteId
+                ? { ...current, id: normalizedQuoteId }
+                : current
+            )));
 
-          setActionLoading(prev => {
-            const updated = { ...prev };
-            delete updated[quoteId];
-            updated[normalizedQuoteId] = true;
-            return updated;
-          });
+            setActionLoading(prev => {
+              const updated = { ...prev };
+              delete updated[quoteId];
+              updated[normalizedQuoteId] = true;
+              return updated;
+            });
+          } catch (normalizationError) {
+            console.warn('Failed to normalize quote id during approval:', normalizationError);
+            toast({
+              title: 'Quote ID normalization skipped',
+              description: 'The quote kept its original identifier because it is still referenced elsewhere.',
+            });
+          }
         }
       }
 
@@ -215,6 +253,15 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
         updates.approved_discount = appliedDiscount;
       }
 
+      const { updates: updatesWithAdditionalInfo } = await prepareAdditionalQuoteInfoUpdates({
+        client,
+        quote: quote ?? {},
+        updates,
+        additionalInfo: action === 'approve' ? additionalQuoteInformation : null,
+      });
+
+      const preparedUpdates = updatesWithAdditionalInfo;
+
       const bomItemsForTotals = (updatedBOMItems && updatedBOMItems.length > 0)
         ? updatedBOMItems
         : ((quote?.bom_items as BOMItemWithDetails[] | undefined) ?? []);
@@ -231,17 +278,17 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
         const discountedGrossProfit = discountedValue - totalCost;
         const discountedMargin = discountedValue > 0 ? (discountedGrossProfit / discountedValue) * 100 : 0;
 
-        updates.total_cost = totalCost;
-        updates.gross_profit = grossProfit;
-        updates.original_quote_value = totalRevenue;
-        updates.original_margin = margin;
-        updates.discounted_value = discountedValue;
-        updates.discounted_margin = discountedMargin;
+        preparedUpdates.total_cost = totalCost;
+        preparedUpdates.gross_profit = grossProfit;
+        preparedUpdates.original_quote_value = totalRevenue;
+        preparedUpdates.original_margin = margin;
+        preparedUpdates.discounted_value = discountedValue;
+        preparedUpdates.discounted_margin = discountedMargin;
       }
 
       const { error: quoteError } = await client
         .from('quotes')
-        .update(updates)
+        .update(preparedUpdates)
         .eq('id', targetQuoteId);
 
       if (quoteError) throw quoteError;
