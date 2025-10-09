@@ -1,6 +1,6 @@
 
 import { useState, useEffect } from 'react';
-import type { PostgrestError } from '@supabase/supabase-js';
+import type { SupabaseClient, PostgrestError } from '@supabase/supabase-js';
 import { getSupabaseClient, getSupabaseAdminClient } from "@/integrations/supabase/client";
 import { normalizeQuoteId, persistNormalizedQuoteId } from '@/utils/quoteIdGenerator';
 import { deriveCustomerNameFromFields } from "@/utils/customerName";
@@ -9,6 +9,7 @@ import {
   parseQuoteFieldsValue,
   updateQuoteWithAdditionalInfo,
 } from '@/utils/additionalQuoteInformation';
+import type { Database } from '@/integrations/supabase/types';
 
 const supabase = getSupabaseClient();
 const supabaseAdmin = getSupabaseAdminClient();
@@ -45,6 +46,52 @@ const resolveCustomerName = (
   }
 
   return 'Pending Customer';
+};
+
+const isMissingBomUpdatedAtColumnError = (error: PostgrestError | null | undefined) => {
+  if (!error) {
+    return false;
+  }
+
+  if (error.code === '42703' || error.code === 'PGRST204') {
+    return true;
+  }
+
+  const message = typeof error.message === 'string' ? error.message.toLowerCase() : '';
+
+  return message.includes('updated_at') && message.includes('column');
+};
+
+const updateBomItemPricing = async (
+  client: SupabaseClient<Database>,
+  quoteId: string,
+  bomItemId: string,
+  payload: Record<string, any>
+): Promise<PostgrestError | null> => {
+  const { updated_at: _updatedAt, ...fallbackPayload } = payload;
+
+  const { error } = await client
+    .from('bom_items')
+    .update(payload)
+    .eq('id', bomItemId)
+    .eq('quote_id', quoteId);
+
+  if (error && isMissingBomUpdatedAtColumnError(error)) {
+    console.warn(
+      'Supabase bom_items table is missing updated_at column; retrying update without timestamp.',
+      { quoteId, bomItemId, error }
+    );
+
+    const retry = await client
+      .from('bom_items')
+      .update(fallbackPayload)
+      .eq('id', bomItemId)
+      .eq('quote_id', quoteId);
+
+    return retry.error;
+  }
+
+  return error;
 };
 
 const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboardProps) => {
@@ -323,11 +370,7 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
 
           const updateResults = await Promise.all(
             bomPayload.map(async ({ id, ...rest }) => {
-              const { error } = await client
-                .from('bom_items')
-                .update(rest)
-                .eq('id', id)
-                .eq('quote_id', safeQuoteId);
+              const error = await updateBomItemPricing(client, safeQuoteId, id, rest);
 
               if (error) {
                 console.error(

@@ -19,6 +19,16 @@ interface CardFormProps {
   initialData?: Level3Product;
 }
 
+const CARD_TYPE_OPTIONS: Array<{ value: string; label: string }> = [
+  { value: "relay", label: "Relay Output" },
+  { value: "analog", label: "Analog Input" },
+  { value: "display", label: "Display" },
+  { value: "fiber", label: "Fiber / Communication" },
+  { value: "bushing", label: "Bushing" },
+  { value: "accessory", label: "Accessory" },
+  { value: "sensor", label: "Sensor" },
+];
+
 const CardForm = ({ onSubmit, level2Products, initialData }: CardFormProps) => {
   const [formData, setFormData] = useState({
     name: initialData?.name || "",
