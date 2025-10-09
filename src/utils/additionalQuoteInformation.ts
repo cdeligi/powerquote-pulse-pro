@@ -125,7 +125,9 @@ export const mergeAdditionalQuoteInformationIntoFields = (
   return { changed: false, nextFields: existingFields ?? null };
 };
 
-const isMissingColumnError = (error: PostgrestError | null | undefined): boolean => {
+export const isMissingAdditionalQuoteInfoColumnError = (
+  error: PostgrestError | null | undefined
+): boolean => {
   if (!error) {
     return false;
   }
@@ -153,7 +155,7 @@ export const ensureAdditionalQuoteInfoColumnSupport = async (
       .select('additional_quote_information')
       .limit(1);
 
-    if (isMissingColumnError(error)) {
+    if (isMissingAdditionalQuoteInfoColumnError(error)) {
       console.warn(
         'Supabase quotes table is missing additional_quote_information column; falling back to quote_fields storage.'
       );
@@ -185,6 +187,7 @@ interface PrepareAdditionalQuoteInfoOptions {
   quote: QuoteLike;
   updates: Record<string, any>;
   additionalInfo?: string | null;
+  forceDisableColumn?: boolean;
 }
 
 export const prepareAdditionalQuoteInfoUpdates = async ({
@@ -192,13 +195,16 @@ export const prepareAdditionalQuoteInfoUpdates = async ({
   quote,
   updates,
   additionalInfo,
+  forceDisableColumn,
 }: PrepareAdditionalQuoteInfoOptions): Promise<{
   updates: Record<string, any>;
   sanitizedInfo: string | undefined;
   mergedFields: QuoteFieldsRecord | null;
 }> => {
   const sanitizedInfo = sanitizeAdditionalQuoteInformation(additionalInfo);
-  const supportsColumn = await ensureAdditionalQuoteInfoColumnSupport(client);
+  const supportsColumn = forceDisableColumn
+    ? false
+    : await ensureAdditionalQuoteInfoColumnSupport(client);
   const parsedFields = parseQuoteFieldsValue(quote?.quote_fields);
   const { changed, nextFields } = mergeAdditionalQuoteInformationIntoFields(
     parsedFields,
@@ -226,5 +232,88 @@ export const prepareAdditionalQuoteInfoUpdates = async ({
 
 export const resetAdditionalQuoteInfoSupportCache = () => {
   additionalInfoColumnSupported = null;
+};
+
+interface PreparedAdditionalQuoteInfoUpdates {
+  updates: Record<string, any>;
+  sanitizedInfo: string | undefined;
+  mergedFields: QuoteFieldsRecord | null;
+}
+
+interface UpdateQuoteWithAdditionalInfoOptions {
+  client: SupabaseClient<Database>;
+  quote: QuoteLike;
+  quoteId: string;
+  updates: Record<string, any>;
+  additionalInfo?: string | null;
+}
+
+export const updateQuoteWithAdditionalInfo = async ({
+  client,
+  quote,
+  quoteId,
+  updates,
+  additionalInfo,
+}: UpdateQuoteWithAdditionalInfoOptions): Promise<{
+  error: PostgrestError | null;
+  preparedUpdates: Record<string, any>;
+  sanitizedInfo: string | undefined;
+  mergedFields: QuoteFieldsRecord | null;
+}> => {
+  const baseUpdates: Record<string, any> = { ...updates };
+  delete baseUpdates.additional_quote_information;
+
+  const buildPreparedUpdates = async (
+    forceDisableColumn?: boolean
+  ): Promise<PreparedAdditionalQuoteInfoUpdates> => {
+    if (additionalInfo === undefined) {
+      return {
+        updates: { ...baseUpdates },
+        sanitizedInfo: undefined,
+        mergedFields: parseQuoteFieldsValue(quote?.quote_fields) ?? null,
+      };
+    }
+
+    return prepareAdditionalQuoteInfoUpdates({
+      client,
+      quote,
+      updates: baseUpdates,
+      additionalInfo,
+      forceDisableColumn,
+    });
+  };
+
+  const attemptUpdate = async (
+    forceDisableColumn?: boolean
+  ): Promise<{
+    error: PostgrestError | null;
+    prepared: PreparedAdditionalQuoteInfoUpdates;
+  }> => {
+    const prepared = await buildPreparedUpdates(forceDisableColumn);
+    const { error } = await client
+      .from('quotes')
+      .update(prepared.updates)
+      .eq('id', quoteId);
+
+    return { error, prepared };
+  };
+
+  let { error, prepared } = await attemptUpdate();
+
+  if (
+    error &&
+    isMissingAdditionalQuoteInfoColumnError(error) &&
+    additionalInfo !== undefined
+  ) {
+    resetAdditionalQuoteInfoSupportCache();
+    ({ error, prepared } = await attemptUpdate(true));
+  }
+
+  return {
+    error,
+    preparedUpdates: prepared.updates,
+    sanitizedInfo: prepared.sanitizedInfo,
+    mergedFields: prepared.mergedFields,
+  };
 };
 

@@ -7,7 +7,7 @@ import { deriveCustomerNameFromFields } from "@/utils/customerName";
 import {
   extractAdditionalQuoteInformation,
   parseQuoteFieldsValue,
-  prepareAdditionalQuoteInfoUpdates,
+  updateQuoteWithAdditionalInfo,
 } from '@/utils/additionalQuoteInformation';
 
 const supabase = getSupabaseClient();
@@ -231,7 +231,7 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
           ? approvedDiscount
           : quote?.approved_discount ?? quote?.requested_discount ?? 0;
 
-      const updates: any = {
+      const updates: Record<string, any> = {
         status: action === 'approve' ? 'approved' : 'rejected',
         reviewed_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
@@ -257,14 +257,7 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
         updates.approved_discount = appliedDiscount;
       }
 
-      const { updates: updatesWithAdditionalInfo } = await prepareAdditionalQuoteInfoUpdates({
-        client,
-        quote: quote ?? {},
-        updates,
-        additionalInfo: action === 'approve' ? additionalQuoteInformation : null,
-      });
-
-      const preparedUpdates = updatesWithAdditionalInfo;
+      const preparedUpdates: Record<string, any> = { ...updates };
 
       const bomItemsForTotals = (updatedBOMItems && updatedBOMItems.length > 0)
         ? updatedBOMItems
@@ -290,10 +283,13 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
         preparedUpdates.discounted_margin = discountedMargin;
       }
 
-      const { error: quoteError } = await client
-        .from('quotes')
-        .update(preparedUpdates)
-        .eq('id', targetQuoteId);
+      const { error: quoteError } = await updateQuoteWithAdditionalInfo({
+        client,
+        quote: quote ?? {},
+        quoteId: targetQuoteId,
+        updates: preparedUpdates,
+        additionalInfo: action === 'approve' ? additionalQuoteInformation : null,
+      });
 
       if (quoteError) throw quoteError;
 

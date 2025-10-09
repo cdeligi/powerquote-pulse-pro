@@ -2,12 +2,12 @@ import { useState, useEffect } from 'react';
 import { getSupabaseClient, getSupabaseAdminClient, isAdminAvailable } from "@/integrations/supabase/client";
 
 const supabase = getSupabaseClient();
-const supabaseAdmin = getSupabaseAdminClient();;
+const supabaseAdmin = getSupabaseAdminClient();
 import { useToast } from '@/hooks/use-toast';
 import {
   extractAdditionalQuoteInformation,
   parseQuoteFieldsValue,
-  prepareAdditionalQuoteInfoUpdates,
+  updateQuoteWithAdditionalInfo,
 } from '@/utils/additionalQuoteInformation';
 
 export interface Quote {
@@ -212,22 +212,14 @@ export const useQuotes = () => {
 
       const client = supabaseAdmin ?? supabase;
 
-      let preparedUpdates = updateData;
-      if (additionalQuoteInformation !== undefined) {
-        const currentQuote = quotes.find((quote) => quote.id === quoteId);
-        const { updates } = await prepareAdditionalQuoteInfoUpdates({
-          client,
-          quote: currentQuote ?? {},
-          updates: updateData,
-          additionalInfo: additionalQuoteInformation,
-        });
-        preparedUpdates = updates;
-      }
-
-      const { error } = await client
-        .from('quotes')
-        .update(preparedUpdates)
-        .eq('id', quoteId);
+      const currentQuote = quotes.find((quote) => quote.id === quoteId);
+      const { error } = await updateQuoteWithAdditionalInfo({
+        client,
+        quote: currentQuote ?? {},
+        quoteId,
+        updates: updateData,
+        additionalInfo: additionalQuoteInformation,
+      });
 
       if (error) {
         console.error('Error updating quote status:', error);
