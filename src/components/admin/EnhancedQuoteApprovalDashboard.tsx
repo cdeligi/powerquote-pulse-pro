@@ -297,14 +297,15 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
 
       if (updatedBOMItems && updatedBOMItems.length > 0) {
         const persistedItems = updatedBOMItems.filter((item) => item.persisted_id);
+        const safeQuoteId = typeof targetQuoteId === 'string' ? targetQuoteId.trim() : '';
 
-        if (persistedItems.length > 0) {
+        if (persistedItems.length > 0 && safeQuoteId) {
           const bomPayload = persistedItems.map((item) => {
             const updatedUnitPrice = Number(item.unit_price) || 0;
             const unitCost = item.unit_cost || 0;
             return {
               id: item.persisted_id!,
-              quote_id: targetQuoteId,
+              quote_id: safeQuoteId,
               unit_price: updatedUnitPrice,
               approved_unit_price: updatedUnitPrice,
               total_price: updatedUnitPrice * item.quantity,
@@ -323,6 +324,11 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
             bomUpdateError = bomError;
             console.error('Error updating BOM items for quote', targetQuoteId, bomError);
           }
+        } else if (!safeQuoteId) {
+          console.warn(
+            'Skipping BOM price update because the resolved quote id is empty.',
+            { originalQuoteId: quoteId, resolvedQuoteId: targetQuoteId }
+          );
         }
       }
 
