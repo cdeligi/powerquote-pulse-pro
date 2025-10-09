@@ -120,6 +120,24 @@ const coerceString = (value: any): string | undefined => {
   return undefined;
 };
 
+const resolveProductInfoUrl = (...sources: Array<any>): string | null => {
+  const keys = ['productInfoUrl', 'product_info_url', 'infoUrl', 'info_url', 'url', 'link'];
+
+  for (const source of sources) {
+    if (!source || typeof source !== 'object') continue;
+
+    for (const key of keys) {
+      if (!Object.prototype.hasOwnProperty.call(source, key)) continue;
+      const resolved = coerceString((source as Record<string, unknown>)[key]);
+      if (resolved) {
+        return resolved;
+      }
+    }
+  }
+
+  return null;
+};
+
 const gatherSources = (slot: SpanAwareSlot): any[] => {
   const rawSlot = slot.rawSlot ?? slot;
   const config = slot.configuration ?? slot.level4Config ?? slot.level4Selections ?? rawSlot?.configuration ?? rawSlot?.level4Config ?? rawSlot?.level4Selections;
@@ -1320,16 +1338,31 @@ export const generateQuotePDF = async (
 
   const normalizedBomItems = bomItems.map(item => {
     const product = (item.product || {}) as any;
+    const parentProduct = (item.parentProduct || product?.parentProduct || {}) as any;
+    const grandParentProduct = (parentProduct?.parentProduct || product?.parentProduct?.parentProduct || {}) as any;
+    const configurationProduct = (item.configuration?.product || item.configuration?.selectedProduct || {}) as any;
+    const configurationLevel2 = (item.configuration?.selectedLevel2Product || item.configuration?.level2Product || {}) as any;
+
+    const productInfoUrl =
+      resolveProductInfoUrl(
+        product,
+        parentProduct,
+        grandParentProduct,
+        item,
+        item.configuration,
+        configurationProduct,
+        configurationLevel2,
+        configurationProduct?.product,
+        configurationProduct?.parentProduct,
+        configurationLevel2?.parentProduct
+      ) || null;
+
     const normalizedProduct = {
       ...product,
       name: product.name || item.name || 'Configured Item',
       description: product.description || item.description || '',
       price: typeof product.price === 'number' ? product.price : (item.product?.price || item.unit_price || 0),
-      productInfoUrl:
-        product.productInfoUrl ||
-        product.product_info_url ||
-        item.productInfoUrl ||
-        item.product_info_url,
+      productInfoUrl,
     };
 
     const partNumber = item.partNumber || item.part_number || product.partNumber || product.part_number || 'TBD';
