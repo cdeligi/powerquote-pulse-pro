@@ -36,6 +36,7 @@ export interface Quote {
   currency: 'USD' | 'EURO' | 'GBP' | 'CAD';
   discount_justification?: string;
   quote_fields: Record<string, any>;
+  price_adjustments?: Record<string, any> | null;
   draft_bom?: any; // JSONB field for draft BOM data
   counter_offers?: Array<{
     discountOffered: number;

@@ -27,6 +27,7 @@ export interface Quote {
   gross_profit: number;
   discount_justification?: string;
   quote_fields?: Record<string, any>;
+  price_adjustments?: Record<string, any> | null;
   draft_bom?: {
     items?: any[];
     rackConfiguration?: any;
