@@ -304,6 +304,7 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
             const unitCost = item.unit_cost || 0;
             return {
               id: item.persisted_id!,
+              quote_id: targetQuoteId,
               unit_price: updatedUnitPrice,
               approved_unit_price: updatedUnitPrice,
               total_price: updatedUnitPrice * item.quantity,
