@@ -8,6 +8,7 @@ import {
 } from "@/types/product";
 import { ChassisType, ChassisTypeFormData } from "@/types/product/chassis-types";
 import { getSupabaseClient, getSupabaseAdminClient, isAdminAvailable } from "@/integrations/supabase/client";
+import { v4 as uuidv4 } from 'uuid';
 
 const supabase = getSupabaseClient();
 const supabaseAdmin = getSupabaseAdminClient();;
@@ -388,24 +389,43 @@ class ProductDataService {
 
   async createLevel3Product(productData: Omit<Level3Product, 'id'>): Promise<Level3Product> {
     try {
+      const newId = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+        ? crypto.randomUUID()
+        : uuidv4();
+
+      const parentId = productData.parent_product_id || productData.parentProductId;
+      if (!parentId) {
+        throw new Error('A parent Level 2 product is required to create a Level 3 product.');
+      }
+
+      const trimmedPartNumber = productData.partNumber?.trim();
+      const requiresLevel4 = (productData as any).requires_level4_config ?? (productData as any).has_level4;
+
+      const payload: Record<string, any> = {
+        id: newId,
+        name: productData.name,
+        display_name: (productData as any).displayName || productData.name,
+        description: productData.description || '',
+        price: Number.isFinite(productData.price) ? Number(productData.price) : 0,
+        cost: Number.isFinite(productData.cost) ? Number(productData.cost) : 0,
+        enabled: productData.enabled !== false,
+        product_level: 3,
+        parent_product_id: parentId,
+        has_level4: (productData as any).has_level4 === true || requiresLevel4 === true,
+        requires_level4_config: requiresLevel4 === true,
+        specifications: productData.specifications || {},
+        part_number: trimmedPartNumber ? trimmedPartNumber : null,
+      };
+
+      if ((productData as any).category) {
+        payload.category = (productData as any).category;
+      } else if (productData.type) {
+        payload.category = productData.type;
+      }
+
       const { data, error } = await supabase
         .from('products')
-        .insert([
-          {
-            name: productData.name,
-            display_name: (productData as any).displayName || productData.name,
-            description: productData.description || '',
-            price: productData.price || 0,
-            cost: productData.cost || 0,
-            enabled: productData.enabled !== false,
-            product_level: 3,
-            parent_product_id: productData.parentProductId,
-            category: productData.type || 'standard',
-            has_level4: (productData as any).has_level4 === true,
-            specifications: productData.specifications || {},
-            part_number: productData.partNumber?.trim() || null
-          }
-        ])
+        .insert([payload])
         .select()
         .single();
 
@@ -418,13 +438,14 @@ class ProductDataService {
         parent_product_id: data.parent_product_id,
         parentProductId: data.parent_product_id,
         product_level: 3,
-        type: data.type,
+        type: data.category,
         description: data.description || '',
         price: data.price || 0,
         cost: data.cost || 0,
         enabled: data.enabled !== false,
         partNumber: data.part_number || undefined,
-        has_level4: data.has_level4 === true,
+        has_level4: data.has_level4 === true || data.requires_level4_config === true,
+        requires_level4_config: data.requires_level4_config === true,
         specifications: data.specifications || {}
       };
 
