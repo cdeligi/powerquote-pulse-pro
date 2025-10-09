@@ -1221,6 +1221,7 @@ export type Database = {
           created_at: string
           currency: string
           customer_name: string
+          additional_quote_information: string | null
           discount_justification: string | null
           discounted_margin: number
           discounted_value: number
@@ -1265,6 +1266,7 @@ export type Database = {
           created_at?: string
           currency?: string
           customer_name: string
+          additional_quote_information?: string | null
           discount_justification?: string | null
           discounted_margin: number
           discounted_value: number
@@ -1309,6 +1311,7 @@ export type Database = {
           created_at?: string
           currency?: string
           customer_name?: string
+          additional_quote_information?: string | null
           discount_justification?: string | null
           discounted_margin?: number
           discounted_value?: number
