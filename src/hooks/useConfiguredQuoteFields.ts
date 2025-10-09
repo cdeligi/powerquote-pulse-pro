@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { SYSTEM_ADDITIONAL_QUOTE_INFO_KEY } from '@/utils/additionalQuoteInformation';
 
 export interface ConfiguredQuoteField {
   id: string;
@@ -8,6 +9,7 @@ export interface ConfiguredQuoteField {
   required: boolean;
   enabled: boolean;
   display_order?: number;
+  include_in_pdf?: boolean;
 }
 
 export interface FormattedQuoteField extends ConfiguredQuoteField {
@@ -67,9 +69,15 @@ const formatQuoteFieldValue = (value: unknown, type: string): string => {
   return String(value);
 };
 
+export interface UseConfiguredQuoteFieldsOptions {
+  includeInQuoteOnly?: boolean;
+}
+
 export const useConfiguredQuoteFields = (
-  quoteFields: Record<string, unknown> | undefined
+  quoteFields: Record<string, unknown> | undefined,
+  options: UseConfiguredQuoteFieldsOptions = {}
 ) => {
+  const { includeInQuoteOnly = false } = options;
   const [configuredFields, setConfiguredFields] = useState<ConfiguredQuoteField[]>([]);
 
   useEffect(() => {
@@ -79,7 +87,7 @@ export const useConfiguredQuoteFields = (
       try {
         const { data, error } = await supabase
           .from("quote_fields")
-          .select("id,label,type,required,enabled,display_order")
+          .select("id,label,type,required,enabled,display_order,include_in_pdf")
           .eq("enabled", true)
           .order("display_order", { ascending: true });
 
@@ -89,7 +97,12 @@ export const useConfiguredQuoteFields = (
         }
 
         if (isMounted) {
-          setConfiguredFields(data || []);
+          setConfiguredFields(
+            (data || []).map((field) => ({
+              ...field,
+              include_in_pdf: Boolean(field.include_in_pdf),
+            }))
+          );
         }
       } catch (fetchError) {
         console.error("Unexpected error loading quote field configuration:", fetchError);
@@ -103,25 +116,37 @@ export const useConfiguredQuoteFields = (
     };
   }, []);
 
+  const filteredConfiguredFields = useMemo<ConfiguredQuoteField[]>(() => {
+    if (!configuredFields.length) {
+      return [];
+    }
+
+    if (!includeInQuoteOnly) {
+      return configuredFields;
+    }
+
+    return configuredFields.filter((field) => field.include_in_pdf);
+  }, [configuredFields, includeInQuoteOnly]);
+
   const formattedFields: FormattedQuoteField[] = useMemo(() => {
-    if (!configuredFields.length) return [];
+    if (!filteredConfiguredFields.length) return [];
 
     const fieldValues = quoteFields || {};
-    return configuredFields.map((field) => ({
+    return filteredConfiguredFields.map((field) => ({
       ...field,
       formattedValue: formatQuoteFieldValue(fieldValues[field.id], field.type),
     }));
-  }, [configuredFields, quoteFields]);
+  }, [filteredConfiguredFields, quoteFields]);
 
   const unmappedFields: UnmappedQuoteField[] = useMemo(() => {
     if (!quoteFields) return [];
-    const mappedIds = new Set(configuredFields.map((field) => field.id));
+    const mappedIds = new Set(filteredConfiguredFields.map((field) => field.id));
 
     return Object.entries(quoteFields)
-      .filter(([key]) => !mappedIds.has(key))
+      .filter(([key]) => !mappedIds.has(key) && key !== SYSTEM_ADDITIONAL_QUOTE_INFO_KEY)
       .map(([key, value]) => ({ key, value }));
-  }, [configuredFields, quoteFields]);
+  }, [filteredConfiguredFields, quoteFields]);
 
-  return { configuredFields, formattedFields, unmappedFields };
+  return { configuredFields: filteredConfiguredFields, formattedFields, unmappedFields };
 };
 
