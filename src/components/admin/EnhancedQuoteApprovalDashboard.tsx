@@ -6,23 +6,63 @@ import { normalizeQuoteId, persistNormalizedQuoteId } from '@/utils/quoteIdGener
 import { deriveCustomerNameFromFields } from "@/utils/customerName";
 import {
   extractAdditionalQuoteInformation,
+  noteAdditionalQuoteInfoColumnFromRow,
   parseQuoteFieldsValue,
   updateQuoteWithAdditionalInfo,
 } from '@/utils/additionalQuoteInformation';
 import type { Database } from '@/integrations/supabase/types';
+import { Quote, BOMItemWithDetails } from '@/types/quote';
+import { User } from '@/types/auth';
+import { toast } from "@/hooks/use-toast";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import QuoteDetails from './quote-approval/QuoteDetails';
+import { RefreshCw, ChevronDown, ChevronRight, Clock, User as UserIcon, Calendar, AlertCircle } from 'lucide-react';
 
 const supabase = getSupabaseClient();
 const supabaseAdmin = getSupabaseAdminClient();
-import { Quote, BOMItemWithDetails } from '@/types/quote';
-import { User } from '@/types/auth';
-import { toast } from "@/hooks/use-toast"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import QuoteDetails from './quote-approval/QuoteDetails';
-import { RefreshCw, ChevronDown, ChevronRight, Clock, User as UserIcon, Calendar, AlertCircle } from 'lucide-react';
+
+const BOM_ITEMS_UPDATED_AT_STORAGE_KEY =
+  'powerquote_bom_items_updated_at_supported';
+
+const readStoredBomUpdatedAtSupport = (): boolean | null => {
+  if (typeof window === 'undefined' || !window?.localStorage) {
+    return null;
+  }
+
+  const stored = window.localStorage.getItem(
+    BOM_ITEMS_UPDATED_AT_STORAGE_KEY
+  );
+
+  if (stored === 'true') {
+    return true;
+  }
+
+  if (stored === 'false') {
+    return false;
+  }
+
+  return null;
+};
+
+const persistBomUpdatedAtSupport = (value: boolean | null) => {
+  if (typeof window === 'undefined' || !window?.localStorage) {
+    return;
+  }
+
+  if (value === null) {
+    window.localStorage.removeItem(BOM_ITEMS_UPDATED_AT_STORAGE_KEY);
+    return;
+  }
+
+  window.localStorage.setItem(
+    BOM_ITEMS_UPDATED_AT_STORAGE_KEY,
+    value ? 'true' : 'false'
+  );
+};
 
 interface EnhancedQuoteApprovalDashboardProps {
   user: User | null;
@@ -62,7 +102,32 @@ const isMissingBomUpdatedAtColumnError = (error: PostgrestError | null | undefin
   return message.includes('updated_at') && message.includes('column');
 };
 
-let bomItemsUpdatedAtSupported: boolean | null = null;
+let bomItemsUpdatedAtSupported: boolean | null = readStoredBomUpdatedAtSupport();
+
+const noteBomItemsUpdatedAtSupportFromRows = (
+  rows: Array<Record<string, any>> | null | undefined
+) => {
+  if (!rows || rows.length === 0) {
+    return;
+  }
+
+  const hasColumn = rows.some((row) =>
+    Object.prototype.hasOwnProperty.call(row, 'updated_at')
+  );
+
+  if (hasColumn) {
+    if (bomItemsUpdatedAtSupported !== true) {
+      bomItemsUpdatedAtSupported = true;
+      persistBomUpdatedAtSupport(true);
+    }
+    return;
+  }
+
+  if (bomItemsUpdatedAtSupported !== false) {
+    bomItemsUpdatedAtSupported = false;
+    persistBomUpdatedAtSupport(false);
+  }
+};
 
 const updateBomItemPricing = async (
   client: SupabaseClient<Database>,
@@ -71,10 +136,6 @@ const updateBomItemPricing = async (
   payload: Record<string, any>
 ): Promise<PostgrestError | null> => {
   if (bomItemsUpdatedAtSupported === false) {
-    console.warn(
-      'Skipping BOM price update because the environment is missing the bom_items.updated_at column.',
-      { quoteId, bomItemId }
-    );
     return null;
   }
 
@@ -86,15 +147,13 @@ const updateBomItemPricing = async (
 
   if (!error) {
     bomItemsUpdatedAtSupported = true;
+    persistBomUpdatedAtSupport(true);
     return null;
   }
 
   if (isMissingBomUpdatedAtColumnError(error)) {
     bomItemsUpdatedAtSupported = false;
-    console.warn(
-      'Supabase bom_items table is missing updated_at column; skipping future BOM price updates.',
-      { quoteId, bomItemId, error }
-    );
+    persistBomUpdatedAtSupport(false);
     return null;
   }
 
@@ -135,6 +194,7 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
       // Fetch BOM items for each quote
       const quotesWithBOM = await Promise.all(
         (quotesData || []).map(async (quote) => {
+          noteAdditionalQuoteInfoColumnFromRow(quote as Record<string, any>);
           const normalizedFields = parseQuoteFieldsValue(quote.quote_fields) ?? undefined;
           const additionalInfo = extractAdditionalQuoteInformation(quote, normalizedFields);
           const resolvedCustomer = resolveCustomerName(normalizedFields, quote.customer_name);
@@ -146,6 +206,10 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
 
           if (bomError) {
             console.error(`Error fetching BOM items for quote ${quote.id}:`, bomError);
+          }
+
+          if (bomItemsUpdatedAtSupported === null) {
+            noteBomItemsUpdatedAtSupportFromRows(bomItems ?? undefined);
           }
 
           const enrichedItems = (bomItems || []).map((item) => ({
