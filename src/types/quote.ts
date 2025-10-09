@@ -74,4 +74,5 @@ export interface BOMItemWithDetails extends BOMItem {
   original_unit_price?: number;
   approved_unit_price?: number;
   price_adjustment_history?: any[];
+  updated_at?: string;
 }
