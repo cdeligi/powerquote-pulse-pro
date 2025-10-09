@@ -9,14 +9,16 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useState } from 'react';
 import { CheckCircle, XCircle, Percent } from 'lucide-react';
-import { 
-  calculateTotalMargin, 
-  calculateDiscountedMargin, 
-  calculateItemCost, 
-  calculateItemMargin, 
-  calculateItemRevenue 
+import {
+  calculateTotalMargin,
+  calculateDiscountedMargin,
+  calculateItemCost,
+  calculateItemMargin,
+  calculateItemRevenue
 } from '@/utils/marginCalculations';
 import POSubmissionForm, { POSubmissionData } from './POSubmissionForm';
+import { useConfiguredQuoteFields } from '@/hooks/useConfiguredQuoteFields';
+import { Separator } from '@/components/ui/separator';
 
 interface QuoteRequestViewProps {
   quote: Quote;
@@ -40,6 +42,23 @@ const QuoteRequestView = ({
 
   const { totalRevenue, totalCost, marginPercentage, grossProfit } = calculateTotalMargin(bomItems);
   const { discountedRevenue, discountedMargin, discountAmount } = calculateDiscountedMargin(bomItems, discountPercentage);
+  const { formattedFields: quoteInformationFields } = useConfiguredQuoteFields(
+    quote.quote_fields,
+    { includeInQuoteOnly: true }
+  );
+  const timelineEntries = (
+    [
+      quote.created_at
+        ? { label: 'Created', value: new Date(quote.created_at).toLocaleString() }
+        : null,
+      quote.submitted_at
+        ? { label: 'Submitted', value: new Date(quote.submitted_at).toLocaleString() }
+        : null,
+      quote.reviewed_at
+        ? { label: 'Reviewed', value: new Date(quote.reviewed_at).toLocaleString() }
+        : null,
+    ].filter((entry): entry is { label: string; value: string } => Boolean(entry))
+  );
 
   const handleReject = () => {
     if (rejectionReason.trim()) {
@@ -127,51 +146,42 @@ const QuoteRequestView = ({
       </Card>
 
       {/* Customer & Quote Information */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Customer Information</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div>
-              <Label className="text-muted-foreground">Customer Name</Label>
-              <p className="text-foreground font-medium">{quote.customer_name}</p>
+      <Card>
+        <CardHeader>
+          <CardTitle>Quote Information</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {quoteInformationFields.length > 0 ? (
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+              {quoteInformationFields.map((field) => (
+                <div key={field.id}>
+                  <Label className="text-muted-foreground">{field.label}</Label>
+                  <p className="text-foreground font-medium break-words">{field.formattedValue}</p>
+                </div>
+              ))}
             </div>
-            <div>
-              <Label className="text-muted-foreground">Oracle Customer ID</Label>
-              <p className="text-foreground font-medium">{quote.oracle_customer_id}</p>
-            </div>
-            <div>
-              <Label className="text-muted-foreground">SFDC Opportunity</Label>
-              <p className="text-foreground font-medium">{quote.sfdc_opportunity}</p>
-            </div>
-            <div>
-              <Label className="text-muted-foreground">Rep Involved</Label>
-              <p className="text-foreground font-medium">{quote.is_rep_involved ? 'Yes' : 'No'}</p>
-            </div>
-          </CardContent>
-        </Card>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              No quote information fields are configured to display.
+            </p>
+          )}
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Terms & Pricing</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div>
-              <Label className="text-muted-foreground">Currency</Label>
-              <p className="text-foreground font-medium">{quote.currency}</p>
+          {quoteInformationFields.length > 0 && timelineEntries.length > 0 && (
+            <Separator className="my-2" />
+          )}
+
+          {timelineEntries.length > 0 && (
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+              {timelineEntries.map((entry) => (
+                <div key={entry.label}>
+                  <Label className="text-muted-foreground">{entry.label}</Label>
+                  <p className="text-foreground font-medium">{entry.value}</p>
+                </div>
+              ))}
             </div>
-            <div>
-              <Label className="text-muted-foreground">Shipping Terms</Label>
-              <p className="text-foreground font-medium">{quote.shipping_terms}</p>
-            </div>
-            <div>
-              <Label className="text-muted-foreground">Payment Terms</Label>
-              <p className="text-foreground font-medium">{quote.payment_terms}</p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Financial Summary with Real-time Margin Analysis */}
       <Card>
