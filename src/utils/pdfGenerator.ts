@@ -120,18 +120,86 @@ const coerceString = (value: any): string | undefined => {
   return undefined;
 };
 
+const PRODUCT_INFO_KEY_VARIANTS = [
+  'productInfoUrl',
+  'product_info_url',
+  'productInfoURL',
+  'product-info-url',
+  'product info url',
+  'productInfo',
+  'product_info',
+  'productInformationUrl',
+  'product_information_url',
+  'productInformation',
+  'product_information',
+  'infoUrl',
+  'info_url',
+  'info-url',
+  'info url',
+  'url',
+  'link',
+];
+
+const normalizeProductInfoKey = (key: string): string => key.replace(/[\s_-]/g, '').toLowerCase();
+
+const PRODUCT_INFO_KEYS = new Set(PRODUCT_INFO_KEY_VARIANTS.map(normalizeProductInfoKey));
+
 const resolveProductInfoUrl = (...sources: Array<any>): string | null => {
-  const keys = ['productInfoUrl', 'product_info_url', 'infoUrl', 'info_url', 'url', 'link'];
+  const visited = new WeakSet<object>();
+
+  const searchObject = (value: unknown, depth: number): string | null => {
+    if (depth > 6) return null;
+
+    if (!value || typeof value !== 'object') {
+      return null;
+    }
+
+    if (visited.has(value as object)) {
+      return null;
+    }
+    visited.add(value as object);
+
+    if (Array.isArray(value)) {
+      for (const entry of value) {
+        const foundInArray = searchObject(entry, depth + 1);
+        if (foundInArray) {
+          return foundInArray;
+        }
+      }
+      return null;
+    }
+
+    for (const [key, raw] of Object.entries(value as Record<string, unknown>)) {
+      const normalizedKey = normalizeProductInfoKey(key);
+      if (PRODUCT_INFO_KEYS.has(normalizedKey)) {
+        const resolved = coerceString(raw);
+        if (resolved) {
+          return resolved;
+        }
+      }
+    }
+
+    for (const raw of Object.values(value as Record<string, unknown>)) {
+      if (raw && typeof raw === 'object') {
+        const nestedResult = searchObject(raw, depth + 1);
+        if (nestedResult) {
+          return nestedResult;
+        }
+      }
+    }
+
+    return null;
+  };
 
   for (const source of sources) {
-    if (!source || typeof source !== 'object') continue;
+    const directString = coerceString(source);
+    if (directString) {
+      return directString;
+    }
 
-    for (const key of keys) {
-      if (!Object.prototype.hasOwnProperty.call(source, key)) continue;
-      const resolved = coerceString((source as Record<string, unknown>)[key]);
-      if (resolved) {
-        return resolved;
-      }
+    const found = searchObject(source, 0);
+    if (found) {
+      return found;
     }
   }
 
