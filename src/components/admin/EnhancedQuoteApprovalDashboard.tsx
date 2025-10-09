@@ -62,13 +62,21 @@ const isMissingBomUpdatedAtColumnError = (error: PostgrestError | null | undefin
   return message.includes('updated_at') && message.includes('column');
 };
 
+let bomItemsUpdatedAtSupported: boolean | null = null;
+
 const updateBomItemPricing = async (
   client: SupabaseClient<Database>,
   quoteId: string,
   bomItemId: string,
   payload: Record<string, any>
 ): Promise<PostgrestError | null> => {
-  const { updated_at: _updatedAt, ...fallbackPayload } = payload;
+  if (bomItemsUpdatedAtSupported === false) {
+    console.warn(
+      'Skipping BOM price update because the environment is missing the bom_items.updated_at column.',
+      { quoteId, bomItemId }
+    );
+    return null;
+  }
 
   const { error } = await client
     .from('bom_items')
@@ -76,19 +84,18 @@ const updateBomItemPricing = async (
     .eq('id', bomItemId)
     .eq('quote_id', quoteId);
 
-  if (error && isMissingBomUpdatedAtColumnError(error)) {
+  if (!error) {
+    bomItemsUpdatedAtSupported = true;
+    return null;
+  }
+
+  if (isMissingBomUpdatedAtColumnError(error)) {
+    bomItemsUpdatedAtSupported = false;
     console.warn(
-      'Supabase bom_items table is missing updated_at column; retrying update without timestamp.',
+      'Supabase bom_items table is missing updated_at column; skipping future BOM price updates.',
       { quoteId, bomItemId, error }
     );
-
-    const retry = await client
-      .from('bom_items')
-      .update(fallbackPayload)
-      .eq('id', bomItemId)
-      .eq('quote_id', quoteId);
-
-    return retry.error;
+    return null;
   }
 
   return error;
