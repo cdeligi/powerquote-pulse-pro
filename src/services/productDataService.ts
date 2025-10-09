@@ -394,30 +394,38 @@ class ProductDataService {
         : uuidv4();
 
       const parentId = productData.parent_product_id || productData.parentProductId;
-      const trimmedPartNumber = productData.partNumber?.trim() || null;
+      if (!parentId) {
+        throw new Error('A parent Level 2 product is required to create a Level 3 product.');
+      }
+
+      const trimmedPartNumber = productData.partNumber?.trim();
       const requiresLevel4 = (productData as any).requires_level4_config ?? (productData as any).has_level4;
+
+      const payload: Record<string, any> = {
+        id: newId,
+        name: productData.name,
+        display_name: (productData as any).displayName || productData.name,
+        description: productData.description || '',
+        price: Number.isFinite(productData.price) ? Number(productData.price) : 0,
+        cost: Number.isFinite(productData.cost) ? Number(productData.cost) : 0,
+        enabled: productData.enabled !== false,
+        product_level: 3,
+        parent_product_id: parentId,
+        has_level4: (productData as any).has_level4 === true || requiresLevel4 === true,
+        requires_level4_config: requiresLevel4 === true,
+        specifications: productData.specifications || {},
+        part_number: trimmedPartNumber ? trimmedPartNumber : null,
+      };
+
+      if ((productData as any).category) {
+        payload.category = (productData as any).category;
+      } else if (productData.type) {
+        payload.category = productData.type;
+      }
 
       const { data, error } = await supabase
         .from('products')
-        .insert([
-          {
-            id: newId,
-            name: productData.name,
-            display_name: (productData as any).displayName || productData.name,
-            description: productData.description || '',
-            price: productData.price || 0,
-            cost: productData.cost || 0,
-            enabled: productData.enabled !== false,
-            product_level: 3,
-            parent_product_id: parentId,
-            type: productData.type || 'standard',
-            category: productData.type || 'standard',
-            has_level4: (productData as any).has_level4 === true || requiresLevel4 === true,
-            requires_level4_config: requiresLevel4 === true,
-            specifications: productData.specifications || {},
-            part_number: trimmedPartNumber
-          }
-        ])
+        .insert([payload])
         .select()
         .single();
 
@@ -430,7 +438,7 @@ class ProductDataService {
         parent_product_id: data.parent_product_id,
         parentProductId: data.parent_product_id,
         product_level: 3,
-        type: data.type || data.category,
+        type: data.category,
         description: data.description || '',
         price: data.price || 0,
         cost: data.cost || 0,
