@@ -127,6 +127,7 @@ export type Database = {
           total_price: number
           unit_cost: number
           unit_price: number
+          updated_at: string
         }
         Insert: {
           approved_unit_price?: number | null
@@ -148,6 +149,7 @@ export type Database = {
           total_price: number
           unit_cost?: number
           unit_price: number
+          updated_at?: string
         }
         Update: {
           approved_unit_price?: number | null
@@ -169,6 +171,7 @@ export type Database = {
           total_price?: number
           unit_cost?: number
           unit_price?: number
+          updated_at?: string
         }
         Relationships: [
           {
