@@ -2,8 +2,13 @@ import { useState, useEffect } from 'react';
 import { getSupabaseClient, getSupabaseAdminClient, isAdminAvailable } from "@/integrations/supabase/client";
 
 const supabase = getSupabaseClient();
-const supabaseAdmin = getSupabaseAdminClient();;
+const supabaseAdmin = getSupabaseAdminClient();
 import { useToast } from '@/hooks/use-toast';
+import {
+  extractAdditionalQuoteInformation,
+  parseQuoteFieldsValue,
+  updateQuoteWithAdditionalInfo,
+} from '@/utils/additionalQuoteInformation';
 
 export interface Quote {
   id: string;
@@ -38,6 +43,7 @@ export interface Quote {
     status: 'pending_approval' | 'accepted' | 'rejected';
   }>;
   approval_notes?: string;
+  additional_quote_information?: string | null;
   rejection_reason?: string;
   reviewed_at?: string;
   reviewed_by?: string;
@@ -108,18 +114,29 @@ export const useQuotes = () => {
       }
 
       console.log(`Fetched ${quotesData?.length || 0} quotes from database`);
-      
+
+      const normalizedQuotes = (quotesData || []).map((quote) => {
+        const parsedFields = parseQuoteFieldsValue(quote.quote_fields) ?? {};
+        const additionalInfo = extractAdditionalQuoteInformation(quote, parsedFields);
+
+        return {
+          ...quote,
+          quote_fields: parsedFields,
+          additional_quote_information: additionalInfo ?? null,
+        };
+      });
+
       // Filter and validate quotes to prevent crashes
-      const validQuotes = (quotesData || []).filter(quote => {
-        return quote && 
-               quote.id && 
-               quote.customer_name && 
+      const validQuotes = normalizedQuotes.filter(quote => {
+        return quote &&
+               quote.id &&
+               quote.customer_name &&
                typeof quote.original_quote_value === 'number' &&
                !quote.id.startsWith('TEMP-'); // Additional safety check
       });
 
       console.log(`Valid quotes after filtering: ${validQuotes.length}`);
-      setQuotes(validQuotes);
+      setQuotes(validQuotes as Quote[]);
     } catch (err) {
       console.error('Failed to fetch quotes:', err);
       const errorMessage = err instanceof Error ? err.message : 'Failed to fetch quotes';
@@ -167,7 +184,8 @@ export const useQuotes = () => {
     status: Quote['status'], 
     approvedDiscount?: number,
     approvalNotes?: string,
-    rejectionReason?: string
+    rejectionReason?: string,
+    additionalQuoteInformation?: string
   ) => {
     console.log(`Updating quote ${quoteId} status to ${status}`);
     
@@ -182,18 +200,26 @@ export const useQuotes = () => {
         updateData.approved_discount = approvedDiscount;
       }
       
-      if (approvalNotes) {
-        updateData.approval_notes = approvalNotes;
-      }
-      
-      if (rejectionReason) {
-        updateData.rejection_reason = rejectionReason;
+      if (approvalNotes !== undefined) {
+        const trimmedNotes = approvalNotes.trim();
+        updateData.approval_notes = trimmedNotes ? trimmedNotes : null;
       }
 
-      const { error } = await supabase
-        .from('quotes')
-        .update(updateData)
-        .eq('id', quoteId);
+      if (rejectionReason !== undefined) {
+        const trimmedReason = rejectionReason.trim();
+        updateData.rejection_reason = trimmedReason ? trimmedReason : null;
+      }
+
+      const client = supabaseAdmin ?? supabase;
+
+      const currentQuote = quotes.find((quote) => quote.id === quoteId);
+      const { error } = await updateQuoteWithAdditionalInfo({
+        client,
+        quote: currentQuote ?? {},
+        quoteId,
+        updates: updateData,
+        additionalInfo: additionalQuoteInformation,
+      });
 
       if (error) {
         console.error('Error updating quote status:', error);
