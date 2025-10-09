@@ -231,10 +231,12 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
           ? approvedDiscount
           : quote?.approved_discount ?? quote?.requested_discount ?? 0;
 
+      const isoNow = new Date().toISOString();
+
       const updates: Record<string, any> = {
         status: action === 'approve' ? 'approved' : 'rejected',
-        reviewed_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
+        reviewed_at: isoNow,
+        updated_at: isoNow
       };
 
       if (user?.id) {
@@ -315,6 +317,7 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
               margin: updatedUnitPrice > 0
                 ? ((updatedUnitPrice - unitCost) / updatedUnitPrice) * 100
                 : 0,
+              updated_at: isoNow,
             };
           });
 
