@@ -6,7 +6,9 @@ export const SYSTEM_ADDITIONAL_QUOTE_INFO_KEY = '__system_additional_quote_infor
 type QuoteFieldsRecord = Record<string, any>;
 
 type QuoteLike = {
+  status?: string | null;
   quote_fields?: unknown;
+  price_adjustments?: unknown;
   additional_quote_information?: unknown;
 };
 
@@ -49,10 +51,34 @@ export const sanitizeAdditionalQuoteInformation = (
   return trimmed.length > 0 ? trimmed : undefined;
 };
 
+const parseJsonRecord = (value: unknown): QuoteFieldsRecord | null => {
+  if (!value) {
+    return null;
+  }
+
+  if (isPlainObject(value)) {
+    return value as QuoteFieldsRecord;
+  }
+
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value);
+      return isPlainObject(parsed) ? (parsed as QuoteFieldsRecord) : null;
+    } catch (error) {
+      console.warn('Unable to parse JSON string', error);
+      return null;
+    }
+  }
+
+  return null;
+};
+
 export const extractAdditionalQuoteInformation = (
   quote: QuoteLike,
   normalizedFields?: QuoteFieldsRecord | null
 ): string | undefined => {
+  const priceAdjustments = parseJsonRecord(quote?.price_adjustments);
+
   const direct = sanitizeAdditionalQuoteInformation(
     quote?.additional_quote_information
   );
@@ -63,6 +89,19 @@ export const extractAdditionalQuoteInformation = (
 
   const fields = normalizedFields ?? parseQuoteFieldsValue(quote?.quote_fields);
   if (!fields) {
+    if (priceAdjustments) {
+      const systemMeta = isPlainObject(priceAdjustments.__system_meta)
+        ? (priceAdjustments.__system_meta as QuoteFieldsRecord)
+        : null;
+      if (systemMeta) {
+        const metaValue = sanitizeAdditionalQuoteInformation(
+          systemMeta.additional_quote_information
+        );
+        if (metaValue) {
+          return metaValue;
+        }
+      }
+    }
     return undefined;
   }
 
@@ -85,6 +124,20 @@ export const extractAdditionalQuoteInformation = (
   );
   if (camelCaseValue) {
     return camelCaseValue;
+  }
+
+  if (priceAdjustments) {
+    const systemMeta = isPlainObject(priceAdjustments.__system_meta)
+      ? (priceAdjustments.__system_meta as QuoteFieldsRecord)
+      : null;
+    if (systemMeta) {
+      const metaValue = sanitizeAdditionalQuoteInformation(
+        systemMeta.additional_quote_information
+      );
+      if (metaValue) {
+        return metaValue;
+      }
+    }
   }
 
   return undefined;
@@ -123,6 +176,51 @@ export const mergeAdditionalQuoteInformationIntoFields = (
   }
 
   return { changed: false, nextFields: existingFields ?? null };
+};
+
+const mergeAdditionalQuoteInformationIntoPriceAdjustments = (
+  existing: QuoteFieldsRecord | null,
+  sanitizedInfo: string | undefined
+): { changed: boolean; nextAdjustments: QuoteFieldsRecord | null } => {
+  const base = existing ? { ...existing } : {};
+  const meta = isPlainObject(base.__system_meta)
+    ? { ...(base.__system_meta as QuoteFieldsRecord) }
+    : {};
+  const hadMetaKey = Object.prototype.hasOwnProperty.call(
+    meta,
+    'additional_quote_information'
+  );
+  const previousValue = sanitizeAdditionalQuoteInformation(
+    meta.additional_quote_information
+  );
+
+  if (sanitizedInfo) {
+    if (previousValue === sanitizedInfo) {
+      return { changed: false, nextAdjustments: existing ?? null };
+    }
+
+    meta.additional_quote_information = sanitizedInfo;
+    base.__system_meta = meta;
+    return { changed: true, nextAdjustments: base };
+  }
+
+  if (!sanitizedInfo && (hadMetaKey || Object.keys(meta).length > 0)) {
+    delete meta.additional_quote_information;
+
+    if (Object.keys(meta).length === 0) {
+      delete base.__system_meta;
+    } else {
+      base.__system_meta = meta;
+    }
+
+    if (Object.keys(base).length === 0) {
+      return { changed: true, nextAdjustments: null };
+    }
+
+    return { changed: true, nextAdjustments: base };
+  }
+
+  return { changed: false, nextAdjustments: existing ?? null };
 };
 
 export const isMissingAdditionalQuoteInfoColumnError = (
@@ -200,16 +298,21 @@ export const prepareAdditionalQuoteInfoUpdates = async ({
   updates: Record<string, any>;
   sanitizedInfo: string | undefined;
   mergedFields: QuoteFieldsRecord | null;
+  mergedPriceAdjustments: QuoteFieldsRecord | null;
 }> => {
   const sanitizedInfo = sanitizeAdditionalQuoteInformation(additionalInfo);
   const supportsColumn = forceDisableColumn
     ? false
     : await ensureAdditionalQuoteInfoColumnSupport(client);
   const parsedFields = parseQuoteFieldsValue(quote?.quote_fields);
-  const { changed, nextFields } = mergeAdditionalQuoteInformationIntoFields(
-    parsedFields,
-    sanitizedInfo
-  );
+  const parsedAdjustments = parseJsonRecord(quote?.price_adjustments);
+
+  const originalStatus = typeof quote?.status === 'string' ? quote.status : null;
+  const targetStatus = typeof updates.status === 'string'
+    ? updates.status
+    : originalStatus;
+  const allowQuoteFieldsFallback =
+    originalStatus === 'draft' && targetStatus === 'draft';
 
   const resultUpdates: Record<string, any> = { ...updates };
 
@@ -219,14 +322,38 @@ export const prepareAdditionalQuoteInfoUpdates = async ({
     delete resultUpdates.additional_quote_information;
   }
 
-  if (changed) {
-    resultUpdates.quote_fields = nextFields;
+  let mergedFields: QuoteFieldsRecord | null = parsedFields ?? null;
+  let mergedPriceAdjustments: QuoteFieldsRecord | null = parsedAdjustments ?? null;
+
+  if (!supportsColumn && allowQuoteFieldsFallback) {
+    const { changed, nextFields } = mergeAdditionalQuoteInformationIntoFields(
+      parsedFields,
+      sanitizedInfo
+    );
+
+    mergedFields = nextFields ?? parsedFields ?? null;
+
+    if (changed) {
+      resultUpdates.quote_fields = nextFields;
+    }
+  } else if (!supportsColumn) {
+    const { changed, nextAdjustments } = mergeAdditionalQuoteInformationIntoPriceAdjustments(
+      parsedAdjustments,
+      sanitizedInfo
+    );
+
+    mergedPriceAdjustments = nextAdjustments ?? parsedAdjustments ?? null;
+
+    if (changed) {
+      resultUpdates.price_adjustments = nextAdjustments;
+    }
   }
 
   return {
     updates: resultUpdates,
     sanitizedInfo,
-    mergedFields: nextFields ?? parsedFields ?? null,
+    mergedFields,
+    mergedPriceAdjustments,
   };
 };
 
@@ -238,6 +365,7 @@ interface PreparedAdditionalQuoteInfoUpdates {
   updates: Record<string, any>;
   sanitizedInfo: string | undefined;
   mergedFields: QuoteFieldsRecord | null;
+  mergedPriceAdjustments: QuoteFieldsRecord | null;
 }
 
 interface UpdateQuoteWithAdditionalInfoOptions {
@@ -259,6 +387,7 @@ export const updateQuoteWithAdditionalInfo = async ({
   preparedUpdates: Record<string, any>;
   sanitizedInfo: string | undefined;
   mergedFields: QuoteFieldsRecord | null;
+  mergedPriceAdjustments: QuoteFieldsRecord | null;
 }> => {
   const baseUpdates: Record<string, any> = { ...updates };
   delete baseUpdates.additional_quote_information;
@@ -271,6 +400,7 @@ export const updateQuoteWithAdditionalInfo = async ({
         updates: { ...baseUpdates },
         sanitizedInfo: undefined,
         mergedFields: parseQuoteFieldsValue(quote?.quote_fields) ?? null,
+        mergedPriceAdjustments: parseJsonRecord(quote?.price_adjustments) ?? null,
       };
     }
 
@@ -314,6 +444,7 @@ export const updateQuoteWithAdditionalInfo = async ({
     preparedUpdates: prepared.updates,
     sanitizedInfo: prepared.sanitizedInfo,
     mergedFields: prepared.mergedFields,
+    mergedPriceAdjustments: prepared.mergedPriceAdjustments,
   };
 };
 
