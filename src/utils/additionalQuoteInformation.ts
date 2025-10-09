@@ -12,7 +12,46 @@ type QuoteLike = {
   additional_quote_information?: unknown;
 };
 
-let additionalInfoColumnSupported: boolean | null = null;
+const ADDITIONAL_INFO_SUPPORT_STORAGE_KEY =
+  'powerquote_additional_quote_info_supported';
+
+const readStoredAdditionalInfoSupport = (): boolean | null => {
+  if (typeof window === 'undefined' || !window?.localStorage) {
+    return null;
+  }
+
+  const stored = window.localStorage.getItem(
+    ADDITIONAL_INFO_SUPPORT_STORAGE_KEY
+  );
+
+  if (stored === 'true') {
+    return true;
+  }
+
+  if (stored === 'false') {
+    return false;
+  }
+
+  return null;
+};
+
+const persistAdditionalInfoSupport = (value: boolean | null) => {
+  if (typeof window === 'undefined' || !window?.localStorage) {
+    return;
+  }
+
+  if (value === null) {
+    window.localStorage.removeItem(ADDITIONAL_INFO_SUPPORT_STORAGE_KEY);
+    return;
+  }
+
+  window.localStorage.setItem(
+    ADDITIONAL_INFO_SUPPORT_STORAGE_KEY,
+    value ? 'true' : 'false'
+  );
+};
+
+let additionalInfoColumnSupported: boolean | null = readStoredAdditionalInfoSupport();
 
 const isPlainObject = (value: unknown): value is Record<string, unknown> => {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
@@ -254,10 +293,8 @@ export const ensureAdditionalQuoteInfoColumnSupport = async (
       .limit(1);
 
     if (isMissingAdditionalQuoteInfoColumnError(error)) {
-      console.warn(
-        'Supabase quotes table is missing additional_quote_information column; falling back to quote_fields storage.'
-      );
       additionalInfoColumnSupported = false;
+      persistAdditionalInfoSupport(false);
       return false;
     }
 
@@ -269,6 +306,7 @@ export const ensureAdditionalQuoteInfoColumnSupport = async (
     }
 
     additionalInfoColumnSupported = true;
+    persistAdditionalInfoSupport(true);
     return true;
   } catch (error) {
     console.warn(
@@ -276,6 +314,7 @@ export const ensureAdditionalQuoteInfoColumnSupport = async (
       error
     );
     additionalInfoColumnSupported = true;
+    persistAdditionalInfoSupport(true);
     return true;
   }
 };
@@ -359,6 +398,44 @@ export const prepareAdditionalQuoteInfoUpdates = async ({
 
 export const resetAdditionalQuoteInfoSupportCache = () => {
   additionalInfoColumnSupported = null;
+  persistAdditionalInfoSupport(null);
+};
+
+const columnPresenceFromRow = (
+  row: Record<string, any> | null | undefined
+): boolean | null => {
+  if (!row || typeof row !== 'object') {
+    return null;
+  }
+
+  if (Object.prototype.hasOwnProperty.call(row, 'additional_quote_information')) {
+    return true;
+  }
+
+  return false;
+};
+
+export const noteAdditionalQuoteInfoColumnFromRow = (
+  row: Record<string, any> | null | undefined
+) => {
+  const detected = columnPresenceFromRow(row);
+
+  if (detected === null) {
+    return;
+  }
+
+  if (detected) {
+    if (additionalInfoColumnSupported !== true) {
+      additionalInfoColumnSupported = true;
+      persistAdditionalInfoSupport(true);
+    }
+    return;
+  }
+
+  if (additionalInfoColumnSupported !== false) {
+    additionalInfoColumnSupported = false;
+    persistAdditionalInfoSupport(false);
+  }
 };
 
 interface PreparedAdditionalQuoteInfoUpdates {

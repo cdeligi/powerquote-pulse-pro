@@ -120,24 +120,6 @@ const coerceString = (value: any): string | undefined => {
   return undefined;
 };
 
-const resolveProductInfoUrl = (...sources: Array<any>): string | null => {
-  const keys = ['productInfoUrl', 'product_info_url', 'infoUrl', 'info_url', 'url', 'link'];
-
-  for (const source of sources) {
-    if (!source || typeof source !== 'object') continue;
-
-    for (const key of keys) {
-      if (!Object.prototype.hasOwnProperty.call(source, key)) continue;
-      const resolved = coerceString((source as Record<string, unknown>)[key]);
-      if (resolved) {
-        return resolved;
-      }
-    }
-  }
-
-  return null;
-};
-
 const gatherSources = (slot: SpanAwareSlot): any[] => {
   const rawSlot = slot.rawSlot ?? slot;
   const config = slot.configuration ?? slot.level4Config ?? slot.level4Selections ?? rawSlot?.configuration ?? rawSlot?.level4Config ?? rawSlot?.level4Selections;
