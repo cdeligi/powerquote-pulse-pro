@@ -303,27 +303,42 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
           const bomPayload = persistedItems.map((item) => {
             const updatedUnitPrice = Number(item.unit_price) || 0;
             const unitCost = item.unit_cost || 0;
+            const totalPrice = updatedUnitPrice * item.quantity;
+            const totalCost = unitCost * item.quantity;
             return {
               id: item.persisted_id!,
               quote_id: safeQuoteId,
               unit_price: updatedUnitPrice,
               approved_unit_price: updatedUnitPrice,
-              total_price: updatedUnitPrice * item.quantity,
-              total_cost: unitCost * item.quantity,
+              total_price: totalPrice,
+              total_cost: totalCost,
               margin: updatedUnitPrice > 0
                 ? ((updatedUnitPrice - unitCost) / updatedUnitPrice) * 100
                 : 0,
             };
           });
 
-          const { error: bomError } = await client
-            .from('bom_items')
-            .upsert(bomPayload, { onConflict: 'id' });
+          const updateResults = await Promise.all(
+            bomPayload.map(async ({ id, ...rest }) => {
+              const { error } = await client
+                .from('bom_items')
+                .update(rest)
+                .eq('id', id)
+                .eq('quote_id', safeQuoteId);
 
-          if (bomError) {
-            bomUpdateError = bomError;
-            console.error('Error updating BOM items for quote', targetQuoteId, bomError);
-          }
+              if (error) {
+                console.error(
+                  'Error updating BOM item price data',
+                  { quoteId: targetQuoteId, bomItemId: id },
+                  error,
+                );
+              }
+
+              return error;
+            })
+          );
+
+          bomUpdateError = updateResults.find((result): result is PostgrestError => Boolean(result)) ?? null;
         } else if (!safeQuoteId) {
           console.warn(
             'Skipping BOM price update because the resolved quote id is empty.',
