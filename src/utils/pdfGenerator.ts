@@ -716,6 +716,36 @@ export const generateQuotePDF = async (
 
   // Fetch Terms & Conditions and settings from database
   let termsAndConditions = '';
+
+  const sanitizeTermsParagraph = (paragraph: string) =>
+    paragraph
+      .trim()
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+
+  const formatTermsAndConditions = (content: string): string => {
+    if (!content) {
+      return '';
+    }
+
+    const hasHtmlTags = /<[^>]+>/.test(content);
+    if (hasHtmlTags) {
+      return content;
+    }
+
+    const paragraphs = content
+      .split(/\n{2,}/)
+      .map(paragraph => sanitizeTermsParagraph(paragraph).replace(/\n/g, '<br />'))
+      .filter(Boolean)
+      .map(paragraph => `<p>${paragraph}</p>`);
+
+    if (paragraphs.length === 0) {
+      return `<p>${sanitizeTermsParagraph(content).replace(/\n/g, '<br />')}</p>`;
+    }
+
+    return paragraphs.join('');
+  };
   let companyName = 'QUALITROL';
   let companyLogoUrl = '';
   let expiresDays = 30;
@@ -1838,6 +1868,8 @@ export const generateQuotePDF = async (
   const isDraft = quoteInfo.status === 'draft';
   const quoteIdDisplay = isDraft ? 'DRAFT' : quoteInfo.id || 'New Quote';
 
+  const formattedTermsAndConditions = formatTermsAndConditions(termsAndConditions);
+
   const htmlContent = `
     <!DOCTYPE html>
     <html>
@@ -1913,11 +1945,58 @@ export const generateQuotePDF = async (
         .level4-option-meta { margin-top: 4px; font-size: 10px; color: #64748b; }
         .level4-empty { color: #64748b; font-style: italic; background: #ffffff; border: 1px dashed #cbd5f5; padding: 14px; border-radius: 12px; margin-top: 16px; }
         .level4-raw { white-space: pre-wrap; font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', monospace; font-size: 10px; background: #0f172a; color: #f8fafc; padding: 16px; border-radius: 12px; margin-top: 18px; }
+        .terms-columns {
+          background: #f8fafc;
+          padding: 24px;
+          border-radius: 16px;
+          border: 1px solid #e2e8f0;
+          margin-bottom: 20px;
+          font-size: 10px;
+          line-height: 1.55;
+          color: #475569;
+          column-count: 2;
+          column-gap: 32px;
+          column-fill: balance;
+          -webkit-column-count: 2;
+          -webkit-column-gap: 32px;
+          -webkit-column-fill: balance;
+          -moz-column-count: 2;
+          -moz-column-gap: 32px;
+        }
+        .terms-columns p,
+        .terms-columns li {
+          break-inside: avoid;
+        }
+        .terms-columns p {
+          margin: 0 0 12px;
+        }
+        .terms-columns ul,
+        .terms-columns ol {
+          margin: 0 0 12px 18px;
+          padding: 0;
+        }
+        .terms-columns strong {
+          color: #0f172a;
+        }
+        .terms-columns h3,
+        .terms-columns h4,
+        .terms-columns h5,
+        .terms-columns h6 {
+          margin-top: 16px;
+          margin-bottom: 8px;
+          color: #0f172a;
+          break-inside: avoid;
+        }
         .footer { margin-top: 48px; border-top: 1px solid #e2e8f0; padding-top: 18px; font-size: 10px; color: #64748b; }
         @media print {
           body { background: #ffffff; padding: 0; }
           .page-container { box-shadow: none; border-radius: 0; margin: 0; padding: 32px; }
           .draft-warning, .level4-section { page-break-inside: avoid; }
+          .terms-columns {
+            column-count: 2;
+            -webkit-column-count: 2;
+            -moz-column-count: 2;
+          }
         }
       </style>
     </head>
@@ -2212,8 +2291,8 @@ export const generateQuotePDF = async (
       ${termsAndConditions ? `
         <div style="page-break-before: always; margin-top: 40px;">
           <h2 style="color: #0f172a; border-bottom: 1px solid #e2e8f0; padding-bottom: 12px;">Terms & Conditions</h2>
-          <div style="background: #f8fafc; padding: 24px; border-radius: 16px; border: 1px solid #e2e8f0; margin-bottom: 20px; white-space: pre-wrap; font-size: 10px; line-height: 1.55; color: #475569;">
-            ${termsAndConditions}
+          <div class="terms-columns">
+            ${formattedTermsAndConditions}
           </div>
         </div>
       ` : ''}
