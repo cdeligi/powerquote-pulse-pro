@@ -144,6 +144,32 @@ const normalizeProductInfoKey = (key: string): string => key.replace(/[\s_-]/g, 
 
 const PRODUCT_INFO_KEYS = new Set(PRODUCT_INFO_KEY_VARIANTS.map(normalizeProductInfoKey));
 
+const PRODUCT_ID_KEY_HINTS = [
+  'productid',
+  'level2productid',
+  'selectedproductid',
+  'selectedlevel2productid',
+  'level2id',
+  'selectedlevel2id',
+  'chassisid',
+  'chassisproductid',
+  'configurationproductid',
+  'variantid',
+  'optionproductid',
+  'parentproductid',
+];
+
+const PRODUCT_CONTAINER_KEY_HINTS = [
+  'product',
+  'level2product',
+  'selectedproduct',
+  'selectedlevel2product',
+  'configurationproduct',
+  'chassis',
+  'variant',
+  'option',
+];
+
 const resolveProductInfoUrl = (...sources: Array<any>): string | null => {
   const visited = new WeakSet<object>();
 
@@ -204,6 +230,91 @@ const resolveProductInfoUrl = (...sources: Array<any>): string | null => {
   }
 
   return null;
+};
+
+const collectProductIdCandidates = (...sources: Array<any>): string[] => {
+  const candidates = new Set<string>();
+  const visited = new WeakSet<object>();
+
+  const addCandidate = (value: unknown) => {
+    const stringValue = coerceString(value);
+    if (stringValue) {
+      candidates.add(stringValue);
+    }
+  };
+
+  const searchObject = (value: unknown, depth: number, parentKey?: string) => {
+    if (!value || typeof value !== 'object' || depth > 6) {
+      return;
+    }
+
+    if (visited.has(value as object)) {
+      return;
+    }
+    visited.add(value as object);
+
+    if (Array.isArray(value)) {
+      for (const entry of value) {
+        if (entry && typeof entry === 'object') {
+          searchObject(entry, depth + 1, parentKey);
+        }
+      }
+      return;
+    }
+
+    const record = value as Record<string, unknown>;
+
+    if (parentKey && PRODUCT_CONTAINER_KEY_HINTS.some(hint => parentKey.includes(hint))) {
+      addCandidate(record.id);
+    }
+
+    const productLevel =
+      coerceNumber(record.productLevel) ??
+      coerceNumber(record.product_level) ??
+      coerceNumber(record.level) ??
+      undefined;
+
+    if (productLevel === 2 || record.parentProductId || record.parent_product_id) {
+      addCandidate(record.id);
+    }
+
+    for (const [key, raw] of Object.entries(record)) {
+      const normalizedKey = normalizeProductInfoKey(key);
+
+      if (PRODUCT_ID_KEY_HINTS.some(hint => normalizedKey.includes(hint))) {
+        addCandidate(raw);
+      }
+
+      if (Array.isArray(raw)) {
+        for (const entry of raw) {
+          if (entry && typeof entry === 'object') {
+            searchObject(entry, depth + 1, normalizedKey);
+          }
+        }
+      } else if (raw && typeof raw === 'object') {
+        searchObject(raw, depth + 1, normalizedKey);
+      } else if (normalizedKey === 'id') {
+        if (PRODUCT_CONTAINER_KEY_HINTS.some(hint => (parentKey ?? '').includes(hint))) {
+          addCandidate(raw);
+        } else if (productLevel === 2) {
+          addCandidate(raw);
+        }
+      }
+    }
+  };
+
+  sources.forEach(source => {
+    if (source == null) return;
+    if (typeof source === 'string' || typeof source === 'number') {
+      addCandidate(source);
+      return;
+    }
+    if (typeof source === 'object') {
+      searchObject(source, 0);
+    }
+  });
+
+  return Array.from(candidates);
 };
 
 const gatherSources = (slot: SpanAwareSlot): any[] => {
@@ -1578,6 +1689,79 @@ export const generateQuotePDF = async (
     };
   });
 
+  const itemsMissingProductInfo = normalizedBomItems.filter(item => !coerceString((item.product as any)?.productInfoUrl));
+
+  if (itemsMissingProductInfo.length > 0) {
+    const productIdsToFetch = new Set<string>();
+
+    itemsMissingProductInfo.forEach(item => {
+      const candidates = collectProductIdCandidates(
+        item,
+        item.product,
+        item.configuration,
+        item.configuration?.product,
+        item.configuration?.selectedProduct,
+        item.configuration?.selectedLevel2Product,
+        item.configuration?.level2Product,
+        item.configuration?.selectedProducts,
+        item.level2Product,
+        item.level2_product,
+        item.parentProduct,
+        item.configuration?.rackConfiguration,
+        item.rackConfiguration,
+        item.slotAssignments
+      );
+
+      candidates.forEach(candidate => productIdsToFetch.add(candidate));
+    });
+
+    if (productIdsToFetch.size > 0) {
+      const { data: productInfoRows } = await supabase
+        .from('products')
+        .select('id, product_info_url')
+        .in('id', Array.from(productIdsToFetch));
+
+      if (Array.isArray(productInfoRows) && productInfoRows.length > 0) {
+        const infoUrlMap = new Map<string, string>();
+        productInfoRows.forEach(row => {
+          const infoUrl = coerceString((row as any)?.product_info_url);
+          if (infoUrl) {
+            infoUrlMap.set(String((row as any).id), infoUrl);
+          }
+        });
+
+        itemsMissingProductInfo.forEach(item => {
+          const candidates = collectProductIdCandidates(
+            item,
+            item.product,
+            item.configuration,
+            item.configuration?.product,
+            item.configuration?.selectedProduct,
+            item.configuration?.selectedLevel2Product,
+            item.configuration?.level2Product,
+            item.configuration?.selectedProducts,
+            item.level2Product,
+            item.level2_product,
+            item.parentProduct,
+            item.configuration?.rackConfiguration,
+            item.rackConfiguration,
+            item.slotAssignments
+          );
+
+          for (const candidate of candidates) {
+            const matchedUrl = candidate ? infoUrlMap.get(candidate) : undefined;
+            if (matchedUrl) {
+              (item.product as any).productInfoUrl = matchedUrl;
+              (item.product as any).product_info_url = matchedUrl;
+              (item as any).productInfoUrl = matchedUrl;
+              break;
+            }
+          }
+        });
+      }
+    }
+  }
+
   const level4DisplayItems: Level4DisplayItem[] = normalizedBomItems.flatMap(item => {
     const entries: Level4DisplayItem[] = [];
 
@@ -1902,9 +2086,15 @@ export const generateQuotePDF = async (
                 <td>${item.product.name}</td>
                 <td>
                   ${item.product.description}
-                  ${item.product.productInfoUrl
-                    ? `<div class="product-info-link">Product Info: <a href="${escapeHtml(item.product.productInfoUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(item.product.productInfoUrl)}</a></div>`
-                    : ''}
+                  ${(() => {
+                    const infoUrl =
+                      coerceString((item.product as any)?.productInfoUrl) ||
+                      coerceString((item.product as any)?.product_info_url) ||
+                      coerceString((item as any)?.productInfoUrl);
+                    return infoUrl
+                      ? `<div class="product-info-link">Product Info: <a href="${escapeHtml(infoUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(infoUrl)}</a></div>`
+                      : '';
+                  })()}
                 </td>
                 <td>${item.partNumber || 'TBD'}</td>
                 <td>${item.quantity}</td>
