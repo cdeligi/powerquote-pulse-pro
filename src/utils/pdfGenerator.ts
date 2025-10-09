@@ -2,6 +2,10 @@
 import { BOMItem } from '@/types/product';
 import { Quote } from '@/types/quote';
 import { supabase } from '@/integrations/supabase/client';
+import {
+  extractAdditionalQuoteInformation,
+  parseQuoteFieldsValue,
+} from '@/utils/additionalQuoteInformation';
 
 type NormalizedLevel4Option = {
   id: string;
@@ -472,9 +476,9 @@ export const generateQuotePDF = async (
 
   const discountAmount = Math.max(originalTotal - finalTotal, 0);
   const hasDiscount = discountAmount > 0.01 || effectiveDiscountPercent > 0.01;
-  const additionalQuoteInfo = typeof quoteInfo?.additional_quote_information === 'string'
-    ? quoteInfo.additional_quote_information.trim()
-    : '';
+  const normalizedQuoteFields = parseQuoteFieldsValue(quoteInfo?.quote_fields);
+  const additionalQuoteInfo =
+    extractAdditionalQuoteInformation(quoteInfo, normalizedQuoteFields) ?? '';
 
   const resolvedCurrency = (() => {
     const raw = typeof quoteInfo?.currency === 'string' ? quoteInfo.currency.trim().toUpperCase() : '';
