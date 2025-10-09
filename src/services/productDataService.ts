@@ -8,6 +8,7 @@ import {
 } from "@/types/product";
 import { ChassisType, ChassisTypeFormData } from "@/types/product/chassis-types";
 import { getSupabaseClient, getSupabaseAdminClient, isAdminAvailable } from "@/integrations/supabase/client";
+import { v4 as uuidv4 } from 'uuid';
 
 const supabase = getSupabaseClient();
 const supabaseAdmin = getSupabaseAdminClient();;
@@ -388,10 +389,19 @@ class ProductDataService {
 
   async createLevel3Product(productData: Omit<Level3Product, 'id'>): Promise<Level3Product> {
     try {
+      const newId = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+        ? crypto.randomUUID()
+        : uuidv4();
+
+      const parentId = productData.parent_product_id || productData.parentProductId;
+      const trimmedPartNumber = productData.partNumber?.trim() || null;
+      const requiresLevel4 = (productData as any).requires_level4_config ?? (productData as any).has_level4;
+
       const { data, error } = await supabase
         .from('products')
         .insert([
           {
+            id: newId,
             name: productData.name,
             display_name: (productData as any).displayName || productData.name,
             description: productData.description || '',
@@ -399,11 +409,13 @@ class ProductDataService {
             cost: productData.cost || 0,
             enabled: productData.enabled !== false,
             product_level: 3,
-            parent_product_id: productData.parentProductId,
+            parent_product_id: parentId,
+            type: productData.type || 'standard',
             category: productData.type || 'standard',
-            has_level4: (productData as any).has_level4 === true,
+            has_level4: (productData as any).has_level4 === true || requiresLevel4 === true,
+            requires_level4_config: requiresLevel4 === true,
             specifications: productData.specifications || {},
-            part_number: productData.partNumber?.trim() || null
+            part_number: trimmedPartNumber
           }
         ])
         .select()
@@ -418,13 +430,14 @@ class ProductDataService {
         parent_product_id: data.parent_product_id,
         parentProductId: data.parent_product_id,
         product_level: 3,
-        type: data.type,
+        type: data.type || data.category,
         description: data.description || '',
         price: data.price || 0,
         cost: data.cost || 0,
         enabled: data.enabled !== false,
         partNumber: data.part_number || undefined,
-        has_level4: data.has_level4 === true,
+        has_level4: data.has_level4 === true || data.requires_level4_config === true,
+        requires_level4_config: data.requires_level4_config === true,
         specifications: data.specifications || {}
       };
 
