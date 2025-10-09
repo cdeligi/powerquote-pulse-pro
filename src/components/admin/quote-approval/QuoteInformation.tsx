@@ -10,7 +10,7 @@ interface QuoteInformationProps {
 }
 
 export const QuoteInformation = ({ quote }: QuoteInformationProps) => {
-  const { formattedFields, unmappedFields } = useConfiguredQuoteFields(quote?.quote_fields);
+  const { formattedFields } = useConfiguredQuoteFields(quote?.quote_fields);
   const priorityBadgeClass = quote?.priority === 'Urgent'
     ? 'bg-red-500'
     : quote?.priority === 'High'
@@ -65,19 +65,6 @@ export const QuoteInformation = ({ quote }: QuoteInformationProps) => {
           </p>
         )}
 
-        {unmappedFields.length > 0 && (
-          <div className="space-y-3">
-            <Label className="text-gray-400">Additional Quote Information</Label>
-            <div className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
-              {unmappedFields.map(({ key, value }) => (
-                <div key={key}>
-                  <Label className="text-gray-400 capitalize">{key.replace(/_/g, ' ')}</Label>
-                  <p className="text-white">{String(value ?? '—')}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
       </CardContent>
     </Card>
   );

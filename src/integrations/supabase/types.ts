@@ -127,6 +127,7 @@ export type Database = {
           total_price: number
           unit_cost: number
           unit_price: number
+          updated_at: string
         }
         Insert: {
           approved_unit_price?: number | null
@@ -148,6 +149,7 @@ export type Database = {
           total_price: number
           unit_cost?: number
           unit_price: number
+          updated_at?: string
         }
         Update: {
           approved_unit_price?: number | null
@@ -169,6 +171,7 @@ export type Database = {
           total_price?: number
           unit_cost?: number
           unit_price?: number
+          updated_at?: string
         }
         Relationships: [
           {
@@ -1221,6 +1224,7 @@ export type Database = {
           created_at: string
           currency: string
           customer_name: string
+          additional_quote_information: string | null
           discount_justification: string | null
           discounted_margin: number
           discounted_value: number
@@ -1265,6 +1269,7 @@ export type Database = {
           created_at?: string
           currency?: string
           customer_name: string
+          additional_quote_information?: string | null
           discount_justification?: string | null
           discounted_margin: number
           discounted_value: number
@@ -1309,6 +1314,7 @@ export type Database = {
           created_at?: string
           currency?: string
           customer_name?: string
+          additional_quote_information?: string | null
           discount_justification?: string | null
           discounted_margin?: number
           discounted_value?: number
