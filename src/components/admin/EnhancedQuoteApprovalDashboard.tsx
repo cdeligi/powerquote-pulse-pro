@@ -364,9 +364,13 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
       if (action === 'approve') {
         updates.approval_notes = notes?.trim() ? notes.trim() : null;
         updates.rejection_reason = null;
+        updates.additional_quote_information = additionalQuoteInformation?.trim()
+          ? additionalQuoteInformation.trim()
+          : null;
       } else if (action === 'reject') {
         updates.rejection_reason = notes?.trim() ? notes.trim() : null;
         updates.approval_notes = null;
+        updates.additional_quote_information = null;
       }
 
       if (action === 'approve') {
