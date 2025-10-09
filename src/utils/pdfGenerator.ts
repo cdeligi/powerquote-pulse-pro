@@ -2004,7 +2004,7 @@ export const generateQuotePDF = async (
       ${termsAndConditions ? `
         <div style="page-break-before: always; margin-top: 40px;">
           <h2 style="color: #0f172a; border-bottom: 1px solid #e2e8f0; padding-bottom: 12px;">Terms & Conditions</h2>
-          <div style="background: #f8fafc; padding: 24px; border-radius: 16px; border: 1px solid #e2e8f0; margin-bottom: 20px; white-space: pre-wrap; font-size: 10px; line-height: 1.55; color: #475569;">
+          <div style="background: #f8fafc; padding: 24px; border-radius: 16px; border: 1px solid #e2e8f0; margin-bottom: 20px; white-space: pre-wrap; font-size: 10px; line-height: 1.55; color: #475569; column-count: 2; column-gap: 32px;">
             ${termsAndConditions}
           </div>
         </div>
