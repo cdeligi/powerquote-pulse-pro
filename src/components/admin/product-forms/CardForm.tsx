@@ -44,7 +44,6 @@ const CardForm = ({ onSubmit, level2Products, initialData }: CardFormProps) => {
     specifications: initialData?.specifications || {}
   });
   const [parentError, setParentError] = useState(false);
-  const [typeError, setTypeError] = useState(false);
 
   const parentOptions = useMemo(
     () => [...level2Products].sort((a, b) => a.name.localeCompare(b.name)),
@@ -87,11 +86,6 @@ const CardForm = ({ onSubmit, level2Products, initialData }: CardFormProps) => {
       return;
     }
 
-    if (!formData.type) {
-      setTypeError(true);
-      return;
-    }
-
     const trimmedPartNumber = formData.partNumber.trim();
 
     const newCard: Omit<Level3Product, "id"> = {
@@ -99,7 +93,6 @@ const CardForm = ({ onSubmit, level2Products, initialData }: CardFormProps) => {
       displayName: formData.displayName || formData.name,
       parent_product_id: formData.parent_product_id,
       parentProductId: formData.parent_product_id,
-      type: formData.type,
       description: formData.description,
       price: Number.isFinite(formData.price) ? Number(formData.price) : 0,
       cost: Number.isFinite(formData.cost) ? Number(formData.cost) : 0,
@@ -110,6 +103,10 @@ const CardForm = ({ onSubmit, level2Products, initialData }: CardFormProps) => {
       specifications: formData.specifications,
       partNumber: trimmedPartNumber ? trimmedPartNumber : undefined,
     };
+
+    if (formData.type) {
+      (newCard as any).type = formData.type;
+    }
 
     onSubmit(newCard);
   };
@@ -146,7 +143,6 @@ const CardForm = ({ onSubmit, level2Products, initialData }: CardFormProps) => {
             setFormData((prev) => ({
               ...prev,
               parent_product_id: value,
-              type: prev.type || "",
             }));
             setParentError(false);
           }}
@@ -166,32 +162,6 @@ const CardForm = ({ onSubmit, level2Products, initialData }: CardFormProps) => {
           <p className="text-sm text-destructive">Please select a parent product.</p>
         )}
       </div>
-
-      <div className="space-y-2">
-        <Label htmlFor="type">Type *</Label>
-        <Select
-          value={formData.type}
-          onValueChange={(value) => {
-            setFormData((prev) => ({ ...prev, type: value }));
-            setTypeError(false);
-          }}
-        >
-          <SelectTrigger id="type">
-            <SelectValue placeholder="Select card type" />
-          </SelectTrigger>
-          <SelectContent>
-            {CARD_TYPE_OPTIONS.map((option) => (
-              <SelectItem key={option.value} value={option.value}>
-                {option.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        {typeError && (
-          <p className="text-sm text-destructive">Please choose a card type.</p>
-        )}
-      </div>
-
       <div className="space-y-2">
         <Label htmlFor="partNumber">Part Number Shown on Quotes</Label>
         <Input
