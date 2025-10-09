@@ -4,6 +4,11 @@ import { getSupabaseClient, getSupabaseAdminClient, isAdminAvailable } from "@/i
 const supabase = getSupabaseClient();
 const supabaseAdmin = getSupabaseAdminClient();;
 import { useToast } from '@/hooks/use-toast';
+import {
+  extractAdditionalQuoteInformation,
+  parseQuoteFieldsValue,
+  prepareAdditionalQuoteInfoUpdates,
+} from '@/utils/additionalQuoteInformation';
 
 export interface Quote {
   id: string;
@@ -109,18 +114,29 @@ export const useQuotes = () => {
       }
 
       console.log(`Fetched ${quotesData?.length || 0} quotes from database`);
-      
+
+      const normalizedQuotes = (quotesData || []).map((quote) => {
+        const parsedFields = parseQuoteFieldsValue(quote.quote_fields) ?? {};
+        const additionalInfo = extractAdditionalQuoteInformation(quote, parsedFields);
+
+        return {
+          ...quote,
+          quote_fields: parsedFields,
+          additional_quote_information: additionalInfo ?? null,
+        };
+      });
+
       // Filter and validate quotes to prevent crashes
-      const validQuotes = (quotesData || []).filter(quote => {
-        return quote && 
-               quote.id && 
-               quote.customer_name && 
+      const validQuotes = normalizedQuotes.filter(quote => {
+        return quote &&
+               quote.id &&
+               quote.customer_name &&
                typeof quote.original_quote_value === 'number' &&
                !quote.id.startsWith('TEMP-'); // Additional safety check
       });
 
       console.log(`Valid quotes after filtering: ${validQuotes.length}`);
-      setQuotes(validQuotes);
+      setQuotes(validQuotes as Quote[]);
     } catch (err) {
       console.error('Failed to fetch quotes:', err);
       const errorMessage = err instanceof Error ? err.message : 'Failed to fetch quotes';
@@ -194,14 +210,23 @@ export const useQuotes = () => {
         updateData.rejection_reason = trimmedReason ? trimmedReason : null;
       }
 
+      const client = supabaseAdmin ?? supabase;
+
+      let preparedUpdates = updateData;
       if (additionalQuoteInformation !== undefined) {
-        const trimmedInfo = additionalQuoteInformation.trim();
-        updateData.additional_quote_information = trimmedInfo ? trimmedInfo : null;
+        const currentQuote = quotes.find((quote) => quote.id === quoteId);
+        const { updates } = await prepareAdditionalQuoteInfoUpdates({
+          client,
+          quote: currentQuote ?? {},
+          updates: updateData,
+          additionalInfo: additionalQuoteInformation,
+        });
+        preparedUpdates = updates;
       }
 
-      const { error } = await supabase
+      const { error } = await client
         .from('quotes')
-        .update(updateData)
+        .update(preparedUpdates)
         .eq('id', quoteId);
 
       if (error) {

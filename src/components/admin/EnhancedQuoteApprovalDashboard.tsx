@@ -4,6 +4,11 @@ import type { PostgrestError } from '@supabase/supabase-js';
 import { getSupabaseClient, getSupabaseAdminClient } from "@/integrations/supabase/client";
 import { normalizeQuoteId, persistNormalizedQuoteId } from '@/utils/quoteIdGenerator';
 import { deriveCustomerNameFromFields } from "@/utils/customerName";
+import {
+  extractAdditionalQuoteInformation,
+  parseQuoteFieldsValue,
+  prepareAdditionalQuoteInfoUpdates,
+} from '@/utils/additionalQuoteInformation';
 
 const supabase = getSupabaseClient();
 const supabaseAdmin = getSupabaseAdminClient();
@@ -25,30 +30,6 @@ interface EnhancedQuoteApprovalDashboardProps {
 interface ExpandedQuoteState {
   [quoteId: string]: boolean;
 }
-
-const parseQuoteFields = (rawFields: unknown): Record<string, any> | undefined => {
-  if (!rawFields) {
-    return undefined;
-  }
-
-  if (typeof rawFields === 'string') {
-    try {
-      const parsed = JSON.parse(rawFields);
-      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-        return parsed as Record<string, any>;
-      }
-    } catch (error) {
-      console.warn('Failed to parse quote_fields JSON string for admin dashboard', error);
-      return undefined;
-    }
-  }
-
-  if (typeof rawFields === 'object' && !Array.isArray(rawFields)) {
-    return rawFields as Record<string, any>;
-  }
-
-  return undefined;
-};
 
 const resolveCustomerName = (
   fields: Record<string, any> | undefined,
@@ -100,7 +81,8 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
       // Fetch BOM items for each quote
       const quotesWithBOM = await Promise.all(
         (quotesData || []).map(async (quote) => {
-          const normalizedFields = parseQuoteFields(quote.quote_fields);
+          const normalizedFields = parseQuoteFieldsValue(quote.quote_fields) ?? undefined;
+          const additionalInfo = extractAdditionalQuoteInformation(quote, normalizedFields);
           const resolvedCustomer = resolveCustomerName(normalizedFields, quote.customer_name);
 
           const { data: bomItems, error: bomError } = await supabase
@@ -128,7 +110,8 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
           return {
             ...quote,
             customer_name: resolvedCustomer,
-            quote_fields: normalizedFields,
+            quote_fields: normalizedFields ?? undefined,
+            additional_quote_information: additionalInfo ?? null,
             bom_items: enrichedItems,
           } as Quote;
         })
@@ -274,6 +257,15 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
         updates.approved_discount = appliedDiscount;
       }
 
+      const { updates: updatesWithAdditionalInfo } = await prepareAdditionalQuoteInfoUpdates({
+        client,
+        quote: quote ?? {},
+        updates,
+        additionalInfo: action === 'approve' ? additionalQuoteInformation : null,
+      });
+
+      const preparedUpdates = updatesWithAdditionalInfo;
+
       const bomItemsForTotals = (updatedBOMItems && updatedBOMItems.length > 0)
         ? updatedBOMItems
         : ((quote?.bom_items as BOMItemWithDetails[] | undefined) ?? []);
@@ -290,17 +282,17 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
         const discountedGrossProfit = discountedValue - totalCost;
         const discountedMargin = discountedValue > 0 ? (discountedGrossProfit / discountedValue) * 100 : 0;
 
-        updates.total_cost = totalCost;
-        updates.gross_profit = grossProfit;
-        updates.original_quote_value = totalRevenue;
-        updates.original_margin = margin;
-        updates.discounted_value = discountedValue;
-        updates.discounted_margin = discountedMargin;
+        preparedUpdates.total_cost = totalCost;
+        preparedUpdates.gross_profit = grossProfit;
+        preparedUpdates.original_quote_value = totalRevenue;
+        preparedUpdates.original_margin = margin;
+        preparedUpdates.discounted_value = discountedValue;
+        preparedUpdates.discounted_margin = discountedMargin;
       }
 
       const { error: quoteError } = await client
         .from('quotes')
-        .update(updates)
+        .update(preparedUpdates)
         .eq('id', targetQuoteId);
 
       if (quoteError) throw quoteError;

@@ -17,6 +17,10 @@ import {
 } from '@/utils/slotAssignmentUtils';
 import { deriveCustomerNameFromFields } from '@/utils/customerName';
 import { useConfiguredQuoteFields } from '@/hooks/useConfiguredQuoteFields';
+import {
+  extractAdditionalQuoteInformation,
+  parseQuoteFieldsValue,
+} from '@/utils/additionalQuoteInformation';
 
 interface Quote {
   id: string;
@@ -160,12 +164,19 @@ const QuoteViewer: React.FC = () => {
         throw new Error('Quote not found');
       }
       
+      const parsedQuoteFields = parseQuoteFieldsValue(quoteData.quote_fields) ?? {};
       const resolvedCustomerName =
-        deriveCustomerNameFromFields(quoteData.quote_fields, quoteData.customer_name ?? null) ??
+        deriveCustomerNameFromFields(parsedQuoteFields, quoteData.customer_name ?? null) ??
         quoteData.customer_name ??
         'Pending Customer';
+      const additionalQuoteInfo = extractAdditionalQuoteInformation(quoteData, parsedQuoteFields);
 
-      setQuote({ ...quoteData, customer_name: resolvedCustomerName });
+      setQuote({
+        ...quoteData,
+        quote_fields: parsedQuoteFields,
+        additional_quote_information: additionalQuoteInfo ?? null,
+        customer_name: resolvedCustomerName,
+      });
 
       if (quoteData.status === 'draft' && quoteData.draft_bom?.items && Array.isArray(quoteData.draft_bom.items)) {
         const loadedItems: BOMItem[] = quoteData.draft_bom.items.map((item: any) => {
@@ -357,6 +368,9 @@ const QuoteViewer: React.FC = () => {
     );
   }
 
+  const normalizedQuoteFields = parseQuoteFieldsValue(quote.quote_fields) ?? quote.quote_fields;
+  const resolvedAdditionalQuoteInfo =
+    extractAdditionalQuoteInformation(quote, normalizedQuoteFields) ?? '';
   const statusBadge = getStatusBadge(quote.status);
   const finalDiscountedValue = quote.discounted_value ?? quote.original_quote_value;
   const discountAmount = Math.max(quote.original_quote_value - finalDiscountedValue, 0);
@@ -376,7 +390,7 @@ const QuoteViewer: React.FC = () => {
   const hasDiscount = discountAmount > 0.01 || effectiveDiscountPercent > 0.01;
   const hasApprovalNotes = Boolean(quote.approval_notes?.trim());
   const hasRejectionReason = Boolean(quote.rejection_reason?.trim());
-  const additionalQuoteInfo = quote.additional_quote_information?.trim();
+  const additionalQuoteInfo = resolvedAdditionalQuoteInfo;
   const hasAdditionalQuoteInfo = Boolean(additionalQuoteInfo);
 
   return (

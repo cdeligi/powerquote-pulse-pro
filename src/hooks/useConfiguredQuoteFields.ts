@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { SYSTEM_ADDITIONAL_QUOTE_INFO_KEY } from '@/utils/additionalQuoteInformation';
 
 export interface ConfiguredQuoteField {
   id: string;
@@ -142,7 +143,7 @@ export const useConfiguredQuoteFields = (
     const mappedIds = new Set(filteredConfiguredFields.map((field) => field.id));
 
     return Object.entries(quoteFields)
-      .filter(([key]) => !mappedIds.has(key))
+      .filter(([key]) => !mappedIds.has(key) && key !== SYSTEM_ADDITIONAL_QUOTE_INFO_KEY)
       .map(([key, value]) => ({ key, value }));
   }, [filteredConfiguredFields, quoteFields]);
 
