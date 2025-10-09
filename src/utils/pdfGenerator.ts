@@ -1325,6 +1325,11 @@ export const generateQuotePDF = async (
       name: product.name || item.name || 'Configured Item',
       description: product.description || item.description || '',
       price: typeof product.price === 'number' ? product.price : (item.product?.price || item.unit_price || 0),
+      productInfoUrl:
+        product.productInfoUrl ||
+        product.product_info_url ||
+        item.productInfoUrl ||
+        item.product_info_url,
     };
 
     const partNumber = item.partNumber || item.part_number || product.partNumber || product.part_number || 'TBD';
@@ -1587,6 +1592,9 @@ export const generateQuotePDF = async (
         .bom-table th { background: #f1f5f9; color: #0f172a; padding: 12px 14px; font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; border-bottom: 1px solid #e2e8f0; }
         .bom-table td { padding: 14px; border-bottom: 1px solid #e2e8f0; color: #0f172a; font-size: 11px; vertical-align: top; }
         .bom-table tbody tr:nth-child(even) { background: #f8fafc; }
+        .product-info-link { margin-top: 8px; font-size: 10px; }
+        .product-info-link a { color: #2563eb; text-decoration: none; word-break: break-all; }
+        .product-info-link a:hover { text-decoration: underline; }
         .total-section { margin-top: 20px; border-top: 1px solid #e2e8f0; padding-top: 16px; display: flex; flex-direction: column; gap: 8px; align-items: flex-end; }
         .total-line { display: flex; gap: 16px; font-size: 12px; font-weight: 600; color: #0f172a; }
         .total-line .label { font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: #64748b; font-weight: 500; }
@@ -1695,7 +1703,12 @@ export const generateQuotePDF = async (
             .map((item, index) => `
               <tr>
                 <td>${item.product.name}</td>
-                <td>${item.product.description}</td>
+                <td>
+                  ${item.product.description}
+                  ${item.product.productInfoUrl
+                    ? `<div class="product-info-link">Product Info: <a href="${escapeHtml(item.product.productInfoUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(item.product.productInfoUrl)}</a></div>`
+                    : ''}
+                </td>
                 <td>${item.partNumber || 'TBD'}</td>
                 <td>${item.quantity}</td>
                 ${canSeePrices ? `
