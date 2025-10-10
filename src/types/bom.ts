@@ -59,6 +59,7 @@ export interface BaseBOMItem {
   product: Product;
   quantity: number;
   enabled: boolean;
+  level?: 1 | 2 | 3 | 4;
   partNumber?: string;
   displayName?: string;
   configuration?: Record<string, any>;
@@ -68,6 +69,8 @@ export interface BaseBOMItem {
   level3Customizations?: Record<string, any>;
   slotAssignments?: Record<number, any>;
   parentProduct?: Product | null;
+  parentLevel2Id?: string;
+  resolvedInfoUrl?: string;
   customPartNumber?: string;
   original_unit_price?: number;
   priceHistory?: Array<{
