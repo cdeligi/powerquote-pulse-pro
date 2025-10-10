@@ -239,7 +239,7 @@ const determineBomItemLevel = (item: any): 1 | 2 | 3 | 4 | undefined => {
 };
 
 const sanitizeHttpUrl = (value: any): string | undefined => {
-  const stringValue = coerceString(value);
+  const stringValue = coerceString(value)?.trim();
   if (!stringValue) return undefined;
   return /^https?:\/\//i.test(stringValue) ? stringValue : undefined;
 };
@@ -2493,8 +2493,12 @@ export const generateQuotePDF = async (
                 return undefined;
               })();
 
-              const effectiveLevel = normalizedLevel ?? (parentLevel2Id ? 3 : undefined);
-              const shouldRenderLink = !!infoUrl && (effectiveLevel === 2 || effectiveLevel === 3);
+              const effectiveLevel =
+                normalizedLevel ??
+                (infoUrl ? (parentLevel2Id ? 3 : 2) : parentLevel2Id ? 3 : undefined);
+
+              const shouldRenderLink =
+                !!infoUrl && effectiveLevel !== 1 && effectiveLevel !== 4 && effectiveLevel !== undefined;
 
               const infoLinkHtml = shouldRenderLink && infoUrl
                 ? `<div class="product-info-link"><a href="${escapeHtml(infoUrl)}" target="_blank" rel="noopener noreferrer">Product Info: ${escapeHtml(infoUrl)}</a></div>`
