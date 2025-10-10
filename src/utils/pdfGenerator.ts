@@ -2150,6 +2150,55 @@ export const generateQuotePDF = async (
     };
   });
 
+  normalizedBomItems = await attachInfoUrlForPdf(normalizedBomItems);
+
+  const level2InfoUrlCache = new Map<string, string>();
+
+  const registerLevel2InfoUrl = (item: any, url: string) => {
+    const candidates = [
+      extractBomProductId(item),
+      item?.product?.id,
+      item?.product_id,
+      item?.productId,
+      item?.configuration?.selectedLevel2Product?.id,
+      item?.configuration?.level2Product?.id,
+      item?.parentLevel2Id,
+      extractParentLevel2IdFromItem(item),
+    ];
+
+    candidates.forEach(candidate => {
+      const id = coerceString(candidate);
+      if (id && !level2InfoUrlCache.has(id)) {
+        level2InfoUrlCache.set(id, url);
+      }
+    });
+  };
+
+  normalizedBomItems.forEach(item => {
+    const level =
+      coerceProductLevel(item?.level) ??
+      coerceProductLevel(item?.product?.product_level) ??
+      determineBomItemLevel(item);
+
+    const sanitizedUrl =
+      sanitizeHttpUrl(item?.resolvedInfoUrl) ??
+      sanitizeHttpUrl((item?.product as any)?.productInfoUrl) ??
+      sanitizeHttpUrl((item?.product as any)?.product_info_url);
+
+    if (!sanitizedUrl) {
+      return;
+    }
+
+    if (level === 2 || (!level && !extractParentLevel2IdFromItem(item))) {
+      registerLevel2InfoUrl(item, sanitizedUrl);
+    } else if (level === 3) {
+      const parentId = coerceString(item?.parentLevel2Id ?? extractParentLevel2IdFromItem(item));
+      if (parentId && !level2InfoUrlCache.has(parentId)) {
+        level2InfoUrlCache.set(parentId, sanitizedUrl);
+      }
+    }
+  });
+
   const itemsMissingProductInfo = normalizedBomItems.filter(item => !coerceString((item.product as any)?.productInfoUrl));
 
   if (itemsMissingProductInfo.length > 0) {
