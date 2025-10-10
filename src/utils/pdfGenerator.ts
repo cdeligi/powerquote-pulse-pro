@@ -172,12 +172,41 @@ const PRODUCT_CONTAINER_KEY_HINTS = [
 
 const coerceProductLevel = (value: any): 1 | 2 | 3 | 4 | undefined => {
   const numeric = coerceNumber(value);
-  if (numeric === undefined) return undefined;
-  const rounded = Math.round(numeric);
-  if (rounded >= 1 && rounded <= 4) {
-    return rounded as 1 | 2 | 3 | 4;
+  if (numeric !== undefined) {
+    const rounded = Math.round(numeric);
+    if (rounded >= 1 && rounded <= 4) {
+      return rounded as 1 | 2 | 3 | 4;
+    }
   }
-  return undefined;
+
+  const stringValue = coerceString(value)?.toLowerCase();
+  if (!stringValue) return undefined;
+
+  const digitMatch = stringValue.match(/([1-4])/);
+  if (digitMatch) {
+    const parsed = Number(digitMatch[1]);
+    if (parsed >= 1 && parsed <= 4) {
+      return parsed as 1 | 2 | 3 | 4;
+    }
+  }
+
+  const keywordMap: Record<string, 1 | 2 | 3 | 4> = {
+    levelone: 1,
+    level1: 1,
+    l1: 1,
+    leveltwo: 2,
+    level2: 2,
+    l2: 2,
+    levelthree: 3,
+    level3: 3,
+    l3: 3,
+    levelfour: 4,
+    level4: 4,
+    l4: 4,
+  };
+
+  const normalizedKey = stringValue.replace(/[^a-z0-9]/g, '');
+  return keywordMap[normalizedKey];
 };
 
 const determineBomItemLevel = (item: any): 1 | 2 | 3 | 4 | undefined => {
