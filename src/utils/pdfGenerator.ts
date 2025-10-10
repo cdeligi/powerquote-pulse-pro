@@ -586,30 +586,54 @@ const attachInfoUrlForPdf = async <T extends Record<string, any>>(items: T[]): P
       }
     }
 
+    const sanitizedExistingProductUrl =
+      sanitizeHttpUrl((item?.product as any)?.productInfoUrl) ??
+      sanitizeHttpUrl((item?.product as any)?.product_info_url);
+
     let resolvedInfoUrl: string | undefined;
 
     if (level === 2) {
       const level2Id = extractBomProductId(item);
       if (level2Id) {
         const entry = level2Index.get(level2Id);
-        resolvedInfoUrl = entry?.productInfoUrl ?? extractProductInfoUrlFromItem(item);
+        resolvedInfoUrl = entry?.productInfoUrl ?? sanitizedExistingProductUrl ?? extractProductInfoUrlFromItem(item);
+      } else {
+        resolvedInfoUrl = sanitizedExistingProductUrl ?? extractProductInfoUrlFromItem(item);
       }
     } else if (level === 3) {
       if (parentLevel2Id) {
         const entry = level2Index.get(parentLevel2Id);
         resolvedInfoUrl = entry?.productInfoUrl ?? extractParentLevel2InfoUrl(item);
+      } else {
+        resolvedInfoUrl = extractParentLevel2InfoUrl(item);
       }
     }
 
     const sanitizedResolved =
-      sanitizeHttpUrl(resolvedInfoUrl) ??
-      sanitizeHttpUrl(item.resolvedInfoUrl) ??
-      (level === 3 ? extractParentLevel2InfoUrl(item) : extractProductInfoUrlFromItem(item));
+      level === 2
+        ? sanitizeHttpUrl(resolvedInfoUrl) ??
+          sanitizeHttpUrl(item.resolvedInfoUrl) ??
+          sanitizedExistingProductUrl ??
+          extractProductInfoUrlFromItem(item)
+        : level === 3
+          ? sanitizeHttpUrl(resolvedInfoUrl) ??
+            sanitizeHttpUrl(item.resolvedInfoUrl) ??
+            extractParentLevel2InfoUrl(item)
+          : sanitizeHttpUrl(item.resolvedInfoUrl) ?? sanitizedExistingProductUrl;
+
+    const mergedProduct =
+      level === 2
+        ? {
+            ...(item?.product ?? {}),
+            productInfoUrl: sanitizedResolved ?? sanitizedExistingProductUrl ?? undefined,
+          }
+        : item?.product;
 
     return {
       ...item,
       level: level ?? item.level,
       parentLevel2Id: parentLevel2Id ?? item.parentLevel2Id,
+      product: mergedProduct,
       resolvedInfoUrl: sanitizedResolved,
     };
   });
@@ -1997,7 +2021,7 @@ export const generateQuotePDF = async (
 
   const level2InfoUrlCache = new Map<string, string>();
 
-  const rememberLevel2InfoUrl = (item: any, url: string) => {
+  const registerLevel2InfoUrl = (item: any, url: string) => {
     const candidates = [
       extractBomProductId(item),
       item?.product?.id,
@@ -2006,6 +2030,7 @@ export const generateQuotePDF = async (
       item?.configuration?.selectedLevel2Product?.id,
       item?.configuration?.level2Product?.id,
       item?.parentLevel2Id,
+      extractParentLevel2IdFromItem(item),
     ];
 
     candidates.forEach(candidate => {
@@ -2022,15 +2047,21 @@ export const generateQuotePDF = async (
       coerceProductLevel(item?.product?.product_level) ??
       determineBomItemLevel(item);
 
-    if (level === 2) {
-      const sanitizedUrl =
-        sanitizeHttpUrl(item?.resolvedInfoUrl) ??
-        sanitizeHttpUrl((item?.product as any)?.productInfoUrl) ??
-        sanitizeHttpUrl((item?.product as any)?.product_info_url) ??
-        sanitizeHttpUrl(extractProductInfoUrlFromItem(item));
+    const sanitizedUrl =
+      sanitizeHttpUrl(item?.resolvedInfoUrl) ??
+      sanitizeHttpUrl((item?.product as any)?.productInfoUrl) ??
+      sanitizeHttpUrl((item?.product as any)?.product_info_url);
 
-      if (sanitizedUrl) {
-        rememberLevel2InfoUrl(item, sanitizedUrl);
+    if (!sanitizedUrl) {
+      return;
+    }
+
+    if (level === 2 || (!level && !extractParentLevel2IdFromItem(item))) {
+      registerLevel2InfoUrl(item, sanitizedUrl);
+    } else if (level === 3) {
+      const parentId = coerceString(item?.parentLevel2Id ?? extractParentLevel2IdFromItem(item));
+      if (parentId && !level2InfoUrlCache.has(parentId)) {
+        level2InfoUrlCache.set(parentId, sanitizedUrl);
       }
     }
   });
@@ -2444,53 +2475,38 @@ export const generateQuotePDF = async (
               );
 
               const infoUrl = (() => {
-                const resolved = sanitizeHttpUrl(item?.resolvedInfoUrl);
-                if (resolved) {
-                  if (normalizedLevel === 2) {
-                    rememberLevel2InfoUrl(item, resolved);
-                  }
-                  return resolved;
-                }
+                const candidates: Array<string | undefined> = [item?.resolvedInfoUrl];
 
-                const direct = sanitizeHttpUrl(extractProductInfoUrlFromItem(item));
-                if (direct) {
-                  if (normalizedLevel === 2) {
-                    rememberLevel2InfoUrl(item, direct);
-                  }
-                  return direct;
-                }
-
-                if (normalizedLevel === 3) {
+                if (normalizedLevel === 2 || (!normalizedLevel && !parentLevel2Id)) {
+                  candidates.push((item?.product as any)?.productInfoUrl);
+                  candidates.push((item?.product as any)?.product_info_url);
+                  candidates.push(extractProductInfoUrlFromItem(item));
+                } else if (normalizedLevel === 3 || (parentLevel2Id && normalizedLevel !== 4)) {
                   if (parentLevel2Id) {
-                    const cached = sanitizeHttpUrl(level2InfoUrlCache.get(parentLevel2Id));
-                    if (cached) {
-                      return cached;
-                    }
+                    candidates.push(level2InfoUrlCache.get(parentLevel2Id));
                   }
-
-                  const parentResolved = extractParentLevel2InfoUrl(item);
-                  if (parentResolved && parentLevel2Id && !level2InfoUrlCache.has(parentLevel2Id)) {
-                    level2InfoUrlCache.set(parentLevel2Id, parentResolved);
+                  candidates.push(extractParentLevel2InfoUrl(item));
+                } else {
+                  candidates.push((item?.product as any)?.productInfoUrl);
+                  if (parentLevel2Id) {
+                    candidates.push(level2InfoUrlCache.get(parentLevel2Id));
                   }
-                  return parentResolved;
+                  candidates.push(extractProductInfoUrlFromItem(item));
                 }
 
-                if (parentLevel2Id) {
-                  const cached = sanitizeHttpUrl(level2InfoUrlCache.get(parentLevel2Id));
-                  if (cached) {
-                    return cached;
-                  }
+                const resolved = candidates
+                  .map(candidate => sanitizeHttpUrl(candidate))
+                  .find((url): url is string => Boolean(url));
 
-                  const parentResolved = extractParentLevel2InfoUrl(item);
-                  if (parentResolved) {
-                    if (!level2InfoUrlCache.has(parentLevel2Id)) {
-                      level2InfoUrlCache.set(parentLevel2Id, parentResolved);
-                    }
-                    return parentResolved;
+                if (resolved) {
+                  if (normalizedLevel === 2 || (!normalizedLevel && !parentLevel2Id)) {
+                    registerLevel2InfoUrl(item, resolved);
+                  } else if (normalizedLevel === 3 && parentLevel2Id && !level2InfoUrlCache.has(parentLevel2Id)) {
+                    level2InfoUrlCache.set(parentLevel2Id, resolved);
                   }
                 }
 
-                return undefined;
+                return resolved;
               })();
 
               const effectiveLevel =
@@ -2501,7 +2517,7 @@ export const generateQuotePDF = async (
                 !!infoUrl && effectiveLevel !== 1 && effectiveLevel !== 4 && effectiveLevel !== undefined;
 
               const infoLinkHtml = shouldRenderLink && infoUrl
-                ? `<div class="product-info-link"><a href="${escapeHtml(infoUrl)}" target="_blank" rel="noopener noreferrer">Product Info: ${escapeHtml(infoUrl)}</a></div>`
+                ? `<div class="product-info-link"><a href="${escapeHtml(infoUrl)}" target="_blank" rel="noopener noreferrer">Info: ${escapeHtml(infoUrl)}</a></div>`
                 : '';
 
               return `
