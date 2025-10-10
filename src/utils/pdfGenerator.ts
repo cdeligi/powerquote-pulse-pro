@@ -1966,6 +1966,46 @@ export const generateQuotePDF = async (
 
   normalizedBomItems = await attachInfoUrlForPdf(normalizedBomItems);
 
+  const level2InfoUrlCache = new Map<string, string>();
+
+  const rememberLevel2InfoUrl = (item: any, url: string) => {
+    const candidates = [
+      extractBomProductId(item),
+      item?.product?.id,
+      item?.product_id,
+      item?.productId,
+      item?.configuration?.selectedLevel2Product?.id,
+      item?.configuration?.level2Product?.id,
+      item?.parentLevel2Id,
+    ];
+
+    candidates.forEach(candidate => {
+      const id = coerceString(candidate);
+      if (id && !level2InfoUrlCache.has(id)) {
+        level2InfoUrlCache.set(id, url);
+      }
+    });
+  };
+
+  normalizedBomItems.forEach(item => {
+    const level =
+      coerceProductLevel(item?.level) ??
+      coerceProductLevel(item?.product?.product_level) ??
+      determineBomItemLevel(item);
+
+    if (level === 2) {
+      const sanitizedUrl =
+        sanitizeHttpUrl(item?.resolvedInfoUrl) ??
+        sanitizeHttpUrl((item?.product as any)?.productInfoUrl) ??
+        sanitizeHttpUrl((item?.product as any)?.product_info_url) ??
+        sanitizeHttpUrl(extractProductInfoUrlFromItem(item));
+
+      if (sanitizedUrl) {
+        rememberLevel2InfoUrl(item, sanitizedUrl);
+      }
+    }
+  });
+
   const itemsMissingProductInfo = normalizedBomItems.filter(item => !coerceString((item.product as any)?.productInfoUrl));
 
   if (itemsMissingProductInfo.length > 0) {
@@ -2361,23 +2401,71 @@ export const generateQuotePDF = async (
           ${normalizedBomItems
             .filter(item => item.enabled)
             .map(item => {
-              const level = determineBomItemLevel(item);
+              const normalizedLevel =
+                coerceProductLevel(item?.level) ??
+                coerceProductLevel(item?.product?.product_level) ??
+                determineBomItemLevel(item);
+
+              const parentLevel2Id = coerceString(
+                extractParentLevel2IdFromItem(item) ??
+                  item?.parentLevel2Id ??
+                  item?.product?.parentLevel2Id ??
+                  item?.product?.parent_product_id ??
+                  item?.product?.parentProductId
+              );
+
               const infoUrl = (() => {
-                const resolved = sanitizeHttpUrl(item.resolvedInfoUrl);
+                const resolved = sanitizeHttpUrl(item?.resolvedInfoUrl);
                 if (resolved) {
+                  if (normalizedLevel === 2) {
+                    rememberLevel2InfoUrl(item, resolved);
+                  }
                   return resolved;
                 }
 
-                const direct = extractProductInfoUrlFromItem(item);
+                const direct = sanitizeHttpUrl(extractProductInfoUrlFromItem(item));
                 if (direct) {
+                  if (normalizedLevel === 2) {
+                    rememberLevel2InfoUrl(item, direct);
+                  }
                   return direct;
                 }
 
-                return extractParentLevel2InfoUrl(item);
+                if (normalizedLevel === 3) {
+                  if (parentLevel2Id) {
+                    const cached = sanitizeHttpUrl(level2InfoUrlCache.get(parentLevel2Id));
+                    if (cached) {
+                      return cached;
+                    }
+                  }
+
+                  const parentResolved = extractParentLevel2InfoUrl(item);
+                  if (parentResolved && parentLevel2Id && !level2InfoUrlCache.has(parentLevel2Id)) {
+                    level2InfoUrlCache.set(parentLevel2Id, parentResolved);
+                  }
+                  return parentResolved;
+                }
+
+                if (parentLevel2Id) {
+                  const cached = sanitizeHttpUrl(level2InfoUrlCache.get(parentLevel2Id));
+                  if (cached) {
+                    return cached;
+                  }
+
+                  const parentResolved = extractParentLevel2InfoUrl(item);
+                  if (parentResolved) {
+                    if (!level2InfoUrlCache.has(parentLevel2Id)) {
+                      level2InfoUrlCache.set(parentLevel2Id, parentResolved);
+                    }
+                    return parentResolved;
+                  }
+                }
+
+                return undefined;
               })();
 
-              const shouldRenderLink =
-                !!infoUrl && level !== 4 && (level === undefined || level === 2 || level === 3);
+              const effectiveLevel = normalizedLevel ?? (parentLevel2Id ? 3 : undefined);
+              const shouldRenderLink = !!infoUrl && (effectiveLevel === 2 || effectiveLevel === 3);
 
               const infoLinkHtml = shouldRenderLink && infoUrl
                 ? `<div class="product-info-link"><a href="${escapeHtml(infoUrl)}" target="_blank" rel="noopener noreferrer">Product Info: ${escapeHtml(infoUrl)}</a></div>`
