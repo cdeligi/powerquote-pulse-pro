@@ -572,7 +572,10 @@ const attachInfoUrlForPdf = async <T extends Record<string, any>>(items: T[]): P
       }
     }
 
-    const sanitizedResolved = sanitizeHttpUrl(resolvedInfoUrl) ?? sanitizeHttpUrl(item.resolvedInfoUrl);
+    const sanitizedResolved =
+      sanitizeHttpUrl(resolvedInfoUrl) ??
+      sanitizeHttpUrl(item.resolvedInfoUrl) ??
+      (level === 3 ? extractParentLevel2InfoUrl(item) : extractProductInfoUrlFromItem(item));
 
     return {
       ...item,
@@ -1857,6 +1860,11 @@ export const generateQuotePDF = async (
       productInfoUrl: productInfoUrl || undefined,
     };
 
+    const normalizedLevel =
+      determineBomItemLevel({ ...item, product: normalizedProduct }) ??
+      determineBomItemLevel(item) ??
+      coerceProductLevel(item.level);
+
     const partNumber = item.partNumber || item.part_number || product.partNumber || product.part_number || 'TBD';
     const fallbackKey = product.id || partNumber || product.name;
 
@@ -1952,6 +1960,7 @@ export const generateQuotePDF = async (
       rackConfiguration: derivedRack,
       level4Config: directLevel4 || undefined,
       slotLevel4: normalizedSlotLevel4Entries,
+      level: normalizedLevel ?? item.level,
     };
   });
 
@@ -2359,18 +2368,18 @@ export const generateQuotePDF = async (
                   return resolved;
                 }
 
-                if (level === 2) {
-                  return extractProductInfoUrlFromItem(item);
+                const direct = extractProductInfoUrlFromItem(item);
+                if (direct) {
+                  return direct;
                 }
 
-                if (level === 3) {
-                  return extractParentLevel2InfoUrl(item);
-                }
-
-                return undefined;
+                return extractParentLevel2InfoUrl(item);
               })();
 
-              const infoLinkHtml = infoUrl
+              const shouldRenderLink =
+                !!infoUrl && level !== 4 && (level === undefined || level === 2 || level === 3);
+
+              const infoLinkHtml = shouldRenderLink && infoUrl
                 ? `<div class="product-info-link"><a href="${escapeHtml(infoUrl)}" target="_blank" rel="noopener noreferrer">Product Info</a></div>`
                 : '';
 
