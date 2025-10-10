@@ -2457,6 +2457,8 @@ export const generateQuotePDF = async (
 
               const infoUrl =
                 sanitizeHttpUrl(item?.resolvedInfoUrl) ??
+                sanitizeHttpUrl((item?.product as any)?.productInfoUrl) ??
+                sanitizeHttpUrl((item?.product as any)?.product_info_url) ??
                 (parentLevel2Item
                   ? sanitizeHttpUrl(parentLevel2Item?.resolvedInfoUrl) ??
                     sanitizeHttpUrl((parentLevel2Item?.product as any)?.productInfoUrl) ??
