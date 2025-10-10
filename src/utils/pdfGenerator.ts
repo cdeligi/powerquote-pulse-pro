@@ -2090,7 +2090,25 @@ export const generateQuotePDF = async (
                     const infoUrl =
                       coerceString((item.product as any)?.productInfoUrl) ||
                       coerceString((item.product as any)?.product_info_url) ||
-                      coerceString((item as any)?.productInfoUrl);
+                      coerceString((item.product as any)?.productInfoURL) ||
+                      coerceString((item.product as any)?.product_information_url) ||
+                      coerceString((item as any)?.productInfoUrl) ||
+                      coerceString((item as any)?.product_info_url) ||
+                      resolveProductInfoUrl(
+                        item.product,
+                        item,
+                        item.configuration,
+                        item.configuration?.product,
+                        item.configuration?.selectedProduct,
+                        item.configuration?.selectedLevel2Product,
+                        item.configuration?.level2Product,
+                        item.level2Product,
+                        item.level2_product,
+                        item.parentProduct,
+                        item.configuration?.rackConfiguration,
+                        item.rackConfiguration,
+                        item.slotAssignments
+                      );
                     return infoUrl
                       ? `<div class="product-info-link">Product Info: <a href="${escapeHtml(infoUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(infoUrl)}</a></div>`
                       : '';
