@@ -2194,6 +2194,8 @@ export const generateQuotePDF = async (
         .bom-table th { background: #f1f5f9; color: #0f172a; padding: 12px 14px; font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; border-bottom: 1px solid #e2e8f0; }
         .bom-table td { padding: 14px; border-bottom: 1px solid #e2e8f0; color: #0f172a; font-size: 11px; vertical-align: top; }
         .bom-table tbody tr:nth-child(even) { background: #f8fafc; }
+        .bom-item-cell { display: flex; flex-direction: column; align-items: flex-start; }
+        .bom-item-name { font-weight: 600; }
         .product-info-link { margin-top: 8px; font-size: 10px; }
         .product-info-link a { color: #2563eb; text-decoration: none; word-break: break-all; }
         .product-info-link a:hover { text-decoration: underline; }
@@ -2349,34 +2351,39 @@ export const generateQuotePDF = async (
         <tbody>
           ${normalizedBomItems
             .filter(item => item.enabled)
-            .map((item, index) => `
+            .map(item => {
+              const level = determineBomItemLevel(item);
+              const infoUrl = (() => {
+                const resolved = sanitizeHttpUrl(item.resolvedInfoUrl);
+                if (resolved) {
+                  return resolved;
+                }
+
+                if (level === 2) {
+                  return extractProductInfoUrlFromItem(item);
+                }
+
+                if (level === 3) {
+                  return extractParentLevel2InfoUrl(item);
+                }
+
+                return undefined;
+              })();
+
+              const infoLinkHtml = infoUrl
+                ? `<div class="product-info-link"><a href="${escapeHtml(infoUrl)}" target="_blank" rel="noopener noreferrer">Product Info</a></div>`
+                : '';
+
+              return `
               <tr>
-                <td>${item.product.name}</td>
+                <td>
+                  <div class="bom-item-cell">
+                    <div class="bom-item-name">${escapeHtml(item.product.name)}</div>
+                    ${infoLinkHtml}
+                  </div>
+                </td>
                 <td>
                   ${item.product.description}
-                  ${(() => {
-                    const level = determineBomItemLevel(item);
-                    const infoUrl = (() => {
-                      const resolved = sanitizeHttpUrl(item.resolvedInfoUrl);
-                      if (resolved) {
-                        return resolved;
-                      }
-
-                      if (level === 2) {
-                        return extractProductInfoUrlFromItem(item);
-                      }
-
-                      if (level === 3) {
-                        return extractParentLevel2InfoUrl(item);
-                      }
-
-                      return undefined;
-                    })();
-
-                    return infoUrl
-                      ? `<div class="product-info-link"><a href="${escapeHtml(infoUrl)}" target="_blank" rel="noopener noreferrer">Product Info</a></div>`
-                      : '';
-                  })()}
                 </td>
                 <td>${item.partNumber || 'TBD'}</td>
                 <td>${item.quantity}</td>
@@ -2385,7 +2392,9 @@ export const generateQuotePDF = async (
                   <td>${formatCurrency(item.product.price * item.quantity)}</td>
                 ` : ''}
               </tr>
-            `).join('')}
+            `;
+            })
+            .join('')}
         </tbody>
       </table>
 
