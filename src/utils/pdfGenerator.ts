@@ -170,6 +170,132 @@ const PRODUCT_CONTAINER_KEY_HINTS = [
   'option',
 ];
 
+const coerceProductLevel = (value: any): 1 | 2 | 3 | 4 | undefined => {
+  const numeric = coerceNumber(value);
+  if (numeric !== undefined) {
+    const rounded = Math.round(numeric);
+    if (rounded >= 1 && rounded <= 4) {
+      return rounded as 1 | 2 | 3 | 4;
+    }
+  }
+
+  const stringValue = coerceString(value)?.toLowerCase();
+  if (!stringValue) return undefined;
+
+  const digitMatch = stringValue.match(/([1-4])/);
+  if (digitMatch) {
+    const parsed = Number(digitMatch[1]);
+    if (parsed >= 1 && parsed <= 4) {
+      return parsed as 1 | 2 | 3 | 4;
+    }
+  }
+
+  const keywordMap: Record<string, 1 | 2 | 3 | 4> = {
+    levelone: 1,
+    level1: 1,
+    l1: 1,
+    leveltwo: 2,
+    level2: 2,
+    l2: 2,
+    levelthree: 3,
+    level3: 3,
+    l3: 3,
+    levelfour: 4,
+    level4: 4,
+    l4: 4,
+  };
+
+  const normalizedKey = stringValue.replace(/[^a-z0-9]/g, '');
+  return keywordMap[normalizedKey];
+};
+
+const determineBomItemLevel = (item: any): 1 | 2 | 3 | 4 | undefined => {
+  if (!item) return undefined;
+
+  const candidates = [
+    item.level,
+    item.product?.level,
+    item.product?.product_level,
+    item.product?.productLevel,
+    item.product_level,
+    item.productLevel,
+    item.product?.product?.product_level,
+    item.product?.product?.level,
+    item.configuration?.product?.product_level,
+    item.configuration?.selectedProduct?.product_level,
+    item.configuration?.selectedLevel2Product?.product_level,
+    item.level2Product?.product_level,
+    item.level2_product?.product_level,
+  ];
+
+  for (const candidate of candidates) {
+    const level = coerceProductLevel(candidate);
+    if (level) {
+      return level;
+    }
+  }
+
+  return undefined;
+};
+
+const sanitizeHttpUrl = (value: any): string | undefined => {
+  const stringValue = coerceString(value)?.trim();
+  if (!stringValue) return undefined;
+  return /^https?:\/\//i.test(stringValue) ? stringValue : undefined;
+};
+
+const extractBomProductId = (item: any): string | undefined => {
+  if (!item) return undefined;
+
+  const candidates = [
+    item.product?.id,
+    item.product?.productId,
+    item.product?.product_id,
+    item.product_id,
+    item.productId,
+  ];
+
+  for (const candidate of candidates) {
+    const id = coerceString(candidate);
+    if (id) return id;
+  }
+
+  return undefined;
+};
+
+const extractParentLevel2IdFromItem = (item: any): string | undefined => {
+  if (!item) return undefined;
+
+  const candidates = [
+    item.parentLevel2Id,
+    item.parent_product_id,
+    item.parentProductId,
+    item.parent_product?.id,
+    item.product?.parentLevel2Id,
+    item.product?.parent_product_id,
+    item.product?.parentProductId,
+    item.product?.parentProduct?.id,
+    item.parentProduct?.id,
+    item.level2Product?.id,
+    item.level2_product?.id,
+    item.configuration?.selectedLevel2Product?.id,
+    item.configuration?.level2Product?.id,
+    item.configuration?.selectedProduct?.parent_product_id,
+    item.configuration?.selectedProduct?.parentProductId,
+    item.configuration?.product?.parent_product_id,
+    item.configuration?.product?.parentProductId,
+  ];
+
+  for (const candidate of candidates) {
+    const id = coerceString(candidate);
+    if (id) {
+      return id;
+    }
+  }
+
+  return undefined;
+};
+
 const resolveProductInfoUrl = (...sources: Array<any>): string | null => {
   const visited = new WeakSet<object>();
 
@@ -315,6 +441,202 @@ const collectProductIdCandidates = (...sources: Array<any>): string[] => {
   });
 
   return Array.from(candidates);
+};
+
+const extractProductInfoUrlFromItem = (item: any): string | undefined => {
+  if (!item) return undefined;
+
+  const resolved = resolveProductInfoUrl(
+    item?.resolvedInfoUrl,
+    item?.productInfoUrl,
+    item?.product_info_url,
+    item?.product?.productInfoUrl,
+    item?.product?.product_info_url,
+    item?.product,
+    item?.parentProduct,
+    item?.configuration?.product,
+    item?.configuration?.selectedProduct,
+    item?.configuration?.selectedLevel2Product,
+    item?.configuration?.level2Product,
+    item?.level2Product,
+    item?.level2_product
+  );
+
+  return sanitizeHttpUrl(resolved);
+};
+
+const extractParentLevel2InfoUrl = (item: any): string | undefined => {
+  const resolved = resolveProductInfoUrl(
+    item?.parentProduct,
+    item?.product?.parentProduct,
+    item?.configuration?.selectedLevel2Product,
+    item?.configuration?.level2Product,
+    item?.level2Product,
+    item?.level2_product,
+    item?.configuration?.selectedProduct?.parentProduct,
+    item?.configuration?.selectedProduct?.level2Product
+  );
+
+  return sanitizeHttpUrl(resolved);
+};
+
+const attachInfoUrlForPdf = async <T extends Record<string, any>>(items: T[]): Promise<T[]> => {
+  if (!items || items.length === 0) {
+    return items;
+  }
+
+  const level2Index = new Map<string, { productInfoUrl?: string }>();
+  const level3ToLevel2 = new Map<string, string>();
+  const level2IdsToFetch = new Set<string>();
+  const level3IdsToFetch = new Set<string>();
+
+  items.forEach(item => {
+    const level = determineBomItemLevel(item);
+
+    if (level === 2) {
+      const level2Id = extractBomProductId(item);
+      if (!level2Id) {
+        return;
+      }
+
+      const existingUrl = extractProductInfoUrlFromItem(item);
+      if (existingUrl) {
+        level2Index.set(level2Id, { productInfoUrl: existingUrl });
+      } else {
+        level2IdsToFetch.add(level2Id);
+      }
+    } else if (level === 3) {
+      const parentLevel2Id = extractParentLevel2IdFromItem(item);
+      if (parentLevel2Id) {
+        if (!level2Index.has(parentLevel2Id)) {
+          const parentUrl = extractParentLevel2InfoUrl(item);
+          if (parentUrl) {
+            level2Index.set(parentLevel2Id, { productInfoUrl: parentUrl });
+          } else {
+            level2IdsToFetch.add(parentLevel2Id);
+          }
+        }
+      } else {
+        const level3Id = extractBomProductId(item);
+        if (level3Id) {
+          level3IdsToFetch.add(level3Id);
+        }
+      }
+    }
+  });
+
+  if (level3IdsToFetch.size > 0) {
+    try {
+      const { data: level3Rows, error: level3Error } = await supabase
+        .from('products')
+        .select('id, parent_product_id')
+        .in('id', Array.from(level3IdsToFetch));
+
+      if (level3Error) throw level3Error;
+
+      (level3Rows || []).forEach(row => {
+        const level3Id = coerceString((row as any)?.id);
+        const parentId = coerceString((row as any)?.parent_product_id);
+
+        if (level3Id && parentId) {
+          level3ToLevel2.set(level3Id, parentId);
+          if (!level2Index.has(parentId)) {
+            level2IdsToFetch.add(parentId);
+          }
+        }
+      });
+    } catch (error) {
+      console.warn('Could not resolve Level 2 parents for Level 3 BOM items:', error);
+    }
+  }
+
+  if (level2IdsToFetch.size > 0) {
+    try {
+      const { data: level2Rows, error: level2Error } = await supabase
+        .from('products')
+        .select('id, product_info_url')
+        .in('id', Array.from(level2IdsToFetch));
+
+      if (level2Error) throw level2Error;
+
+      (level2Rows || []).forEach(row => {
+        const id = coerceString((row as any)?.id);
+        if (!id) return;
+
+        const url = sanitizeHttpUrl((row as any)?.product_info_url);
+        if (url) {
+          level2Index.set(id, { productInfoUrl: url });
+        } else if (!level2Index.has(id)) {
+          level2Index.set(id, { productInfoUrl: undefined });
+        }
+      });
+    } catch (error) {
+      console.warn('Could not fetch Level 2 product info URLs for BOM items:', error);
+    }
+  }
+
+  return items.map(item => {
+    const level = determineBomItemLevel(item);
+    let parentLevel2Id = extractParentLevel2IdFromItem(item);
+
+    if (level === 3 && !parentLevel2Id) {
+      const level3Id = extractBomProductId(item);
+      if (level3Id) {
+        parentLevel2Id = level3ToLevel2.get(level3Id);
+      }
+    }
+
+    const sanitizedExistingProductUrl =
+      sanitizeHttpUrl((item?.product as any)?.productInfoUrl) ??
+      sanitizeHttpUrl((item?.product as any)?.product_info_url);
+
+    let resolvedInfoUrl: string | undefined;
+
+    if (level === 2) {
+      const level2Id = extractBomProductId(item);
+      if (level2Id) {
+        const entry = level2Index.get(level2Id);
+        resolvedInfoUrl = entry?.productInfoUrl ?? sanitizedExistingProductUrl ?? extractProductInfoUrlFromItem(item);
+      } else {
+        resolvedInfoUrl = sanitizedExistingProductUrl ?? extractProductInfoUrlFromItem(item);
+      }
+    } else if (level === 3) {
+      if (parentLevel2Id) {
+        const entry = level2Index.get(parentLevel2Id);
+        resolvedInfoUrl = entry?.productInfoUrl ?? extractParentLevel2InfoUrl(item);
+      } else {
+        resolvedInfoUrl = extractParentLevel2InfoUrl(item);
+      }
+    }
+
+    const sanitizedResolved =
+      level === 2
+        ? sanitizeHttpUrl(resolvedInfoUrl) ??
+          sanitizeHttpUrl(item.resolvedInfoUrl) ??
+          sanitizedExistingProductUrl ??
+          extractProductInfoUrlFromItem(item)
+        : level === 3
+          ? sanitizeHttpUrl(resolvedInfoUrl) ??
+            sanitizeHttpUrl(item.resolvedInfoUrl) ??
+            extractParentLevel2InfoUrl(item)
+          : sanitizeHttpUrl(item.resolvedInfoUrl) ?? sanitizedExistingProductUrl;
+
+    const mergedProduct =
+      level === 2
+        ? {
+            ...(item?.product ?? {}),
+            productInfoUrl: sanitizedResolved ?? sanitizedExistingProductUrl ?? undefined,
+          }
+        : item?.product;
+
+    return {
+      ...item,
+      level: level ?? item.level,
+      parentLevel2Id: parentLevel2Id ?? item.parentLevel2Id,
+      product: mergedProduct,
+      resolvedInfoUrl: sanitizedResolved,
+    };
+  });
 };
 
 const gatherSources = (slot: SpanAwareSlot): any[] => {
@@ -1545,7 +1867,7 @@ export const generateQuotePDF = async (
     return undefined;
   };
 
-  const normalizedBomItems = bomItems.map(item => {
+  let normalizedBomItems = bomItems.map(item => {
     const product = (item.product || {}) as any;
     const parentProduct = (item.parentProduct || product?.parentProduct || {}) as any;
     const grandParentProduct = (parentProduct?.parentProduct || product?.parentProduct?.parentProduct || {}) as any;
@@ -1590,6 +1912,11 @@ export const generateQuotePDF = async (
       price: typeof product.price === 'number' ? product.price : (item.product?.price || item.unit_price || 0),
       productInfoUrl: productInfoUrl || undefined,
     };
+
+    const normalizedLevel =
+      determineBomItemLevel({ ...item, product: normalizedProduct }) ??
+      determineBomItemLevel(item) ??
+      coerceProductLevel(item.level);
 
     const partNumber = item.partNumber || item.part_number || product.partNumber || product.part_number || 'TBD';
     const fallbackKey = product.id || partNumber || product.name;
@@ -1686,6 +2013,140 @@ export const generateQuotePDF = async (
       rackConfiguration: derivedRack,
       level4Config: directLevel4 || undefined,
       slotLevel4: normalizedSlotLevel4Entries,
+      level: normalizedLevel ?? item.level,
+    };
+  });
+
+  normalizedBomItems = await attachInfoUrlForPdf(normalizedBomItems);
+
+  const level2InfoUrlCache = new Map<string, string>();
+
+  const registerLevel2InfoUrl = (item: any, url: string) => {
+    const candidates = [
+      extractBomProductId(item),
+      item?.product?.id,
+      item?.product_id,
+      item?.productId,
+      item?.configuration?.selectedLevel2Product?.id,
+      item?.configuration?.level2Product?.id,
+      item?.parentLevel2Id,
+      extractParentLevel2IdFromItem(item),
+    ];
+
+    candidates.forEach(candidate => {
+      const id = coerceString(candidate);
+      if (id && !level2InfoUrlCache.has(id)) {
+        level2InfoUrlCache.set(id, url);
+      }
+    });
+  };
+
+  const resolveDirectInfoUrlForItem = (item: any): string | undefined => {
+    const directCandidates: Array<string | undefined> = [
+      item?.resolvedInfoUrl,
+      (item?.product as any)?.productInfoUrl,
+      (item?.product as any)?.product_info_url,
+      (item as any)?.productInfoUrl,
+      (item as any)?.product_info_url,
+      item?.configuration?.product?.productInfoUrl,
+      item?.configuration?.product?.product_info_url,
+      item?.configuration?.selectedProduct?.productInfoUrl,
+      item?.configuration?.selectedProduct?.product_info_url,
+    ];
+
+    for (const candidate of directCandidates) {
+      const sanitized = sanitizeHttpUrl(candidate);
+      if (sanitized) {
+        return sanitized;
+      }
+    }
+
+    return undefined;
+  };
+
+  const resolveParentInfoUrlForItem = (item: any, parentLevel2Id?: string | null): string | undefined => {
+    const candidates: Array<string | undefined> = [];
+
+    if (parentLevel2Id) {
+      candidates.push(level2InfoUrlCache.get(parentLevel2Id));
+    }
+
+    candidates.push(item?.parentProduct?.productInfoUrl);
+    candidates.push(item?.parentProduct?.product_info_url);
+    candidates.push(item?.product?.parentProduct?.productInfoUrl);
+    candidates.push(item?.product?.parentProduct?.product_info_url);
+    candidates.push(item?.configuration?.selectedLevel2Product?.productInfoUrl);
+    candidates.push(item?.configuration?.selectedLevel2Product?.product_info_url);
+    candidates.push(item?.configuration?.level2Product?.productInfoUrl);
+    candidates.push(item?.configuration?.level2Product?.product_info_url);
+    candidates.push(extractParentLevel2InfoUrl(item));
+
+    for (const candidate of candidates) {
+      const sanitized = sanitizeHttpUrl(candidate);
+      if (sanitized) {
+        return sanitized;
+      }
+    }
+
+    return undefined;
+  };
+
+  normalizedBomItems.forEach(item => {
+    const level =
+      coerceProductLevel(item?.level) ??
+      coerceProductLevel(item?.product?.product_level) ??
+      determineBomItemLevel(item);
+
+    const parentId = coerceString(item?.parentLevel2Id ?? extractParentLevel2IdFromItem(item));
+    const sanitizedUrl = resolveDirectInfoUrlForItem(item);
+
+    if (!sanitizedUrl) {
+      return;
+    }
+
+    if (level === 2 || (!level && !parentId)) {
+      registerLevel2InfoUrl(item, sanitizedUrl);
+    } else if (parentId && !level2InfoUrlCache.has(parentId)) {
+      level2InfoUrlCache.set(parentId, sanitizedUrl);
+    }
+  });
+
+  normalizedBomItems = normalizedBomItems.map(item => {
+    const normalizedLevel =
+      coerceProductLevel(item?.level) ??
+      coerceProductLevel(item?.product?.product_level) ??
+      determineBomItemLevel(item);
+
+    const parentLevel2Id = coerceString(item?.parentLevel2Id ?? extractParentLevel2IdFromItem(item));
+
+    let resolvedInfoUrl = resolveDirectInfoUrlForItem(item);
+
+    if ((!resolvedInfoUrl || normalizedLevel === 3) && parentLevel2Id) {
+      resolvedInfoUrl =
+        resolveParentInfoUrlForItem(item, parentLevel2Id) ?? level2InfoUrlCache.get(parentLevel2Id) ?? resolvedInfoUrl;
+    }
+
+    if (resolvedInfoUrl) {
+      if (normalizedLevel === 2 || (!normalizedLevel && !parentLevel2Id)) {
+        registerLevel2InfoUrl(item, resolvedInfoUrl);
+      } else if (parentLevel2Id && !level2InfoUrlCache.has(parentLevel2Id)) {
+        level2InfoUrlCache.set(parentLevel2Id, resolvedInfoUrl);
+      }
+    }
+
+    const mergedProduct =
+      resolvedInfoUrl
+        ? {
+            ...(item?.product ?? {}),
+            productInfoUrl: resolvedInfoUrl,
+          }
+        : item?.product;
+
+    return {
+      ...item,
+      parentLevel2Id: parentLevel2Id ?? item.parentLevel2Id,
+      resolvedInfoUrl,
+      product: mergedProduct,
     };
   });
 
@@ -1926,6 +2387,8 @@ export const generateQuotePDF = async (
         .bom-table th { background: #f1f5f9; color: #0f172a; padding: 12px 14px; font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; border-bottom: 1px solid #e2e8f0; }
         .bom-table td { padding: 14px; border-bottom: 1px solid #e2e8f0; color: #0f172a; font-size: 11px; vertical-align: top; }
         .bom-table tbody tr:nth-child(even) { background: #f8fafc; }
+        .bom-item-cell { display: flex; flex-direction: column; align-items: flex-start; }
+        .bom-item-name { font-weight: 600; }
         .product-info-link { margin-top: 8px; font-size: 10px; }
         .product-info-link a { color: #2563eb; text-decoration: none; word-break: break-all; }
         .product-info-link a:hover { text-decoration: underline; }
@@ -2081,38 +2544,41 @@ export const generateQuotePDF = async (
         <tbody>
           ${normalizedBomItems
             .filter(item => item.enabled)
-            .map((item, index) => `
+            .map(item => {
+              const normalizedLevel =
+                coerceProductLevel(item?.level) ??
+                coerceProductLevel(item?.product?.product_level) ??
+                determineBomItemLevel(item);
+
+              const parentLevel2Id = coerceString(
+                extractParentLevel2IdFromItem(item) ??
+                  item?.parentLevel2Id ??
+                  item?.product?.parentLevel2Id ??
+                  item?.product?.parent_product_id ??
+                  item?.product?.parentProductId
+              );
+
+              const infoUrl =
+                sanitizeHttpUrl(item?.resolvedInfoUrl) ??
+                (parentLevel2Id ? sanitizeHttpUrl(level2InfoUrlCache.get(parentLevel2Id)) : undefined);
+
+              const shouldRenderLink =
+                !!infoUrl && normalizedLevel !== 1 && normalizedLevel !== 4;
+
+              const infoLinkHtml = shouldRenderLink && infoUrl
+                ? `<div class="product-info-link"><a href="${escapeHtml(infoUrl)}" target="_blank" rel="noopener noreferrer">Info: ${escapeHtml(infoUrl)}</a></div>`
+                : '';
+
+              return `
               <tr>
-                <td>${item.product.name}</td>
+                <td>
+                  <div class="bom-item-cell">
+                    <div class="bom-item-name">${escapeHtml(item.product.name)}</div>
+                    ${infoLinkHtml}
+                  </div>
+                </td>
                 <td>
                   ${item.product.description}
-                  ${(() => {
-                    const infoUrl =
-                      coerceString((item.product as any)?.productInfoUrl) ||
-                      coerceString((item.product as any)?.product_info_url) ||
-                      coerceString((item.product as any)?.productInfoURL) ||
-                      coerceString((item.product as any)?.product_information_url) ||
-                      coerceString((item as any)?.productInfoUrl) ||
-                      coerceString((item as any)?.product_info_url) ||
-                      resolveProductInfoUrl(
-                        item.product,
-                        item,
-                        item.configuration,
-                        item.configuration?.product,
-                        item.configuration?.selectedProduct,
-                        item.configuration?.selectedLevel2Product,
-                        item.configuration?.level2Product,
-                        item.level2Product,
-                        item.level2_product,
-                        item.parentProduct,
-                        item.configuration?.rackConfiguration,
-                        item.rackConfiguration,
-                        item.slotAssignments
-                      );
-                    return infoUrl
-                      ? `<div class="product-info-link">Product Info: <a href="${escapeHtml(infoUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(infoUrl)}</a></div>`
-                      : '';
-                  })()}
                 </td>
                 <td>${item.partNumber || 'TBD'}</td>
                 <td>${item.quantity}</td>
@@ -2121,7 +2587,9 @@ export const generateQuotePDF = async (
                   <td>${formatCurrency(item.product.price * item.quantity)}</td>
                 ` : ''}
               </tr>
-            `).join('')}
+            `;
+            })
+            .join('')}
         </tbody>
       </table>
 
