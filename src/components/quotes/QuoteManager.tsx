@@ -62,6 +62,37 @@ const ensureRecord = (value: unknown): Record<string, unknown> | null => {
   return null;
 };
 
+const coerceString = (value: unknown): string | undefined => {
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : undefined;
+  }
+
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return String(value);
+  }
+
+  return undefined;
+};
+
+const coerceProductLevel = (value: unknown): 1 | 2 | 3 | 4 | undefined => {
+  if (value === null || value === undefined) {
+    return undefined;
+  }
+
+  const numeric = typeof value === "number" ? value : Number(coerceString(value));
+  if (!Number.isFinite(numeric)) {
+    return undefined;
+  }
+
+  const rounded = Math.round(numeric);
+  if (rounded >= 1 && rounded <= 4) {
+    return rounded as 1 | 2 | 3 | 4;
+  }
+
+  return undefined;
+};
+
 const ensureArray = (value: unknown): unknown[] | null => {
   const parsed = parseJsonValue(value);
   return Array.isArray(parsed) ? parsed : null;
@@ -519,6 +550,55 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
 
         if (bomError) throw bomError;
 
+        const productIdSet = new Set<string>();
+        (bomData || []).forEach(item => {
+          const productId = coerceString((item as any)?.product_id);
+          if (productId) {
+            productIdSet.add(productId);
+          }
+        });
+
+        const productMetadataMap = new Map<
+          string,
+          {
+            productLevel?: 1 | 2 | 3 | 4;
+            productInfoUrl?: string;
+            parentLevel2Id?: string;
+          }
+        >();
+
+        if (productIdSet.size > 0) {
+          try {
+            const { data: productRows, error: productError } = await supabase
+              .from('products')
+              .select('id, product_level, product_info_url, parent_product_id')
+              .in('id', Array.from(productIdSet));
+
+            if (productError) {
+              console.error('Error fetching product metadata for BOM items:', productError);
+            } else {
+              (productRows || []).forEach(row => {
+                const id = coerceString((row as any)?.id);
+                if (!id) {
+                  return;
+                }
+
+                const productLevel = coerceProductLevel((row as any)?.product_level);
+                const productInfoUrl = coerceString((row as any)?.product_info_url);
+                const parentLevel2Id = coerceString((row as any)?.parent_product_id);
+
+                productMetadataMap.set(id, {
+                  productLevel,
+                  productInfoUrl,
+                  parentLevel2Id,
+                });
+              });
+            }
+          } catch (metadataError) {
+            console.error('Unexpected error enriching BOM product metadata:', metadataError);
+          }
+        }
+
         bomItems = (bomData || []).map(item => {
           const configData = item.configuration_data || {};
           const storedSlotAssignments = configData.slotAssignments as SerializedSlotAssignment[] | undefined;
@@ -587,16 +667,33 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
             return null;
           })();
 
+          const productId = coerceString((item as any)?.product_id);
+          const productMetadata = productId ? productMetadataMap.get(productId) : undefined;
+          const productLevel = productMetadata?.productLevel;
+          const productInfoUrl = productMetadata?.productInfoUrl;
+          const parentLevel2Id = productMetadata?.parentLevel2Id;
+
+          const normalizedPrice = typeof item.unit_price === 'number' ? item.unit_price : 0;
+          const normalizedQuantity = typeof item.quantity === 'number' && item.quantity > 0 ? item.quantity : 1;
+
           return {
             id: item.id,
             product: {
+              id: productId || item.id,
               name: item.name,
               description: item.description || '',
-              price: item.unit_price
+              price: normalizedPrice,
+              product_level: productLevel,
+              productInfoUrl,
+              parent_product_id: parentLevel2Id,
+              parentProductId: parentLevel2Id,
             },
-            quantity: item.quantity,
+            quantity: normalizedQuantity,
             enabled: true,
             partNumber: item.part_number || 'TBD',
+            level: productLevel,
+            parentLevel2Id: productLevel === 3 ? parentLevel2Id : undefined,
+            resolvedInfoUrl: productLevel === 2 ? productInfoUrl : undefined,
             slotAssignments,
             rackConfiguration: rackLayout,
             level4Config: normalizedLevel4Config,
