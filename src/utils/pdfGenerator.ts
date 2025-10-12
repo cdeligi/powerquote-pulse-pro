@@ -1554,7 +1554,7 @@ export const generateQuotePDF = async (
 
           if (optionInfoUrl) {
             detailParts.push(
-              `Info: <a href="${escapeHtml(optionInfoUrl)}" target="_blank" rel="noopener noreferrer">Product Info</a>`
+              `<a href="${escapeHtml(optionInfoUrl)}" target="_blank" rel="noopener noreferrer">Product Info</a>`
             );
           }
           if (!option) {
