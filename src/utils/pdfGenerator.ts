@@ -1548,8 +1548,14 @@ export const generateQuotePDF = async (
           if (option?.partNumber) {
             detailParts.push(`Part Number: ${escapeHtml(option.partNumber)}`);
           }
-          if (option?.infoUrl) {
-            detailParts.push(`Info: ${escapeHtml(option.infoUrl)}`);
+          const optionInfoUrl =
+            sanitizeHttpUrl(option?.infoUrl) ??
+            sanitizeHttpUrl((option as any)?.info_url);
+
+          if (optionInfoUrl) {
+            detailParts.push(
+              `Info: <a href="${escapeHtml(optionInfoUrl)}" target="_blank" rel="noopener noreferrer">Product Info</a>`
+            );
           }
           if (!option) {
             detailParts.push(`Option ID: ${escapeHtml(selection.value)}`);
