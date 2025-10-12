@@ -42,6 +42,7 @@ export interface Level1Product extends BaseProduct {
 export interface Level2Product extends BaseProduct {
   parentProductId: string; // Links to Level1Product (camelCase for frontend)
   parent_product_id?: string; // snake_case for database compatibility
+  productInfoUrl?: string; // Maps to database column product_info_url
   parentProduct?: {      // Added for easy access to parent product details
     id: string;
     name: string;
@@ -123,10 +124,13 @@ export interface BOMItem {
   product: Product;
   quantity: number;
   enabled: boolean;
+  level?: 1 | 2 | 3 | 4;
   slot?: number;
   partNumber?: string;
   displayName?: string;
   configuration?: Record<string, any>;
+  parentLevel2Id?: string;
+  resolvedInfoUrl?: string;
   rackConfiguration?: {
     slots?: Array<{
       slot?: number;
