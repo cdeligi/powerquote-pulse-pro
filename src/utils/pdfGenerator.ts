@@ -2469,7 +2469,7 @@ export const generateQuotePDF = async (
                 !!infoUrl && normalizedLevel !== 1 && normalizedLevel !== 4;
 
               const infoLinkHtml = shouldRenderLink && infoUrl
-                ? `<div class="product-info-link"><a href="${escapeHtml(infoUrl)}" target="_blank" rel="noopener noreferrer">Info: ${escapeHtml(infoUrl)}</a></div>`
+                ? `<div class="product-info-link"><a href="${escapeHtml(infoUrl)}" target="_blank" rel="noopener noreferrer">Product Info</a></div>`
                 : '';
 
               return `
