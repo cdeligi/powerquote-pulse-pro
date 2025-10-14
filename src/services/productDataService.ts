@@ -939,7 +939,42 @@ class ProductDataService {
   }
   
   deleteLevel2Product = async (id: string) => {};
-  deleteLevel3Product = async (id: string) => {};
+  deleteLevel3Product = async (id: string) => {
+    try {
+      const { error: relationshipDeleteError } = await supabase
+        .from('level2_level3_relationships')
+        .delete()
+        .eq('level3_product_id', id);
+
+      if (relationshipDeleteError) {
+        throw relationshipDeleteError;
+      }
+
+      const { error: partNumberDeleteError } = await supabase
+        .from('part_number_codes')
+        .delete()
+        .eq('level3_product_id', id);
+
+      if (partNumberDeleteError) {
+        throw partNumberDeleteError;
+      }
+
+      const { error: productDeleteError } = await supabase
+        .from('products')
+        .delete()
+        .eq('id', id);
+
+      if (productDeleteError) {
+        throw productDeleteError;
+      }
+
+      this.level3Products = this.level3Products.filter(product => product.id !== id);
+      delete this.level3ParentMap[id];
+    } catch (error) {
+      console.error('Error deleting Level 3 product:', error);
+      throw error;
+    }
+  };
   
   getLevel2ProductsByCategory = async (category: string): Promise<Level2Product[]> => {
     return this.level2Products.filter(p => 
