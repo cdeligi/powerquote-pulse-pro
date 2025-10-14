@@ -144,6 +144,37 @@ interface BOMBuilderProps {
 
 const SLOT_LEVEL4_FLAG = '__slotLevel4Session';
 
+const calculateChassisPricing = (
+  chassis: Level2Product,
+  assignments: Record<number, Level3Product>,
+) => {
+  const basePrice = Number(chassis.price) || 0;
+  const baseCost = Number(chassis.cost) || 0;
+
+  return Object.values(assignments).reduce(
+    (totals, assignment) => {
+      if (!assignment) {
+        return totals;
+      }
+
+      const extended = assignment as Level3Product & Record<string, any>;
+
+      if (extended.isBushingSecondary || extended.isSharedLevel4Config) {
+        return totals;
+      }
+
+      const price = Number(extended.price ?? (extended as any)?.product?.price) || 0;
+      const cost = Number(extended.cost ?? (extended as any)?.product?.cost) || 0;
+
+      return {
+        price: totals.price + price,
+        cost: totals.cost + cost,
+      };
+    },
+    { price: basePrice, cost: baseCost },
+  );
+};
+
 const convertRackLayoutToAssignments = (
   layout?: {
     slots?: Array<{
@@ -2520,15 +2551,25 @@ if (
           }
         : undefined;
 
+    const { price: totalPrice, cost: totalCost } = calculateChassisPricing(
+      selectedChassis,
+      slotAssignments,
+    );
+
+    const quantity = 1;
+    const margin = totalPrice > 0 ? ((totalPrice - totalCost) / totalPrice) * 100 : 100;
+
     // Create a new BOM item for the chassis with its configuration
     const newItem: BOMItem = {
       id: `chassis-${Date.now()}`,
       product: {
         ...selectedChassis,
         displayName: selectedChassis.name,
-        partNumber: partNumber
+        partNumber: partNumber,
+        price: totalPrice,
+        cost: totalCost,
       },
-      quantity: 1,
+      quantity,
       enabled: true,
       partNumber: partNumber,
       displayName: selectedChassis.name,
@@ -2537,6 +2578,13 @@ if (
         hasRemoteDisplay,
       },
       partNumberContext,
+      unit_price: totalPrice,
+      unit_cost: totalCost,
+      total_price: totalPrice * quantity,
+      total_cost: totalCost * quantity,
+      margin,
+      original_unit_price: totalPrice,
+      approved_unit_price: totalPrice,
     };
 
     // Add chassis to BOM
@@ -2665,12 +2713,21 @@ if (
       ? capturedContext
       : editingOriginalItem.partNumberContext || capturedContext;
 
+    const { price: totalPrice, cost: totalCost } = calculateChassisPricing(
+      selectedChassis,
+      slotAssignments,
+    );
+    const quantity = editingOriginalItem.quantity || 1;
+    const margin = totalPrice > 0 ? ((totalPrice - totalCost) / totalPrice) * 100 : 100;
+
     const updatedItem: BOMItem = {
       ...editingOriginalItem,
       product: {
         ...selectedChassis,
         displayName: selectedChassis.name,
         partNumber: partNumber,
+        price: totalPrice,
+        cost: totalCost,
       },
       partNumber: partNumber,
       displayName: selectedChassis.name,
@@ -2679,6 +2736,13 @@ if (
         hasRemoteDisplay,
       },
       partNumberContext,
+      unit_price: totalPrice,
+      unit_cost: totalCost,
+      total_price: totalPrice * quantity,
+      total_cost: totalCost * quantity,
+      margin,
+      original_unit_price: totalPrice,
+      approved_unit_price: totalPrice,
     };
 
     const chassisIndex = bomItems.findIndex(item => item.id === editingOriginalItem.id);
