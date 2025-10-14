@@ -1794,10 +1794,24 @@ if (
           productDataService.getLevel3Products(),
           productDataService.getAssetTypes(),
         ]);
-        setLevel1Products(l1.filter(p => p.enabled));
+        setLevel1Products(
+          l1
+            .filter(p => p.enabled)
+            .map(product => ({
+              ...product,
+              asset_type_id: product.asset_type_id ? String(product.asset_type_id) : undefined,
+            })),
+        );
         setAllLevel2Products(l2);
         setAllLevel3Products(l3);
-        setAssetTypes((types || []).filter(type => type.enabled));
+        setAssetTypes(
+          (types || [])
+            .filter(type => type.enabled)
+            .map(type => ({
+              ...type,
+              id: String(type.id),
+            })),
+        );
       } catch (error) {
         console.error('Error loading all products:', error);
         setLevel1Products([]);
@@ -1821,7 +1835,12 @@ if (
       return [];
     }
 
-    return level1Products.filter(product => product.asset_type_id === selectedAssetType);
+    return level1Products.filter(product => {
+      if (!product.asset_type_id) {
+        return false;
+      }
+      return product.asset_type_id === selectedAssetType;
+    });
   }, [level1Products, selectedAssetType]);
 
   const productMap = useMemo(() => {
@@ -3691,27 +3710,27 @@ if (
         {/* Product Selection - Left Side (2/3 width) */}
         <div className="lg:col-span-2">
           <Card>
-            <CardHeader>
-              <CardTitle>Product Selection</CardTitle>
-              <CardDescription>
+            <CardHeader className="space-y-1">
+              <CardTitle className="text-xl font-semibold text-foreground">Product Selection</CardTitle>
+              <CardDescription className="text-sm text-muted-foreground">
                 Select products to add to your Bill of Materials
               </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-6">
                 <div className="space-y-2">
-                  <Label htmlFor="asset-type-select" className="text-gray-700">Asset Type</Label>
+                  <Label htmlFor="asset-type-select" className="text-sm font-medium text-foreground">Asset Type</Label>
                   <Select
                     value={selectedAssetType || undefined}
                     onValueChange={handleAssetTypeChange}
                     disabled={assetTypes.length === 0}
                   >
-                    <SelectTrigger id="asset-type-select">
+                    <SelectTrigger id="asset-type-select" className="w-full">
                       <SelectValue placeholder={assetTypes.length === 0 ? 'No asset types available' : 'Select an asset type'} />
                     </SelectTrigger>
                     <SelectContent>
                       {assetTypes.map((assetType) => (
-                        <SelectItem key={assetType.id} value={assetType.id} className="text-gray-900">
+                        <SelectItem key={assetType.id} value={assetType.id}>
                           {assetType.name}
                         </SelectItem>
                       ))}
@@ -3720,13 +3739,13 @@ if (
                 </div>
 
                 {!selectedAssetType && assetTypes.length > 0 && (
-                  <div className="rounded-md border border-dashed border-gray-300 p-6 text-center text-sm text-gray-600">
+                  <div className="rounded-lg border border-dashed border-muted-foreground/40 bg-muted/30 p-6 text-center text-sm text-muted-foreground">
                     Select an asset type to view the available product portfolios.
                   </div>
                 )}
 
                 {selectedAssetType && filteredLevel1Products.length === 0 && (
-                  <div className="rounded-md border border-dashed border-gray-300 p-6 text-center text-sm text-gray-600">
+                  <div className="rounded-lg border border-dashed border-muted-foreground/40 bg-muted/30 p-6 text-center text-sm text-muted-foreground">
                     No Level 1 products are currently associated with this asset type.
                   </div>
                 )}
@@ -3752,9 +3771,13 @@ if (
                       setTimeout(() => setIsLoading(false), 100);
                     }}
                   >
-                    <TabsList className="flex w-full flex-wrap gap-2">
+                    <TabsList className="w-full justify-start gap-2 overflow-x-auto bg-transparent p-0">
                       {filteredLevel1Products.map(product => (
-                        <TabsTrigger key={product.id} value={product.id} className="flex-1 whitespace-nowrap px-3 py-2 sm:flex-none">
+                        <TabsTrigger
+                          key={product.id}
+                          value={product.id}
+                          className="whitespace-nowrap rounded-md border border-transparent px-3 py-2 text-sm font-medium transition-colors data-[state=active]:border-primary data-[state=active]:bg-primary/10"
+                        >
                           {product.name}
                         </TabsTrigger>
                       ))}
