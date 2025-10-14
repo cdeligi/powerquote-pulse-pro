@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
@@ -30,10 +31,17 @@ const CARD_TYPE_OPTIONS: Array<{ value: string; label: string }> = [
 ];
 
 const CardForm = ({ onSubmit, level2Products, initialData }: CardFormProps) => {
+  const initialParentIds = useMemo(() => {
+    if (initialData?.parentProductIds?.length) return initialData.parentProductIds;
+    if ((initialData as any)?.parent_product_ids?.length) return (initialData as any).parent_product_ids;
+    const legacyParent = initialData?.parent_product_id || initialData?.parentProductId;
+    return legacyParent ? [legacyParent] : [];
+  }, [initialData]);
+
   const [formData, setFormData] = useState({
     name: initialData?.name || "",
     displayName: initialData?.displayName || initialData?.name || "",
-    parent_product_id: initialData?.parent_product_id || initialData?.parentProductId || "",
+    parent_product_ids: initialParentIds,
     type: initialData?.type || "",
     description: initialData?.description || "",
     price: initialData?.price ?? 0,
@@ -81,7 +89,7 @@ const CardForm = ({ onSubmit, level2Products, initialData }: CardFormProps) => {
   const handleSubmit = (event: React.FormEvent) => {
     event.preventDefault();
 
-    if (!formData.parent_product_id) {
+    if (!formData.parent_product_ids.length) {
       setParentError(true);
       return;
     }
@@ -91,8 +99,10 @@ const CardForm = ({ onSubmit, level2Products, initialData }: CardFormProps) => {
     const newCard: Omit<Level3Product, "id"> = {
       name: formData.name,
       displayName: formData.displayName || formData.name,
-      parent_product_id: formData.parent_product_id,
-      parentProductId: formData.parent_product_id,
+      parent_product_id: formData.parent_product_ids[0],
+      parentProductId: formData.parent_product_ids[0],
+      parent_product_ids: formData.parent_product_ids,
+      parentProductIds: formData.parent_product_ids,
       description: formData.description,
       price: Number.isFinite(formData.price) ? Number(formData.price) : 0,
       cost: Number.isFinite(formData.cost) ? Number(formData.cost) : 0,
@@ -123,43 +133,75 @@ const CardForm = ({ onSubmit, level2Products, initialData }: CardFormProps) => {
             placeholder="e.g., Basic Relay Card"
             required
           />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="displayName">Display Name</Label>
-          <Input
-            id="displayName"
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="displayName">Display Name</Label>
+        <Input
+          id="displayName"
             value={formData.displayName}
             onChange={(event) => handleDisplayNameChange(event.target.value)}
             placeholder="Shown on quotes (defaults to Name)"
           />
         </div>
       </div>
-
       <div className="space-y-2">
-        <Label htmlFor="parentProduct">Parent Product *</Label>
+        <Label htmlFor="type">Type</Label>
         <Select
-          value={formData.parent_product_id}
-          onValueChange={(value) => {
-            setFormData((prev) => ({
-              ...prev,
-              parent_product_id: value,
-            }));
-            setParentError(false);
-          }}
+          value={formData.type}
+          onValueChange={(value) => setFormData((prev) => ({ ...prev, type: value }))}
         >
-          <SelectTrigger id="parentProduct">
-            <SelectValue placeholder="Select a Level 2 product" />
+          <SelectTrigger id="type">
+            <SelectValue placeholder="Select a card type" />
           </SelectTrigger>
           <SelectContent>
-            {parentOptions.map((product) => (
-              <SelectItem key={product.id} value={product.id}>
-                {product.displayName || product.name}
+            {CARD_TYPE_OPTIONS.map((option) => (
+              <SelectItem key={option.value} value={option.value}>
+                {option.label}
               </SelectItem>
             ))}
           </SelectContent>
         </Select>
+      </div>
+
+      <div className="space-y-2">
+        <Label>Parent Products *</Label>
+        <div className="max-h-48 overflow-y-auto rounded-md border border-border p-3 space-y-2">
+          {parentOptions.map((product) => {
+            const isChecked = formData.parent_product_ids.includes(product.id);
+            return (
+              <label key={product.id} className="flex items-center gap-2 text-sm">
+                <Checkbox
+                  checked={isChecked}
+                  onCheckedChange={(checked) => {
+                    const nextChecked = checked === true;
+                    setFormData((prev) => {
+                      const nextIds = new Set(prev.parent_product_ids);
+                      if (nextChecked) {
+                        nextIds.add(product.id);
+                      } else {
+                        nextIds.delete(product.id);
+                      }
+                      return {
+                        ...prev,
+                        parent_product_ids: Array.from(nextIds),
+                      };
+                    });
+                    setParentError(false);
+                  }}
+                />
+                <span>{product.displayName || product.name}</span>
+              </label>
+            );
+          })}
+          {parentOptions.length === 0 && (
+            <p className="text-sm text-muted-foreground">No Level 2 products available.</p>
+          )}
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Select every Level 2 product that can use this Level 3 card.
+        </p>
         {parentError && (
-          <p className="text-sm text-destructive">Please select a parent product.</p>
+          <p className="text-sm text-destructive">Please select at least one parent product.</p>
         )}
       </div>
       <div className="space-y-2">
