@@ -3771,12 +3771,12 @@ if (
                       setTimeout(() => setIsLoading(false), 100);
                     }}
                   >
-                    <TabsList className="w-full justify-start gap-2 overflow-x-auto bg-transparent p-0">
+                    <TabsList className="flex w-full items-center gap-1 overflow-x-auto rounded-lg bg-slate-900/90 p-1 text-slate-300 shadow-sm">
                       {filteredLevel1Products.map(product => (
                         <TabsTrigger
                           key={product.id}
                           value={product.id}
-                          className="whitespace-nowrap rounded-md border border-transparent px-3 py-2 text-sm font-medium transition-colors data-[state=active]:border-primary data-[state=active]:bg-primary/10"
+                          className="flex-1 whitespace-nowrap rounded-md px-4 py-2 text-sm font-medium transition-colors data-[state=active]:bg-red-600 data-[state=active]:text-white data-[state=active]:shadow-md data-[state=inactive]:text-slate-300 hover:text-white focus-visible:ring-0 min-w-[160px]"
                         >
                           {product.name}
                         </TabsTrigger>
