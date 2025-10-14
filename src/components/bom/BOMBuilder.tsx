@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { BOMItem, Level1Product, Level2Product, Level3Product, Level3Customization } from '@/types/product';
+import { AssetType, BOMItem, Level1Product, Level2Product, Level3Product, Level3Customization } from '@/types/product';
 import Level2OptionsSelector from './Level2OptionsSelector';
 import ChassisSelector from './ChassisSelector';
 import RackVisualizer from './RackVisualizer';
@@ -39,6 +39,8 @@ import {
   buildRackLayoutFromAssignments,
   type SerializedSlotAssignment,
 } from '@/utils/slotAssignmentUtils';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const supabase = getSupabaseClient();
 const supabaseAdmin = getSupabaseAdminClient();
@@ -535,6 +537,8 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
   const [level3Products, setLevel3Products] = useState<Level3Product[]>([]);
   const [autoPlaced, setAutoPlaced] = useState(false);
   const [selectedAccessories, setSelectedAccessories] = useState<Set<string>>(new Set());
+  const [assetTypes, setAssetTypes] = useState<AssetType[]>([]);
+  const [selectedAssetType, setSelectedAssetType] = useState<string>('');
 
   // Hints for standard slot positions not yet filled (top-level to avoid conditional hooks)
   const standardSlotHints = useMemo(() => {
@@ -1784,19 +1788,22 @@ if (
   useEffect(() => {
     const loadAllProducts = async () => {
       try {
-        const [l1, l2, l3] = await Promise.all([
+        const [l1, l2, l3, types] = await Promise.all([
           productDataService.getLevel1Products(),
           productDataService.getLevel2Products(),
           productDataService.getLevel3Products(),
+          productDataService.getAssetTypes(),
         ]);
         setLevel1Products(l1.filter(p => p.enabled));
         setAllLevel2Products(l2);
         setAllLevel3Products(l3);
+        setAssetTypes((types || []).filter(type => type.enabled));
       } catch (error) {
         console.error('Error loading all products:', error);
         setLevel1Products([]);
         setAllLevel2Products([]);
         setAllLevel3Products([]);
+        setAssetTypes([]);
       } finally {
         setLevel1Loading(false);
       }
@@ -1809,6 +1816,14 @@ if (
     // TODO: Add logic here if this useEffect was intended to perform an action
   }, [level3Products, codeMap, selectedAccessories]);
 
+  const filteredLevel1Products = useMemo(() => {
+    if (!selectedAssetType) {
+      return [];
+    }
+
+    return level1Products.filter(product => product.asset_type_id === selectedAssetType);
+  }, [level1Products, selectedAssetType]);
+
   const productMap = useMemo(() => {
     const map = new Map<string, string>();
     [...level1Products, ...allLevel2Products, ...allLevel3Products].forEach(p => {
@@ -1817,13 +1832,33 @@ if (
     return map;
   }, [level1Products, allLevel2Products, allLevel3Products]);
 
-  // Set default active tab when products are loaded
+  // Set default active tab when asset type changes
   useEffect(() => {
-    if (level1Products.length > 0 && !activeTab) {
-      console.log('Setting default active tab. Available products:', level1Products.map(p => ({ id: p.id, name: p.name })));
-      setActiveTab(level1Products[0].id);
+    if (!selectedAssetType) {
+      if (activeTab) {
+        setActiveTab('');
+      }
+      if (selectedLevel1Product) {
+        setSelectedLevel1Product(null);
+      }
+      return;
     }
-  }, [level1Products.length, activeTab]);
+
+    if (filteredLevel1Products.length === 0) {
+      if (activeTab) {
+        setActiveTab('');
+      }
+      if (selectedLevel1Product) {
+        setSelectedLevel1Product(null);
+      }
+      return;
+    }
+
+    setActiveTab(prev => {
+      const stillValid = filteredLevel1Products.some(product => product.id === prev);
+      return stillValid ? prev : filteredLevel1Products[0].id;
+    });
+  }, [activeTab, filteredLevel1Products, selectedAssetType, selectedLevel1Product]);
 
   // Update selected product when tab changes
   useEffect(() => {
@@ -1831,7 +1866,7 @@ if (
       console.log('Active tab changed to:', activeTab);
       const product = level1Products.find(p => p.id === activeTab);
       console.log('Found product for tab:', product);
-      
+
       if (product && selectedLevel1Product?.id !== activeTab) {
         console.log('Setting selectedLevel1Product to:', product);
         setSelectedLevel1Product(product);
@@ -1840,12 +1875,18 @@ if (
         setSlotAssignments({});
         setSelectedSlot(null);
       }
+    } else if (!activeTab && selectedLevel1Product) {
+      setSelectedLevel1Product(null);
+      setSelectedLevel2Options([]);
+      setSelectedChassis(null);
+      setSlotAssignments({});
+      setSelectedSlot(null);
     }
-  }, [activeTab, level1Products, selectedLevel1Product?.id]);
+  }, [activeTab, level1Products, selectedLevel1Product]);
 
   const handleAddToBOM = (product: Level1Product | Level2Product | Level3Product, customPartNumber?: string) => {
     console.log('Adding product to BOM:', product.name);
-    
+
     let partNumber = customPartNumber || product.partNumber;
     
     // For Level 2 products with "Not Applicable" chassis type, use the Admin-configured prefix as part number
@@ -1873,6 +1914,20 @@ if (
       description: `${product.name} has been added to your bill of materials.`,
     });
   };
+
+  const handleAssetTypeChange = useCallback((assetTypeId: string) => {
+    setSelectedAssetType(assetTypeId);
+    setActiveTab('');
+    setSelectedLevel1Product(null);
+    setSelectedLevel2Options([]);
+    setSelectedChassis(null);
+    setSlotAssignments({});
+    setSelectedSlot(null);
+    setHasRemoteDisplay(false);
+    setConfiguringChassis(null);
+    setConfiguringNonChassis(null);
+    setSelectedAccessories(new Set());
+  }, []);
 
   // Handle adding a non-chassis product with its accessories to the BOM
   const handleAddNonChassisToBOM = (customPartNumber?: string) => {
@@ -3643,37 +3698,76 @@ if (
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <Tabs value={activeTab} onValueChange={(value) => {
-                setIsLoading(true);
-                
-                setActiveTab(value);
-                const selectedProduct = level1Products.find(p => p.id === value);
-                setSelectedLevel1Product(selectedProduct || null);
-                
-                // Clear relevant state when switching tabs
-                setSelectedChassis(null);
-                setSlotAssignments({});
-                setSelectedSlot(null);
-                setHasRemoteDisplay(false);
-                
-                console.log('Tab switching to:', value, 'Product:', selectedProduct);
-                
-                setTimeout(() => setIsLoading(false), 100);
-              }}>
-                <TabsList className="grid w-full grid-cols-3">
-                  {level1Products.map(product => (
-                    <TabsTrigger key={product.id} value={product.id}>
-                      {product.name}
-                    </TabsTrigger>
-                  ))}
-                </TabsList>
+              <div className="space-y-6">
+                <div className="space-y-2">
+                  <Label htmlFor="asset-type-select" className="text-gray-700">Asset Type</Label>
+                  <Select
+                    value={selectedAssetType || undefined}
+                    onValueChange={handleAssetTypeChange}
+                    disabled={assetTypes.length === 0}
+                  >
+                    <SelectTrigger id="asset-type-select">
+                      <SelectValue placeholder={assetTypes.length === 0 ? 'No asset types available' : 'Select an asset type'} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {assetTypes.map((assetType) => (
+                        <SelectItem key={assetType.id} value={assetType.id} className="text-gray-900">
+                          {assetType.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
 
-                {level1Products.map(product => (
-                  <TabsContent key={product.id} value={product.id}>
-                    {renderProductContent(product.id)}
-                  </TabsContent>
-                ))}
-              </Tabs>
+                {!selectedAssetType && assetTypes.length > 0 && (
+                  <div className="rounded-md border border-dashed border-gray-300 p-6 text-center text-sm text-gray-600">
+                    Select an asset type to view the available product portfolios.
+                  </div>
+                )}
+
+                {selectedAssetType && filteredLevel1Products.length === 0 && (
+                  <div className="rounded-md border border-dashed border-gray-300 p-6 text-center text-sm text-gray-600">
+                    No Level 1 products are currently associated with this asset type.
+                  </div>
+                )}
+
+                {selectedAssetType && filteredLevel1Products.length > 0 && (
+                  <Tabs
+                    value={activeTab}
+                    onValueChange={(value) => {
+                      setIsLoading(true);
+
+                      setActiveTab(value);
+                      const selectedProduct = level1Products.find(p => p.id === value);
+                      setSelectedLevel1Product(selectedProduct || null);
+
+                      // Clear relevant state when switching tabs
+                      setSelectedChassis(null);
+                      setSlotAssignments({});
+                      setSelectedSlot(null);
+                      setHasRemoteDisplay(false);
+
+                      console.log('Tab switching to:', value, 'Product:', selectedProduct);
+
+                      setTimeout(() => setIsLoading(false), 100);
+                    }}
+                  >
+                    <TabsList className="flex w-full flex-wrap gap-2">
+                      {filteredLevel1Products.map(product => (
+                        <TabsTrigger key={product.id} value={product.id} className="flex-1 whitespace-nowrap px-3 py-2 sm:flex-none">
+                          {product.name}
+                        </TabsTrigger>
+                      ))}
+                    </TabsList>
+
+                    {filteredLevel1Products.map(product => (
+                      <TabsContent key={product.id} value={product.id}>
+                        {renderProductContent(product.id)}
+                      </TabsContent>
+                    ))}
+                  </Tabs>
+                )}
+              </div>
             </CardContent>
           </Card>
         </div>
