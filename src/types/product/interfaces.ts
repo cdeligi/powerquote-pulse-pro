@@ -59,8 +59,10 @@ export interface Level2Product extends BaseProduct {
 
 // Level 3: Components/Cards/Options (Cards for chassis, accessories for others)
 export interface Level3Product extends Omit<BaseProduct, 'partNumber'> {
-  parent_product_id: string; // Links to Level2Product
+  parent_product_id: string; // Links to Level2Product (primary parent for backward compatibility)
   parentProductId?: string; // Backward compatibility alias
+  parent_product_ids?: string[]; // All associated Level 2 parents in snake_case for Supabase rows
+  parentProductIds?: string[]; // All associated Level 2 parents in camelCase for frontend logic
   parentProduct?: {      // Added for easy access to parent product details
     id: string;
     name: string;
