@@ -1788,6 +1788,8 @@ if (
   useEffect(() => {
     const loadAllProducts = async () => {
       try {
+        await productDataService.initialize();
+
         const [l1, l2, l3, types] = await Promise.all([
           productDataService.getLevel1Products(),
           productDataService.getLevel2Products(),
@@ -1830,18 +1832,78 @@ if (
     // TODO: Add logic here if this useEffect was intended to perform an action
   }, [level3Products, codeMap, selectedAccessories]);
 
+  const assetTypeNameById = useMemo(() => {
+    const lookup = new Map<string, string>();
+
+    assetTypes.forEach(assetType => {
+      if (!assetType?.id) {
+        return;
+      }
+
+      const normalizedId = String(assetType.id);
+      const normalizedName = typeof assetType.name === 'string'
+        ? assetType.name.trim().toLowerCase()
+        : '';
+
+      lookup.set(normalizedId, normalizedName);
+    });
+
+    return lookup;
+  }, [assetTypes]);
+
   const filteredLevel1Products = useMemo(() => {
     if (!selectedAssetType) {
       return [];
     }
 
+    const selectedAssetTypeName = assetTypeNameById.get(String(selectedAssetType));
+
+    const addCandidate = (set: Set<string>, value: unknown) => {
+      if (value === undefined || value === null) {
+        return;
+      }
+
+      const normalized = String(value).trim();
+      if (normalized.length === 0) {
+        return;
+      }
+
+      set.add(normalized);
+      set.add(normalized.toLowerCase());
+    };
+
     return level1Products.filter(product => {
-      if (!product.asset_type_id) {
+      const candidates = new Set<string>();
+
+      addCandidate(candidates, (product as any).asset_type_id);
+      addCandidate(candidates, (product as any).assetTypeId);
+      addCandidate(candidates, (product as any).assetTypeID);
+
+      const nestedAssetType = (product as any).assetType || (product as any).asset_type;
+      if (nestedAssetType && typeof nestedAssetType === 'object') {
+        addCandidate(candidates, (nestedAssetType as any).id);
+        addCandidate(candidates, (nestedAssetType as any).name);
+      }
+
+      addCandidate(candidates, product.specifications?.assetType);
+      addCandidate(candidates, product.specifications?.asset_type);
+      addCandidate(candidates, product.category);
+
+      if (candidates.size === 0) {
         return false;
       }
-      return product.asset_type_id === selectedAssetType;
+
+      if (candidates.has(String(selectedAssetType))) {
+        return true;
+      }
+
+      if (selectedAssetTypeName && candidates.has(selectedAssetTypeName)) {
+        return true;
+      }
+
+      return false;
     });
-  }, [level1Products, selectedAssetType]);
+  }, [assetTypeNameById, level1Products, selectedAssetType]);
 
   const productMap = useMemo(() => {
     const map = new Map<string, string>();
