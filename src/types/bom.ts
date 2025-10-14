@@ -40,6 +40,7 @@ export interface Level2Product extends Product {
 export interface Level3Product extends Product {
   product_level: 3;
   parentProductId: string;
+  parentProductIds?: string[];
   slot_span?: number;
   is_standard?: boolean;
   standard_position?: number;

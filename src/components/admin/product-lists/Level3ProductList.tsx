@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Edit3, Trash2, Save, X, Filter, Settings } from "lucide-react";
 import { Level2Product, Level3Product } from "@/types/product";
 import { productDataService } from "@/services/productDataService";
@@ -27,9 +28,21 @@ export const Level3ProductList: React.FC<Level3ProductListProps> = ({
 }) => {
   const { toast } = useToast();
   const [editingProduct, setEditingProduct] = useState<string | null>(null);
-  const [editFormData, setEditFormData] = useState<Partial<Level3Product>>({});
+  const [editFormData, setEditFormData] = useState<Partial<Level3Product> & { parentProductIds?: string[] }>({});
   const [parentFilter, setParentFilter] = useState<string>('all');
   const [isSaving, setIsSaving] = useState(false);
+
+  const parentOptions = useMemo(
+    () => [...level2Products].sort((a, b) => a.name.localeCompare(b.name)),
+    [level2Products]
+  );
+
+  const getProductParentIds = (product: Level3Product): string[] => {
+    if (product.parentProductIds?.length) return product.parentProductIds;
+    if ((product as any)?.parent_product_ids?.length) return (product as any).parent_product_ids;
+    const fallback = product.parentProductId || (product as any)?.parent_product_id;
+    return fallback ? [fallback] : [];
+  };
 
   const handleEditStart = (product: Level3Product) => {
     setEditingProduct(product.id);
@@ -37,6 +50,7 @@ export const Level3ProductList: React.FC<Level3ProductListProps> = ({
       name: product.name,
       displayName: (product as any).displayName || product.name,
       parentProductId: product.parentProductId,
+      parentProductIds: getProductParentIds(product),
       type: product.type,
       description: product.description,
       price: product.price,
@@ -47,12 +61,14 @@ export const Level3ProductList: React.FC<Level3ProductListProps> = ({
     });
   };
 
-  // Part number codes for current parent filter
   const [parentCodes, setParentCodes] = useState<Record<string, { template: string; slot_span: number }>>({});
   useEffect(() => {
     let mounted = true;
     (async () => {
-      if (parentFilter === 'all') { setParentCodes({}); return; }
+      if (parentFilter === 'all') {
+        setParentCodes({});
+        return;
+      }
       const codes = await productDataService.getPartNumberCodesForLevel2(parentFilter);
       if (mounted) setParentCodes(codes);
     })();
@@ -63,6 +79,15 @@ export const Level3ProductList: React.FC<Level3ProductListProps> = ({
     if (!editingProduct) return;
 
     try {
+      if (editFormData.parentProductIds && editFormData.parentProductIds.length === 0) {
+        toast({
+          title: "Parent required",
+          description: "Select at least one Level 2 parent before saving.",
+          variant: "destructive",
+        });
+        return;
+      }
+
       setIsSaving(true);
       await productDataService.updateLevel3Product(productId, {
         ...editFormData,
@@ -74,7 +99,7 @@ export const Level3ProductList: React.FC<Level3ProductListProps> = ({
       onProductUpdate();
       setEditingProduct(null);
       setEditFormData({});
-      
+
       toast({
         title: "Success",
         description: "Product updated successfully.",
@@ -121,10 +146,9 @@ export const Level3ProductList: React.FC<Level3ProductListProps> = ({
     return parent ? parent.name : 'Unknown Parent';
   };
 
-  // Filter products by parent Level 2 product
-  const filteredProducts = parentFilter === 'all' 
-    ? products 
-    : products.filter(product => product.parentProductId === parentFilter);
+  const filteredProducts = parentFilter === 'all'
+    ? products
+    : products.filter(product => getProductParentIds(product).includes(parentFilter));
 
   if (products.length === 0) {
     return (
@@ -165,80 +189,114 @@ export const Level3ProductList: React.FC<Level3ProductListProps> = ({
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
-          {filteredProducts.map((product) => (
-            <div key={product.id} className="p-4 border border-gray-200 rounded-lg bg-gray-50">
-              {editingProduct === product.id ? (
-                <div className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor={`name-${product.id}`} className="text-gray-700">Name *</Label>
-                      <Input
-                        id={`name-${product.id}`}
-                        value={editFormData.name || ''}
-                        onChange={(e) => setEditFormData(prev => ({ ...prev, name: e.target.value }))}
-                        className="bg-white border-gray-300 text-gray-900"
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor={`displayName-${product.id}`} className="text-gray-700">Display Name</Label>
-                      <Input
-                        id={`displayName-${product.id}`}
-                        value={editFormData.displayName || ''}
-                        onChange={(e) => setEditFormData(prev => ({ ...prev, displayName: e.target.value }))}
-                        className="bg-white border-gray-300 text-gray-900"
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor={`parent-${product.id}`} className="text-gray-700">Parent Product</Label>
-                      <Select
-                        value={editFormData.parentProductId || ''}
-                        onValueChange={(value) => setEditFormData(prev => ({ ...prev, parentProductId: value }))}
-                      >
-                        <SelectTrigger className="bg-white border-gray-300 text-gray-900">
-                          <SelectValue placeholder="Select Parent Product" />
-                        </SelectTrigger>
-                        <SelectContent className="bg-white border-gray-300">
-                          {level2Products.map((l2Product) => (
-                            <SelectItem key={l2Product.id} value={l2Product.id} className="text-gray-900">
-                              {l2Product.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <Label htmlFor={`type-${product.id}`} className="text-gray-700">Type</Label>
-                      <Input
-                        id={`type-${product.id}`}
-                        value={editFormData.type || ''}
-                        onChange={(e) => setEditFormData(prev => ({ ...prev, type: e.target.value }))}
-                        className="bg-white border-gray-300 text-gray-900"
-                      />
-                    </div>
-                    <div className="md:col-span-2">
-                      <Label htmlFor={`partNumber-${product.id}`} className="text-gray-700">Part Number Shown on Quotes</Label>
-                    <div>
+          {filteredProducts.map((product) => {
+            const productParentIds = getProductParentIds(product);
+            const activeParentId = parentFilter !== 'all'
+              ? parentFilter
+              : (productParentIds.length === 1 ? productParentIds[0] : undefined);
 
-                      <Label htmlFor={`partNumber-${product.id}`} className="text-gray-700">Level 3 Part Number</Label>
-
-                      <Label htmlFor={`partNumber-${product.id}`} className="text-gray-700">Part Number</Label>
-                      main
-                      <Input
-                        id={`partNumber-${product.id}`}
-                        value={editFormData.partNumber || ''}
-                        onChange={(e) => setEditFormData(prev => ({ ...prev, partNumber: e.target.value }))}
-                        placeholder="e.g., ANA-16CH-001"
-                        className="bg-white border-gray-300 text-gray-900"
-                      />
-                      <p className="text-xs text-gray-500 mt-1">
-                        Update this value to control the part number that appears in rack slot listings within generated quotes.
-                      </p>
+            return (
+              <div key={product.id} className="p-4 border border-gray-200 rounded-lg bg-gray-50">
+                {editingProduct === product.id ? (
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor={`name-${product.id}`} className="text-gray-700">Name *</Label>
+                        <Input
+                          id={`name-${product.id}`}
+                          value={editFormData.name || ''}
+                          onChange={(e) => setEditFormData(prev => ({ ...prev, name: e.target.value }))}
+                          className="bg-white border-gray-300 text-gray-900"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor={`displayName-${product.id}`} className="text-gray-700">Display Name</Label>
+                        <Input
+                          id={`displayName-${product.id}`}
+                          value={editFormData.displayName || ''}
+                          onChange={(e) => setEditFormData(prev => ({ ...prev, displayName: e.target.value }))}
+                          className="bg-white border-gray-300 text-gray-900"
+                        />
+                      </div>
+                      <div className="md:col-span-2">
+                        <Label className="text-gray-700">Parent Products</Label>
+                        <div className="mt-2 max-h-40 overflow-y-auto rounded-md border border-gray-300 bg-white p-3 space-y-2">
+                          {parentOptions.map((l2Product) => {
+                            const isChecked = (editFormData.parentProductIds || []).includes(l2Product.id);
+                            return (
+                              <label key={l2Product.id} className="flex items-center gap-2 text-sm text-gray-700">
+                                <Checkbox
+                                  checked={isChecked}
+                                  onCheckedChange={(checked) => {
+                                    const nextChecked = checked === true;
+                                    setEditFormData(prev => {
+                                      const nextIds = new Set(prev.parentProductIds || []);
+                                      if (nextChecked) {
+                                        nextIds.add(l2Product.id);
+                                      } else {
+                                        nextIds.delete(l2Product.id);
+                                      }
+                                      return {
+                                        ...prev,
+                                        parentProductIds: Array.from(nextIds),
+                                      };
+                                    });
+                                  }}
+                                />
+                                <span>{l2Product.displayName || l2Product.name}</span>
+                              </label>
+                            );
+                          })}
+                          {parentOptions.length === 0 && (
+                            <p className="text-sm text-gray-500">No Level 2 products available.</p>
+                          )}
+                        </div>
+                        <p className="text-xs text-gray-500 mt-1">Select every Level 2 parent that should have access to this Level 3 product.</p>
+                      </div>
+                      <div>
+                        <Label htmlFor={`type-${product.id}`} className="text-gray-700">Type</Label>
+                        <Input
+                          id={`type-${product.id}`}
+                          value={editFormData.type || ''}
+                          onChange={(e) => setEditFormData(prev => ({ ...prev, type: e.target.value }))}
+                          className="bg-white border-gray-300 text-gray-900"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor={`partNumber-${product.id}`} className="text-gray-700">Part Number Shown on Quotes</Label>
+                        <Input
+                          id={`partNumber-${product.id}`}
+                          value={editFormData.partNumber || ''}
+                          onChange={(e) => setEditFormData(prev => ({ ...prev, partNumber: e.target.value }))}
+                          placeholder="e.g., ANA-16CH-001"
+                          className="bg-white border-gray-300 text-gray-900"
+                        />
+                        <p className="text-xs text-gray-500 mt-1">Update this value to control the part number that appears in rack slot listings within generated quotes.</p>
+                      </div>
+                      <div>
+                        <Label htmlFor={`price-${product.id}`} className="text-gray-700">Price ($)</Label>
+                        <Input
+                          id={`price-${product.id}`}
+                          type="number"
+                          step="0.01"
+                          value={editFormData.price || 0}
+                          onChange={(e) => setEditFormData(prev => ({ ...prev, price: parseFloat(e.target.value) || 0 }))}
+                          className="bg-white border-gray-300 text-gray-900"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor={`cost-${product.id}`} className="text-gray-700">Cost ($)</Label>
+                        <Input
+                          id={`cost-${product.id}`}
+                          type="number"
+                          step="0.01"
+                          value={editFormData.cost || 0}
+                          onChange={(e) => setEditFormData(prev => ({ ...prev, cost: parseFloat(e.target.value) || 0 }))}
+                          className="bg-white border-gray-300 text-gray-900"
+                        />
+                      </div>
                     </div>
-
-                      <p className="text-xs text-gray-500 mt-1">This value appears on generated quotes for the selected slot.</p>
-
-                    main
-                    </div>
+                    <div className="flex flex-wrap gap-4">
                       <div className="flex items-center space-x-2">
                         <Switch
                           id={`enabled-${product.id}`}
@@ -255,174 +313,156 @@ export const Level3ProductList: React.FC<Level3ProductListProps> = ({
                         />
                         <Label htmlFor={`has-level4-${product.id}`} className="text-gray-700">Has Level 4 Config</Label>
                       </div>
-                    main
-                    <div>
-                      <Label htmlFor={`price-${product.id}`} className="text-gray-700">Price ($)</Label>
-                      <Input
-                        id={`price-${product.id}`}
-                        type="number"
-                        step="0.01"
-                        value={editFormData.price || 0}
-                        onChange={(e) => setEditFormData(prev => ({ ...prev, price: parseFloat(e.target.value) || 0 }))}
-                        className="bg-white border-gray-300 text-gray-900"
-                      />
                     </div>
                     <div>
-                      <Label htmlFor={`cost-${product.id}`} className="text-gray-700">Cost ($)</Label>
-                      <Input
-                        id={`cost-${product.id}`}
-                        type="number"
-                        step="0.01"
-                        value={editFormData.cost || 0}
-                        onChange={(e) => setEditFormData(prev => ({ ...prev, cost: parseFloat(e.target.value) || 0 }))}
+                      <Label htmlFor={`description-${product.id}`} className="text-gray-700">Description</Label>
+                      <Textarea
+                        id={`description-${product.id}`}
+                        value={editFormData.description || ''}
+                        onChange={(e) => setEditFormData(prev => ({ ...prev, description: e.target.value }))}
                         className="bg-white border-gray-300 text-gray-900"
+                        rows={3}
                       />
                     </div>
-                  </div>
-                  <div className="flex flex-wrap gap-4">
-                    <div className="flex items-center space-x-2">
-                      <Switch
-                        id={`enabled-${product.id}`}
-                        checked={editFormData.enabled !== false}
-                        onCheckedChange={(checked) => setEditFormData(prev => ({ ...prev, enabled: checked }))}
-                      />
-                      <Label htmlFor={`enabled-${product.id}`} className="text-gray-700">Enabled</Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Switch
-                        id={`has-level4-${product.id}`}
-                        checked={(editFormData as any).has_level4 || false}
-                        onCheckedChange={(checked) => setEditFormData(prev => ({ ...prev, has_level4: checked }))}
-                      />
-                      <Label htmlFor={`has-level4-${product.id}`} className="text-gray-700">Has Level 4 Config</Label>
-                    </div>
-                  </div>
-                  <div>
-                    <Label htmlFor={`description-${product.id}`} className="text-gray-700">Description</Label>
-                    <Textarea
-                      id={`description-${product.id}`}
-                      value={editFormData.description || ''}
-                      onChange={(e) => setEditFormData(prev => ({ ...prev, description: e.target.value }))}
-                      className="bg-white border-gray-300 text-gray-900"
-                      rows={3}
-                    />
-                  </div>
-                  <div className="flex space-x-2">
-                    <Button
-                      onClick={() => handleEditSave(product.id)}
-                      className="bg-green-600 hover:bg-green-700 text-white"
-                      disabled={!editFormData.name?.trim() || isSaving}
-                    >
-                      <Save className="h-4 w-4 mr-2" />
-                      Save
-                    </Button>
-                    <Button
-                      onClick={handleEditCancel}
-                      variant="outline"
-                      className="border-gray-300 text-gray-700 hover:bg-gray-100"
-                    >
-                      <X className="h-4 w-4 mr-2" />
-                      Cancel
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                <div>
-                  <div className="flex justify-between items-start mb-3">
-                    <div className="flex-1">
-                      <h4 className="text-gray-900 font-medium text-lg">{product.name}</h4>
-                      {product.description && (
-                        <p className="text-gray-600 text-sm mt-1">{product.description}</p>
-                      )}
-                      <div className="flex items-center space-x-2 mt-2">
-                        <Badge variant="secondary" className="bg-blue-100 text-blue-800 border-blue-200">
-                          {product.type}
-                        </Badge>
-                        <Badge variant="outline" className="bg-purple-100 text-purple-800 border-purple-200">
-                          Parent: {getParentProductName(product.parentProductId)}
-                        </Badge>
-                        <Badge variant={product.enabled !== false ? "default" : "secondary"} 
-                               className={product.enabled !== false ? "bg-green-100 text-green-800 border-green-200" : "bg-gray-100 text-gray-600 border-gray-200"}>
-                          {product.enabled !== false ? 'Enabled' : 'Disabled'}
-                        </Badge>
-                        {(product as any).has_level4 && (
-                          <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-200">
-                            L4 Enabled
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex space-x-2 ml-4">
+                    <div className="flex space-x-2">
                       <Button
-                        onClick={() => handleEditStart(product)}
+                        onClick={() => handleEditSave(product.id)}
+                        className="bg-green-600 hover:bg-green-700 text-white"
+                        disabled={!editFormData.name?.trim() || isSaving}
+                      >
+                        <Save className="h-4 w-4 mr-2" />
+                        Save
+                      </Button>
+                      <Button
+                        onClick={handleEditCancel}
                         variant="outline"
-                        size="sm"
                         className="border-gray-300 text-gray-700 hover:bg-gray-100"
                       >
-                        <Edit3 className="h-4 w-4" />
+                        <X className="h-4 w-4 mr-2" />
+                        Cancel
                       </Button>
-                      <Button
-                        onClick={() => onEditPartNumbers(product.parentProductId)}
-                        variant="outline"
-                        size="sm"
-                        className="border-blue-300 text-blue-700 hover:bg-blue-50"
-                      >
-                        Part Numbers
-                      </Button>
-                      {(product as any).has_level4 && (
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    <div className="flex justify-between items-start mb-3">
+                      <div className="flex-1">
+                        <h4 className="text-gray-900 font-medium text-lg">{product.name}</h4>
+                        {product.description && (
+                          <p className="text-gray-600 text-sm mt-1">{product.description}</p>
+                        )}
+                        <div className="flex flex-wrap items-center gap-2 mt-2">
+                          <Badge variant="secondary" className="bg-blue-100 text-blue-800 border-blue-200">
+                            {product.type}
+                          </Badge>
+                          {productParentIds.length > 0 ? (
+                            productParentIds.map(parentId => (
+                              <Badge
+                                key={`${product.id}-${parentId}`}
+                                variant="outline"
+                                className="bg-purple-100 text-purple-800 border-purple-200"
+                              >
+                                Parent: {getParentProductName(parentId)}
+                              </Badge>
+                            ))
+                          ) : (
+                            <Badge variant="outline" className="bg-yellow-100 text-yellow-800 border-yellow-200">
+                              No Parent Assigned
+                            </Badge>
+                          )}
+                          <Badge
+                            variant={product.enabled !== false ? 'default' : 'secondary'}
+                            className={product.enabled !== false ? 'bg-green-100 text-green-800 border-green-200' : 'bg-gray-100 text-gray-600 border-gray-200'}
+                          >
+                            {product.enabled !== false ? 'Enabled' : 'Disabled'}
+                          </Badge>
+                          {(product as any).has_level4 && (
+                            <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-200">
+                              L4 Enabled
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex space-x-2 ml-4">
                         <Button
-                          onClick={() => window.open(`/admin/level4?product=${product.id}`, '_blank')}
+                          onClick={() => handleEditStart(product)}
                           variant="outline"
                           size="sm"
-                          className="border-green-300 text-green-700 hover:bg-green-50"
+                          className="border-gray-300 text-gray-700 hover:bg-gray-100"
                         >
-                          <Settings className="h-4 w-4" />
+                          <Edit3 className="h-4 w-4" />
                         </Button>
-                      )}
-                      <Button
-                        onClick={() => handleDelete(product.id, product.name)}
-                        variant="outline"
-                        size="sm"
-                        className="border-red-300 text-red-600 hover:bg-red-50"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div>
-                      <span className="text-gray-500">Price:</span>
-                      <span className="text-gray-900 font-medium ml-2">${product.price.toLocaleString()}</span>
-                    </div>
-                    <div>
-                      <span className="text-gray-500">Cost:</span>
-                      <span className="text-gray-900 font-medium ml-2">${(product.cost || 0).toLocaleString()}</span>
-                    </div>
-                    <div>
-                      <span className="text-gray-500">Part Number:</span>
-                      <span className="text-gray-900 font-medium ml-2">{product.partNumber || '—'}</span>
-                    </div>
-                  </div>
-                  {parentFilter !== 'all' && (
-                    <div className="mt-3 p-3 rounded-md border border-gray-200 bg-white">
-                      <div className="text-xs text-gray-500 mb-1">Part Number Template</div>
-                      <div className="grid grid-cols-2 gap-2 text-sm">
-                        <div><span className="text-gray-500">Template:</span> <span className="text-gray-900 ml-1">{parentCodes[product.id]?.template || '—'}</span></div>
-                        <div><span className="text-gray-500">Slot Span:</span> <span className="text-gray-900 ml-1">{parentCodes[product.id]?.slot_span ?? '—'}</span></div>
-                      </div>
-                      <div className="text-right mt-2">
-                        <Button size="sm" variant="outline" className="border-blue-300 text-blue-700 hover:bg-blue-50" onClick={() => onEditPartNumbers(product.parentProductId)}>
-                          Edit in Part Numbers
+                        <Button
+                          onClick={() => activeParentId && onEditPartNumbers(activeParentId)}
+                          variant="outline"
+                          size="sm"
+                          className="border-blue-300 text-blue-700 hover:bg-blue-50 disabled:opacity-50"
+                          disabled={!activeParentId}
+                        >
+                          Part Numbers
+                        </Button>
+                        {(product as any).has_level4 && (
+                          <Button
+                            onClick={() => window.open(`/admin/level4?product=${product.id}`, '_blank')}
+                            variant="outline"
+                            size="sm"
+                            className="border-green-300 text-green-700 hover:bg-green-50"
+                          >
+                            <Settings className="h-4 w-4" />
+                          </Button>
+                        )}
+                        <Button
+                          onClick={() => handleDelete(product.id, product.name)}
+                          variant="outline"
+                          size="sm"
+                          className="border-red-300 text-red-600 hover:bg-red-50"
+                        >
+                          <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
                     </div>
-                  )}
-                </div>
-              )}
-            </div>
-          ))}
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <span className="text-gray-500">Price:</span>
+                        <span className="text-gray-900 font-medium ml-2">${product.price.toLocaleString()}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-500">Cost:</span>
+                        <span className="text-gray-900 font-medium ml-2">${(product.cost || 0).toLocaleString()}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-500">Part Number:</span>
+                        <span className="text-gray-900 font-medium ml-2">{product.partNumber || '—'}</span>
+                      </div>
+                    </div>
+                    {parentFilter !== 'all' && (
+                      <div className="mt-3 p-3 rounded-md border border-gray-200 bg-white">
+                        <div className="text-xs text-gray-500 mb-1">Part Number Template</div>
+                        <div className="grid grid-cols-2 gap-2 text-sm">
+                          <div><span className="text-gray-500">Template:</span> <span className="text-gray-900 ml-1">{parentCodes[product.id]?.template || '—'}</span></div>
+                          <div><span className="text-gray-500">Slot Span:</span> <span className="text-gray-900 ml-1">{parentCodes[product.id]?.slot_span ?? '—'}</span></div>
+                        </div>
+                        <div className="text-right mt-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="border-blue-300 text-blue-700 hover:bg-blue-50 disabled:opacity-50"
+                            onClick={() => activeParentId && onEditPartNumbers(activeParentId)}
+                            disabled={!activeParentId}
+                          >
+                            Edit in Part Numbers
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       </CardContent>
     </Card>
   );
 };
+
