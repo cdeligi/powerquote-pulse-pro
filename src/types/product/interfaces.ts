@@ -164,6 +164,7 @@ export interface BOMItem {
   part_number?: string;
   unit_price?: number;
   unit_cost?: number;
+  total_cost?: number;
   original_unit_price?: number;
   priceHistory?: Array<{
     timestamp: string;
@@ -175,10 +176,13 @@ export interface BOMItem {
   margin?: number;
   approved_unit_price?: number;
   price_adjustment_history?: any[];
-  partNumberContext?: {
-    pnConfig: any | null;
-    codeMap: Record<string, any>;
-  };
+  partNumberContext?: Record<string, any>;
+  parentProduct?: any;
+  level2Product?: any;
+  level2_product?: any;
+  productInfoUrl?: string;
+  product_id?: string;
+  productId?: string;
 }
 
 export type Product = Level1Product | Level2Product | Level3Product;

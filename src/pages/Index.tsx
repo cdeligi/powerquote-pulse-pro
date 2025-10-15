@@ -1,5 +1,5 @@
 
-import LoginForm from "@/components/auth/LoginForm";
+import { ModernLoginPage } from "@/components/auth/ModernLoginPage";
 import Dashboard from "@/components/dashboard/Dashboard";
 import { useAuth } from "@/hooks/useAuth";
 import { Loader2 } from "lucide-react";
@@ -40,11 +40,9 @@ const Index = () => {
   if (!user) {
     console.log('No authenticated user, showing login form...');
     return (
-      <div className="min-h-screen bg-background text-foreground flex items-center justify-center">
-        <LoginForm onLogin={() => {
-          console.log('Login callback triggered');
-        }} />
-      </div>
+      <ModernLoginPage onLogin={() => {
+        console.log('Login callback triggered');
+      }} />
     );
   }
 
