@@ -9,6 +9,7 @@ import UserRegistrationForm from "./UserRegistrationForm";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import qualitrolLogo from "@/assets/qualitrol-logo.png";
 
 interface ModernLoginPageProps {
   onLogin: (user: User) => void;
@@ -83,7 +84,7 @@ export function ModernLoginPage({ onLogin }: ModernLoginPageProps) {
   }
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+    <div className="relative min-h-screen overflow-hidden bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
       {/* Animated background pattern */}
       <div className="absolute inset-0 opacity-20">
         <div className="absolute inset-0" style={{
@@ -92,9 +93,9 @@ export function ModernLoginPage({ onLogin }: ModernLoginPageProps) {
         }} />
       </div>
 
-      {/* Subtle gradient overlays for depth */}
-      <div className="absolute inset-0 bg-gradient-to-tr from-blue-950/30 via-transparent to-slate-950/40" />
-      <div className="absolute inset-0 bg-gradient-to-bl from-transparent via-slate-900/50 to-blue-950/20" />
+      {/* Subtle gradient overlays with Qualitrol red accent */}
+      <div className="absolute inset-0 bg-gradient-to-tr from-red-950/20 via-transparent to-slate-950/40" />
+      <div className="absolute inset-0 bg-gradient-to-bl from-transparent via-slate-900/50 to-red-950/10" />
 
       {/* Content */}
       <div className="relative flex min-h-screen items-center justify-center p-4 sm:p-6">
@@ -103,12 +104,13 @@ export function ModernLoginPage({ onLogin }: ModernLoginPageProps) {
           {/* Left side - Hero content */}
           <div className="space-y-8 text-center lg:text-left">
             {/* Logo and brand */}
-            <div className="space-y-4">
-              <div className="flex items-center justify-center lg:justify-start gap-3">
-                <div className="relative">
-                  <Activity className="h-12 w-12 text-blue-400" strokeWidth={1.5} />
-                  <div className="absolute inset-0 blur-xl bg-blue-400/30 animate-pulse" />
-                </div>
+            <div className="space-y-6">
+              <div className="flex flex-col items-center lg:items-start gap-4">
+                <img 
+                  src={qualitrolLogo} 
+                  alt="Qualitrol" 
+                  className="h-12 w-auto"
+                />
                 <h1 className="text-4xl sm:text-5xl font-bold text-white tracking-tight">
                   PowerQuotePro
                 </h1>
@@ -121,8 +123,8 @@ export function ModernLoginPage({ onLogin }: ModernLoginPageProps) {
             {/* Value propositions */}
             <div className="space-y-4 max-w-md mx-auto lg:mx-0">
               <div className="flex items-start gap-3 text-left">
-                <div className="mt-1 p-2 rounded-lg bg-blue-500/10 border border-blue-500/20">
-                  <Shield className="h-5 w-5 text-blue-400" />
+                <div className="mt-1 p-2 rounded-lg bg-red-600/10 border border-red-500/20">
+                  <Shield className="h-5 w-5 text-red-400" />
                 </div>
                 <div>
                   <h3 className="font-semibold text-white mb-1">Enterprise-Grade Security</h3>
@@ -131,8 +133,8 @@ export function ModernLoginPage({ onLogin }: ModernLoginPageProps) {
               </div>
               
               <div className="flex items-start gap-3 text-left">
-                <div className="mt-1 p-2 rounded-lg bg-blue-500/10 border border-blue-500/20">
-                  <Zap className="h-5 w-5 text-blue-400" />
+                <div className="mt-1 p-2 rounded-lg bg-cyan-500/10 border border-cyan-400/20">
+                  <Zap className="h-5 w-5 text-cyan-400" />
                 </div>
                 <div>
                   <h3 className="font-semibold text-white mb-1">Instant Configuration</h3>
@@ -141,8 +143,8 @@ export function ModernLoginPage({ onLogin }: ModernLoginPageProps) {
               </div>
 
               <div className="flex items-start gap-3 text-left">
-                <div className="mt-1 p-2 rounded-lg bg-blue-500/10 border border-blue-500/20">
-                  <Activity className="h-5 w-5 text-blue-400" />
+                <div className="mt-1 p-2 rounded-lg bg-red-600/10 border border-red-500/20">
+                  <Activity className="h-5 w-5 text-red-400" />
                 </div>
                 <div>
                   <h3 className="font-semibold text-white mb-1">Digital Quoting Approval Process</h3>
@@ -186,7 +188,7 @@ export function ModernLoginPage({ onLogin }: ModernLoginPageProps) {
                       type="email"
                       value={credentials.email}
                       onChange={(e) => setCredentials(prev => ({ ...prev, email: e.target.value }))}
-                      className="bg-slate-800/50 border-slate-600 text-white placeholder:text-slate-500 focus:border-blue-500 focus:ring-blue-500/20"
+                      className="bg-slate-800/50 border-slate-600 text-white placeholder:text-slate-500 focus:border-red-500 focus:ring-red-500/20"
                       placeholder="your.email@company.com"
                       required
                     />
@@ -199,7 +201,7 @@ export function ModernLoginPage({ onLogin }: ModernLoginPageProps) {
                       type="password"
                       value={credentials.password}
                       onChange={(e) => setCredentials(prev => ({ ...prev, password: e.target.value }))}
-                      className="bg-slate-800/50 border-slate-600 text-white placeholder:text-slate-500 focus:border-blue-500 focus:ring-blue-500/20"
+                      className="bg-slate-800/50 border-slate-600 text-white placeholder:text-slate-500 focus:border-red-500 focus:ring-red-500/20"
                       placeholder="Enter your password"
                       required
                     />
@@ -207,7 +209,7 @@ export function ModernLoginPage({ onLogin }: ModernLoginPageProps) {
                   
                   <Button
                     type="submit"
-                    className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium shadow-lg shadow-blue-500/20 transition-all duration-200"
+                    className="w-full bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white font-medium shadow-lg shadow-red-500/20 transition-all duration-200"
                     disabled={isLoading}
                   >
                     {isLoading ? "Signing In..." : "Sign In"}
