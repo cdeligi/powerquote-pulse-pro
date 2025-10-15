@@ -114,7 +114,7 @@ export function ModernLoginPage({ onLogin }: ModernLoginPageProps) {
                 </h1>
               </div>
               <p className="text-xl text-slate-300 font-light">
-                Your pipeline, powered by precision
+                Quoting at the speed of opportunity
               </p>
             </div>
 
@@ -126,7 +126,7 @@ export function ModernLoginPage({ onLogin }: ModernLoginPageProps) {
                 </div>
                 <div>
                   <h3 className="font-semibold text-white mb-1">Enterprise-Grade Security</h3>
-                  <p className="text-sm text-slate-400">Secure quoting for critical infrastructure projects</p>
+                  <p className="text-sm text-slate-400">Secure quoting tool with different users access level</p>
                 </div>
               </div>
               
@@ -136,7 +136,7 @@ export function ModernLoginPage({ onLogin }: ModernLoginPageProps) {
                 </div>
                 <div>
                   <h3 className="font-semibold text-white mb-1">Instant Configuration</h3>
-                  <p className="text-sm text-slate-400">Build complex BOMs in minutes, not hours</p>
+                  <p className="text-sm text-slate-400">Build complex BOMs in minutes, not weeks</p>
                 </div>
               </div>
 
@@ -145,8 +145,8 @@ export function ModernLoginPage({ onLogin }: ModernLoginPageProps) {
                   <Activity className="h-5 w-5 text-blue-400" />
                 </div>
                 <div>
-                  <h3 className="font-semibold text-white mb-1">Real-Time Validation</h3>
-                  <p className="text-sm text-slate-400">Every component validated against your requirements</p>
+                  <h3 className="font-semibold text-white mb-1">Digital Quoting Approval Process</h3>
+                  <p className="text-sm text-slate-400">Every minute counts</p>
                 </div>
               </div>
             </div>
