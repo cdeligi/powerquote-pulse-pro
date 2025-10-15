@@ -40,6 +40,7 @@ export interface Quote {
   reviewed_by?: string;
   submitted_by_name?: string;
   submitted_by_email?: string;
+  submitted_at?: string;
   created_at: string;
   updated_at: string;
   bom_items?: BOMItem[];

@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useLocation, Routes, Route, Navigate } from "react-router-dom";
 import { User } from "@/types/auth";
-import Sidebar from "./Sidebar";
+import { ModernSidebar } from "./ModernSidebar";
 import DashboardOverview from "./DashboardOverview";
 import BOMBuilder from "../bom/BOMBuilder";
 import QuoteManager from "../quotes/QuoteManager";
@@ -152,14 +152,12 @@ const Dashboard = ({ user, onLogout }: DashboardProps) => {
   };
 
   return (
-    <div className="min-h-screen bg-background text-foreground flex">
-      <Sidebar 
+    <div className="min-h-screen bg-background text-foreground">
+      <ModernSidebar 
         user={user}
-        activeView={activeView}
-        onViewChange={handleViewChange}
         onLogout={onLogout}
       />
-      <main className="flex-1 ml-64 p-8">
+      <main className="md:ml-16 transition-all duration-200 p-4 md:p-8">
         <Routes>
           {/* BOM editing routes */}
           <Route path="/bom-edit/:quoteId" element={renderContent()} />
