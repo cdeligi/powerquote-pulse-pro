@@ -9,7 +9,8 @@ import {
   Settings,
   LogOut,
   Menu,
-  Package,
+  Wrench,
+  FileText,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -28,14 +29,20 @@ export function ModernSidebar({ user, onLogout }: ModernSidebarProps) {
   const [isExpanded, setIsExpanded] = useState(false);
 
   const menuItems = [
-    { title: 'Dashboard', icon: LayoutDashboard, path: '/' },
-    { title: 'Products', icon: Package, path: '/products' },
+    { title: 'Dashboard', icon: LayoutDashboard, path: '/', viewId: 'overview', useHash: false },
+    { title: 'BOM Builder', icon: Wrench, path: '/bom-new', viewId: 'bom', useHash: false },
+    { title: 'Quotes', icon: FileText, path: '/', viewId: 'quotes', useHash: true },
     ...(user.role === 'ADMIN'
-      ? [{ title: 'Admin Panel', icon: Settings, path: '/admin' }]
+      ? [{ title: 'Admin Panel', icon: Settings, path: '/', viewId: 'admin', useHash: true }]
       : []),
   ];
 
-  const isActive = (path: string) => location.pathname === path;
+  const isActive = (item: any) => {
+    if (item.useHash) {
+      return window.location.hash === `#${item.viewId}`;
+    }
+    return location.pathname === item.path || (item.path === '/bom-new' && location.pathname.startsWith('/bom'));
+  };
 
   const getRoleBadge = (role?: string) => {
     if (!role) return null;
@@ -50,41 +57,50 @@ export function ModernSidebar({ user, onLogout }: ModernSidebarProps) {
 
   // Desktop sidebar content
   const SidebarContent = ({ collapsed = false }: { collapsed?: boolean }) => (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full flex-col overflow-hidden">
       {/* User section */}
-      <div className="border-b border-border p-4">
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
-            {user.full_name?.[0] || user.email[0]}
+      <div className="border-b border-border p-3 flex-shrink-0">
+        <div className="flex items-center gap-2 min-w-0">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground text-sm font-semibold">
+            {user.full_name?.[0]?.toUpperCase() || user.email[0]?.toUpperCase()}
           </div>
           {!collapsed && (
-            <div className="flex-1 overflow-hidden">
-              <p className="truncate text-sm font-medium">{user.full_name || user.email}</p>
-              <p className="truncate text-xs text-muted-foreground">{user.email}</p>
-              {user.role && <div className="mt-1">{getRoleBadge(user.role)}</div>}
+            <div className="flex-1 min-w-0">
+              <p className="truncate text-sm font-medium leading-tight">{user.full_name || user.email}</p>
+              <p className="truncate text-xs text-muted-foreground leading-tight mt-0.5">{user.email}</p>
+              {user.role && <div className="mt-1.5">{getRoleBadge(user.role)}</div>}
             </div>
           )}
         </div>
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 space-y-1 p-2">
+      <nav className="flex-1 space-y-1 p-2 overflow-y-auto">
         {menuItems.map((item) => {
           const Icon = item.icon;
-          const active = isActive(item.path);
+          const active = isActive(item);
 
           const button = (
             <Button
               variant={active ? 'secondary' : 'ghost'}
               className={cn(
                 'w-full justify-start gap-3 transition-all duration-200',
-                collapsed && 'justify-center',
+                collapsed && 'justify-center px-2',
                 active && 'bg-accent font-medium'
               )}
-              onClick={() => navigate(item.path)}
+              onClick={() => {
+                if (item.useHash) {
+                  navigate('/');
+                  setTimeout(() => {
+                    window.location.hash = item.viewId;
+                  }, 0);
+                } else {
+                  navigate(item.path);
+                }
+              }}
             >
               <Icon className="h-5 w-5 shrink-0" />
-              {!collapsed && <span>{item.title}</span>}
+              {!collapsed && <span className="truncate">{item.title}</span>}
             </Button>
           );
 
@@ -102,15 +118,15 @@ export function ModernSidebar({ user, onLogout }: ModernSidebarProps) {
       </nav>
 
       {/* Footer with logo and logout */}
-      <div className="border-t border-border p-4 space-y-3">
-        <div className={cn('flex items-center', collapsed ? 'justify-center' : 'gap-2')}>
+      <div className="border-t border-border p-3 space-y-2 flex-shrink-0">
+        <div className={cn('flex items-center min-w-0', collapsed ? 'justify-center' : 'gap-2')}>
           <img
             src="/lovable-uploads/2955a70a-6714-4ded-af05-c5f87bbda099.png"
             alt="PowerQuotePro"
-            className={cn('h-8', collapsed && 'w-8')}
+            className={cn('h-7 object-contain', collapsed ? 'w-7' : 'max-w-full')}
           />
           {!collapsed && (
-            <span className="text-sm font-semibold">PowerQuotePro</span>
+            <span className="text-sm font-semibold truncate">PowerQuotePro</span>
           )}
         </div>
 
@@ -147,7 +163,7 @@ export function ModernSidebar({ user, onLogout }: ModernSidebarProps) {
     <>
       {/* Desktop Sidebar */}
       <aside
-        className="hidden md:flex fixed left-0 top-0 h-screen bg-card border-r border-border transition-all duration-200 ease-out z-40 group"
+        className="hidden md:flex fixed left-0 top-0 h-screen bg-card border-r border-border transition-all duration-200 ease-out z-40 group overflow-hidden flex-shrink-0"
         style={{ width: isExpanded ? '256px' : '64px' }}
         onMouseEnter={() => setIsExpanded(true)}
         onMouseLeave={() => setIsExpanded(false)}
@@ -158,7 +174,9 @@ export function ModernSidebar({ user, onLogout }: ModernSidebarProps) {
           }
         }}
       >
-        <SidebarContent collapsed={!isExpanded} />
+        <div className="w-full h-full">
+          <SidebarContent collapsed={!isExpanded} />
+        </div>
       </aside>
 
       {/* Mobile Sidebar */}
