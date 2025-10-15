@@ -29,7 +29,7 @@ export function ModernSidebar({ user, onLogout }: ModernSidebarProps) {
   const [isExpanded, setIsExpanded] = useState(false);
 
   const menuItems = [
-    { title: 'Dashboard', icon: LayoutDashboard, path: '/', viewId: 'overview', useHash: false },
+    { title: 'Dashboard', icon: LayoutDashboard, path: '/', viewId: 'overview', useHash: true },
     { title: 'BOM Builder', icon: Wrench, path: '/bom-new', viewId: 'bom', useHash: false },
     { title: 'Quotes', icon: FileText, path: '/', viewId: 'quotes', useHash: true },
     ...(user.role === 'ADMIN'
