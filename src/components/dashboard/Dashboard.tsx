@@ -45,42 +45,43 @@ const Dashboard = ({ user, onLogout }: DashboardProps) => {
     setBomItems(items);
   };
 
-  // Initialize with overview by default, but allow route-based overrides
-  useEffect(() => {
-    // Only set to overview if we're on the root path and no hash
-    if (location.pathname === '/' && !window.location.hash) {
-      setActiveView('overview');
-    }
-  }, []);  // Run once on mount
-
   // Compute permissions for BOM
   const canSeeCosts = has(FEATURES.BOM_SHOW_PRODUCT_COST);
 
-  // Direct view change handler for better performance
-  const handleViewChange = (view: ActiveView) => {
-    setActiveView(view);
-    // Update URL hash for bookmarking without complex routing
-    if (view !== 'overview') {
-      window.history.pushState(null, '', `#${view}`);
-    } else {
-      window.history.pushState(null, '', '/');
-    }
-  };
+  // Listen to hash changes for navigation
+  useEffect(() => {
+    const handleHashChange = () => {
+      const hash = window.location.hash;
+      if (hash === '#overview' || hash === '') {
+        setActiveView('overview');
+      } else if (hash === '#quotes') {
+        setActiveView('quotes');
+      } else if (hash === '#admin') {
+        setActiveView('admin');
+      } else if (hash === '#bom') {
+        setActiveView('bom');
+      }
+    };
 
-  // Simplified route synchronization - only sync when needed
+    // Run on mount to sync initial state
+    handleHashChange();
+
+    // Listen to hash changes
+    window.addEventListener('hashchange', handleHashChange);
+    
+    return () => {
+      window.removeEventListener('hashchange', handleHashChange);
+    };
+  }, []);
+
+  // Handle path-based routing (not hash-based)
   useEffect(() => {
     const path = location.pathname;
-    const hash = window.location.hash;
     
-    if (path.startsWith('/bom-edit/') || path.startsWith('/bom-new')) {
+    if (path.startsWith('/bom-edit/') || path === '/bom-new') {
       setActiveView('bom');
-    } else if (hash === '#quotes') {
-      setActiveView('quotes');
-    } else if (hash === '#admin') {
-      setActiveView('admin');
-    } else if (hash === '#overview' || (hash === '' && path === '/')) {
-      setActiveView('overview');
     }
+    // Don't set activeView for root path - let hash handler do it
   }, [location.pathname]);
 
   const renderContent = () => {
