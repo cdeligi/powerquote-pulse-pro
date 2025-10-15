@@ -3833,17 +3833,22 @@ if (
                       setTimeout(() => setIsLoading(false), 100);
                     }}
                   >
-                    <TabsList className="flex w-full items-center gap-1 overflow-x-auto rounded-lg bg-slate-900/90 p-1 text-slate-300 shadow-sm">
-                      {filteredLevel1Products.map(product => (
-                        <TabsTrigger
-                          key={product.id}
-                          value={product.id}
-                          className="flex-1 whitespace-nowrap rounded-md px-4 py-2 text-sm font-medium transition-colors data-[state=active]:bg-red-600 data-[state=active]:text-white data-[state=active]:shadow-md data-[state=inactive]:text-slate-300 hover:text-white focus-visible:ring-0 min-w-[160px]"
-                        >
-                          {product.name}
-                        </TabsTrigger>
-                      ))}
-                    </TabsList>
+                    <div className="relative">
+                      <TabsList
+                        className="flex w-full flex-wrap items-stretch justify-start gap-2 rounded-xl border border-slate-800/60 bg-slate-950/90 p-2 text-slate-200 shadow-inner transition-colors md:flex-nowrap md:overflow-x-auto md:pr-8"
+                      >
+                        {filteredLevel1Products.map(product => (
+                          <TabsTrigger
+                            key={product.id}
+                            value={product.id}
+                            className="flex-none whitespace-nowrap rounded-lg px-4 py-2 text-sm font-semibold tracking-tight text-slate-200 transition-all duration-150 data-[state=active]:bg-red-600 data-[state=active]:text-white data-[state=active]:shadow-lg data-[state=inactive]:bg-transparent data-[state=inactive]:text-slate-300 hover:text-white focus-visible:ring-0 md:min-w-[172px]"
+                          >
+                            {product.name}
+                          </TabsTrigger>
+                        ))}
+                      </TabsList>
+                      <div className="pointer-events-none absolute inset-y-2 right-0 hidden w-8 rounded-r-xl bg-gradient-to-l from-slate-950/95 to-transparent md:block" />
+                    </div>
 
                     {filteredLevel1Products.map(product => (
                       <TabsContent key={product.id} value={product.id}>
