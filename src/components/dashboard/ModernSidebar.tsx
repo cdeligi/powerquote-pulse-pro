@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -27,6 +27,16 @@ export function ModernSidebar({ user, onLogout }: ModernSidebarProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const [isExpanded, setIsExpanded] = useState(false);
+  const [currentHash, setCurrentHash] = useState(window.location.hash);
+
+  useEffect(() => {
+    const handleHashChange = () => {
+      setCurrentHash(window.location.hash);
+    };
+    
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
 
   const menuItems = [
     { title: 'Dashboard', icon: LayoutDashboard, path: '/', viewId: 'overview', useHash: true },
@@ -39,7 +49,7 @@ export function ModernSidebar({ user, onLogout }: ModernSidebarProps) {
 
   const isActive = (item: any) => {
     if (item.useHash) {
-      return window.location.hash === `#${item.viewId}`;
+      return currentHash === `#${item.viewId}` || (item.viewId === 'overview' && currentHash === '');
     }
     return location.pathname === item.path || (item.path === '/bom-new' && location.pathname.startsWith('/bom'));
   };
@@ -88,16 +98,13 @@ export function ModernSidebar({ user, onLogout }: ModernSidebarProps) {
                 collapsed && 'justify-center px-2',
                 active && 'bg-accent font-medium'
               )}
-              onClick={() => {
-                if (item.useHash) {
-                  navigate('/');
-                  setTimeout(() => {
-                    window.location.hash = item.viewId;
-                  }, 0);
-                } else {
-                  navigate(item.path);
-                }
-              }}
+                  onClick={() => {
+                    if (item.useHash) {
+                      window.location.hash = item.viewId;
+                    } else {
+                      navigate(item.path);
+                    }
+                  }}
             >
               <Icon className="h-5 w-5 shrink-0" />
               {!collapsed && <span className="truncate">{item.title}</span>}
