@@ -28,6 +28,7 @@ export function ModernSidebar({ user, onLogout }: ModernSidebarProps) {
   const location = useLocation();
   const [isExpanded, setIsExpanded] = useState(false);
   const [currentHash, setCurrentHash] = useState(window.location.hash);
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   useEffect(() => {
     const handleHashChange = () => {
@@ -66,7 +67,7 @@ export function ModernSidebar({ user, onLogout }: ModernSidebarProps) {
   };
 
   // Desktop sidebar content
-  const SidebarContent = ({ collapsed = false }: { collapsed?: boolean }) => (
+  const SidebarContent = ({ collapsed = false, isMobile = false }: { collapsed?: boolean; isMobile?: boolean }) => (
     <div className="flex h-full flex-col overflow-hidden">
       {/* User section */}
       <div className="border-b border-border p-3 flex-shrink-0">
@@ -103,6 +104,9 @@ export function ModernSidebar({ user, onLogout }: ModernSidebarProps) {
                       window.location.hash = item.viewId;
                     } else {
                       navigate(item.path);
+                    }
+                    if (isMobile) {
+                      setMobileOpen(false);
                     }
                   }}
             >
@@ -187,7 +191,7 @@ export function ModernSidebar({ user, onLogout }: ModernSidebarProps) {
       </aside>
 
       {/* Mobile Sidebar */}
-      <Sheet>
+      <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
         <SheetTrigger asChild>
           <Button
             variant="ghost"
@@ -198,7 +202,7 @@ export function ModernSidebar({ user, onLogout }: ModernSidebarProps) {
           </Button>
         </SheetTrigger>
         <SheetContent side="left" className="w-64 p-0">
-          <SidebarContent />
+          <SidebarContent isMobile={true} />
         </SheetContent>
       </Sheet>
     </>
