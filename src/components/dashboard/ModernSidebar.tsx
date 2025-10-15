@@ -50,7 +50,10 @@ export function ModernSidebar({ user, onLogout }: ModernSidebarProps) {
 
   const isActive = (item: any) => {
     if (item.useHash) {
-      return currentHash === `#${item.viewId}` || (item.viewId === 'overview' && currentHash === '');
+      // Active if we're on root path with matching hash, or root with no hash for overview
+      const onRootPath = location.pathname === '/';
+      const hashMatches = currentHash === `#${item.viewId}` || (item.viewId === 'overview' && (currentHash === '' || currentHash === '#'));
+      return onRootPath && hashMatches;
     }
     return location.pathname === item.path || (item.path === '/bom-new' && location.pathname.startsWith('/bom'));
   };
@@ -101,7 +104,17 @@ export function ModernSidebar({ user, onLogout }: ModernSidebarProps) {
               )}
                   onClick={() => {
                     if (item.useHash) {
-                      window.location.hash = item.viewId;
+                      // Navigate to root first, THEN set the hash
+                      if (location.pathname !== '/') {
+                        navigate('/');
+                        // Use setTimeout to ensure navigation completes before setting hash
+                        setTimeout(() => {
+                          window.location.hash = item.viewId;
+                        }, 0);
+                      } else {
+                        // Already on root, just set hash
+                        window.location.hash = item.viewId;
+                      }
                     } else {
                       navigate(item.path);
                     }

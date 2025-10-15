@@ -52,7 +52,9 @@ const Dashboard = ({ user, onLogout }: DashboardProps) => {
   useEffect(() => {
     const handleHashChange = () => {
       const hash = window.location.hash;
-      if (hash === '#overview' || hash === '') {
+      console.log('Hash changed to:', hash); // Debug log
+      
+      if (hash === '#overview' || hash === '' || hash === '#') {
         setActiveView('overview');
       } else if (hash === '#quotes') {
         setActiveView('quotes');
