@@ -13,6 +13,16 @@ import { v4 as uuidv4 } from 'uuid';
 const supabase = getSupabaseClient();
 const supabaseAdmin = getSupabaseAdminClient();;
 
+// Helper function to generate a slug from a name
+function generateSlug(name: string): string {
+  return name
+    .toLowerCase()
+    .trim()
+    .replace(/[^\w\s-]/g, '') // Remove special characters
+    .replace(/\s+/g, '-')      // Replace spaces with hyphens
+    .replace(/-+/g, '-');      // Replace multiple hyphens with single hyphen
+}
+
 // Private instance to ensure singleton pattern
 class ProductDataService {
   private static instance: ProductDataService | null = null;
@@ -342,10 +352,14 @@ class ProductDataService {
 
   async createLevel1Product(productData: Omit<Level1Product, 'id'>): Promise<Level1Product> {
     try {
+      // Generate a unique ID from the product name
+      const productId = generateSlug(productData.name);
+      
       // Explicitly map fields - DO NOT include 'type' as it doesn't exist in DB
       const { data, error } = await supabase
         .from('products')
         .insert({
+          id: productId,
           name: productData.name,
           description: productData.description || '',
           price: productData.price || 0,
