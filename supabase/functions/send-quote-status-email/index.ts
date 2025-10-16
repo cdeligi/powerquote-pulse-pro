@@ -169,9 +169,29 @@ const handler = async (req: Request): Promise<Response> => {
       ? `${quoteData.submitter.first_name || ''} ${quoteData.submitter.last_name || ''}`.trim()
       : 'Unknown';
 
+    // Extract customer name from quote_fields first, then fall back to root-level customer_name
+    const extractCustomerName = (quoteData: any): string => {
+      // Try to get from quote_fields JSON first (most accurate)
+      if (quoteData.quote_fields) {
+        const fields = quoteData.quote_fields;
+        const directKeys = ['customerName', 'customer_name', 'customer-name', 'customer name', 'customer', 
+                           'clientName', 'client_name', 'client-name', 'client name', 'client'];
+        
+        for (const key of directKeys) {
+          const value = fields[key];
+          if (value && typeof value === 'string' && value.trim().length > 0) {
+            return value.trim();
+          }
+        }
+      }
+      
+      // Fall back to root-level customer_name
+      return quoteData.customer_name || 'Unknown Customer';
+    };
+
     const templateData = {
       quote_id: quoteData.id,
-      customer_name: quoteData.customer_name,
+      customer_name: extractCustomerName(quoteData),
       original_value: `$${Number(quoteData.original_quote_value || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
       approved_discount: quoteData.approved_discount || 0,
       final_value: `$${Number(quoteData.discounted_value || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
