@@ -94,18 +94,47 @@ const handler = async (req: Request): Promise<Response> => {
 
     const template: EmailTemplate = templateRecord;
 
-    // 3. Fetch quote details
-    const { data: quoteData, error: quoteError } = await supabase
-      .from('quotes')
-      .select(`
-        *,
-        reviewer:reviewed_by(first_name, last_name, email),
-        submitter:user_id(first_name, last_name, email)
-      `)
-      .eq('id', quoteId)
-      .single();
+    // 3. Fetch quote details or use mock data for testing
+    let quoteData: any;
 
-    if (quoteError) throw new Error(`Failed to fetch quote: ${quoteError.message}`);
+    if (quoteId === 'TEST') {
+      // Use mock data for testing
+      console.log('Using mock data for test email');
+      quoteData = {
+        id: 'TEST-QUOTE-001',
+        customer_name: 'Test Customer Inc.',
+        original_quote_value: 50000,
+        discounted_value: 47500,
+        approved_discount: 5,
+        approval_notes: 'This is a test email notification',
+        rejection_reason: 'This is a test rejection notification',
+        reviewed_at: new Date().toISOString(),
+        reviewer: {
+          first_name: 'Test',
+          last_name: 'Reviewer',
+          email: settings.smtp_from_email
+        },
+        submitter: {
+          first_name: 'Test',
+          last_name: 'User',
+          email: settings.smtp_from_email
+        }
+      };
+    } else {
+      // Fetch real quote data
+      const { data: fetchedQuoteData, error: quoteError } = await supabase
+        .from('quotes')
+        .select(`
+          *,
+          reviewer:reviewed_by(first_name, last_name, email),
+          submitter:user_id(first_name, last_name, email)
+        `)
+        .eq('id', quoteId)
+        .single();
+
+      if (quoteError) throw new Error(`Failed to fetch quote: ${quoteError.message}`);
+      quoteData = fetchedQuoteData;
+    }
 
     // 4. Determine recipients
     let recipients: string[] = [];
