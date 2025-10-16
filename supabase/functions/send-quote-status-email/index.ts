@@ -83,7 +83,7 @@ const handler = async (req: Request): Promise<Response> => {
 
     // 2. Fetch email template
     const templateType = action === 'approved' ? 'quote_approved' : 'quote_rejected';
-    const { data: templateData, error: templateError } = await supabase
+    const { data: templateRecord, error: templateError } = await supabase
       .from('email_templates')
       .select('*')
       .eq('template_type', templateType)
@@ -92,7 +92,7 @@ const handler = async (req: Request): Promise<Response> => {
 
     if (templateError) throw new Error(`Failed to fetch email template: ${templateError.message}`);
 
-    const template: EmailTemplate = templateData;
+    const template: EmailTemplate = templateRecord;
 
     // 3. Fetch quote details
     const { data: quoteData, error: quoteError } = await supabase
