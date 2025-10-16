@@ -342,16 +342,23 @@ class ProductDataService {
 
   async createLevel1Product(productData: Omit<Level1Product, 'id'>): Promise<Level1Product> {
     try {
-      const { displayName, asset_type_id, category, rackConfigurable, ...restOfProductData } = productData;
       const { data, error } = await supabase
         .from('products')
         .insert({
-          ...restOfProductData, // Spread the rest of the data
+          name: productData.name,
+          description: productData.description || '',
+          price: productData.price || 0,
+          cost: productData.cost || 0,
+          enabled: productData.enabled ?? true,
           product_level: 1,
-          display_name: displayName || productData.name,
-          asset_type_id: asset_type_id,
-          category: category,
-          rack_configurable: rackConfigurable || false,
+          display_name: productData.displayName || productData.name,
+          asset_type_id: productData.asset_type_id || null,
+          category: productData.category || null,
+          rack_configurable: productData.rackConfigurable || false,
+          part_number: productData.partNumber || null,
+          image_url: productData.image || null,
+          product_info_url: productData.productInfoUrl || null,
+          specifications: productData.specifications || {}
         })
         .select()
         .single();
