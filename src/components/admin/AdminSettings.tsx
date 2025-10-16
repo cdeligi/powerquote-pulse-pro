@@ -13,6 +13,7 @@ const supabaseAdmin = getSupabaseAdminClient();;
 import { toast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { UserSharingManager } from './UserSharingManager';
+import { EmailSettings } from './EmailSettings';
 
 const AdminSettings = () => {
   const { user } = useAuth();
@@ -191,7 +192,7 @@ const AdminSettings = () => {
       </div>
 
       <Tabs defaultValue="general" className="w-full">
-        <TabsList className="grid w-full grid-cols-7 bg-gray-800">
+        <TabsList className="grid w-full grid-cols-8 bg-gray-800">
           <TabsTrigger value="general" className="text-white data-[state=active]:bg-red-600">
             General
           </TabsTrigger>
@@ -203,6 +204,9 @@ const AdminSettings = () => {
           </TabsTrigger>
           <TabsTrigger value="session" className="text-white data-[state=active]:bg-red-600">
             Session Management
+          </TabsTrigger>
+          <TabsTrigger value="email" className="text-white data-[state=active]:bg-red-600">
+            Email Settings
           </TabsTrigger>
           <TabsTrigger value="terms" className="text-white data-[state=active]:bg-red-600">
             Terms & Conditions
@@ -589,6 +593,10 @@ const AdminSettings = () => {
               <UserSharingManager />
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="email">
+          <EmailSettings />
         </TabsContent>
 
         <TabsContent value="legal">

@@ -127,7 +127,6 @@ export type Database = {
           total_price: number
           unit_cost: number
           unit_price: number
-          updated_at: string
         }
         Insert: {
           approved_unit_price?: number | null
@@ -149,7 +148,6 @@ export type Database = {
           total_price: number
           unit_cost?: number
           unit_price: number
-          updated_at?: string
         }
         Update: {
           approved_unit_price?: number | null
@@ -171,7 +169,6 @@ export type Database = {
           total_price?: number
           unit_cost?: number
           unit_price?: number
-          updated_at?: string
         }
         Relationships: [
           {
@@ -361,6 +358,133 @@ export type Database = {
           owner_id?: string | null
         }
         Relationships: []
+      }
+      email_audit_log: {
+        Row: {
+          body: string
+          created_at: string
+          error_message: string | null
+          id: string
+          quote_id: string
+          recipient_email: string
+          recipient_name: string | null
+          sent_at: string | null
+          status: string
+          subject: string
+          template_type: string
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          quote_id: string
+          recipient_email: string
+          recipient_name?: string | null
+          sent_at?: string | null
+          status: string
+          subject: string
+          template_type: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          quote_id?: string
+          recipient_email?: string
+          recipient_name?: string | null
+          sent_at?: string | null
+          status?: string
+          subject?: string
+          template_type?: string
+        }
+        Relationships: []
+      }
+      email_settings: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          is_encrypted: boolean | null
+          setting_key: string
+          setting_value: Json
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_encrypted?: boolean | null
+          setting_key: string
+          setting_value?: Json
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_encrypted?: boolean | null
+          setting_key?: string
+          setting_value?: Json
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_settings_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      email_templates: {
+        Row: {
+          body_template: string
+          created_at: string
+          enabled: boolean | null
+          id: string
+          subject_template: string
+          template_type: string
+          updated_at: string
+          updated_by: string | null
+          variables: Json | null
+        }
+        Insert: {
+          body_template: string
+          created_at?: string
+          enabled?: boolean | null
+          id?: string
+          subject_template: string
+          template_type: string
+          updated_at?: string
+          updated_by?: string | null
+          variables?: Json | null
+        }
+        Update: {
+          body_template?: string
+          created_at?: string
+          enabled?: boolean | null
+          id?: string
+          subject_template?: string
+          template_type?: string
+          updated_at?: string
+          updated_by?: string | null
+          variables?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_templates_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       features: {
         Row: {
@@ -1224,7 +1348,6 @@ export type Database = {
           created_at: string
           currency: string
           customer_name: string
-          additional_quote_information: string | null
           discount_justification: string | null
           discounted_margin: number
           discounted_value: number
@@ -1269,7 +1392,6 @@ export type Database = {
           created_at?: string
           currency?: string
           customer_name: string
-          additional_quote_information?: string | null
           discount_justification?: string | null
           discounted_margin: number
           discounted_value: number
@@ -1314,7 +1436,6 @@ export type Database = {
           created_at?: string
           currency?: string
           customer_name?: string
-          additional_quote_information?: string | null
           discount_justification?: string | null
           discounted_margin?: number
           discounted_value?: number
@@ -1840,12 +1961,7 @@ export type Database = {
         Returns: number
       }
       clone_quote: {
-        Args: {
-          p_source_quote_id?: string
-          p_new_user_id?: string
-          source_quote_id?: string
-          new_user_id?: string
-        }
+        Args: { new_user_id: string; source_quote_id: string }
         Returns: string
       }
       create_user: {
@@ -2031,7 +2147,7 @@ export type Database = {
               p_user_agent?: string
               p_user_id: string
             }
-        Returns: undefined
+        Returns: string
       }
       log_user_security_event: {
         Args: {
