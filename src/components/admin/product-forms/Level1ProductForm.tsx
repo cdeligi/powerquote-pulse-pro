@@ -57,7 +57,7 @@ const Level1ProductForm = ({ onSubmit, initialData }: Level1ProductFormProps) =>
       asset_type_id: formData.asset_type_id,
       category: formData.category,
       enabled: formData.enabled,
-      type: formData.name,
+      type: formData.name, // Required by TypeScript, not sent to DB
       price: 0,
       cost: 0
     });

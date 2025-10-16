@@ -342,6 +342,7 @@ class ProductDataService {
 
   async createLevel1Product(productData: Omit<Level1Product, 'id'>): Promise<Level1Product> {
     try {
+      // Explicitly map fields - DO NOT include 'type' as it doesn't exist in DB
       const { data, error } = await supabase
         .from('products')
         .insert({
@@ -359,6 +360,7 @@ class ProductDataService {
           image_url: productData.image || null,
           product_info_url: productData.productInfoUrl || null,
           specifications: productData.specifications || {}
+          // NOTE: 'type' field is NOT included - it doesn't exist in the products table
         })
         .select()
         .single();
