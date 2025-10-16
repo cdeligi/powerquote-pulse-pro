@@ -1,3 +1,4 @@
+import NotFound from "./pages/NotFound";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -5,7 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import Index from "./pages/Index";
-import NotFound from "./pages/NotFound";
+import QuotePDF from "./pages/QuotePDF";
 
 // React Query provider moved to main.tsx
 
@@ -56,6 +57,7 @@ const App = () => {
                 {/* This makes the Index component the entry point for all routes,
                     allowing it to handle auth and render the Dashboard, which in turn
                     should contain its own nested <Routes> to handle sub-paths like /admin. */}
+                <Route path="/quote-pdf/:quoteId" element={<QuotePDF />} />
                 <Route path="/*" element={<Index />} />
               </Routes>
             </BrowserRouter>

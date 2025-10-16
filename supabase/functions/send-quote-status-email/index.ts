@@ -1,7 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.50.0";
 import { Resend } from "npm:resend@2.0.0";
-import { jsPDF } from "npm:jspdf@2.5.2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -190,195 +189,12 @@ const handler = async (req: Request): Promise<Response> => {
       return quoteData.customer_name || 'Unknown Customer';
     };
 
-    // Generate PDF attachment
-    let pdfAttachment = null;
-    try {
-      console.log('Generating PDF for quote:', quoteId);
-      
-      // Fetch BOM items for the quote
-      const { data: bomItems, error: bomError } = await supabase
-        .from('bom_items')
-        .select('*')
-        .eq('quote_id', quoteId);
-      
-      if (bomError) {
-        console.error('Error fetching BOM items:', bomError);
-      }
-
-      const pdf = new jsPDF();
-      const pageWidth = pdf.internal.pageSize.getWidth();
-      let yPos = 20;
-      const lineHeight = 7;
-      
-      // Header
-      pdf.setFontSize(20);
-      pdf.setFont('helvetica', 'bold');
-      pdf.text('Quote Document', pageWidth / 2, yPos, { align: 'center' });
-      yPos += lineHeight * 2;
-      
-      // Quote Information
-      pdf.setFontSize(12);
-      pdf.setFont('helvetica', 'bold');
-      pdf.text('Quote Information', 15, yPos);
-      yPos += lineHeight;
-      
-      pdf.setFontSize(10);
-      pdf.setFont('helvetica', 'normal');
-      pdf.text(`Quote ID: ${quoteData.id}`, 15, yPos);
-      yPos += lineHeight;
-      pdf.text(`Customer: ${extractCustomerName(quoteData)}`, 15, yPos);
-      yPos += lineHeight;
-      pdf.text(`Status: ${action === 'approved' ? 'APPROVED' : 'REJECTED'}`, 15, yPos);
-      yPos += lineHeight;
-      pdf.text(`Priority: ${quoteData.priority || 'Medium'}`, 15, yPos);
-      yPos += lineHeight;
-      pdf.text(`Currency: ${quoteData.currency || 'USD'}`, 15, yPos);
-      yPos += lineHeight * 1.5;
-      
-      // Financial Information
-      pdf.setFont('helvetica', 'bold');
-      pdf.text('Financial Summary', 15, yPos);
-      yPos += lineHeight;
-      
-      pdf.setFont('helvetica', 'normal');
-      const originalValue = Number(quoteData.original_quote_value || 0);
-      const discountedValue = Number(quoteData.discounted_value || 0);
-      const totalCost = Number(quoteData.total_cost || 0);
-      const discount = Number(quoteData.approved_discount || 0);
-      
-      pdf.text(`Original Value: $${originalValue.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, 15, yPos);
-      yPos += lineHeight;
-      
-      if (discount > 0) {
-        pdf.text(`Discount: ${discount}%`, 15, yPos);
-        yPos += lineHeight;
-        pdf.text(`Final Value: $${discountedValue.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, 15, yPos);
-        yPos += lineHeight;
-      }
-      
-      pdf.text(`Total Cost: $${totalCost.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, 15, yPos);
-      yPos += lineHeight;
-      
-      const margin = originalValue > 0 ? ((originalValue - totalCost) / originalValue * 100) : 0;
-      pdf.text(`Margin: ${margin.toFixed(2)}%`, 15, yPos);
-      yPos += lineHeight * 1.5;
-      
-      // BOM Items
-      if (bomItems && bomItems.length > 0) {
-        pdf.setFont('helvetica', 'bold');
-        pdf.text('Bill of Materials', 15, yPos);
-        yPos += lineHeight;
-        
-        pdf.setFontSize(9);
-        pdf.setFont('helvetica', 'normal');
-        
-        bomItems.forEach((item, index) => {
-          if (yPos > 270) {
-            pdf.addPage();
-            yPos = 20;
-          }
-          
-          const itemText = `${index + 1}. ${item.name || 'Unnamed'} (${item.part_number || 'N/A'})`;
-          pdf.text(itemText, 15, yPos);
-          yPos += lineHeight;
-          
-          const qty = item.quantity || 1;
-          const price = Number(item.unit_price || 0);
-          const total = qty * price;
-          
-          pdf.text(`   Qty: ${qty} @ $${price.toFixed(2)} = $${total.toFixed(2)}`, 15, yPos);
-          yPos += lineHeight * 0.8;
-        });
-        yPos += lineHeight;
-      }
-      
-      // Additional Information
-      if (quoteData.quote_fields) {
-        if (yPos > 250) {
-          pdf.addPage();
-          yPos = 20;
-        }
-        
-        pdf.setFontSize(10);
-        pdf.setFont('helvetica', 'bold');
-        pdf.text('Additional Information', 15, yPos);
-        yPos += lineHeight;
-        
-        pdf.setFont('helvetica', 'normal');
-        const fields = quoteData.quote_fields;
-        
-        if (fields.sfdcOpportunity) {
-          pdf.text(`SFDC Opportunity: ${fields.sfdcOpportunity}`, 15, yPos);
-          yPos += lineHeight;
-        }
-        
-        if (fields.oracleCustomerId) {
-          pdf.text(`Oracle Customer ID: ${fields.oracleCustomerId}`, 15, yPos);
-          yPos += lineHeight;
-        }
-        
-        if (fields.shippingTerms) {
-          pdf.text(`Shipping Terms: ${fields.shippingTerms}`, 15, yPos);
-          yPos += lineHeight;
-        }
-        
-        if (fields.paymentTerms) {
-          pdf.text(`Payment Terms: ${fields.paymentTerms}`, 15, yPos);
-          yPos += lineHeight;
-        }
-      }
-      
-      // Notes for rejection
-      if (action === 'rejected' && quoteData.approval_notes) {
-        if (yPos > 250) {
-          pdf.addPage();
-          yPos = 20;
-        }
-        
-        yPos += lineHeight;
-        pdf.setFont('helvetica', 'bold');
-        pdf.text('Rejection Reason:', 15, yPos);
-        yPos += lineHeight;
-        
-        pdf.setFont('helvetica', 'normal');
-        const lines = pdf.splitTextToSize(quoteData.approval_notes, pageWidth - 30);
-        lines.forEach((line: string) => {
-          if (yPos > 280) {
-            pdf.addPage();
-            yPos = 20;
-          }
-          pdf.text(line, 15, yPos);
-          yPos += lineHeight;
-        });
-      }
-      
-      // Footer
-      const totalPages = pdf.getNumberOfPages();
-      for (let i = 1; i <= totalPages; i++) {
-        pdf.setPage(i);
-        pdf.setFontSize(8);
-        pdf.setFont('helvetica', 'normal');
-        pdf.text(
-          `Page ${i} of ${totalPages} - Generated ${new Date().toLocaleString()}`,
-          pageWidth / 2,
-          pdf.internal.pageSize.getHeight() - 10,
-          { align: 'center' }
-        );
-      }
-      
-      // Convert PDF to base64
-      const pdfBase64 = pdf.output('datauristring').split(',')[1];
-      
-      pdfAttachment = {
-        filename: `Quote_${quoteId.replace(/[^a-zA-Z0-9-]/g, '_')}.pdf`,
-        content: pdfBase64,
-      };
-      
-      console.log('PDF generated successfully');
-    } catch (pdfError) {
-      console.error('Error generating PDF:', pdfError);
-      // Continue without PDF attachment if generation fails
-    }
+    // Generate PDF access link
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
+    const projectRef = supabaseUrl.match(/https:\/\/([^.]+)\.supabase\.co/)?.[1] || '';
+    const pdfUrl = `https://${projectRef}.lovable.app/quote-pdf/${quoteId}`;
+    
+    console.log(`Generated PDF access URL: ${pdfUrl}`);
 
     const templateData = {
       quote_id: quoteData.id,
@@ -394,6 +210,8 @@ const handler = async (req: Request): Promise<Response> => {
       approval_notes: quoteData.approval_notes || '',
       rejection_reason: quoteData.rejection_reason || '',
       recipient_name: submitterName,
+      pdf_url: pdfUrl,
+      pdf_link: `<a href="${pdfUrl}" style="display: inline-block; padding: 12px 24px; background-color: #0066cc; color: white; text-decoration: none; border-radius: 4px; font-weight: bold;">View & Download Full Quote PDF</a>`,
     };
 
     // 6. Send emails
@@ -416,11 +234,6 @@ const handler = async (req: Request): Promise<Response> => {
           subject: subject,
           html: body,
         };
-        
-        // Attach PDF if available
-        if (pdfAttachment) {
-          emailPayload.attachments = [pdfAttachment];
-        }
         
         const { data, error } = await resend.emails.send(emailPayload);
 
