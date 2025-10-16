@@ -471,6 +471,31 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
           : `Quote ${action === 'approve' ? 'approved' : 'rejected'} successfully`,
       });
 
+      // Send email notification
+      try {
+        console.log(`Triggering email notification for ${action} of quote ${targetQuoteId}`);
+        
+        const { error: emailError } = await supabase.functions.invoke('send-quote-status-email', {
+          body: {
+            quoteId: targetQuoteId,
+            action: action === 'approve' ? 'approved' : 'rejected',
+          },
+        });
+
+        if (emailError) {
+          console.error('Failed to send email notification:', emailError);
+          toast({
+            title: 'Email Warning',
+            description: 'Quote status updated, but email notification failed to send.',
+            variant: 'default',
+          });
+        } else {
+          console.log('Email notification sent successfully');
+        }
+      } catch (emailError) {
+        console.error('Exception sending email notification:', emailError);
+      }
+
       const refreshedQuotes = await fetchData();
       const refreshedQuote = refreshedQuotes.find(q => q.id === targetQuoteId);
       if (refreshedQuote) {
