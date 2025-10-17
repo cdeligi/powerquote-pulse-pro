@@ -189,8 +189,7 @@ const handler = async (req: Request): Promise<Response> => {
       return quoteData.customer_name || 'Unknown Customer';
     };
 
-    // Generate PDF access link
-    const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
+    // Generate PDF access link (using supabaseUrl from line 59)
     const projectRef = supabaseUrl.match(/https:\/\/([^.]+)\.supabase\.co/)?.[1] || '';
     const pdfUrl = `https://${projectRef}.lovable.app/quote-pdf/${quoteId}`;
     
