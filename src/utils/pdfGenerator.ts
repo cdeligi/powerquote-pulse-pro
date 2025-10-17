@@ -1046,27 +1046,246 @@ export const generateQuotePDF = async (
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;');
 
+  const isLikelyTermsHeading = (value: string) => {
+    const trimmed = value.trim();
+    if (!trimmed) return false;
+
+    const hasLetters = /[a-zA-Z]/.test(trimmed);
+    const hasLowercase = /[a-z]/.test(trimmed);
+    const isAllCaps = hasLetters && !hasLowercase;
+    const startsWithNumber = /^\d{1,3}(?:[A-Z]?)[).\-\s]+/.test(trimmed);
+
+    if (startsWithNumber) {
+      const withoutNumber = trimmed.replace(/^\d{1,3}(?:[A-Z]?)[).\-\s]+/, '');
+      if (!withoutNumber) {
+        return true;
+      }
+      const headingPart = withoutNumber.trim();
+      const headingHasLetters = /[a-zA-Z]/.test(headingPart);
+      const headingHasLowercase = /[a-z]/.test(headingPart);
+      if (headingHasLetters && !headingHasLowercase) {
+        return true;
+      }
+    }
+
+    if (isAllCaps) {
+      return true;
+    }
+
+    return false;
+  };
+
+  const buildTermsSection = (
+    heading: string | undefined,
+    paragraphs: string[],
+    index: number
+  ) => {
+    const safeHeading = heading ? escapeHtml(heading.trim()) : '';
+    const safeParagraphs = paragraphs
+      .map(paragraph => `<p>${sanitizeTermsParagraph(paragraph).replace(/\r?\n/g, '<br />')}</p>`)
+      .join('');
+
+    const headingClass = heading
+      ? `terms-heading${index === 0 ? ' terms-heading--intro' : ''}`
+      : '';
+
+    const headingHtml = heading
+      ? `<h3 class="${headingClass}">${safeHeading}</h3>`
+      : '';
+
+    return `<section class="terms-section">${headingHtml}${safeParagraphs}</section>`;
+  };
+
+  const formatPlainTextTerms = (content: string): string => {
+    const normalized = content.replace(/\r\n/g, '\n');
+    const rawParagraphs = normalized
+      .split(/\n{2,}/)
+      .map(paragraph => paragraph.trim())
+      .filter(Boolean);
+
+    if (rawParagraphs.length === 0) {
+      return buildTermsSection(undefined, [content], 0);
+    }
+
+    const sections: Array<{ heading?: string; paragraphs: string[] }> = [];
+    let currentSection: { heading?: string; paragraphs: string[] } | null = null;
+
+    const finalizeSection = () => {
+      if (!currentSection) return;
+      if (!currentSection.heading && currentSection.paragraphs.length === 0) return;
+      sections.push(currentSection);
+      currentSection = null;
+    };
+
+    rawParagraphs.forEach(paragraph => {
+      const [firstLine, ...rest] = paragraph.split('\n');
+      const remainder = rest.join('\n').trim();
+      const candidateHeading = firstLine.trim();
+
+      if (isLikelyTermsHeading(candidateHeading)) {
+        finalizeSection();
+        currentSection = {
+          heading: candidateHeading,
+          paragraphs: remainder ? [remainder] : [],
+        };
+        return;
+      }
+
+      if (!currentSection) {
+        currentSection = {
+          heading: undefined,
+          paragraphs: [paragraph],
+        };
+        return;
+      }
+
+      if (!currentSection.heading && isLikelyTermsHeading(paragraph)) {
+        finalizeSection();
+        currentSection = {
+          heading: paragraph,
+          paragraphs: [],
+        };
+        return;
+      }
+
+      currentSection.paragraphs.push(paragraph);
+    });
+
+    finalizeSection();
+
+    if (sections.length === 0) {
+      return buildTermsSection(undefined, rawParagraphs, 0);
+    }
+
+    return sections
+      .map((section, index) => buildTermsSection(section.heading, section.paragraphs, index))
+      .join('');
+  };
+
+  const tryFormatHtmlTerms = (content: string): string | null => {
+    if (typeof document === 'undefined') {
+      return null;
+    }
+
+    try {
+      const tempContainer = document.createElement('div');
+      tempContainer.innerHTML = content;
+
+      const sections: Array<{ heading?: string; body: string[] }> = [];
+      let current: { heading?: string; body: string[] } | null = null;
+
+      const pushCurrent = () => {
+        if (!current) return;
+        if (!current.heading && current.body.length === 0) {
+          current = null;
+          return;
+        }
+        sections.push(current);
+        current = null;
+      };
+
+      const processNode = (node: Node) => {
+        if (node.nodeType === Node.ELEMENT_NODE) {
+          const element = node as HTMLElement;
+          const tagName = element.tagName.toUpperCase();
+
+          if (/^H[1-6]$/.test(tagName)) {
+            pushCurrent();
+            const headingText = element.textContent?.trim() || '';
+            current = {
+              heading: headingText,
+              body: [],
+            };
+            return;
+          }
+
+          if (tagName === 'P' || tagName === 'UL' || tagName === 'OL' || tagName === 'TABLE') {
+            if (!current) {
+              current = { heading: undefined, body: [] };
+            }
+            current.body.push(element.outerHTML);
+            return;
+          }
+
+          if (tagName === 'STRONG' && isLikelyTermsHeading(element.textContent || '')) {
+            pushCurrent();
+            current = {
+              heading: element.textContent?.trim() || '',
+              body: [],
+            };
+            return;
+          }
+
+          const childNodes = Array.from(element.childNodes);
+          if (childNodes.length === 0) {
+            const text = element.textContent?.trim();
+            if (text) {
+              if (!current) {
+                current = { heading: undefined, body: [] };
+              }
+              current.body.push(`<p>${escapeHtml(text)}</p>`);
+            }
+            return;
+          }
+
+          childNodes.forEach(processNode);
+          return;
+        }
+
+        if (node.nodeType === Node.TEXT_NODE) {
+          const text = node.textContent?.trim();
+          if (text) {
+            if (!current) {
+              current = { heading: undefined, body: [] };
+            }
+            current.body.push(`<p>${escapeHtml(text)}</p>`);
+          }
+        }
+      };
+
+      Array.from(tempContainer.childNodes).forEach(processNode);
+      pushCurrent();
+
+      if (sections.length === 0) {
+        return null;
+      }
+
+      return sections
+        .map((section, index) => {
+          const heading = section.heading ? escapeHtml(section.heading.trim()) : '';
+          const headingClass = section.heading
+            ? `terms-heading${index === 0 ? ' terms-heading--intro' : ''}`
+            : '';
+          const headingHtml = section.heading
+            ? `<h3 class="${headingClass}">${heading}</h3>`
+            : '';
+          const bodyHtml = section.body.join('');
+          return `<section class="terms-section">${headingHtml}${bodyHtml}</section>`;
+        })
+        .join('');
+    } catch (error) {
+      console.warn('Could not normalize Terms & Conditions HTML for PDF:', error);
+      return null;
+    }
+  };
+
   const formatTermsAndConditions = (content: string): string => {
     if (!content) {
       return '';
     }
 
-    const hasHtmlTags = /<[^>]+>/.test(content);
+    const trimmed = content.trim();
+    if (!trimmed) {
+      return '';
+    }
+
+    const hasHtmlTags = /<[^>]+>/.test(trimmed);
     if (hasHtmlTags) {
-      return content;
+      const normalized = tryFormatHtmlTerms(trimmed);
+      return normalized ?? trimmed;
     }
 
-    const paragraphs = content
-      .split(/\n{2,}/)
-      .map(paragraph => sanitizeTermsParagraph(paragraph).replace(/\n/g, '<br />'))
-      .filter(Boolean)
-      .map(paragraph => `<p>${paragraph}</p>`);
-
-    if (paragraphs.length === 0) {
-      return `<p>${sanitizeTermsParagraph(content).replace(/\n/g, '<br />')}</p>`;
-    }
-
-    return paragraphs.join('');
+    return formatPlainTextTerms(trimmed);
   };
   let companyName = 'QUALITROL';
   let companyLogoUrl = '';
@@ -1597,8 +1816,7 @@ export const generateQuotePDF = async (
     }
 
     return `
-      <div style="margin-top: 40px; page-break-before: always;">
-        <h2 style="color: #dc2626; border-bottom: 2px solid #dc2626; padding-bottom: 10px;">Level 4 Configuration Details</h2>
+      <div class="level4-collection">
         ${sections}
       </div>
     `;
@@ -2232,6 +2450,136 @@ export const generateQuotePDF = async (
 
   const formattedTermsAndConditions = formatTermsAndConditions(termsAndConditions);
 
+  const rackConfigurationHTML = (() => {
+    const chassisItems = normalizedBomItems.filter(item =>
+      item.enabled &&
+      item.rackConfiguration &&
+      typeof item.rackConfiguration === 'object'
+    );
+
+    const fallbackRackLayouts = Array.isArray(draftBom?.rackLayouts) ? draftBom.rackLayouts : [];
+
+    if (chassisItems.length === 0 && fallbackRackLayouts.length === 0 && !quoteInfo.draft_bom?.rackConfiguration) {
+      return '';
+    }
+
+    let rackConfigHTML = '<div class="rack-config">';
+
+    const renderedRackLayoutKeys = new Set<string>();
+
+    const buildRackLayoutKey = (title: string, partNumber: string | undefined, slots: any[]) => {
+      const normalizedTitle = typeof title === 'string' ? title.trim().toLowerCase() : '';
+      const normalizedPart = typeof partNumber === 'string' ? partNumber.trim().toLowerCase() : '';
+      const normalizedSlots = Array.isArray(slots)
+        ? slots.map(slot => ({
+            slot:
+              slot?.slot ??
+              slot?.slotNumber ??
+              slot?.position ??
+              null,
+            partNumber:
+              typeof slot?.partNumber === 'string'
+                ? slot.partNumber.trim().toLowerCase()
+                : typeof slot?.product?.partNumber === 'string'
+                  ? slot.product.partNumber.trim().toLowerCase()
+                  : null,
+            cardName:
+              typeof slot?.cardName === 'string'
+                ? slot.cardName.trim().toLowerCase()
+                : typeof slot?.name === 'string'
+                  ? slot.name.trim().toLowerCase()
+                  : null,
+          }))
+        : [];
+
+      try {
+        return `${normalizedTitle}|${normalizedPart}|${JSON.stringify(normalizedSlots)}`;
+      } catch {
+        return `${normalizedTitle}|${normalizedPart}`;
+      }
+    };
+
+    const renderRackLayout = (title: string, partNumber: string | undefined, slots: any[]) => {
+      const layoutKey = buildRackLayoutKey(title, partNumber, slots);
+      if (layoutKey && renderedRackLayoutKeys.has(layoutKey)) {
+        return;
+      }
+
+      if (layoutKey) {
+        renderedRackLayoutKeys.add(layoutKey);
+      }
+
+      const safeTitle = escapeHtml(title);
+      const safePartNumber = partNumber ? escapeHtml(partNumber) : '';
+
+      rackConfigHTML += `
+        <div class="rack-card">
+          <h3 class="rack-card-title">${safeTitle}${safePartNumber ? ` · ${safePartNumber}` : ''}</h3>
+      `;
+
+      const normalizedSlots = Array.isArray(slots) ? dedupeSpanAwareSlots(slots as SpanAwareSlot[]) : [];
+
+      if (normalizedSlots.length > 0) {
+        rackConfigHTML += '<table class="rack-table"><thead><tr><th>Slot</th><th>Card Type</th><th>Part Number</th></tr></thead><tbody>';
+
+        normalizedSlots.forEach((slot: any, idx: number) => {
+          const slotNumber = slot?.slot ?? slot?.slotNumber ?? slot?.position ?? (idx + 1);
+          const cardName = slot?.cardName || slot?.name || slot?.product?.name || 'Empty';
+          const slotPartNumber = slot?.partNumber || slot?.product?.partNumber || '-';
+
+          rackConfigHTML += `
+            <tr>
+              <td>Slot ${escapeHtml(String(slotNumber))}</td>
+              <td>${escapeHtml(cardName)}</td>
+              <td>${escapeHtml(String(slotPartNumber))}</td>
+            </tr>
+          `;
+        });
+
+        rackConfigHTML += '</tbody></table>';
+      } else {
+        rackConfigHTML += '<p class="rack-empty">No rack configuration data available</p>';
+      }
+
+      rackConfigHTML += '</div>';
+    };
+
+    chassisItems.forEach(chassisItem => {
+      const config = chassisItem.rackConfiguration;
+      renderRackLayout(chassisItem.product.name, chassisItem.partNumber, config?.slots || []);
+    });
+
+    fallbackRackLayouts.forEach(layout => {
+      const slots = layout?.layout?.slots || layout?.slots;
+      if (Array.isArray(slots) && slots.length > 0) {
+        renderRackLayout(layout.productName || 'Configured Rack', layout.partNumber, slots);
+      }
+    });
+
+    if (quoteInfo.draft_bom?.rackConfiguration) {
+      const rawLayout = JSON.stringify(quoteInfo.draft_bom.rackConfiguration, null, 2);
+      rackConfigHTML += `
+        <div class="rack-card">
+          <h3 class="rack-card-title">Draft Rack Configuration</h3>
+          <pre class="rack-raw">${escapeHtml(rawLayout)}</pre>
+        </div>
+      `;
+    }
+
+    rackConfigHTML += '</div>';
+    return rackConfigHTML;
+  })();
+
+  const footerHTML = `
+    <div class="footer">
+      <p>${isDraft ? 'This is a draft quote and is subject to final approval and terms & conditions.' : 'This quote is subject to the terms & conditions outlined above.'}</p>
+      <p>Generated by PowerQuotePro Quote System | ${companyName}</p>
+      ${!isDraft ? `<p><strong>Quote ID:</strong> ${quoteInfo.id}</p>` : ''}
+    </div>
+  `;
+
+  const hasRackOrLevel4Content = Boolean(rackConfigurationHTML || level4SectionHTML);
+
   const htmlContent = `
     <!DOCTYPE html>
     <html>
@@ -2240,23 +2588,29 @@ export const generateQuotePDF = async (
       <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
         * { box-sizing: border-box; }
+        @page {
+          margin: 12mm 10mm;
+        }
         body {
           font-family: 'Inter', sans-serif;
           background: #f1f5f9;
           color: #0f172a;
           margin: 0;
-          padding: 36px;
+          padding: 24px 16px;
           font-size: 11px;
           line-height: 1.55;
         }
-        .page-container {
-          max-width: 1080px;
-          margin: 0 auto;
+        .page {
           background: #ffffff;
           border-radius: 20px;
-          padding: 40px 44px;
           box-shadow: 0 30px 60px -28px rgba(15, 23, 42, 0.3);
+          margin: 0 auto 24px;
+          max-width: 210mm;
+          width: 100%;
+          page-break-after: always;
         }
+        .page:last-of-type { page-break-after: auto; }
+        .page-inner { padding: 32px 36px; }
         .header {
           border-bottom: 1px solid #e2e8f0;
           padding-bottom: 24px;
@@ -2282,11 +2636,13 @@ export const generateQuotePDF = async (
         .field-row { display: grid; grid-template-columns: minmax(180px, 220px) 1fr; gap: 14px; padding: 10px 0; border-bottom: 1px solid #e2e8f0; }
         .field-row:last-of-type { border-bottom: none; }
         .field-label { font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: #64748b; font-weight: 600; }
-        .field-value { font-size: 12px; color: #0f172a; font-weight: 500; }
-        h2 { color: #0f172a; font-size: 16px; font-weight: 600; margin: 28px 0 18px; }
+        .field-value { font-size: 12px; color: #0f172a; font-weight: 500; word-break: break-word; }
+        .section-title { color: #0f172a; font-size: 16px; font-weight: 600; margin: 0 0 18px; }
         .bom-table { width: 100%; border-collapse: collapse; margin-bottom: 12px; }
+        .bom-table thead { display: table-header-group; }
         .bom-table th { background: #f1f5f9; color: #0f172a; padding: 12px 14px; font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; border-bottom: 1px solid #e2e8f0; }
         .bom-table td { padding: 14px; border-bottom: 1px solid #e2e8f0; color: #0f172a; font-size: 11px; vertical-align: top; }
+        .bom-table tbody tr { page-break-inside: avoid; }
         .bom-table tbody tr:nth-child(even) { background: #f8fafc; }
         .bom-item-cell { display: flex; flex-direction: column; align-items: flex-start; }
         .bom-item-name { font-weight: 600; }
@@ -2298,7 +2654,20 @@ export const generateQuotePDF = async (
         .total-line .label { font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: #64748b; font-weight: 500; }
         .total-line.discount { color: #b45309; }
         .total-line.final { font-size: 15px; color: #0f172a; }
-        .level4-section { margin-top: 40px; border: 1px solid #e2e8f0; border-radius: 16px; padding: 26px; background: linear-gradient(135deg, rgba(241,245,249,0.88), rgba(248,250,252,0.96)); }
+        .additional-info { margin-top: 24px; padding: 18px 20px; border-radius: 12px; background: #f8fafc; border: 1px solid #e2e8f0; }
+        .additional-info h3 { margin: 0 0 10px; color: #0f172a; font-size: 14px; font-weight: 600; }
+        .additional-info p { margin: 0; font-size: 11px; color: #334155; line-height: 1.6; }
+        .rack-config { display: flex; flex-direction: column; gap: 24px; }
+        .rack-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 16px; padding: 24px; box-shadow: 0 12px 32px -18px rgba(15,23,42,0.25); }
+        .rack-card-title { color: #0f172a; margin: 0; font-size: 15px; font-weight: 600; }
+        .rack-table { width: 100%; border-collapse: collapse; margin-top: 18px; background: #ffffff; border-radius: 12px; overflow: hidden; border: 1px solid #e2e8f0; }
+        .rack-table th { background: #0f172a; color: #f8fafc; padding: 12px; text-align: left; font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; }
+        .rack-table td { padding: 12px; border-bottom: 1px solid #e2e8f0; font-size: 11px; color: #0f172a; }
+        .rack-table tbody tr:nth-child(even) { background: #f8fafc; }
+        .rack-empty { color: #64748b; font-style: italic; padding: 18px; background: #ffffff; border-radius: 12px; border: 1px dashed #cbd5f5; margin-top: 18px; }
+        .rack-raw { white-space: pre-wrap; font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', monospace; font-size: 10px; background: #0f172a; color: #f8fafc; padding: 16px; border-radius: 12px; margin-top: 18px; overflow-x: auto; }
+        .level4-collection { display: flex; flex-direction: column; gap: 24px; margin-top: 24px; }
+        .level4-section { border: 1px solid #e2e8f0; border-radius: 16px; padding: 26px; background: linear-gradient(135deg, rgba(241,245,249,0.88), rgba(248,250,252,0.96)); }
         .level4-heading { margin: 0; font-size: 15px; font-weight: 600; color: #0f172a; }
         .level4-subheading { margin-top: 6px; color: #64748b; font-size: 11px; }
         .level4-meta { margin-top: 10px; color: #64748b; font-size: 10px; }
@@ -2311,51 +2680,88 @@ export const generateQuotePDF = async (
         .level4-raw { white-space: pre-wrap; font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', monospace; font-size: 10px; background: #0f172a; color: #f8fafc; padding: 16px; border-radius: 12px; margin-top: 18px; }
         .terms-columns {
           background: #f8fafc;
-          padding: 24px;
-          border-radius: 16px;
+          padding: 20px 22px;
+          border-radius: 14px;
           border: 1px solid #e2e8f0;
           margin-bottom: 20px;
           font-size: 10px;
-          line-height: 1.55;
+          line-height: 1.6;
           color: #475569;
           column-count: 2;
-          column-gap: 32px;
+          column-gap: 24px;
           column-fill: balance;
           -webkit-column-count: 2;
-          -webkit-column-gap: 32px;
+          -webkit-column-gap: 24px;
           -webkit-column-fill: balance;
           -moz-column-count: 2;
-          -moz-column-gap: 32px;
+          -moz-column-gap: 24px;
         }
-        .terms-columns p,
-        .terms-columns li {
+        .terms-columns > div:not(.terms-section),
+        .terms-columns > section:not(.terms-section),
+        .terms-columns > article,
+        .terms-columns > ul,
+        .terms-columns > ol,
+        .terms-columns div:not(.terms-section),
+        .terms-columns .terms-grid,
+        .terms-columns .grid,
+        .terms-columns .column,
+        .terms-columns .columns-2,
+        .terms-columns .space-y-1,
+        .terms-columns .space-y-2,
+        .terms-columns .space-y-3,
+        .terms-columns .space-y-4,
+        .terms-columns .space-y-5,
+        .terms-columns .space-y-6,
+        .terms-columns .space-y-7,
+        .terms-columns .space-y-8 {
+          display: contents;
+        }
+        .terms-section {
+          break-inside: avoid;
+          display: block;
+          margin-bottom: 18px;
+        }
+        .terms-heading {
+          font-size: 10px;
+          letter-spacing: 0.08em;
+          text-transform: uppercase;
+          color: #0f172a;
+          font-weight: 700;
+          margin: 0 0 6px;
+        }
+        .terms-heading--intro {
+          font-size: 11px;
+          letter-spacing: 0.12em;
+        }
+        .terms-section:first-of-type .terms-heading {
+          margin-top: 0;
+        }
+        .terms-section p,
+        .terms-section li {
           break-inside: avoid;
         }
-        .terms-columns p {
-          margin: 0 0 12px;
+        .terms-section p {
+          margin: 0 0 10px;
+          color: #475569;
         }
-        .terms-columns ul,
-        .terms-columns ol {
+        .terms-section ul,
+        .terms-section ol {
           margin: 0 0 12px 18px;
           padding: 0;
         }
+        .terms-section li {
+          margin-bottom: 6px;
+        }
         .terms-columns strong {
           color: #0f172a;
-        }
-        .terms-columns h3,
-        .terms-columns h4,
-        .terms-columns h5,
-        .terms-columns h6 {
-          margin-top: 16px;
-          margin-bottom: 8px;
-          color: #0f172a;
-          break-inside: avoid;
+          font-weight: 600;
         }
         .footer { margin-top: 48px; border-top: 1px solid #e2e8f0; padding-top: 18px; font-size: 10px; color: #64748b; }
         @media print {
           body { background: #ffffff; padding: 0; }
-          .page-container { box-shadow: none; border-radius: 0; margin: 0; padding: 32px; }
-          .draft-warning, .level4-section { page-break-inside: avoid; }
+          .page { box-shadow: none; border-radius: 0; margin: 0 auto; max-width: none; width: auto; }
+          .page-inner { padding: 12mm; }
+          .draft-warning, .date-info, .quote-header-fields, .rack-card, .level4-section { page-break-inside: avoid; }
           .terms-columns {
             column-count: 2;
             -webkit-column-count: 2;
@@ -2365,321 +2771,204 @@ export const generateQuotePDF = async (
       </style>
     </head>
     <body>
-      <div class="page-container">
-        <div class="header">
-          <div class="header-left">
-            ${companyLogoUrl ? `<img src="${companyLogoUrl}" alt="${companyName} Logo" class="logo-img" />` : `<div class="logo-text">${companyName}</div>`}
-          </div>
-          <div class="header-right">
-            <div class="quote-id">Quote ID: ${quoteIdDisplay}</div>
-            <div class="header-meta">Generated on: ${createdDate.toLocaleDateString()}</div>
-          </div>
-        </div>
-
-        ${isDraft ? `
-          <div class="draft-warning">
-            <strong>⚠️ Draft</strong>
-            <p>Draft values are informational. Please request a formal quotation with a finalized configuration and quote ID before purchasing.</p>
-          </div>
-        ` : ''}
-
-        <div class="date-info">
-          <span><strong>Created:</strong> ${createdDate.toLocaleDateString()}</span>
-          <span><strong>Valid Until:</strong> ${expiryDate.toLocaleDateString()}</span>
-          <span class="note">Valid for ${expiresDays} days</span>
-        </div>
-
-      <div class="quote-header-fields">
-        <h3>Quote Information</h3>
-        
-        ${quoteFieldsForPDF.map(field => {
-          let value: any = 'Not specified';
-
-          const candidateIds = Array.from(new Set([
-            field.id,
-            field.id?.replace(/-/g, '_'),
-            field.id?.replace(/_/g, '-'),
-            field.id?.toLowerCase?.(),
-            field.label,
-          ].filter(Boolean)));
-
-          const candidates = candidateIds.flatMap(candidateId => [
-            combinedQuoteFields[candidateId as string],
-            (quoteInfo as Record<string, any> | undefined)?.[candidateId as string],
-          ]);
-
-          const found = candidates.find(candidate => candidate !== undefined && candidate !== null && candidate !== '');
-          if (found !== undefined) {
-            value = found;
-          }
-
-          if (value && typeof value === 'object') {
-            value = JSON.stringify(value);
-          } else if (value === null || value === undefined || value === '') {
-            value = 'Not specified';
-          } else {
-            value = String(value).replace(/</g, '&lt;').replace(/>/g, '&gt;');
-          }
-
-          return `
-            <div class="field-row">
-              <div class="field-label">${field.label}:</div>
-              <div class="field-value">${value}</div>
+      <div class="page page-intro">
+        <div class="page-inner">
+          <div class="header">
+            <div class="header-left">
+              ${companyLogoUrl ? `<img src="${companyLogoUrl}" alt="${companyName} Logo" class="logo-img" />` : `<div class="logo-text">${companyName}</div>`}
             </div>
-          `;
-        }).join('')}
-        
-      </div>
+            <div class="header-right">
+              <div class="quote-id">Quote ID: ${quoteIdDisplay}</div>
+              <div class="header-meta">Generated on: ${createdDate.toLocaleDateString()}</div>
+            </div>
+          </div>
 
-      <h2>Bill of Materials</h2>
-      <table class="bom-table">
-        <thead>
-          <tr>
-            <th>Item</th>
-            <th>Description</th>
-            <th>Part Number</th>
-            <th>Qty</th>
-            ${canSeePrices ? '<th>Unit Price</th><th>Total</th>' : ''}
-          </tr>
-        </thead>
-        <tbody>
-          ${normalizedBomItems
-            .filter(item => item.enabled)
-            .map(item => {
-              const normalizedLevel =
-                coerceProductLevel(item?.level) ??
-                coerceProductLevel(item?.product?.product_level) ??
-                determineBomItemLevel(item);
+          ${isDraft ? `
+            <div class="draft-warning">
+              <strong>⚠️ Draft</strong>
+              <p>Draft values are informational. Please request a formal quotation with a finalized configuration and quote ID before purchasing.</p>
+            </div>
+          ` : ''}
 
-              const parentLevel2Id = coerceString(
-                extractParentLevel2IdFromItem(item) ??
-                  item?.parentLevel2Id ??
-                  item?.product?.parentLevel2Id ??
-                  item?.product?.parent_product_id ??
-                  item?.product?.parentProductId
-              );
+          <div class="date-info">
+            <span><strong>Created:</strong> ${createdDate.toLocaleDateString()}</span>
+            <span><strong>Valid Until:</strong> ${expiryDate.toLocaleDateString()}</span>
+            <span class="note">Valid for ${expiresDays} days</span>
+          </div>
 
-              const parentLevel2Item = parentLevel2Id ? level2ItemsById.get(parentLevel2Id) : undefined;
+          <div class="quote-header-fields">
+            <h3>Quote Information</h3>
 
-              const infoUrl =
-                sanitizeHttpUrl(item?.resolvedInfoUrl) ??
-                sanitizeHttpUrl((item?.product as any)?.productInfoUrl) ??
-                sanitizeHttpUrl((item?.product as any)?.product_info_url) ??
-                (parentLevel2Item
-                  ? sanitizeHttpUrl(parentLevel2Item?.resolvedInfoUrl) ??
-                    sanitizeHttpUrl((parentLevel2Item?.product as any)?.productInfoUrl) ??
-                    sanitizeHttpUrl((parentLevel2Item?.product as any)?.product_info_url)
-                  : undefined);
+            ${quoteFieldsForPDF.map(field => {
+              let value: any = 'Not specified';
 
-              const shouldRenderLink =
-                !!infoUrl && normalizedLevel !== 1 && normalizedLevel !== 4;
+              const candidateIds = Array.from(new Set([
+                field.id,
+                field.id?.replace(/-/g, '_'),
+                field.id?.replace(/_/g, '-'),
+                field.id?.toLowerCase?.(),
+                field.label,
+              ].filter(Boolean)));
 
-              const infoLinkHtml = shouldRenderLink && infoUrl
-                ? `<div class="product-info-link"><a href="${escapeHtml(infoUrl)}" target="_blank" rel="noopener noreferrer">Product Info</a></div>`
-                : '';
+              const candidates = candidateIds.flatMap(candidateId => [
+                combinedQuoteFields[candidateId as string],
+                (quoteInfo as Record<string, any> | undefined)?.[candidateId as string],
+              ]);
+
+              const found = candidates.find(candidate => candidate !== undefined && candidate !== null && candidate !== '');
+              if (found !== undefined) {
+                value = found;
+              }
+
+              if (value && typeof value === 'object') {
+                value = JSON.stringify(value);
+              } else if (value === null || value === undefined || value === '') {
+                value = 'Not specified';
+              } else {
+                value = String(value).replace(/</g, '&lt;').replace(/>/g, '&gt;');
+              }
 
               return `
-              <tr>
-                <td>
-                  <div class="bom-item-cell">
-                    <div class="bom-item-name">${escapeHtml(item.product.name)}</div>
-                    ${infoLinkHtml}
-                  </div>
-                </td>
-                <td>
-                  ${item.product.description}
-                </td>
-                <td>${item.partNumber || 'TBD'}</td>
-                <td>${item.quantity}</td>
-                ${canSeePrices ? `
-                  <td>${formatCurrency(item.product.price)}</td>
-                  <td>${formatCurrency(item.product.price * item.quantity)}</td>
-                ` : ''}
-              </tr>
-            `;
-            })
-            .join('')}
-        </tbody>
-      </table>
+                <div class="field-row">
+                  <div class="field-label">${field.label}:</div>
+                  <div class="field-value">${value}</div>
+                </div>
+              `;
+            }).join('')}
 
-      ${canSeePrices ? `
-        <div class="total-section">
-          ${hasDiscount ? `
-            <p class="total-line">
-              <span class="label">Original Total:</span>
-              <span>${formatCurrency(originalTotal)}</span>
-            </p>
-            <p class="total-line discount">
-              <span class="label">Discount (${formatPercent(effectiveDiscountPercent)}%):</span>
-              <span>- ${formatCurrency(discountAmount)}</span>
-            </p>
-            <p class="total-line final">
-              <span class="label">Final Total:</span>
-              <span>${formatCurrency(finalTotal)}</span>
-            </p>
-          ` : `
-            <p class="total-line final">
-              <span class="label">Total:</span>
-              <span>${formatCurrency(finalTotal)}</span>
-            </p>
-          `}
-        </div>
-      ` : ''}
-
-      ${(() => {
-        if (!additionalQuoteInfo) {
-          return '';
-        }
-
-        const escaped = escapeHtml(additionalQuoteInfo).replace(/\r?\n/g, '<br />');
-        return `
-          <div style="margin-top: 24px; padding: 18px 20px; border-radius: 12px; background: #f8fafc; border: 1px solid #e2e8f0;">
-            <h3 style="margin-top: 0; margin-bottom: 10px; color: #0f172a; font-size: 14px; font-weight: 600;">Additional Quote Information</h3>
-            <p style="margin: 0; font-size: 11px; color: #334155; line-height: 1.6;">${escaped}</p>
           </div>
-        `;
-      })()}
-
-      ${(() => {
-        // Check if any items have chassis configurations
-        const chassisItems = normalizedBomItems.filter(item =>
-          item.enabled &&
-          item.rackConfiguration &&
-          typeof item.rackConfiguration === 'object'
-        );
-
-        const fallbackRackLayouts = Array.isArray(draftBom?.rackLayouts) ? draftBom.rackLayouts : [];
-
-        if (chassisItems.length === 0 && fallbackRackLayouts.length === 0 && !quoteInfo.draft_bom?.rackConfiguration) {
-          return '';
-        }
-
-        let rackConfigHTML = '<div style="page-break-before: always; margin-top: 40px;">';
-        rackConfigHTML += '<h2 style="color: #0f172a; border-bottom: 1px solid #e2e8f0; padding-bottom: 12px;">Rack Configuration</h2>';
-
-        const renderedRackLayoutKeys = new Set<string>();
-
-        const buildRackLayoutKey = (title: string, partNumber: string | undefined, slots: any[]) => {
-          const normalizedTitle = typeof title === 'string' ? title.trim().toLowerCase() : '';
-          const normalizedPart = typeof partNumber === 'string' ? partNumber.trim().toLowerCase() : '';
-          const normalizedSlots = Array.isArray(slots)
-            ? slots.map(slot => ({
-                slot:
-                  slot?.slot ??
-                  slot?.slotNumber ??
-                  slot?.position ??
-                  null,
-                partNumber:
-                  typeof slot?.partNumber === 'string'
-                    ? slot.partNumber.trim().toLowerCase()
-                    : typeof slot?.product?.partNumber === 'string'
-                      ? slot.product.partNumber.trim().toLowerCase()
-                      : null,
-                cardName:
-                  typeof slot?.cardName === 'string'
-                    ? slot.cardName.trim().toLowerCase()
-                    : typeof slot?.name === 'string'
-                      ? slot.name.trim().toLowerCase()
-                      : null,
-              }))
-            : [];
-
-          try {
-            return `${normalizedTitle}|${normalizedPart}|${JSON.stringify(normalizedSlots)}`;
-          } catch {
-            return `${normalizedTitle}|${normalizedPart}`;
-          }
-        };
-
-        const renderRackLayout = (title: string, partNumber: string | undefined, slots: any[]) => {
-          const layoutKey = buildRackLayoutKey(title, partNumber, slots);
-          if (layoutKey && renderedRackLayoutKeys.has(layoutKey)) {
-            return;
-          }
-
-          if (layoutKey) {
-            renderedRackLayoutKeys.add(layoutKey);
-          }
-
-          rackConfigHTML += `
-            <div style="margin-top: 30px; margin-bottom: 30px; background: #f8fafc; padding: 24px; border-radius: 16px; border: 1px solid #e2e8f0; box-shadow: 0 12px 32px -18px rgba(15,23,42,0.25);">
-              <h3 style="color: #0f172a; margin-top: 0; font-size: 15px; font-weight: 600;">${title}${partNumber ? ` · ${partNumber}` : ''}</h3>
-              <div style="margin-top: 18px;">`;
-
-          const normalizedSlots = Array.isArray(slots) ? dedupeSpanAwareSlots(slots as SpanAwareSlot[]) : [];
-
-          if (normalizedSlots.length > 0) {
-            rackConfigHTML += '<table style="width: 100%; border-collapse: collapse; margin-top: 12px; background: #ffffff; border-radius: 12px; overflow: hidden; border: 1px solid #e2e8f0;">';
-            rackConfigHTML += '<thead><tr style="background: #0f172a; color: #f8fafc;"><th style="padding: 12px; border-bottom: 1px solid #1f2937; text-align: left; font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase;">Slot</th><th style="padding: 12px; border-bottom: 1px solid #1f2937; text-align: left; font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase;">Card Type</th><th style="padding: 12px; border-bottom: 1px solid #1f2937; text-align: left; font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase;">Part Number</th></tr></thead>';
-            rackConfigHTML += '<tbody>';
-
-            normalizedSlots.forEach((slot: any, idx: number) => {
-              const slotNumber = slot?.slot ?? slot?.slotNumber ?? slot?.position ?? (idx + 1);
-              const cardName = slot?.cardName || slot?.name || slot?.product?.name || 'Empty';
-              const slotPartNumber = slot?.partNumber || slot?.product?.partNumber || '-';
-              const rowStyle = idx % 2 === 0 ? 'background: #f8fafc;' : 'background: #ffffff;';
-              rackConfigHTML += `
-                <tr style="${rowStyle}">
-                  <td style="padding: 12px; border-bottom: 1px solid #e2e8f0; font-weight: 600; color: #0f172a;">Slot ${slotNumber}</td>
-                  <td style="padding: 12px; border-bottom: 1px solid #e2e8f0; color: #0f172a;">${cardName}</td>
-                  <td style="padding: 12px; border-bottom: 1px solid #e2e8f0; font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', monospace; font-size: 10px; color: #0f172a;">${slotPartNumber}</td>
-                </tr>`;
-            });
-
-            rackConfigHTML += '</tbody></table>';
-          } else {
-            rackConfigHTML += '<p style="color: #64748b; font-style: italic; padding: 18px; background: #ffffff; border-radius: 12px; border: 1px dashed #cbd5f5;">No rack configuration data available</p>';
-          }
-
-          rackConfigHTML += '</div></div>';
-        };
-
-        // Process each chassis item
-        chassisItems.forEach(chassisItem => {
-          const config = chassisItem.rackConfiguration;
-          renderRackLayout(chassisItem.product.name, chassisItem.partNumber, config?.slots || []);
-        });
-
-        // Render fallback rack layouts stored in draft data
-        fallbackRackLayouts.forEach(layout => {
-          const slots = layout?.layout?.slots || layout?.slots;
-          if (Array.isArray(slots) && slots.length > 0) {
-            renderRackLayout(layout.productName || 'Configured Rack', layout.partNumber, slots);
-          }
-        });
-
-        // Also check draft_bom for any raw rack configuration data
-        if (quoteInfo.draft_bom?.rackConfiguration) {
-          rackConfigHTML += `
-            <div style="margin-top: 30px; margin-bottom: 30px; background: #f8fafc; padding: 24px; border-radius: 16px; border: 1px solid #e2e8f0;">
-              <h3 style="color: #0f172a; margin-top: 0; font-size: 15px; font-weight: 600;">Draft Rack Configuration</h3>
-              <pre style="white-space: pre-wrap; font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', monospace; font-size: 10px; background: #0f172a; color: #f8fafc; padding: 16px; border-radius: 12px; overflow-x: auto;">${JSON.stringify(quoteInfo.draft_bom.rackConfiguration, null, 2)}</pre>
-            </div>`;
-        }
-        
-        rackConfigHTML += '</div>';
-        return rackConfigHTML;
-      })()}
-
-      ${level4SectionHTML}
-
-
-
-      ${termsAndConditions ? `
-        <div style="page-break-before: always; margin-top: 40px;">
-          <h2 style="color: #0f172a; border-bottom: 1px solid #e2e8f0; padding-bottom: 12px;">Terms & Conditions</h2>
-          <div class="terms-columns">
-            ${formattedTermsAndConditions}
-          </div>
-        </div>
-      ` : ''}
-
-        <div class="footer">
-          <p>${isDraft ? 'This is a draft quote and is subject to final approval and terms & conditions.' : 'This quote is subject to the terms & conditions outlined above.'}</p>
-          <p>Generated by PowerQuotePro Quote System | ${companyName}</p>
-          ${!isDraft ? `<p><strong>Quote ID:</strong> ${quoteInfo.id}</p>` : ''}
         </div>
       </div>
+
+      <div class="page page-bom">
+        <div class="page-inner">
+          <h2 class="section-title">Bill of Materials</h2>
+          <table class="bom-table">
+            <thead>
+              <tr>
+                <th>Item</th>
+                <th>Description</th>
+                <th>Part Number</th>
+                <th>Qty</th>
+                ${canSeePrices ? '<th>Unit Price</th><th>Total</th>' : ''}
+              </tr>
+            </thead>
+            <tbody>
+              ${normalizedBomItems
+                .filter(item => item.enabled)
+                .map(item => {
+                  const normalizedLevel =
+                    coerceProductLevel(item?.level) ??
+                    coerceProductLevel(item?.product?.product_level) ??
+                    determineBomItemLevel(item);
+
+                  const parentLevel2Id = coerceString(
+                    extractParentLevel2IdFromItem(item) ??
+                      item?.parentLevel2Id ??
+                      item?.product?.parentLevel2Id ??
+                      item?.product?.parent_product_id ??
+                      item?.product?.parentProductId
+                  );
+
+                  const parentLevel2Item = parentLevel2Id ? level2ItemsById.get(parentLevel2Id) : undefined;
+
+                  const infoUrl =
+                    sanitizeHttpUrl(item?.resolvedInfoUrl) ??
+                    sanitizeHttpUrl((item?.product as any)?.productInfoUrl) ??
+                    sanitizeHttpUrl((item?.product as any)?.product_info_url) ??
+                    (parentLevel2Item
+                      ? sanitizeHttpUrl(parentLevel2Item?.resolvedInfoUrl) ??
+                        sanitizeHttpUrl((parentLevel2Item?.product as any)?.productInfoUrl) ??
+                        sanitizeHttpUrl((parentLevel2Item?.product as any)?.product_info_url)
+                      : undefined);
+
+                  const shouldRenderLink =
+                    !!infoUrl && normalizedLevel !== 1 && normalizedLevel !== 4;
+
+                  const infoLinkHtml = shouldRenderLink && infoUrl
+                    ? `<div class="product-info-link"><a href="${escapeHtml(infoUrl)}" target="_blank" rel="noopener noreferrer">Product Info</a></div>`
+                    : '';
+
+                  return `
+                  <tr>
+                    <td>
+                      <div class="bom-item-cell">
+                        <div class="bom-item-name">${escapeHtml(item.product.name)}</div>
+                        ${infoLinkHtml}
+                      </div>
+                    </td>
+                    <td>
+                      ${item.product.description}
+                    </td>
+                    <td>${item.partNumber || 'TBD'}</td>
+                    <td>${item.quantity}</td>
+                    ${canSeePrices ? `
+                      <td>${formatCurrency(item.product.price)}</td>
+                      <td>${formatCurrency(item.product.price * item.quantity)}</td>
+                    ` : ''}
+                  </tr>
+                `;
+                })
+                .join('')}
+            </tbody>
+          </table>
+
+          ${canSeePrices ? `
+            <div class="total-section">
+              ${hasDiscount ? `
+                <p class="total-line">
+                  <span class="label">Original Total:</span>
+                  <span>${formatCurrency(originalTotal)}</span>
+                </p>
+                <p class="total-line discount">
+                  <span class="label">Discount (${formatPercent(effectiveDiscountPercent)}%):</span>
+                  <span>- ${formatCurrency(discountAmount)}</span>
+                </p>
+                <p class="total-line final">
+                  <span class="label">Final Total:</span>
+                  <span>${formatCurrency(finalTotal)}</span>
+                </p>
+              ` : `
+                <p class="total-line final">
+                  <span class="label">Total:</span>
+                  <span>${formatCurrency(finalTotal)}</span>
+                </p>
+              `}
+            </div>
+          ` : ''}
+
+          ${additionalQuoteInfo ? `
+            <div class="additional-info">
+              <h3>Additional Quote Information</h3>
+              <p>${escapeHtml(additionalQuoteInfo).replace(/\r?\n/g, '<br />')}</p>
+            </div>
+          ` : ''}
+
+          ${!hasRackOrLevel4Content && !termsAndConditions ? footerHTML : ''}
+        </div>
+      </div>
+
+      ${hasRackOrLevel4Content ? `
+        <div class="page page-config">
+          <div class="page-inner">
+            ${rackConfigurationHTML ? `<h2 class="section-title">Rack Configuration</h2>${rackConfigurationHTML}` : ''}
+            ${level4SectionHTML ? `<h2 class="section-title">Level 4 Configuration Details</h2>${level4SectionHTML}` : ''}
+            ${!termsAndConditions ? footerHTML : ''}
+          </div>
+        </div>
+      ` : ''}
+
+      ${termsAndConditions ? `
+        <div class="page page-terms">
+          <div class="page-inner">
+            <h2 class="section-title">Terms & Conditions</h2>
+            <div class="terms-columns">
+              ${formattedTermsAndConditions}
+            </div>
+            ${footerHTML}
+          </div>
+        </div>
+      ` : ''}
     </body>
     </html>
   `;
