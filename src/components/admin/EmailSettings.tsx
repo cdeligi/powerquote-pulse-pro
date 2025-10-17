@@ -190,11 +190,16 @@ export const EmailSettings = () => {
     try {
       setTestingSMTP(true);
       
+      // Use notification recipients for test email (not the from_email which is the sender)
+      const testRecipients = settings.notification_recipients.length > 0 
+        ? settings.notification_recipients 
+        : ['carlosdeligi@gmail.com']; // Fallback to default
+      
       const { data, error } = await supabase.functions.invoke('send-quote-status-email', {
         body: {
           quoteId: 'TEST',
           action: 'approved',
-          recipientEmails: [settings.smtp_from_email],
+          recipientEmails: testRecipients,
         },
       });
 
