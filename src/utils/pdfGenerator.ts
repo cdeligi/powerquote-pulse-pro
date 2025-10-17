@@ -1046,27 +1046,246 @@ export const generateQuotePDF = async (
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;');
 
+  const isLikelyTermsHeading = (value: string) => {
+    const trimmed = value.trim();
+    if (!trimmed) return false;
+
+    const hasLetters = /[a-zA-Z]/.test(trimmed);
+    const hasLowercase = /[a-z]/.test(trimmed);
+    const isAllCaps = hasLetters && !hasLowercase;
+    const startsWithNumber = /^\d{1,3}(?:[A-Z]?)[).\-\s]+/.test(trimmed);
+
+    if (startsWithNumber) {
+      const withoutNumber = trimmed.replace(/^\d{1,3}(?:[A-Z]?)[).\-\s]+/, '');
+      if (!withoutNumber) {
+        return true;
+      }
+      const headingPart = withoutNumber.trim();
+      const headingHasLetters = /[a-zA-Z]/.test(headingPart);
+      const headingHasLowercase = /[a-z]/.test(headingPart);
+      if (headingHasLetters && !headingHasLowercase) {
+        return true;
+      }
+    }
+
+    if (isAllCaps) {
+      return true;
+    }
+
+    return false;
+  };
+
+  const buildTermsSection = (
+    heading: string | undefined,
+    paragraphs: string[],
+    index: number
+  ) => {
+    const safeHeading = heading ? escapeHtml(heading.trim()) : '';
+    const safeParagraphs = paragraphs
+      .map(paragraph => `<p>${sanitizeTermsParagraph(paragraph).replace(/\r?\n/g, '<br />')}</p>`)
+      .join('');
+
+    const headingClass = heading
+      ? `terms-heading${index === 0 ? ' terms-heading--intro' : ''}`
+      : '';
+
+    const headingHtml = heading
+      ? `<h3 class="${headingClass}">${safeHeading}</h3>`
+      : '';
+
+    return `<section class="terms-section">${headingHtml}${safeParagraphs}</section>`;
+  };
+
+  const formatPlainTextTerms = (content: string): string => {
+    const normalized = content.replace(/\r\n/g, '\n');
+    const rawParagraphs = normalized
+      .split(/\n{2,}/)
+      .map(paragraph => paragraph.trim())
+      .filter(Boolean);
+
+    if (rawParagraphs.length === 0) {
+      return buildTermsSection(undefined, [content], 0);
+    }
+
+    const sections: Array<{ heading?: string; paragraphs: string[] }> = [];
+    let currentSection: { heading?: string; paragraphs: string[] } | null = null;
+
+    const finalizeSection = () => {
+      if (!currentSection) return;
+      if (!currentSection.heading && currentSection.paragraphs.length === 0) return;
+      sections.push(currentSection);
+      currentSection = null;
+    };
+
+    rawParagraphs.forEach(paragraph => {
+      const [firstLine, ...rest] = paragraph.split('\n');
+      const remainder = rest.join('\n').trim();
+      const candidateHeading = firstLine.trim();
+
+      if (isLikelyTermsHeading(candidateHeading)) {
+        finalizeSection();
+        currentSection = {
+          heading: candidateHeading,
+          paragraphs: remainder ? [remainder] : [],
+        };
+        return;
+      }
+
+      if (!currentSection) {
+        currentSection = {
+          heading: undefined,
+          paragraphs: [paragraph],
+        };
+        return;
+      }
+
+      if (!currentSection.heading && isLikelyTermsHeading(paragraph)) {
+        finalizeSection();
+        currentSection = {
+          heading: paragraph,
+          paragraphs: [],
+        };
+        return;
+      }
+
+      currentSection.paragraphs.push(paragraph);
+    });
+
+    finalizeSection();
+
+    if (sections.length === 0) {
+      return buildTermsSection(undefined, rawParagraphs, 0);
+    }
+
+    return sections
+      .map((section, index) => buildTermsSection(section.heading, section.paragraphs, index))
+      .join('');
+  };
+
+  const tryFormatHtmlTerms = (content: string): string | null => {
+    if (typeof document === 'undefined') {
+      return null;
+    }
+
+    try {
+      const tempContainer = document.createElement('div');
+      tempContainer.innerHTML = content;
+
+      const sections: Array<{ heading?: string; body: string[] }> = [];
+      let current: { heading?: string; body: string[] } | null = null;
+
+      const pushCurrent = () => {
+        if (!current) return;
+        if (!current.heading && current.body.length === 0) {
+          current = null;
+          return;
+        }
+        sections.push(current);
+        current = null;
+      };
+
+      const processNode = (node: Node) => {
+        if (node.nodeType === Node.ELEMENT_NODE) {
+          const element = node as HTMLElement;
+          const tagName = element.tagName.toUpperCase();
+
+          if (/^H[1-6]$/.test(tagName)) {
+            pushCurrent();
+            const headingText = element.textContent?.trim() || '';
+            current = {
+              heading: headingText,
+              body: [],
+            };
+            return;
+          }
+
+          if (tagName === 'P' || tagName === 'UL' || tagName === 'OL' || tagName === 'TABLE') {
+            if (!current) {
+              current = { heading: undefined, body: [] };
+            }
+            current.body.push(element.outerHTML);
+            return;
+          }
+
+          if (tagName === 'STRONG' && isLikelyTermsHeading(element.textContent || '')) {
+            pushCurrent();
+            current = {
+              heading: element.textContent?.trim() || '',
+              body: [],
+            };
+            return;
+          }
+
+          const childNodes = Array.from(element.childNodes);
+          if (childNodes.length === 0) {
+            const text = element.textContent?.trim();
+            if (text) {
+              if (!current) {
+                current = { heading: undefined, body: [] };
+              }
+              current.body.push(`<p>${escapeHtml(text)}</p>`);
+            }
+            return;
+          }
+
+          childNodes.forEach(processNode);
+          return;
+        }
+
+        if (node.nodeType === Node.TEXT_NODE) {
+          const text = node.textContent?.trim();
+          if (text) {
+            if (!current) {
+              current = { heading: undefined, body: [] };
+            }
+            current.body.push(`<p>${escapeHtml(text)}</p>`);
+          }
+        }
+      };
+
+      Array.from(tempContainer.childNodes).forEach(processNode);
+      pushCurrent();
+
+      if (sections.length === 0) {
+        return null;
+      }
+
+      return sections
+        .map((section, index) => {
+          const heading = section.heading ? escapeHtml(section.heading.trim()) : '';
+          const headingClass = section.heading
+            ? `terms-heading${index === 0 ? ' terms-heading--intro' : ''}`
+            : '';
+          const headingHtml = section.heading
+            ? `<h3 class="${headingClass}">${heading}</h3>`
+            : '';
+          const bodyHtml = section.body.join('');
+          return `<section class="terms-section">${headingHtml}${bodyHtml}</section>`;
+        })
+        .join('');
+    } catch (error) {
+      console.warn('Could not normalize Terms & Conditions HTML for PDF:', error);
+      return null;
+    }
+  };
+
   const formatTermsAndConditions = (content: string): string => {
     if (!content) {
       return '';
     }
 
-    const hasHtmlTags = /<[^>]+>/.test(content);
+    const trimmed = content.trim();
+    if (!trimmed) {
+      return '';
+    }
+
+    const hasHtmlTags = /<[^>]+>/.test(trimmed);
     if (hasHtmlTags) {
-      return content;
+      const normalized = tryFormatHtmlTerms(trimmed);
+      return normalized ?? trimmed;
     }
 
-    const paragraphs = content
-      .split(/\n{2,}/)
-      .map(paragraph => sanitizeTermsParagraph(paragraph).replace(/\n/g, '<br />'))
-      .filter(Boolean)
-      .map(paragraph => `<p>${paragraph}</p>`);
-
-    if (paragraphs.length === 0) {
-      return `<p>${sanitizeTermsParagraph(content).replace(/\n/g, '<br />')}</p>`;
-    }
-
-    return paragraphs.join('');
+    return formatPlainTextTerms(trimmed);
   };
   let companyName = 'QUALITROL';
   let companyLogoUrl = '';
@@ -2370,15 +2589,14 @@ export const generateQuotePDF = async (
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
         * { box-sizing: border-box; }
         @page {
-          size: 210mm 297mm;
-          margin: 16mm;
+          margin: 12mm 10mm;
         }
         body {
           font-family: 'Inter', sans-serif;
           background: #f1f5f9;
           color: #0f172a;
           margin: 0;
-          padding: 32px;
+          padding: 24px 16px;
           font-size: 11px;
           line-height: 1.55;
         }
@@ -2392,7 +2610,7 @@ export const generateQuotePDF = async (
           page-break-after: always;
         }
         .page:last-of-type { page-break-after: auto; }
-        .page-inner { padding: 40px 44px; }
+        .page-inner { padding: 32px 36px; }
         .header {
           border-bottom: 1px solid #e2e8f0;
           padding-bottom: 24px;
@@ -2462,51 +2680,87 @@ export const generateQuotePDF = async (
         .level4-raw { white-space: pre-wrap; font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', monospace; font-size: 10px; background: #0f172a; color: #f8fafc; padding: 16px; border-radius: 12px; margin-top: 18px; }
         .terms-columns {
           background: #f8fafc;
-          padding: 24px;
-          border-radius: 16px;
+          padding: 20px 22px;
+          border-radius: 14px;
           border: 1px solid #e2e8f0;
           margin-bottom: 20px;
           font-size: 10px;
-          line-height: 1.55;
+          line-height: 1.6;
           color: #475569;
           column-count: 2;
-          column-gap: 32px;
+          column-gap: 24px;
           column-fill: balance;
           -webkit-column-count: 2;
-          -webkit-column-gap: 32px;
+          -webkit-column-gap: 24px;
           -webkit-column-fill: balance;
           -moz-column-count: 2;
-          -moz-column-gap: 32px;
+          -moz-column-gap: 24px;
         }
-        .terms-columns p,
-        .terms-columns li {
+        .terms-columns > div:not(.terms-section),
+        .terms-columns > section:not(.terms-section),
+        .terms-columns > article,
+        .terms-columns > ul,
+        .terms-columns > ol,
+        .terms-columns div:not(.terms-section),
+        .terms-columns .terms-grid,
+        .terms-columns .grid,
+        .terms-columns .column,
+        .terms-columns .columns-2,
+        .terms-columns .space-y-1,
+        .terms-columns .space-y-2,
+        .terms-columns .space-y-3,
+        .terms-columns .space-y-4,
+        .terms-columns .space-y-5,
+        .terms-columns .space-y-6,
+        .terms-columns .space-y-7,
+        .terms-columns .space-y-8 {
+          display: contents;
+        }
+        .terms-section {
+          break-inside: avoid;
+          display: block;
+          margin-bottom: 18px;
+        }
+        .terms-heading {
+          font-size: 10px;
+          letter-spacing: 0.08em;
+          text-transform: uppercase;
+          color: #0f172a;
+          font-weight: 700;
+          margin: 0 0 6px;
+        }
+        .terms-heading--intro {
+          font-size: 11px;
+          letter-spacing: 0.12em;
+        }
+        .terms-section:first-of-type .terms-heading {
+          margin-top: 0;
+        }
+        .terms-section p,
+        .terms-section li {
           break-inside: avoid;
         }
-        .terms-columns p {
-          margin: 0 0 12px;
+        .terms-section p {
+          margin: 0 0 10px;
+          color: #475569;
         }
-        .terms-columns ul,
-        .terms-columns ol {
+        .terms-section ul,
+        .terms-section ol {
           margin: 0 0 12px 18px;
           padding: 0;
         }
+        .terms-section li {
+          margin-bottom: 6px;
+        }
         .terms-columns strong {
           color: #0f172a;
-        }
-        .terms-columns h3,
-        .terms-columns h4,
-        .terms-columns h5,
-        .terms-columns h6 {
-          margin-top: 16px;
-          margin-bottom: 8px;
-          color: #0f172a;
-          break-inside: avoid;
+          font-weight: 600;
         }
         .footer { margin-top: 48px; border-top: 1px solid #e2e8f0; padding-top: 18px; font-size: 10px; color: #64748b; }
         @media print {
           body { background: #ffffff; padding: 0; }
           .page { box-shadow: none; border-radius: 0; margin: 0 auto; max-width: none; width: auto; }
-          .page-inner { padding: 16mm; }
+          .page-inner { padding: 12mm; }
           .draft-warning, .date-info, .quote-header-fields, .rack-card, .level4-section { page-break-inside: avoid; }
           .terms-columns {
             column-count: 2;
