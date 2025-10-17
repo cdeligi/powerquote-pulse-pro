@@ -50,11 +50,6 @@ const QuotePDF = () => {
         await generateQuotePDF(bomItems || [], quote as Partial<Quote>, true, 'download');
         
         setLoading(false);
-        
-        // Close window after a short delay
-        setTimeout(() => {
-          window.close();
-        }, 1000);
       } catch (err: any) {
         console.error('Error generating PDF:', err);
         setError(err.message || 'Failed to generate PDF');
@@ -96,10 +91,24 @@ const QuotePDF = () => {
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-background">
-      <div className="text-center">
+      <div className="text-center max-w-md">
         <div className="text-green-500 text-6xl mb-4">✓</div>
-        <p className="text-lg font-medium">PDF Generated Successfully</p>
-        <p className="text-sm text-muted-foreground mt-2">This window will close automatically.</p>
+        <p className="text-lg font-medium mb-2">PDF Generated Successfully</p>
+        <p className="text-sm text-muted-foreground mb-6">Your quote has been downloaded to your device.</p>
+        <div className="flex gap-3 justify-center">
+          <button
+            onClick={() => window.close()}
+            className="px-4 py-2 bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/80 transition-colors"
+          >
+            Close Window
+          </button>
+          <button
+            onClick={() => navigate('/')}
+            className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors"
+          >
+            Return to Dashboard
+          </button>
+        </div>
       </div>
     </div>
   );
