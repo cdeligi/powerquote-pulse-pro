@@ -1356,10 +1356,11 @@ let loadedItems: BOMItem[] = [];
             '',
           // Add product metadata from database
           chassisType: productMeta?.chassis_type || mergedConfigurationData.chassisType || 'N/A',
-          rack_configurable: productMeta?.rack_configurable || mergedConfigurationData.rack_configurable || false,
+          chassis_type: productMeta?.chassis_type || mergedConfigurationData.chassis_type,
+          rack_configurable: productMeta?.rack_configurable ?? mergedConfigurationData.rack_configurable ?? false,
           product_level: productMeta?.product_level || mergedConfigurationData.product_level || 2,
-          has_level4: productMeta?.has_level4 || mergedConfigurationData.has_level4 || false,
-          parentProductId: productMeta?.parent_product_id || mergedConfigurationData.parentProductId,
+          has_level4: productMeta?.has_level4 ?? mergedConfigurationData.has_level4 ?? false,
+          parentProductId: productMeta?.parent_product_id || mergedConfigurationData.parentProductId || mergedConfigurationData.parent_product_id,
           parent_product_id: productMeta?.parent_product_id || mergedConfigurationData.parent_product_id,
           ...mergedConfigurationData,
           price,
@@ -1542,6 +1543,52 @@ let loadedItems: BOMItem[] = [];
         setTimeout(() => {
           onBOMUpdate(loadedItems);
         }, 100);
+      }
+      
+      // Auto-detect and set Asset Type from loaded items
+      if (loadedItems.length > 0) {
+        const chassisItem = loadedItems.find(item => {
+          const product = item.product as any;
+          return (
+            product.rack_configurable === true ||
+            product.chassisType ||
+            product.chassis_type ||
+            ['LTX', 'MTX', 'STX'].includes(String(product.chassisType || product.chassis_type))
+          );
+        });
+        
+        if (chassisItem) {
+          const product = chassisItem.product as any;
+          const parentId = product.parentProductId || product.parent_product_id;
+          console.log('🔍 Detected chassis item, parent ID:', parentId);
+          
+          if (parentId) {
+            // Wait for level1Products to be loaded
+            const checkAndSetAssetType = () => {
+              const parentL1 = level1Products.find(p => p.id === parentId);
+              if (parentL1?.asset_type_id) {
+                console.log('✅ Auto-setting asset type to:', parentL1.asset_type_id);
+                setSelectedAssetType(parentL1.asset_type_id);
+                setActiveTab(parentId);
+                setSelectedLevel1Product(parentL1);
+                return true;
+              }
+              return false;
+            };
+            
+            // Try immediately, or wait for products to load
+            if (!checkAndSetAssetType()) {
+              const interval = setInterval(() => {
+                if (level1Products.length > 0 && checkAndSetAssetType()) {
+                  clearInterval(interval);
+                }
+              }, 100);
+              
+              // Cleanup after 3 seconds
+              setTimeout(() => clearInterval(interval), 3000);
+            }
+          }
+        }
       }
       
       // Show success message

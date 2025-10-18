@@ -1990,7 +1990,7 @@ export const generateQuotePDF = async (
     return fallbackIndex + 1;
   };
 
-  const toSlotEntries = (slots: any[]): Array<{
+  const toSlotEntries = (slots: any[], bomItems: any[]): Array<{
     slot: number;
     cardName: string;
     partNumber?: string;
@@ -2002,8 +2002,32 @@ export const generateQuotePDF = async (
     sharedFromSlot?: number;
   }> => {
     if (!Array.isArray(slots)) return [];
+    
+    // Extract valid product IDs from BOM items
+    const validProductIds = new Set(
+      bomItems
+        .filter(item => item && (item.product_id || item.productId || item.product?.id))
+        .map(item => String(item.product_id || item.productId || item.product?.id))
+    );
+    
     return slots
       .map((slot, index) => {
+        // Extract product ID from slot
+        const slotProductId = 
+          slot?.productId || 
+          slot?.product_id || 
+          slot?.cardId ||
+          slot?.card_id ||
+          slot?.product?.id ||
+          slot?.level3ProductId ||
+          slot?.level3_product_id;
+        
+        // Filter: Skip slots for products that are no longer in the BOM
+        if (slotProductId && !validProductIds.has(String(slotProductId))) {
+          console.log(`🗑️ Excluding deleted product from PDF: ${slotProductId} at slot ${index + 1}`);
+          return null;
+        }
+        
         const slotNumber = normalizeSlotNumber(slot?.slot ?? slot?.slotNumber ?? slot?.position ?? slot?.slot_index, index);
         return {
           slot: slotNumber,
@@ -2057,7 +2081,7 @@ export const generateQuotePDF = async (
       .filter(entry => entry.slot !== undefined && entry.slot !== null);
   };
 
-  const deriveRackConfiguration = (item: any): {
+  const deriveRackConfiguration = (item: any, allBomItems: any[]): {
     slots: Array<{
       slot: number;
       cardName: string;
@@ -2074,16 +2098,16 @@ export const generateQuotePDF = async (
 
     if (item.rackConfiguration && typeof item.rackConfiguration === 'object') {
       if (Array.isArray(item.rackConfiguration.slots)) {
-        return { slots: toSlotEntries(item.rackConfiguration.slots) };
+        return { slots: toSlotEntries(item.rackConfiguration.slots, allBomItems) };
       }
 
       if (Array.isArray(item.rackConfiguration)) {
-        return { slots: toSlotEntries(item.rackConfiguration) };
+        return { slots: toSlotEntries(item.rackConfiguration, allBomItems) };
       }
     }
 
     if (Array.isArray(item.slotAssignments)) {
-      return { slots: toSlotEntries(item.slotAssignments) };
+      return { slots: toSlotEntries(item.slotAssignments, allBomItems) };
     }
 
     if (item.slotAssignments && typeof item.slotAssignments === 'object') {
@@ -2302,7 +2326,7 @@ export const generateQuotePDF = async (
 
     const fallbackRackEntry = fallbackKey ? rackLayoutFallbackMap.get(String(fallbackKey)) : undefined;
     const fallbackRack = fallbackRackEntry?.layout || fallbackRackEntry;
-    const derivedRack = deriveRackConfiguration(item) || fallbackRack;
+    const derivedRack = deriveRackConfiguration(item, bomItems) || fallbackRack;
 
     const fallbackLevel4 = fallbackKey ? level4FallbackMap.get(String(fallbackKey)) : undefined;
     let directLevel4 = item.level4Config || item.level4Selections || null;
