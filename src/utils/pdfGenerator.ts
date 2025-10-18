@@ -1428,14 +1428,8 @@ export const generateQuotePDF = async (
       return block.html;
     };
 
-    const html = columns
-      .map(columnBlocks => `
-        <div class="terms-column">
-          ${columnBlocks.map(renderBlock).join('')}
-        </div>
-      `)
-      .join('')
-      .trim();
+    const flattenedBlocks = sections.flat();
+    const html = flattenedBlocks.map(renderBlock).join('').trim();
 
     return { html, columnCount: columns.length };
   };
@@ -2864,18 +2858,17 @@ export const generateQuotePDF = async (
           font-size: 10px;
           line-height: 1.6;
           color: #475569;
-          display: grid;
-          grid-template-columns: repeat(2, minmax(0, 1fr));
-          gap: 22px;
-          align-items: start;
+          column-count: 2;
+          column-gap: 22px;
+          column-fill: balance;
         }
         .terms-columns--single {
-          grid-template-columns: minmax(0, 1fr);
+          column-count: 1;
         }
-        .terms-column {
-          display: flex;
-          flex-direction: column;
-          gap: 6px;
+        .terms-columns > * {
+          display: block;
+          break-inside: avoid;
+          page-break-inside: avoid;
         }
         .terms-columns h3 {
           font-size: 10px;
@@ -2894,19 +2887,7 @@ export const generateQuotePDF = async (
           font-size: 11px;
           letter-spacing: 0.12em;
         }
-        .terms-column > * {
-          break-inside: avoid;
-          page-break-inside: avoid;
-        }
         .terms-columns p {
-          margin: 0 0 10px;
-          color: #475569;
-        }
-        .terms-section p,
-        .terms-section li {
-          break-inside: avoid;
-        }
-        .terms-section p {
           margin: 0 0 10px;
           color: #475569;
         }
@@ -2948,35 +2929,16 @@ export const generateQuotePDF = async (
           .page-inner { padding: 9mm 8mm; }
           .draft-warning, .date-info, .quote-header-fields, .rack-card, .level4-section { page-break-inside: avoid; }
           .terms-columns {
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-            gap: 18px;
+            column-count: 2;
+            column-gap: 18px;
+            column-fill: balance;
           }
           .terms-columns--single {
-            grid-template-columns: minmax(0, 1fr);
+            column-count: 1;
           }
-          .terms-columns::after {
-            content: '';
-            display: block;
-            clear: both;
-          }
-          .terms-columns:not(.terms-columns--single) {
-            display: block;
-          }
-          .terms-columns:not(.terms-columns--single) .terms-column {
-            float: left;
-            width: calc(50% - 9px);
-            margin-right: 18px;
-          }
-          .terms-columns:not(.terms-columns--single) .terms-column:nth-of-type(2n) {
-            margin-right: 0;
-          }
-          .terms-columns--single .terms-column {
-            float: none;
-            width: 100%;
-            margin-right: 0;
-          }
-          .terms-column {
+          .terms-columns > * {
             break-inside: avoid-column;
+            page-break-inside: avoid;
           }
         }
       </style>
