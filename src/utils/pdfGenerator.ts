@@ -1344,32 +1344,210 @@ export const generateQuotePDF = async (
     }
   };
 
-  const computeTermsBlockWeight = (block: TermsBlock): number => {
+  const fallbackMeasureTermsBlockHeight = (block: TermsBlock): number => {
     if (block.type === 'heading') {
-      return 6;
+      return 140;
     }
 
-    const textContent = block.html.replace(/<[^>]+>/g, ' ').trim();
+    const textContent = block.html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
     if (!textContent) {
-      return 2;
+      return 80;
     }
 
     const wordCount = textContent.split(/\s+/).length;
+    const charCount = textContent.length;
+    const paragraphCount = (block.html.match(/<p\b/gi) || []).length;
+    const breakCount = (block.html.match(/<br\s*\/?\s*>/gi) || []).length;
+    const listItemCount = (block.html.match(/<li\b/gi) || []).length;
+    const tableRowCount = (block.html.match(/<tr\b/gi) || []).length;
     const hasTable = /<table/i.test(block.html);
     const hasList = /<(ul|ol)/i.test(block.html);
-    const hasBreakHeavyContent = /<(blockquote|pre)/i.test(block.html);
+    const blockquoteCount = (block.html.match(/<(blockquote|pre)\b/gi) || []).length;
 
-    let weight = Math.max(wordCount, 6);
+    let height = Math.max(wordCount * 3, Math.ceil(charCount * 0.85), 90);
 
-    if (hasTable) {
-      weight = Math.max(weight * 2, weight + 160);
-    } else if (hasList) {
-      weight = Math.max(Math.round(weight * 1.35), weight + 28);
-    } else if (hasBreakHeavyContent) {
-      weight = Math.max(Math.round(weight * 1.5), weight + 80);
+    if (paragraphCount > 1) {
+      height += (paragraphCount - 1) * 32;
     }
 
-    return weight;
+    if (breakCount > 0) {
+      height += breakCount * 18;
+    }
+
+    if (hasList) {
+      height += 48 + listItemCount * 24;
+    }
+
+    if (hasTable) {
+      height += 160 + Math.max(tableRowCount, 1) * 48;
+    }
+
+    if (blockquoteCount > 0) {
+      height += blockquoteCount * 72;
+    }
+
+    return height;
+  };
+
+  const TERMS_COLUMN_WIDTH = 348;
+  const TERMS_SECTION_SPACING = 44;
+  const TERMS_MAX_COLUMN_HEIGHT = 960;
+
+  const createTermsMeasurementContext = () => {
+    if (typeof document === 'undefined') {
+      return {
+        measure: (block: TermsBlock) => fallbackMeasureTermsBlockHeight(block),
+        dispose: () => {},
+      };
+    }
+
+    const measurementRoot = document.createElement('div');
+    measurementRoot.setAttribute('data-terms-measure', 'true');
+    measurementRoot.style.position = 'absolute';
+    measurementRoot.style.left = '-9999px';
+    measurementRoot.style.top = '0';
+    measurementRoot.style.width = `${TERMS_COLUMN_WIDTH}px`;
+    measurementRoot.style.visibility = 'hidden';
+    measurementRoot.style.pointerEvents = 'none';
+    measurementRoot.style.fontSize = '10px';
+    measurementRoot.style.lineHeight = '1.6';
+    measurementRoot.style.fontFamily = "'Inter', 'Helvetica Neue', Arial, sans-serif";
+    measurementRoot.style.color = '#475569';
+    measurementRoot.style.boxSizing = 'border-box';
+    measurementRoot.style.padding = '0';
+    measurementRoot.style.margin = '0';
+    measurementRoot.style.whiteSpace = 'normal';
+    measurementRoot.style.wordBreak = 'break-word';
+
+    const applyContentStyles = (element: HTMLElement) => {
+      element.querySelectorAll('p').forEach(paragraph => {
+        const target = paragraph as HTMLElement;
+        target.style.margin = '0 0 10px';
+        target.style.fontSize = '10px';
+        target.style.lineHeight = '1.6';
+        target.style.color = '#475569';
+      });
+
+      element.querySelectorAll('ul, ol').forEach(list => {
+        const target = list as HTMLElement;
+        target.style.margin = '0 0 12px 18px';
+        target.style.padding = '0';
+      });
+
+      element.querySelectorAll('li').forEach(item => {
+        const target = item as HTMLElement;
+        target.style.marginBottom = '6px';
+      });
+
+      element.querySelectorAll('table').forEach(table => {
+        const target = table as HTMLElement;
+        target.style.width = '100%';
+        target.style.borderCollapse = 'collapse';
+        target.style.margin = '6px 0 12px';
+      });
+
+      element.querySelectorAll('th, td').forEach(cell => {
+        const target = cell as HTMLElement;
+        target.style.border = '1px solid #cbd5f5';
+        target.style.padding = '6px 8px';
+        target.style.textAlign = 'left';
+        target.style.fontSize = '10px';
+        target.style.lineHeight = '1.6';
+      });
+
+      element.querySelectorAll('strong').forEach(strong => {
+        const target = strong as HTMLElement;
+        target.style.fontWeight = '600';
+        target.style.color = '#0f172a';
+      });
+
+      element.querySelectorAll('a').forEach(link => {
+        const target = link as HTMLElement;
+        target.style.color = '#2563eb';
+        target.style.textDecoration = 'none';
+      });
+    };
+
+    document.body.appendChild(measurementRoot);
+
+    return {
+      measure: (block: TermsBlock) => {
+        const wrapper = document.createElement('div');
+        wrapper.style.display = 'block';
+        wrapper.style.width = '100%';
+        wrapper.style.boxSizing = 'border-box';
+        wrapper.style.padding = '0';
+        wrapper.style.margin = '0';
+        wrapper.style.breakInside = 'avoid';
+        wrapper.style.pageBreakInside = 'avoid';
+
+        if (block.type === 'heading') {
+          const heading = document.createElement('div');
+          heading.textContent = block.text;
+          heading.style.fontSize = '10px';
+          heading.style.fontWeight = '700';
+          heading.style.letterSpacing = '0.08em';
+          heading.style.textTransform = 'uppercase';
+          heading.style.color = '#0f172a';
+          heading.style.margin = '14px 0 6px';
+          wrapper.appendChild(heading);
+        } else {
+          wrapper.innerHTML = block.html;
+        }
+
+        applyContentStyles(wrapper);
+        measurementRoot.appendChild(wrapper);
+        const rect = wrapper.getBoundingClientRect();
+        measurementRoot.removeChild(wrapper);
+
+        const measuredHeight = Math.ceil(rect.height);
+        const allowance = block.type === 'heading' ? 28 : 18;
+
+        return Math.max(measuredHeight + allowance, block.type === 'heading' ? 72 : 40);
+      },
+      dispose: () => {
+        if (measurementRoot.parentElement) {
+          measurementRoot.parentElement.removeChild(measurementRoot);
+        }
+      },
+    };
+  };
+
+  const splitOversizedContentBlock = (block: TermsBlock): TermsBlock[] => {
+    if (block.type !== 'content') {
+      return [block];
+    }
+
+    const paragraphFragments = block.html
+      .split(/<\/p>/i)
+      .map(fragment => fragment.trim())
+      .filter(fragment => fragment.length > 0)
+      .map(fragment => (fragment.endsWith('</p>') ? fragment : `${fragment}</p>`));
+
+    if (paragraphFragments.length > 1) {
+      return paragraphFragments.map(html => ({ type: 'content', html }));
+    }
+
+    const listMatch = block.html.match(/^<(ul|ol)[^>]*>[\s\S]*<\/\1>$/i);
+    if (listMatch) {
+      const listTag = listMatch[1].toLowerCase();
+      const listItems = block.html.match(/<li[^>]*>[\s\S]*?<\/li>/gi) || [];
+      if (listItems.length > 1) {
+        return listItems.map(item => ({ type: 'content', html: `<${listTag}>${item}</${listTag}>` }));
+      }
+    }
+
+    const breakFragments = block.html
+      .split(/<br\s*\/?\s*>/i)
+      .map(fragment => fragment.trim())
+      .filter(fragment => fragment.length > 0)
+      .map(fragment => `<p>${fragment}</p>`);
+
+    if (breakFragments.length > 1) {
+      return breakFragments.map(html => ({ type: 'content', html }));
+    }
+
+    return [block];
   };
 
   const renderTermsColumns = (blocks: TermsBlock[]): { html: string; columnCount: number } => {
@@ -1403,31 +1581,100 @@ export const generateQuotePDF = async (
       return block.html;
     };
 
-    const MAX_COLUMN_WEIGHT = 340;
+    const measurement = createTermsMeasurementContext();
+    const heightCache = new Map<TermsBlock, number>();
+
+    const ensureMeasured = (block: TermsBlock): number => {
+      const cached = heightCache.get(block);
+      if (typeof cached === 'number') {
+        return cached;
+      }
+
+      const measured = measurement.measure(block);
+      heightCache.set(block, measured);
+      return measured;
+    };
+
+    const expandedSections = sections.map(section => {
+      const expanded: TermsBlock[] = [];
+
+      section.forEach(block => {
+        if (block.type === 'content') {
+          const blockHeight = ensureMeasured(block);
+          if (blockHeight > TERMS_MAX_COLUMN_HEIGHT) {
+            const splitBlocks = splitOversizedContentBlock(block);
+            if (splitBlocks.length > 1) {
+              splitBlocks.forEach(splitBlock => {
+                const measuredSplit = ensureMeasured(splitBlock);
+                if (measuredSplit > TERMS_MAX_COLUMN_HEIGHT) {
+                  const deeperSplit = splitOversizedContentBlock(splitBlock);
+                  if (deeperSplit.length > 1) {
+                    deeperSplit.forEach(item => {
+                      ensureMeasured(item);
+                      expanded.push(item);
+                    });
+                    return;
+                  }
+                }
+                expanded.push(splitBlock);
+              });
+              return;
+            }
+          }
+        }
+
+        expanded.push(block);
+      });
+
+      return expanded;
+    });
+
     const columns: TermsBlock[][] = [];
     let currentColumn: TermsBlock[] = [];
-    let currentColumnWeight = 0;
+    let currentColumnHeight = 0;
 
     const pushCurrentColumn = () => {
       if (currentColumn.length > 0) {
         columns.push(currentColumn);
         currentColumn = [];
-        currentColumnWeight = 0;
+        currentColumnHeight = 0;
       }
     };
 
-    sections.forEach(section => {
-      const sectionWeight = section.reduce((sectionSum, block) => sectionSum + computeTermsBlockWeight(block), 0);
+    expandedSections.forEach(section => {
+      const sectionHeights = section.map(block => ensureMeasured(block));
 
-      if (currentColumn.length > 0 && currentColumnWeight + sectionWeight > MAX_COLUMN_WEIGHT) {
-        pushCurrentColumn();
-      }
+      section.forEach((block, index) => {
+        const blockHeight = sectionHeights[index];
+        const nextHeight = sectionHeights[index + 1] ?? 0;
+        const isFirstInSection = index === 0;
 
-      currentColumn.push(...section);
-      currentColumnWeight += sectionWeight;
+        if (isFirstInSection && currentColumn.length > 0) {
+          const required = blockHeight + (block.type === 'heading' ? nextHeight : 0) + TERMS_SECTION_SPACING;
+          if (currentColumnHeight + required > TERMS_MAX_COLUMN_HEIGHT) {
+            pushCurrentColumn();
+          } else {
+            currentColumnHeight += TERMS_SECTION_SPACING;
+          }
+        } else if (currentColumn.length > 0 && currentColumnHeight + blockHeight > TERMS_MAX_COLUMN_HEIGHT) {
+          pushCurrentColumn();
+        }
+
+        if (
+          block.type === 'heading' &&
+          currentColumn.length > 0 &&
+          currentColumnHeight + blockHeight + Math.min(nextHeight || 0, 160) > TERMS_MAX_COLUMN_HEIGHT
+        ) {
+          pushCurrentColumn();
+        }
+
+        currentColumn.push(block);
+        currentColumnHeight += blockHeight;
+      });
     });
 
     pushCurrentColumn();
+    measurement.dispose();
 
     if (columns.length === 0) {
       const html = blocks.map(renderBlock).join('').trim();
