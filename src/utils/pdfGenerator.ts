@@ -1344,48 +1344,124 @@ export const generateQuotePDF = async (
     }
   };
 
-  const renderTermsBlocks = (blocks: TermsBlock[]): string => {
-    if (blocks.length === 0) {
-      return '';
+  const computeTermsBlockWeight = (block: TermsBlock): number => {
+    if (block.type === 'heading') {
+      return 4;
     }
 
-    let headingCount = 0;
+    const textContent = block.html.replace(/<[^>]+>/g, ' ').trim();
+    if (!textContent) {
+      return 1;
+    }
 
-    return blocks
-      .map(block => {
-        if (block.type === 'heading') {
-          const headingClass = `terms-heading${headingCount === 0 ? ' terms-heading--intro' : ''}`;
-          headingCount += 1;
-          return `<h3 class="${headingClass}">${escapeHtml(block.text)}</h3>`;
-        }
-
-        return block.html;
-      })
-      .join('');
+    const wordCount = textContent.split(/\s+/).length;
+    return Math.max(wordCount, 4);
   };
 
-  const formatTermsAndConditions = (content: string): string => {
+  const renderTermsColumns = (blocks: TermsBlock[]): { html: string; columnCount: number } => {
+    if (blocks.length === 0) {
+      return { html: '', columnCount: 0 };
+    }
+
+    const sections: TermsBlock[][] = [];
+    blocks.forEach(block => {
+      if (block.type === 'heading') {
+        sections.push([block]);
+        return;
+      }
+
+      const lastSection = sections[sections.length - 1];
+      if (lastSection) {
+        lastSection.push(block);
+      } else {
+        sections.push([block]);
+      }
+    });
+
+    const totalWeight = sections.reduce(
+      (sum, section) => sum + section.reduce((sectionSum, block) => sectionSum + computeTermsBlockWeight(block), 0),
+      0
+    );
+    const idealColumnWeight = totalWeight / 2;
+
+    const firstColumn: TermsBlock[] = [];
+    const secondColumn: TermsBlock[] = [];
+    let accumulatedWeight = 0;
+
+    sections.forEach((section, index) => {
+      const sectionWeight = section.reduce((sectionSum, block) => sectionSum + computeTermsBlockWeight(block), 0);
+      const isLastSection = index === sections.length - 1;
+
+      if (firstColumn.length === 0) {
+        firstColumn.push(...section);
+        accumulatedWeight += sectionWeight;
+        return;
+      }
+
+      if ((accumulatedWeight + sectionWeight <= idealColumnWeight) || (secondColumn.length === 0 && !isLastSection)) {
+        firstColumn.push(...section);
+        accumulatedWeight += sectionWeight;
+      } else {
+        secondColumn.push(...section);
+      }
+    });
+
+    if (secondColumn.length === 0 && sections.length > 1) {
+      const lastSection = sections[sections.length - 1];
+      if (lastSection) {
+        const removeCount = lastSection.length;
+        firstColumn.splice(Math.max(firstColumn.length - removeCount, 0), removeCount);
+        secondColumn.push(...lastSection);
+      }
+    }
+
+    const columns = secondColumn.length > 0 ? [firstColumn, secondColumn] : [firstColumn];
+    const headingState = { count: 0 };
+
+    const renderBlock = (block: TermsBlock): string => {
+      if (block.type === 'heading') {
+        const headingClass = `terms-heading${headingState.count === 0 ? ' terms-heading--intro' : ''}`;
+        headingState.count += 1;
+        return `<h3 class="${headingClass}">${escapeHtml(block.text)}</h3>`;
+      }
+
+      return block.html;
+    };
+
+    const html = columns
+      .map(columnBlocks => `
+        <div class="terms-column">
+          ${columnBlocks.map(renderBlock).join('')}
+        </div>
+      `)
+      .join('')
+      .trim();
+
+    return { html, columnCount: columns.length };
+  };
+
+  const formatTermsAndConditions = (content: string): { html: string; columnCount: number } => {
     if (!content) {
-      return '';
+      return { html: '', columnCount: 0 };
     }
 
     const trimmed = content.trim();
     if (!trimmed) {
-      return '';
+      return { html: '', columnCount: 0 };
     }
 
     const hasHtmlTags = /<[^>]+>/.test(trimmed);
     if (hasHtmlTags) {
       const normalizedBlocks = buildHtmlTermsBlocks(trimmed);
       if (normalizedBlocks) {
-        return renderTermsBlocks(normalizedBlocks);
+        return renderTermsColumns(normalizedBlocks);
       }
 
       const textOnly = trimmed.replace(/<[^>]+>/g, ' ');
-      return renderTermsBlocks(buildPlainTextTermsBlocks(textOnly));
+      return renderTermsColumns(buildPlainTextTermsBlocks(textOnly));
     }
 
-    return renderTermsBlocks(buildPlainTextTermsBlocks(trimmed));
+    return renderTermsColumns(buildPlainTextTermsBlocks(trimmed));
   };
   let companyName = 'QUALITROL';
   let companyLogoUrl = '';
@@ -2549,6 +2625,137 @@ export const generateQuotePDF = async (
   const quoteIdDisplay = isDraft ? 'DRAFT' : quoteInfo.id || 'New Quote';
 
   const formattedTermsAndConditions = formatTermsAndConditions(termsAndConditions);
+  const hasTermsContent = formattedTermsAndConditions.columnCount > 0 && formattedTermsAndConditions.html.trim().length > 0;
+
+  const rackConfigurationHTML = (() => {
+    const chassisItems = normalizedBomItems.filter(item =>
+      item.enabled &&
+      item.rackConfiguration &&
+      typeof item.rackConfiguration === 'object'
+    );
+
+    const fallbackRackLayouts = Array.isArray(draftBom?.rackLayouts) ? draftBom.rackLayouts : [];
+
+    if (chassisItems.length === 0 && fallbackRackLayouts.length === 0 && !quoteInfo.draft_bom?.rackConfiguration) {
+      return '';
+    }
+
+    let rackConfigHTML = '<div class="rack-config">';
+
+    const renderedRackLayoutKeys = new Set<string>();
+
+    const buildRackLayoutKey = (title: string, partNumber: string | undefined, slots: any[]) => {
+      const normalizedTitle = typeof title === 'string' ? title.trim().toLowerCase() : '';
+      const normalizedPart = typeof partNumber === 'string' ? partNumber.trim().toLowerCase() : '';
+      const normalizedSlots = Array.isArray(slots)
+        ? slots.map(slot => ({
+            slot:
+              slot?.slot ??
+              slot?.slotNumber ??
+              slot?.position ??
+              null,
+            partNumber:
+              typeof slot?.partNumber === 'string'
+                ? slot.partNumber.trim().toLowerCase()
+                : typeof slot?.product?.partNumber === 'string'
+                  ? slot.product.partNumber.trim().toLowerCase()
+                  : null,
+            cardName:
+              typeof slot?.cardName === 'string'
+                ? slot.cardName.trim().toLowerCase()
+                : typeof slot?.name === 'string'
+                  ? slot.name.trim().toLowerCase()
+                  : null,
+          }))
+        : [];
+
+      try {
+        return `${normalizedTitle}|${normalizedPart}|${JSON.stringify(normalizedSlots)}`;
+      } catch {
+        return `${normalizedTitle}|${normalizedPart}`;
+      }
+    };
+
+    const renderRackLayout = (title: string, partNumber: string | undefined, slots: any[]) => {
+      const layoutKey = buildRackLayoutKey(title, partNumber, slots);
+      if (layoutKey && renderedRackLayoutKeys.has(layoutKey)) {
+        return;
+      }
+
+      if (layoutKey) {
+        renderedRackLayoutKeys.add(layoutKey);
+      }
+
+      const safeTitle = escapeHtml(title);
+      const safePartNumber = partNumber ? escapeHtml(partNumber) : '';
+
+      rackConfigHTML += `
+        <div class="rack-card">
+          <h3 class="rack-card-title">${safeTitle}${safePartNumber ? ` · ${safePartNumber}` : ''}</h3>
+      `;
+
+      const normalizedSlots = Array.isArray(slots) ? dedupeSpanAwareSlots(slots as SpanAwareSlot[]) : [];
+
+      if (normalizedSlots.length > 0) {
+        rackConfigHTML += '<table class="rack-table"><thead><tr><th>Slot</th><th>Card Type</th><th>Part Number</th></tr></thead><tbody>';
+
+        normalizedSlots.forEach((slot: any, idx: number) => {
+          const slotNumber = slot?.slot ?? slot?.slotNumber ?? slot?.position ?? (idx + 1);
+          const cardName = slot?.cardName || slot?.name || slot?.product?.name || 'Empty';
+          const slotPartNumber = slot?.partNumber || slot?.product?.partNumber || '-';
+
+          rackConfigHTML += `
+            <tr>
+              <td>Slot ${escapeHtml(String(slotNumber))}</td>
+              <td>${escapeHtml(cardName)}</td>
+              <td>${escapeHtml(String(slotPartNumber))}</td>
+            </tr>
+          `;
+        });
+
+        rackConfigHTML += '</tbody></table>';
+      } else {
+        rackConfigHTML += '<p class="rack-empty">No rack configuration data available</p>';
+      }
+
+      rackConfigHTML += '</div>';
+    };
+
+    chassisItems.forEach(chassisItem => {
+      const config = chassisItem.rackConfiguration;
+      renderRackLayout(chassisItem.product.name, chassisItem.partNumber, config?.slots || []);
+    });
+
+    fallbackRackLayouts.forEach(layout => {
+      const slots = layout?.layout?.slots || layout?.slots;
+      if (Array.isArray(slots) && slots.length > 0) {
+        renderRackLayout(layout.productName || 'Configured Rack', layout.partNumber, slots);
+      }
+    });
+
+    if (quoteInfo.draft_bom?.rackConfiguration) {
+      const rawLayout = JSON.stringify(quoteInfo.draft_bom.rackConfiguration, null, 2);
+      rackConfigHTML += `
+        <div class="rack-card">
+          <h3 class="rack-card-title">Draft Rack Configuration</h3>
+          <pre class="rack-raw">${escapeHtml(rawLayout)}</pre>
+        </div>
+      `;
+    }
+
+    rackConfigHTML += '</div>';
+    return rackConfigHTML;
+  })();
+
+  const footerHTML = `
+    <div class="footer">
+      <p>${isDraft ? 'This is a draft quote and is subject to final approval and terms & conditions.' : 'This quote is subject to the terms & conditions outlined above.'}</p>
+      <p>Generated by PowerQuotePro Quote System | ${companyName}</p>
+      ${!isDraft ? `<p><strong>Quote ID:</strong> ${quoteInfo.id}</p>` : ''}
+    </div>
+  `;
+
+  const hasRackOrLevel4Content = Boolean(rackConfigurationHTML || level4SectionHTML);
 
   const rackConfigurationHTML = (() => {
     const chassisItems = normalizedBomItems.filter(item =>
@@ -2689,14 +2896,14 @@ export const generateQuotePDF = async (
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
         * { box-sizing: border-box; }
         @page {
-          margin: 12mm 10mm;
+          margin: 10mm 8mm;
         }
         body {
           font-family: 'Inter', sans-serif;
           background: #f1f5f9;
           color: #0f172a;
           margin: 0;
-          padding: 24px 16px;
+          padding: 20px 12px;
           font-size: 11px;
           line-height: 1.55;
         }
@@ -2710,7 +2917,7 @@ export const generateQuotePDF = async (
           page-break-after: always;
         }
         .page:last-of-type { page-break-after: auto; }
-        .page-inner { padding: 32px 36px; }
+        .page-inner { padding: 28px 30px; }
         .header {
           border-bottom: 1px solid #e2e8f0;
           padding-bottom: 24px;
@@ -2787,14 +2994,18 @@ export const generateQuotePDF = async (
           font-size: 10px;
           line-height: 1.6;
           color: #475569;
-          column-count: 2;
-          column-gap: 24px;
-          column-fill: balance;
-          -webkit-column-count: 2;
-          -webkit-column-gap: 24px;
-          -webkit-column-fill: balance;
-          -moz-column-count: 2;
-          -moz-column-gap: 24px;
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 22px;
+          align-items: start;
+        }
+        .terms-columns--single {
+          grid-template-columns: minmax(0, 1fr);
+        }
+        .terms-column {
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
         }
         .terms-columns h3 {
           font-size: 10px;
@@ -2803,8 +3014,7 @@ export const generateQuotePDF = async (
           color: #0f172a;
           font-weight: 700;
           margin: 14px 0 6px;
-          break-after: avoid-column;
-          -webkit-column-break-after: avoid;
+          break-after: avoid;
           page-break-after: avoid;
         }
         .terms-columns h3:first-of-type {
@@ -2814,12 +3024,8 @@ export const generateQuotePDF = async (
           font-size: 11px;
           letter-spacing: 0.12em;
         }
-        .terms-columns p,
-        .terms-columns ul,
-        .terms-columns ol,
-        .terms-columns table {
-          break-inside: avoid-column;
-          -webkit-column-break-inside: avoid;
+        .terms-column > * {
+          break-inside: avoid;
           page-break-inside: avoid;
         }
         .terms-columns p {
@@ -2869,13 +3075,10 @@ export const generateQuotePDF = async (
         @media print {
           body { background: #ffffff; padding: 0; }
           .page { box-shadow: none; border-radius: 0; margin: 0 auto; max-width: none; width: auto; }
-          .page-inner { padding: 12mm; }
+          .page-inner { padding: 9mm 8mm; }
           .draft-warning, .date-info, .quote-header-fields, .rack-card, .level4-section { page-break-inside: avoid; }
-          .terms-columns {
-            column-count: 2;
-            -webkit-column-count: 2;
-            -moz-column-count: 2;
-          }
+          .terms-columns { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+          .terms-columns--single { grid-template-columns: minmax(0, 1fr); }
         }
       </style>
     </head>
@@ -3053,7 +3256,7 @@ export const generateQuotePDF = async (
             </div>
           ` : ''}
 
-          ${!hasRackOrLevel4Content && !termsAndConditions ? footerHTML : ''}
+          ${!hasRackOrLevel4Content && !hasTermsContent ? footerHTML : ''}
         </div>
       </div>
 
@@ -3062,17 +3265,17 @@ export const generateQuotePDF = async (
           <div class="page-inner">
             ${rackConfigurationHTML ? `<h2 class="section-title">Rack Configuration</h2>${rackConfigurationHTML}` : ''}
             ${level4SectionHTML ? `<h2 class="section-title">Level 4 Configuration Details</h2>${level4SectionHTML}` : ''}
-            ${!termsAndConditions ? footerHTML : ''}
+            ${!hasTermsContent ? footerHTML : ''}
           </div>
         </div>
       ` : ''}
 
-      ${termsAndConditions ? `
+      ${hasTermsContent ? `
         <div class="page page-terms">
           <div class="page-inner">
             <h2 class="section-title">Terms & Conditions</h2>
-            <div class="terms-columns">
-              ${formattedTermsAndConditions}
+            <div class="terms-columns${formattedTermsAndConditions.columnCount === 1 ? ' terms-columns--single' : ''}">
+              ${formattedTermsAndConditions.html}
             </div>
             ${footerHTML}
           </div>
@@ -3084,9 +3287,44 @@ export const generateQuotePDF = async (
 
   printWindow.document.write(htmlContent);
   printWindow.document.close();
-  
+
+  const waitForDocumentReady = async () => {
+    const doc = printWindow.document;
+
+    if (doc.readyState !== 'complete') {
+      await new Promise<void>(resolve => {
+        const handleReadyState = () => {
+          if (doc.readyState === 'complete') {
+            doc.removeEventListener('readystatechange', handleReadyState);
+            resolve();
+          }
+        };
+
+        doc.addEventListener('readystatechange', handleReadyState);
+        if (doc.readyState === 'complete') {
+          doc.removeEventListener('readystatechange', handleReadyState);
+          resolve();
+        }
+      });
+    }
+
+    const fontSet = (doc as Document & { fonts?: FontFaceSet }).fonts;
+    if (fontSet?.ready) {
+      try {
+        await fontSet.ready;
+      } catch (error) {
+        console.warn('PDF fonts did not finish loading before print:', error);
+      }
+    }
+  };
+
+  const delay = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms));
+
   // Only trigger print dialog if action is 'download', otherwise just show in browser
   if (action === 'download') {
+    await waitForDocumentReady();
+    await delay(150);
+    printWindow.focus();
     printWindow.print();
   }
 };
