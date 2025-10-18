@@ -1515,7 +1515,7 @@ export const generateQuotePDF = async (
       const leftColumnHtml = page.leftColumn.map(renderBlock).join('');
       const rightColumnHtml = page.rightColumn.map(renderBlock).join('');
       
-      return `
+      const pageContent = `
       <div class="terms-page-columns">
         <div class="terms-column-left">
           ${leftColumnHtml}
@@ -1524,7 +1524,23 @@ export const generateQuotePDF = async (
           ${rightColumnHtml}
         </div>
       </div>
-      ${pageIndex < pages.length - 1 ? '<div class="page-break"></div>' : ''}
+    `;
+      
+      // If not the last page, wrap in a page container with page break
+      if (pageIndex < pages.length - 1) {
+        return `
+      <div class="terms-page-wrapper">
+        ${pageContent}
+      </div>
+      <div class="page-break"></div>
+    `;
+      }
+      
+      // Last page doesn't need page break
+      return `
+      <div class="terms-page-wrapper">
+        ${pageContent}
+      </div>
     `;
     }).join('');
 
@@ -2927,74 +2943,94 @@ export const generateQuotePDF = async (
         .level4-option-meta { margin-top: 4px; font-size: 10px; color: #64748b; }
         .level4-empty { color: #64748b; font-style: italic; background: #ffffff; border: 1px dashed #cbd5f5; padding: 14px; border-radius: 12px; margin-top: 16px; }
         .level4-raw { white-space: pre-wrap; font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', monospace; font-size: 10px; background: #0f172a; color: #f8fafc; padding: 16px; border-radius: 12px; margin-top: 18px; }
-        .terms-columns {
-          background: #f8fafc;
-          padding: 18px 20px;
-          border-radius: 14px;
-          border: 1px solid #e2e8f0;
+        .terms-page-wrapper {
           margin-bottom: 20px;
-          font-size: 10px;
-          line-height: 1.6;
-          color: #475569;
         }
         .terms-page-columns {
           display: grid;
           grid-template-columns: 1fr 1fr;
           gap: 22px;
-          margin-bottom: 24px;
+          font-size: 10px;
+          line-height: 1.6;
+          color: #475569;
         }
         .terms-column-left,
         .terms-column-right {
           min-height: 100px;
         }
-        .terms-columns h3 {
+        .terms-page-columns h3,
+        .terms-column-left h3,
+        .terms-column-right h3 {
           font-size: 15px;
           font-weight: 600;
           color: #1e293b;
           margin: 16px 0 10px 0;
           line-height: 1.4;
         }
-        .terms-columns h3:first-child {
+        .terms-page-columns h3:first-child {
           margin-top: 0;
         }
-        .terms-columns p {
+        .terms-page-columns p,
+        .terms-column-left p,
+        .terms-column-right p {
           margin: 0 0 14px 0;
           line-height: 1.6;
           color: #334155;
         }
-        .terms-columns ul,
-        .terms-columns ol {
+        .terms-page-columns ul,
+        .terms-page-columns ol,
+        .terms-column-left ul,
+        .terms-column-left ol,
+        .terms-column-right ul,
+        .terms-column-right ol {
           margin: 0 0 14px 0;
           padding-left: 24px;
         }
-        .terms-columns li {
+        .terms-page-columns li,
+        .terms-column-left li,
+        .terms-column-right li {
           margin: 6px 0;
           line-height: 1.5;
         }
-        .terms-columns table {
+        .terms-page-columns table,
+        .terms-column-left table,
+        .terms-column-right table {
           width: 100%;
           border-collapse: collapse;
           margin: 12px 0;
         }
-        .terms-columns table th,
-        .terms-columns table td {
+        .terms-page-columns table th,
+        .terms-page-columns table td,
+        .terms-column-left table th,
+        .terms-column-left table td,
+        .terms-column-right table th,
+        .terms-column-right table td {
           border: 1px solid #e2e8f0;
           padding: 8px;
           text-align: left;
+          font-size: 10px;
         }
-        .terms-columns table th {
+        .terms-page-columns table th,
+        .terms-column-left table th,
+        .terms-column-right table th {
           background-color: #f8fafc;
           font-weight: 600;
         }
-        .terms-columns strong {
+        .terms-page-columns strong,
+        .terms-column-left strong,
+        .terms-column-right strong {
           color: #0f172a;
           font-weight: 600;
         }
-        .terms-columns a {
+        .terms-page-columns a,
+        .terms-column-left a,
+        .terms-column-right a {
           color: #2563eb;
           text-decoration: none;
         }
-        .terms-columns a:hover {
+        .terms-page-columns a:hover,
+        .terms-column-left a:hover,
+        .terms-column-right a:hover {
           text-decoration: underline;
         }
         .page-break {
@@ -3010,12 +3046,14 @@ export const generateQuotePDF = async (
           .page { box-shadow: none; border-radius: 0; margin: 0 auto; max-width: none; width: auto; }
           .page-inner { padding: 8mm 6mm; }
           .draft-warning, .date-info, .quote-header-fields, .rack-card, .level4-section { page-break-inside: avoid; }
+          .terms-page-wrapper {
+            page-break-inside: avoid;
+            break-inside: avoid;
+          }
           .terms-page-columns {
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 18px;
-            page-break-inside: avoid;
-            break-inside: avoid;
           }
           .terms-column-left,
           .terms-column-right {
@@ -3221,9 +3259,7 @@ export const generateQuotePDF = async (
         <div class="page page-terms">
           <div class="page-inner">
             <h2 class="section-title">Terms & Conditions</h2>
-            <div class="terms-columns">
-              ${formattedTerms.html}
-            </div>
+            ${formattedTerms.html}
             ${footerHTML}
           </div>
         </div>
