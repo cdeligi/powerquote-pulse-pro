@@ -2928,8 +2928,8 @@ export const generateQuotePDF = async (
           margin: 0 0 10px;
           color: #475569;
         }
-        .terms-columns ul,
-        .terms-columns ol {
+        .terms-section ul,
+        .terms-section ol {
           margin: 0 0 12px 18px;
           padding: 0;
         }
