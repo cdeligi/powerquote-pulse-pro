@@ -1655,16 +1655,74 @@ export const generateQuotePDF = async (
       return expanded;
     });
 
-    const columns: TermsBlock[][] = [];
-    let currentColumn: TermsBlock[] = [];
-    let currentColumnHeight = 0;
+    type ColumnBuffer = { blocks: TermsBlock[]; height: number };
+    const createColumn = (): ColumnBuffer => ({ blocks: [], height: 0 });
 
-    const pushCurrentColumn = () => {
-      if (currentColumn.length > 0) {
-        columns.push(currentColumn);
-        currentColumn = [];
-        currentColumnHeight = 0;
+    type PageBuffer = { columns: [ColumnBuffer, ColumnBuffer] };
+    const pages: PageBuffer[] = [{ columns: [createColumn(), createColumn()] }];
+
+    let currentPage = pages[0];
+    let currentColumnIndex = 0;
+
+    const advanceColumn = () => {
+      if (currentColumnIndex === 0) {
+        currentColumnIndex = 1;
+      } else {
+        const nextPage: PageBuffer = { columns: [createColumn(), createColumn()] };
+        pages.push(nextPage);
+        currentPage = nextPage;
+        currentColumnIndex = 0;
       }
+    };
+
+    const computeHeadingGuard = (blockHeight: number, nextHeight?: number) => {
+      if (!nextHeight || blockHeight >= TERMS_MAX_COLUMN_HEIGHT) {
+        return 0;
+      }
+
+      const remaining = TERMS_MAX_COLUMN_HEIGHT - blockHeight;
+      if (remaining <= 0) {
+        return 0;
+      }
+
+      return Math.min(nextHeight, remaining);
+    };
+
+    const placeBlock = (
+      block: TermsBlock,
+      blockHeight: number,
+      context: { isSectionStart: boolean; nextHeight?: number },
+    ) => {
+      const headingGuard = computeHeadingGuard(blockHeight, context.nextHeight);
+      let attempts = 0;
+
+      while (attempts < 16) {
+        attempts += 1;
+        const column = currentPage.columns[currentColumnIndex];
+        const needsSectionSpacing = context.isSectionStart && column.blocks.length > 0;
+        const spacing = needsSectionSpacing ? TERMS_SECTION_SPACING : 0;
+        const required = column.height + spacing + blockHeight + headingGuard;
+
+        if (required <= TERMS_MAX_COLUMN_HEIGHT || column.blocks.length === 0) {
+          if (needsSectionSpacing) {
+            column.height += TERMS_SECTION_SPACING;
+          }
+
+          column.blocks.push(block);
+          column.height += blockHeight;
+          return;
+        }
+
+        advanceColumn();
+      }
+
+      const fallbackColumn = currentPage.columns[currentColumnIndex];
+      const needsSpacing = context.isSectionStart && fallbackColumn.blocks.length > 0;
+      if (needsSpacing) {
+        fallbackColumn.height += TERMS_SECTION_SPACING;
+      }
+      fallbackColumn.blocks.push(block);
+      fallbackColumn.height += Math.min(blockHeight, TERMS_MAX_COLUMN_HEIGHT);
     };
 
     expandedSections.forEach(section => {
@@ -1672,52 +1730,36 @@ export const generateQuotePDF = async (
 
       section.forEach((block, index) => {
         const blockHeight = sectionHeights[index];
-        const nextHeight = sectionHeights[index + 1] ?? 0;
-        const isFirstInSection = index === 0;
+        const nextHeight = sectionHeights[index + 1];
 
-        if (isFirstInSection && currentColumn.length > 0) {
-          const required = blockHeight + (block.type === 'heading' ? nextHeight : 0) + TERMS_SECTION_SPACING;
-          if (currentColumnHeight + required > TERMS_MAX_COLUMN_HEIGHT) {
-            pushCurrentColumn();
-          } else {
-            currentColumnHeight += TERMS_SECTION_SPACING;
+        if (blockHeight > TERMS_MAX_COLUMN_HEIGHT && block.type === 'content') {
+          const splitBlocks = splitOversizedContentBlock(block);
+          if (splitBlocks.length > 1) {
+            const splitHeights = splitBlocks.map(splitBlock => ensureMeasured(splitBlock));
+            splitBlocks.forEach((splitBlock, splitIndex) => {
+              const splitNextHeight = splitHeights[splitIndex + 1] ?? nextHeight;
+              placeBlock(splitBlock, splitHeights[splitIndex], {
+                isSectionStart: index === 0 && splitIndex === 0,
+                nextHeight: splitNextHeight,
+              });
+            });
+            return;
           }
-        } else if (currentColumn.length > 0 && currentColumnHeight + blockHeight > TERMS_MAX_COLUMN_HEIGHT) {
-          pushCurrentColumn();
         }
 
-        if (
-          block.type === 'heading' &&
-          currentColumn.length > 0 &&
-          currentColumnHeight + blockHeight + Math.min(nextHeight || 0, 160) > TERMS_MAX_COLUMN_HEIGHT
-        ) {
-          pushCurrentColumn();
-        }
-
-        currentColumn.push(block);
-        currentColumnHeight += blockHeight;
+        placeBlock(block, blockHeight, {
+          isSectionStart: index === 0,
+          nextHeight,
+        });
       });
     });
 
-    pushCurrentColumn();
     measurement.dispose();
 
-    if (columns.length === 0) {
-      const html = blocks.map(renderBlock).join('').trim();
-      return { html, columnCount: 1 };
-    }
-
-    const pages: TermsBlock[][][] = [];
-    for (let i = 0; i < columns.length; i += 2) {
-      const leftColumn = columns[i];
-      const rightColumn = columns[i + 1] || [];
-      pages.push([leftColumn, rightColumn]);
-    }
-
-    const html = pages
-      .map((pageColumns, pageIndex) => {
-        const [leftColumn, rightColumn] = pageColumns;
-        const isSingleColumnPage = rightColumn.length === 0;
+    const renderedPages = pages
+      .map((page, pageIndex) => {
+        const [leftColumn, rightColumn] = page.columns;
+        const isSingleColumnPage = rightColumn.blocks.length === 0;
         const classes = [
           'terms-columns-set',
           isSingleColumnPage ? 'terms-columns-set--single' : '',
@@ -1725,22 +1767,31 @@ export const generateQuotePDF = async (
         ].filter(Boolean);
 
         const columnMarkup = [leftColumn, rightColumn]
-          .filter((columnBlocks, columnIndex) => columnBlocks.length > 0 || columnIndex === 0)
-          .map(columnBlocks => {
-            if (columnBlocks.length === 0) {
+          .filter((columnBuffer, columnIdx) => columnBuffer.blocks.length > 0 || columnIdx === 0)
+          .map(columnBuffer => {
+            if (columnBuffer.blocks.length === 0) {
               return '';
             }
 
-            return `<div class="terms-column">${columnBlocks.map(renderBlock).join('')}</div>`;
+            return `<div class="terms-column">${columnBuffer.blocks.map(renderBlock).join('')}</div>`;
           })
           .join('');
 
+        if (!columnMarkup) {
+          return '';
+        }
+
         return `<div class="${classes.join(' ')}">${columnMarkup}</div>`;
       })
-      .join('')
-      .trim();
+      .filter(Boolean);
 
-    const hasSecondColumn = pages.some(([, rightColumn]) => rightColumn.length > 0);
+    if (renderedPages.length === 0) {
+      const html = blocks.map(renderBlock).join('').trim();
+      return { html, columnCount: 1 };
+    }
+
+    const html = renderedPages.join('').trim();
+    const hasSecondColumn = pages.some(page => page.columns[1].blocks.length > 0);
 
     return { html, columnCount: hasSecondColumn ? 2 : 1 };
   };
