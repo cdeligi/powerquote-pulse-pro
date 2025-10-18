@@ -1097,6 +1097,30 @@ let loadedItems: BOMItem[] = [];
       Array.isArray(quote.draft_bom.items)
     ) {
   console.log('Loading BOM data from draft_bom field');
+  
+  // Extract unique product IDs and query products table for metadata
+  let productMetaMap = new Map();
+  const productIds = [...new Set(quote.draft_bom.items.map((item: any) => 
+    item.productId || item.product_id || item.product?.id
+  ).filter(Boolean))];
+  
+  if (productIds.length > 0) {
+    const { data: productsData, error: productsError } = await supabase
+      .from('products')
+      .select('id, parent_product_id, chassis_type, rack_configurable, product_level, has_level4')
+      .in('id', productIds);
+      
+    if (productsError) {
+      console.error('Error loading product metadata for draft:', productsError);
+    } else {
+      productMetaMap = new Map(
+        productsData?.map(p => [p.id, p]) || []
+      );
+      console.log('✅ Loaded product metadata for draft BOM:', productIds);
+      console.log('📦 Draft BOM product metadata map:', Object.fromEntries(productMetaMap));
+    }
+  }
+  
   loadedItems = await Promise.all(
     quote.draft_bom.items.map(async (item: any) => {
       // Use stored values from draft_bom, fallback to unit_price/unit_cost, then fetch if needed
@@ -1270,10 +1294,15 @@ let loadedItems: BOMItem[] = [];
         (rawConfiguration as any)?.configuration ||
         null;
 
+      const productId = item.productId || item.product_id || item.product?.id;
+      const productMeta = productMetaMap.get(productId);
+      
+      console.log(`🔍 Draft BOM product metadata for ${productId}:`, productMeta);
+
       return {
         id: item.id || crypto.randomUUID(),
         product: {
-          id: item.productId || item.product_id || item.product?.id,
+          id: productId,
           name: item.name || item.product?.name,
           partNumber: item.partNumber || item.part_number || item.product?.partNumber,
           description:
@@ -1281,6 +1310,13 @@ let loadedItems: BOMItem[] = [];
             item.product?.description ||
             (mergedConfigurationData as any)?.description ||
             '',
+          // Add product metadata from database
+          chassisType: productMeta?.chassis_type || mergedConfigurationData.chassisType || 'N/A',
+          rack_configurable: productMeta?.rack_configurable || mergedConfigurationData.rack_configurable || false,
+          product_level: productMeta?.product_level || mergedConfigurationData.product_level || 2,
+          has_level4: productMeta?.has_level4 || mergedConfigurationData.has_level4 || false,
+          parentProductId: productMeta?.parent_product_id || mergedConfigurationData.parentProductId,
+          parent_product_id: productMeta?.parent_product_id || mergedConfigurationData.parent_product_id,
           ...mergedConfigurationData,
           price,
           cost,
