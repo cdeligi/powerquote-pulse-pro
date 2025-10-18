@@ -1379,14 +1379,15 @@ let loadedItems: BOMItem[] = [];
     }
   };
 
-  const buildDraftBomSnapshot = () => {
+  const buildDraftBomSnapshot = (itemsToUse?: BOMItem[]) => {
     const rackLayoutSummaries: Array<Record<string, any>> = [];
     const level4Summaries: Array<Record<string, any>> = [];
 
     let totalValue = 0;
     let totalCost = 0;
 
-    const items = bomItems.map(item => {
+    // Use passed items or fall back to state
+    const items = (itemsToUse || bomItems).map(item => {
       const price = item.product.price || 0;
       const cost = item.product.cost || 0;
 
@@ -3290,30 +3291,73 @@ let loadedItems: BOMItem[] = [];
   };
 
   const handleBOMUpdate = async (updatedItems: BOMItem[]) => {
+    console.log('Items before update:', bomItems.map(i => ({ id: i.id, name: i.product.name })));
+    console.log('Items after update:', updatedItems.map(i => ({ id: i.id, name: i.product.name })));
+    
     setBomItems(updatedItems);
     onBOMUpdate(updatedItems);
     
     // Sync draft_bom with current items for draft quotes
     if (currentQuoteId && isDraftMode) {
       try {
-        const draftBomData = buildDraftBomSnapshot();
+        // Pass updatedItems directly to avoid stale state
+        const draftBomData = buildDraftBomSnapshot(updatedItems);
         
-        // Find removed items (in bomItems but not in updatedItems)
-        const removedItems = bomItems.filter(
-          oldItem => !updatedItems.some(newItem => newItem.id === oldItem.id)
-        );
+        // Find removed items more reliably
+        const removedItems = bomItems.filter(oldItem => {
+          // First try matching by ID
+          const matchById = updatedItems.some(newItem => newItem.id === oldItem.id);
+          if (matchById) return false;
+          
+          // Fallback: match by product_id and part_number for items with temp IDs
+          const matchByProduct = updatedItems.some(
+            newItem => 
+              newItem.product?.id === oldItem.product?.id &&
+              newItem.partNumber === oldItem.partNumber
+          );
+          return !matchByProduct;
+        });
+        
+        console.log('Items to remove:', removedItems.map(i => ({ id: i.id, name: i.product.name })));
         
         // Delete removed items from bom_items table
         if (removedItems.length > 0) {
-          const { error: deleteError } = await supabase
-            .from('bom_items')
-            .delete()
-            .in('id', removedItems.map(item => item.id));
-            
-          if (deleteError) {
-            console.error('Error deleting bom items:', deleteError);
-          } else {
-            console.log(`Deleted ${removedItems.length} item(s) from bom_items table`);
+          // Try to delete by ID first for items with database IDs
+          const itemsWithDbIds = removedItems.filter(item => 
+            item.id && !item.id.startsWith('temp-')
+          );
+          
+          if (itemsWithDbIds.length > 0) {
+            const { error: deleteError } = await supabase
+              .from('bom_items')
+              .delete()
+              .in('id', itemsWithDbIds.map(item => item.id));
+              
+            if (deleteError) {
+              console.error('Error deleting by ID:', deleteError);
+            } else {
+              console.log(`Deleted ${itemsWithDbIds.length} item(s) by ID`);
+            }
+          }
+          
+          // Fallback: delete by product_id and quote_id for items without valid DB IDs
+          const itemsWithoutDbIds = removedItems.filter(item => 
+            !item.id || item.id.startsWith('temp-')
+          );
+          
+          for (const item of itemsWithoutDbIds) {
+            const { error: fallbackDeleteError } = await supabase
+              .from('bom_items')
+              .delete()
+              .eq('quote_id', currentQuoteId)
+              .eq('product_id', item.product?.id)
+              .eq('part_number', item.partNumber);
+              
+            if (fallbackDeleteError) {
+              console.error('Error deleting by product match:', fallbackDeleteError);
+            } else {
+              console.log(`Deleted item by product match: ${item.product?.name}`);
+            }
           }
         }
         
