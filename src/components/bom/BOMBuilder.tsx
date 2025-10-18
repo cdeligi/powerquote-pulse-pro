@@ -3363,36 +3363,10 @@ let loadedItems: BOMItem[] = [];
       console.log('✅ Editing chassis configuration for:', item.product.name);
       console.log('📦 Existing slot assignments:', item.slotAssignments);
       console.log('🔢 Existing part number:', item.partNumber);
-      
-      // Find parent Level 1 product and switch to its tab
-      const parentProductId = (item.product as Level2Product).parentProductId || 
-                              (item.product as any).parent_product_id;
-      
-      if (parentProductId) {
-        console.log('🔄 Parent product ID:', parentProductId);
-        const parentL1Product = level1Products.find(p => p.id === parentProductId);
-        
-        if (parentL1Product) {
-          // Set asset type if available
-          if (parentL1Product.asset_type_id) {
-            console.log('🔄 Setting asset type to:', parentL1Product.asset_type_id);
-            setSelectedAssetType(parentL1Product.asset_type_id);
-          }
-          
-          // Switch to parent product tab
-          console.log('🔄 Switching active tab to:', parentProductId);
-          setActiveTab(parentProductId);
-          setSelectedLevel1Product(parentL1Product);
-        } else {
-          console.warn('⚠️ Parent Level 1 product not found for:', parentProductId);
-        }
-      } else {
-        console.warn('⚠️ No parent product ID found for chassis:', item.product.id);
-      }
-      
+
       const productId = (item.product as Level2Product)?.id;
       let hydratedChassis = productId && allLevel2Products.find(p => p.id === productId);
-      
+
       // Fallback: Fetch from database if not in memory or missing chassisType
       if (!hydratedChassis || !(hydratedChassis as any).chassisType) {
         console.log('🔄 Product not in memory or incomplete, fetching from database...');
@@ -3415,8 +3389,44 @@ let loadedItems: BOMItem[] = [];
           hydratedChassis = item.product as Level2Product;
         }
       }
-      
+
       console.log('✅ Using chassis:', hydratedChassis?.name, 'Type:', (hydratedChassis as any)?.chassisType);
+
+      // Find parent Level 1 product and switch to its tab
+      let parentProductId =
+        (item.product as Level2Product).parentProductId ||
+        (item.product as any).parent_product_id ||
+        hydratedChassis?.parentProductId ||
+        (hydratedChassis as any)?.parent_product_id ||
+        hydratedChassis?.parentProduct?.id;
+
+      if (!parentProductId && hydratedChassis?.chassisType) {
+        // Fallback for known QTMS chassis that may not include parent references in BOM payloads
+        parentProductId = 'qtms';
+        console.log('ℹ️ Falling back to default QTMS parent for chassis with type:', hydratedChassis.chassisType);
+      }
+
+      if (parentProductId) {
+        console.log('🔄 Parent product ID:', parentProductId);
+        const parentL1Product = level1Products.find(p => p.id === parentProductId);
+
+        if (parentL1Product) {
+          // Set asset type if available
+          if (parentL1Product.asset_type_id) {
+            console.log('🔄 Setting asset type to:', parentL1Product.asset_type_id);
+            setSelectedAssetType(parentL1Product.asset_type_id);
+          }
+
+          // Switch to parent product tab
+          console.log('🔄 Switching active tab to:', parentProductId);
+          setActiveTab(parentProductId);
+          setSelectedLevel1Product(parentL1Product);
+        } else {
+          console.warn('⚠️ Parent Level 1 product not found for:', parentProductId);
+        }
+      } else {
+        console.warn('⚠️ No parent product ID found for chassis:', item.product.id);
+      }
 
       // Set up the chassis for editing
       setSelectedChassis(hydratedChassis);
