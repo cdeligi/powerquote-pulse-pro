@@ -557,9 +557,14 @@ export const EnhancedBOMDisplay = ({
                       <Button
                         size="sm"
                         variant="ghost"
-                        className="h-7 w-7 p-0 text-gray-400 hover:text-white hover:bg-gray-700"
-                        onClick={() => onEditConfiguration(item)}
+                        className="h-7 w-7 p-0 text-gray-400 hover:text-white hover:bg-gray-700 pointer-events-auto"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          console.log('🖱️ Edit Configuration button clicked');
+                          onEditConfiguration(item);
+                        }}
                         title="Edit Configuration"
+                        aria-label={`Edit configuration for ${item.product.name}`}
                       >
                         <Edit className="h-3 w-3" />
                       </Button>

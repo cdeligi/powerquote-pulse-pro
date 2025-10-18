@@ -935,6 +935,11 @@ let loadedItems: BOMItem[] = [];
     if (isClonedQuote) {
       console.log('Loading cloned quote - querying bom_items table');
       
+      // Clear any stale configuration state
+      setConfiguringLevel4Item(null);
+      setConfiguringChassis(null);
+      setSelectedChassis(null);
+      
       // Add retry logic for cloned quotes (handles timing/transaction issues)
       let retryCount = 0;
       const maxRetries = 3;
@@ -3160,11 +3165,22 @@ let loadedItems: BOMItem[] = [];
   };
 
   const handleBOMConfigurationEdit = (item: BOMItem) => {
-    console.log('Editing BOM item configuration:', item);
+    console.log('🔧 Edit Configuration clicked for:', item.product.name, 'Item ID:', item.id);
+    
+    // Guard: Prevent opening if already configuring
+    if (configuringLevel4Item) {
+      console.warn('Already configuring an item, ignoring new request');
+      toast({
+        title: "Configuration In Progress",
+        description: "Please save or cancel the current configuration first.",
+        variant: "destructive"
+      });
+      return;
+    }
     
     // FIRST: Check for Level 4 configuration
     if ((item.product as any).has_level4) {
-      console.log('Opening Level 4 configuration for:', item.product.name);
+      console.log('✅ Opening Level 4 configuration for:', item.product.name);
       setConfiguringLevel4Item(item);
       return;
     }
