@@ -2603,6 +2603,116 @@ export const generateQuotePDF = async (
   const isDraft = quoteInfo.status === 'draft';
   const quoteIdDisplay = isDraft ? 'DRAFT' : quoteInfo.id || 'New Quote';
 
+  // Helper function to get card abbreviation
+  const getCardAbbreviation = (cardName: string): string => {
+    if (!cardName || cardName === 'Empty') return '';
+    
+    const name = cardName.trim().toUpperCase();
+    
+    // Special cases
+    if (name.includes('CPU')) return 'CPU';
+    if (name.includes('DISPLAY')) return 'DISP';
+    
+    // Multi-word: first letter of each word
+    const words = name.split(/\s+/).filter(w => w.length > 0);
+    if (words.length > 1) {
+      return words.map(w => w[0]).join('').substring(0, 4);
+    }
+    
+    // Single word: first 3-4 characters
+    return name.substring(0, 4);
+  };
+
+  // Helper function to generate visual chassis grid HTML
+  const generateChassisVisualHTML = (
+    chassisTypeCode: string,
+    totalSlots: number,
+    slotAssignments: any[],
+    partNumber: string | undefined
+  ): string => {
+    // Determine layout based on chassis type
+    let layout: number[][] = [];
+    
+    const upperType = chassisTypeCode?.toUpperCase() || '';
+    
+    if (upperType.includes('LTX')) {
+      // LTX: 14 slots - Top row: 8-14 (7 slots), Bottom row: CPU + 1-7 (8 slots)
+      layout = [
+        [8, 9, 10, 11, 12, 13, 14],
+        [-1, 1, 2, 3, 4, 5, 6, 7] // -1 represents CPU
+      ];
+    } else if (upperType.includes('MTX')) {
+      // MTX: 7 slots - Single row: CPU + 1-7 (8 slots)
+      layout = [[-1, 1, 2, 3, 4, 5, 6, 7]];
+    } else if (upperType.includes('STX')) {
+      // STX: 4 slots - Single row: CPU + 1-4 (5 slots)
+      layout = [[-1, 1, 2, 3, 4]];
+    } else {
+      // Fallback: dynamic layout (max 8 per row)
+      const slotsPerRow = Math.min(8, totalSlots);
+      const numRows = Math.ceil(totalSlots / slotsPerRow);
+      for (let row = 0; row < numRows; row++) {
+        const rowSlots: number[] = [];
+        for (let i = 0; i < slotsPerRow; i++) {
+          const slotNum = row * slotsPerRow + i + 1;
+          if (slotNum <= totalSlots) {
+            rowSlots.push(slotNum);
+          }
+        }
+        if (rowSlots.length > 0) {
+          layout.push(rowSlots);
+        }
+      }
+    }
+
+    // Create slot assignment map
+    const slotMap = new Map<number, { name: string; partNumber: string }>();
+    slotAssignments.forEach((slot: any) => {
+      const slotNum = slot?.slot ?? slot?.slotNumber ?? slot?.position;
+      const cardName = slot?.cardName || slot?.name || slot?.product?.name || '';
+      const slotPartNumber = slot?.partNumber || slot?.product?.partNumber || '';
+      
+      if (slotNum !== null && slotNum !== undefined && cardName !== 'Empty') {
+        slotMap.set(Number(slotNum), { name: cardName, partNumber: slotPartNumber });
+      }
+    });
+
+    // Generate HTML for the grid
+    let gridHTML = '<div class="chassis-visual"><div class="chassis-grid">';
+
+    layout.forEach(row => {
+      const colCount = row.length;
+      gridHTML += `<div class="chassis-grid-row" style="grid-template-columns: repeat(${colCount}, 1fr);">`;
+      
+      row.forEach(slotNum => {
+        if (slotNum === -1) {
+          // CPU slot
+          gridHTML += '<div class="chassis-slot cpu-slot"><span class="slot-label">CPU</span></div>';
+        } else {
+          const assignment = slotMap.get(slotNum);
+          if (assignment) {
+            const abbrev = getCardAbbreviation(assignment.name);
+            gridHTML += `<div class="chassis-slot occupied"><span class="slot-label">${escapeHtml(abbrev)}</span></div>`;
+          } else {
+            gridHTML += `<div class="chassis-slot empty"><span class="slot-number">${slotNum}</span></div>`;
+          }
+        }
+      });
+      
+      gridHTML += '</div>';
+    });
+
+    gridHTML += '</div>';
+    
+    if (partNumber) {
+      gridHTML += `<div class="chassis-part-number">Part Number: ${escapeHtml(partNumber)}</div>`;
+    }
+    
+    gridHTML += '</div>';
+
+    return gridHTML;
+  };
+
   const rackConfigurationHTML = (() => {
     const chassisItems = normalizedBomItems.filter(item =>
       item.enabled &&
@@ -2652,7 +2762,7 @@ export const generateQuotePDF = async (
       }
     };
 
-    const renderRackLayout = (title: string, partNumber: string | undefined, slots: any[]) => {
+    const renderRackLayout = (title: string, partNumber: string | undefined, slots: any[], chassisTypeCode?: string) => {
       const layoutKey = buildRackLayoutKey(title, partNumber, slots);
       if (layoutKey && renderedRackLayoutKeys.has(layoutKey)) {
         return;
@@ -2671,6 +2781,23 @@ export const generateQuotePDF = async (
       `;
 
       const normalizedSlots = Array.isArray(slots) ? dedupeSpanAwareSlots(slots as SpanAwareSlot[]) : [];
+
+      // Add visual chassis grid if we have slots
+      if (normalizedSlots.length > 0 && chassisTypeCode) {
+        const totalSlots = normalizedSlots.filter((s: any) => {
+          const cardName = s?.cardName || s?.name || s?.product?.name || '';
+          return cardName !== 'Empty';
+        }).length;
+        
+        const visualGridHTML = generateChassisVisualHTML(
+          chassisTypeCode,
+          totalSlots,
+          normalizedSlots,
+          partNumber
+        );
+        
+        rackConfigHTML += visualGridHTML;
+      }
 
       if (normalizedSlots.length > 0) {
         rackConfigHTML += '<table class="rack-table"><thead><tr><th>Slot</th><th>Card Type</th><th>Part Number</th></tr></thead><tbody>';
@@ -2699,13 +2826,15 @@ export const generateQuotePDF = async (
 
     chassisItems.forEach(chassisItem => {
       const config = chassisItem.rackConfiguration;
-      renderRackLayout(chassisItem.product.name, chassisItem.partNumber, config?.slots || []);
+      const chassisType = chassisItem.product?.id || chassisItem.product?.name || '';
+      renderRackLayout(chassisItem.product.name, chassisItem.partNumber, config?.slots || [], chassisType);
     });
 
     fallbackRackLayouts.forEach(layout => {
       const slots = layout?.layout?.slots || layout?.slots;
       if (Array.isArray(slots) && slots.length > 0) {
-        renderRackLayout(layout.productName || 'Configured Rack', layout.partNumber, slots);
+        const chassisType = layout.productId || layout.productName || '';
+        renderRackLayout(layout.productName || 'Configured Rack', layout.partNumber, slots, chassisType);
       }
     });
 
@@ -2821,6 +2950,16 @@ export const generateQuotePDF = async (
         .rack-config { display: flex; flex-direction: column; gap: 24px; }
         .rack-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 16px; padding: 24px; box-shadow: 0 12px 32px -18px rgba(15,23,42,0.25); }
         .rack-card-title { color: #0f172a; margin: 0; font-size: 15px; font-weight: 600; }
+        .chassis-visual { background: #1e293b; border-radius: 12px; padding: 20px; margin: 18px 0; }
+        .chassis-grid { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+        .chassis-grid-row { display: grid; gap: 8px; }
+        .chassis-slot { height: 48px; border: 2px solid #475569; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 600; color: #ffffff; background: #334155; }
+        .chassis-slot.occupied { background: #3b82f6; border-color: #2563eb; }
+        .chassis-slot.cpu-slot { background: #8b5cf6; border-color: #7c3aed; }
+        .chassis-slot.empty { background: #475569; color: #94a3b8; font-size: 16px; }
+        .chassis-slot .slot-label { font-size: 12px; font-weight: 700; }
+        .chassis-slot .slot-number { font-size: 14px; font-weight: 500; }
+        .chassis-part-number { font-size: 10px; color: #cbd5e1; text-align: left; font-family: 'Courier New', monospace; }
         .rack-table { width: 100%; border-collapse: collapse; margin-top: 18px; background: #ffffff; border-radius: 12px; overflow: hidden; border: 1px solid #e2e8f0; }
         .rack-table th { background: #0f172a; color: #f8fafc; padding: 12px; text-align: left; font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; }
         .rack-table td { padding: 12px; border-bottom: 1px solid #e2e8f0; font-size: 11px; color: #0f172a; }
