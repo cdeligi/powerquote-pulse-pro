@@ -1318,6 +1318,12 @@ let loadedItems: BOMItem[] = [];
               id,
               level4_config_id,
               entries
+            ),
+            products!inner (
+              chassis_type,
+              rack_configurable,
+              product_level,
+              has_level4
             )
           `)
           .eq('quote_id', quoteId);
@@ -1354,6 +1360,9 @@ let loadedItems: BOMItem[] = [];
           const slotLevel4 = storedSlotAssignments?.filter(assign => assign.level4Config || assign.level4Selections) || [];
           const mergedLevel4 = directLevel4 || (slotLevel4.length > 0 ? { slots: slotLevel4 } : null);
 
+          // Get product metadata from joined products table
+          const productMeta = (item as any).products;
+          
           return {
             id: item.id,
             product: {
@@ -1363,6 +1372,10 @@ let loadedItems: BOMItem[] = [];
               price: item.unit_price,
               cost: item.unit_cost,
               description: item.description,
+              chassisType: productMeta?.chassis_type || 'N/A',
+              rack_configurable: productMeta?.rack_configurable || false,
+              product_level: productMeta?.product_level || 2,
+              has_level4: productMeta?.has_level4 || false,
               ...configData
             },
             quantity: item.quantity,
@@ -3164,19 +3177,20 @@ let loadedItems: BOMItem[] = [];
     });
   };
 
-  const handleBOMConfigurationEdit = (item: BOMItem) => {
+  const handleBOMConfigurationEdit = async (item: BOMItem) => {
     console.log('🔧 Edit Configuration clicked for:', item.product.name, 'Item ID:', item.id);
+    console.log('📊 Item details:', {
+      chassisType: (item.product as any).chassisType,
+      rack_configurable: (item.product as any).rack_configurable,
+      hasSlotAssignments: !!item.slotAssignments,
+      slotCount: Object.keys(item.slotAssignments || {}).length,
+      productId: item.product.id,
+      has_level4: (item.product as any).has_level4
+    });
     
-    // Guard: Prevent opening if already configuring
-    if (configuringLevel4Item) {
-      console.warn('Already configuring an item, ignoring new request');
-      toast({
-        title: "Configuration In Progress",
-        description: "Please save or cancel the current configuration first.",
-        variant: "destructive"
-      });
-      return;
-    }
+    // Clear all configuration states for clean slate
+    setConfiguringLevel4Item(null);
+    setConfiguringNonChassis(null);
     
     // FIRST: Check for Level 4 configuration
     if ((item.product as any).has_level4) {
@@ -3185,16 +3199,48 @@ let loadedItems: BOMItem[] = [];
       return;
     }
     
-    // Check if this is a chassis-configured item (has slot assignments)
-    if (item.slotAssignments || (item.product as any).chassisType && (item.product as any).chassisType !== 'N/A') {
-      console.log('Editing chassis configuration for:', item.product.name);
-      console.log('Existing slot assignments:', item.slotAssignments);
-      console.log('Existing part number:', item.partNumber);
+    // Check if this is a chassis-configured item
+    const isChassisConfigurable = 
+      item.slotAssignments || 
+      item.rackConfiguration ||
+      ((item.product as any).chassisType && (item.product as any).chassisType !== 'N/A') ||
+      (item.product as any).rack_configurable === true ||
+      item.product.id.includes('chassis');
+    
+    console.log('🔍 Chassis configurable check:', isChassisConfigurable);
+    
+    if (isChassisConfigurable) {
+      console.log('✅ Editing chassis configuration for:', item.product.name);
+      console.log('📦 Existing slot assignments:', item.slotAssignments);
+      console.log('🔢 Existing part number:', item.partNumber);
       
       const productId = (item.product as Level2Product)?.id;
-      const hydratedChassis =
-        (productId && allLevel2Products.find(p => p.id === productId)) ||
-        (item.product as Level2Product);
+      let hydratedChassis = productId && allLevel2Products.find(p => p.id === productId);
+      
+      // Fallback: Fetch from database if not in memory or missing chassisType
+      if (!hydratedChassis || !(hydratedChassis as any).chassisType) {
+        console.log('🔄 Product not in memory or incomplete, fetching from database...');
+        const { data: freshProduct, error } = await supabase
+          .from('products')
+          .select('*')
+          .eq('id', productId)
+          .single();
+          
+        if (freshProduct && !error) {
+          console.log('✅ Fetched fresh product data:', freshProduct.name);
+          hydratedChassis = {
+            ...item.product,
+            ...freshProduct,
+            chassisType: freshProduct.chassis_type,
+            rack_configurable: freshProduct.rack_configurable
+          } as Level2Product;
+        } else {
+          console.warn('⚠️ Could not fetch product from database, using item.product');
+          hydratedChassis = item.product as Level2Product;
+        }
+      }
+      
+      console.log('✅ Using chassis:', hydratedChassis?.name, 'Type:', (hydratedChassis as any)?.chassisType);
 
       // Set up the chassis for editing
       setSelectedChassis(hydratedChassis);
