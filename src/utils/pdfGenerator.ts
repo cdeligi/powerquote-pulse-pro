@@ -1389,435 +1389,40 @@ export const generateQuotePDF = async (
     return height;
   };
 
-  const TERMS_COLUMN_WIDTH = 348;
-  const TERMS_SECTION_SPACING = 44;
-  const TERMS_MAX_COLUMN_HEIGHT = 960;
 
-  const createTermsMeasurementContext = () => {
-    if (typeof document === 'undefined') {
-      return {
-        measure: (block: TermsBlock) => fallbackMeasureTermsBlockHeight(block),
-        dispose: () => {},
-      };
-    }
-
-    const measurementRoot = document.createElement('div');
-    measurementRoot.setAttribute('data-terms-measure', 'true');
-    measurementRoot.style.position = 'absolute';
-    measurementRoot.style.left = '-9999px';
-    measurementRoot.style.top = '0';
-    measurementRoot.style.width = `${TERMS_COLUMN_WIDTH}px`;
-    measurementRoot.style.visibility = 'hidden';
-    measurementRoot.style.pointerEvents = 'none';
-    measurementRoot.style.fontSize = '10px';
-    measurementRoot.style.lineHeight = '1.6';
-    measurementRoot.style.fontFamily = "'Inter', 'Helvetica Neue', Arial, sans-serif";
-    measurementRoot.style.color = '#475569';
-    measurementRoot.style.boxSizing = 'border-box';
-    measurementRoot.style.padding = '0';
-    measurementRoot.style.margin = '0';
-    measurementRoot.style.whiteSpace = 'normal';
-    measurementRoot.style.wordBreak = 'break-word';
-
-    const applyContentStyles = (element: HTMLElement) => {
-      element.querySelectorAll('p').forEach(paragraph => {
-        const target = paragraph as HTMLElement;
-        target.style.margin = '0 0 10px';
-        target.style.fontSize = '10px';
-        target.style.lineHeight = '1.6';
-        target.style.color = '#475569';
-      });
-
-      element.querySelectorAll('ul, ol').forEach(list => {
-        const target = list as HTMLElement;
-        target.style.margin = '0 0 12px 18px';
-        target.style.padding = '0';
-      });
-
-      element.querySelectorAll('li').forEach(item => {
-        const target = item as HTMLElement;
-        target.style.marginBottom = '6px';
-      });
-
-      element.querySelectorAll('table').forEach(table => {
-        const target = table as HTMLElement;
-        target.style.width = '100%';
-        target.style.borderCollapse = 'collapse';
-        target.style.margin = '6px 0 12px';
-      });
-
-      element.querySelectorAll('th, td').forEach(cell => {
-        const target = cell as HTMLElement;
-        target.style.border = '1px solid #cbd5f5';
-        target.style.padding = '6px 8px';
-        target.style.textAlign = 'left';
-        target.style.fontSize = '10px';
-        target.style.lineHeight = '1.6';
-      });
-
-      element.querySelectorAll('strong').forEach(strong => {
-        const target = strong as HTMLElement;
-        target.style.fontWeight = '600';
-        target.style.color = '#0f172a';
-      });
-
-      element.querySelectorAll('a').forEach(link => {
-        const target = link as HTMLElement;
-        target.style.color = '#2563eb';
-        target.style.textDecoration = 'none';
-      });
-    };
-
-    document.body.appendChild(measurementRoot);
-
-    return {
-      measure: (block: TermsBlock) => {
-        const wrapper = document.createElement('div');
-        wrapper.style.display = 'block';
-        wrapper.style.width = '100%';
-        wrapper.style.boxSizing = 'border-box';
-        wrapper.style.padding = '0';
-        wrapper.style.margin = '0';
-        wrapper.style.breakInside = 'avoid';
-        wrapper.style.pageBreakInside = 'avoid';
-
-        if (block.type === 'heading') {
-          const heading = document.createElement('div');
-          heading.textContent = block.text;
-          heading.style.fontSize = '10px';
-          heading.style.fontWeight = '700';
-          heading.style.letterSpacing = '0.08em';
-          heading.style.textTransform = 'uppercase';
-          heading.style.color = '#0f172a';
-          heading.style.margin = '14px 0 6px';
-          wrapper.appendChild(heading);
-        } else {
-          wrapper.innerHTML = block.html;
-        }
-
-        applyContentStyles(wrapper);
-        measurementRoot.appendChild(wrapper);
-        const rect = wrapper.getBoundingClientRect();
-        measurementRoot.removeChild(wrapper);
-
-        const measuredHeight = Math.ceil(rect.height);
-        const allowance = block.type === 'heading' ? 28 : 18;
-
-        return Math.max(measuredHeight + allowance, block.type === 'heading' ? 72 : 40);
-      },
-      dispose: () => {
-        if (measurementRoot.parentElement) {
-          measurementRoot.parentElement.removeChild(measurementRoot);
-        }
-      },
-    };
-  };
-
-  const splitOversizedContentBlock = (block: TermsBlock): TermsBlock[] => {
-    if (block.type !== 'content') {
-      return [block];
-    }
-
-    const paragraphFragments = block.html
-      .split(/<\/p>/i)
-      .map(fragment => fragment.trim())
-      .filter(fragment => fragment.length > 0)
-      .map(fragment => (fragment.endsWith('</p>') ? fragment : `${fragment}</p>`));
-
-    if (paragraphFragments.length > 1) {
-      return paragraphFragments.map(html => ({ type: 'content', html }));
-    }
-
-    const listMatch = block.html.match(/^<(ul|ol)([^>]*)>([\s\S]*)<\/\1>$/i);
-    if (listMatch) {
-      const listTag = listMatch[1].toLowerCase();
-      const listAttributes = listMatch[2] || '';
-      const listBody = listMatch[3] || '';
-      const listItems = listBody.match(/<li[^>]*>[\s\S]*?<\/li>/gi) || [];
-      if (listItems.length > 1) {
-        const normalizedAttributes = listAttributes
-          .replace(/\s+/g, ' ')
-          .replace(/\s*start\s*=\s*"?\d+"?/gi, '')
-          .trim();
-
-        const attributeSuffix = normalizedAttributes ? ` ${normalizedAttributes}` : '';
-
-        let startValue = 1;
-        if (listTag === 'ol') {
-          const explicitStart = listAttributes.match(/start\s*=\s*"?(\d+)"?/i);
-          if (explicitStart) {
-            const parsedStart = parseInt(explicitStart[1], 10);
-            if (!Number.isNaN(parsedStart)) {
-              startValue = parsedStart;
-            }
-          }
-        }
-
-        return listItems.map((item, index) => {
-          const startAttribute = listTag === 'ol' ? ` start="${startValue + index}"` : '';
-          return {
-            type: 'content',
-            html: `<${listTag}${attributeSuffix}${startAttribute}>${item}</${listTag}>`,
-          };
-        });
-      }
-    }
-
-    const breakFragments = block.html
-      .split(/<br\s*\/?\s*>/i)
-      .map(fragment => fragment.trim())
-      .filter(fragment => fragment.length > 0)
-      .map(fragment => `<p>${fragment}</p>`);
-
-    if (breakFragments.length > 1) {
-      return breakFragments.map(html => ({ type: 'content', html }));
-    }
-
-    return [block];
-  };
-
-  const renderTermsColumns = (blocks: TermsBlock[]): { html: string; columnCount: number } => {
-    if (blocks.length === 0) {
-      return { html: '', columnCount: 0 };
-    }
-
-    const sections: TermsBlock[][] = [];
-    blocks.forEach(block => {
-      if (block.type === 'heading') {
-        sections.push([block]);
-        return;
-      }
-
-      const lastSection = sections[sections.length - 1];
-      if (lastSection) {
-        lastSection.push(block);
-      } else {
-        sections.push([block]);
-      }
-    });
-
-    const headingState = { count: 0 };
-    const renderBlock = (block: TermsBlock): string => {
-      if (block.type === 'heading') {
-        const headingClass = `terms-heading${headingState.count === 0 ? ' terms-heading--intro' : ''}`;
-        headingState.count += 1;
-        return `<h3 class="${headingClass}">${escapeHtml(block.text)}</h3>`;
-      }
-
-      return block.html;
-    };
-
-    const measurement = createTermsMeasurementContext();
-    const heightCache = new Map<TermsBlock, number>();
-
-    const ensureMeasured = (block: TermsBlock): number => {
-      const cached = heightCache.get(block);
-      if (typeof cached === 'number') {
-        return cached;
-      }
-
-      const measured = measurement.measure(block);
-      heightCache.set(block, measured);
-      return measured;
-    };
-
-    const expandedSections = sections.map(section => {
-      const expanded: TermsBlock[] = [];
-
-      section.forEach(block => {
-        if (block.type === 'content') {
-          const blockHeight = ensureMeasured(block);
-          if (blockHeight > TERMS_MAX_COLUMN_HEIGHT) {
-            const splitBlocks = splitOversizedContentBlock(block);
-            if (splitBlocks.length > 1) {
-              splitBlocks.forEach(splitBlock => {
-                const measuredSplit = ensureMeasured(splitBlock);
-                if (measuredSplit > TERMS_MAX_COLUMN_HEIGHT) {
-                  const deeperSplit = splitOversizedContentBlock(splitBlock);
-                  if (deeperSplit.length > 1) {
-                    deeperSplit.forEach(item => {
-                      ensureMeasured(item);
-                      expanded.push(item);
-                    });
-                    return;
-                  }
-                }
-                expanded.push(splitBlock);
-              });
-              return;
-            }
-          }
-        }
-
-        expanded.push(block);
-      });
-
-      return expanded;
-    });
-
-    type ColumnBuffer = { blocks: TermsBlock[]; height: number };
-    const createColumn = (): ColumnBuffer => ({ blocks: [], height: 0 });
-
-    type PageBuffer = { columns: [ColumnBuffer, ColumnBuffer] };
-    const pages: PageBuffer[] = [{ columns: [createColumn(), createColumn()] }];
-
-    let currentPage = pages[0];
-    let currentColumnIndex = 0;
-
-    const advanceColumn = () => {
-      if (currentColumnIndex === 0) {
-        currentColumnIndex = 1;
-      } else {
-        const nextPage: PageBuffer = { columns: [createColumn(), createColumn()] };
-        pages.push(nextPage);
-        currentPage = nextPage;
-        currentColumnIndex = 0;
-      }
-    };
-
-    const computeHeadingGuard = (blockHeight: number, nextHeight?: number) => {
-      if (!nextHeight || blockHeight >= TERMS_MAX_COLUMN_HEIGHT) {
-        return 0;
-      }
-
-      const remaining = TERMS_MAX_COLUMN_HEIGHT - blockHeight;
-      if (remaining <= 0) {
-        return 0;
-      }
-
-      return Math.min(nextHeight, remaining);
-    };
-
-    const placeBlock = (
-      block: TermsBlock,
-      blockHeight: number,
-      context: { isSectionStart: boolean; nextHeight?: number },
-    ) => {
-      const headingGuard = computeHeadingGuard(blockHeight, context.nextHeight);
-      let attempts = 0;
-
-      while (attempts < 16) {
-        attempts += 1;
-        const column = currentPage.columns[currentColumnIndex];
-        const needsSectionSpacing = context.isSectionStart && column.blocks.length > 0;
-        const spacing = needsSectionSpacing ? TERMS_SECTION_SPACING : 0;
-        const required = column.height + spacing + blockHeight + headingGuard;
-
-        if (required <= TERMS_MAX_COLUMN_HEIGHT || column.blocks.length === 0) {
-          if (needsSectionSpacing) {
-            column.height += TERMS_SECTION_SPACING;
-          }
-
-          column.blocks.push(block);
-          column.height += blockHeight;
-          return;
-        }
-
-        advanceColumn();
-      }
-
-      const fallbackColumn = currentPage.columns[currentColumnIndex];
-      const needsSpacing = context.isSectionStart && fallbackColumn.blocks.length > 0;
-      if (needsSpacing) {
-        fallbackColumn.height += TERMS_SECTION_SPACING;
-      }
-      fallbackColumn.blocks.push(block);
-      fallbackColumn.height += Math.min(blockHeight, TERMS_MAX_COLUMN_HEIGHT);
-    };
-
-    expandedSections.forEach(section => {
-      const sectionHeights = section.map(block => ensureMeasured(block));
-
-      section.forEach((block, index) => {
-        const blockHeight = sectionHeights[index];
-        const nextHeight = sectionHeights[index + 1];
-
-        if (blockHeight > TERMS_MAX_COLUMN_HEIGHT && block.type === 'content') {
-          const splitBlocks = splitOversizedContentBlock(block);
-          if (splitBlocks.length > 1) {
-            const splitHeights = splitBlocks.map(splitBlock => ensureMeasured(splitBlock));
-            splitBlocks.forEach((splitBlock, splitIndex) => {
-              const splitNextHeight = splitHeights[splitIndex + 1] ?? nextHeight;
-              placeBlock(splitBlock, splitHeights[splitIndex], {
-                isSectionStart: index === 0 && splitIndex === 0,
-                nextHeight: splitNextHeight,
-              });
-            });
-            return;
-          }
-        }
-
-        placeBlock(block, blockHeight, {
-          isSectionStart: index === 0,
-          nextHeight,
-        });
-      });
-    });
-
-    measurement.dispose();
-
-    const renderedPages = pages
-      .map((page, pageIndex) => {
-        const [leftColumn, rightColumn] = page.columns;
-        const isSingleColumnPage = rightColumn.blocks.length === 0;
-        const classes = [
-          'terms-columns-set',
-          isSingleColumnPage ? 'terms-columns-set--single' : '',
-          pageIndex < pages.length - 1 ? 'terms-columns-set--paged' : '',
-        ].filter(Boolean);
-
-        const columnMarkup = [leftColumn, rightColumn]
-          .filter((columnBuffer, columnIdx) => columnBuffer.blocks.length > 0 || columnIdx === 0)
-          .map(columnBuffer => {
-            if (columnBuffer.blocks.length === 0) {
-              return '';
-            }
-
-            return `<div class="terms-column">${columnBuffer.blocks.map(renderBlock).join('')}</div>`;
-          })
-          .join('');
-
-        if (!columnMarkup) {
-          return '';
-        }
-
-        return `<div class="${classes.join(' ')}">${columnMarkup}</div>`;
-      })
-      .filter(Boolean);
-
-    if (renderedPages.length === 0) {
-      const html = blocks.map(renderBlock).join('').trim();
-      return { html, columnCount: 1 };
-    }
-
-    const html = renderedPages.join('').trim();
-    const hasSecondColumn = pages.some(page => page.columns[1].blocks.length > 0);
-
-    return { html, columnCount: hasSecondColumn ? 2 : 1 };
-  };
-
-  const formatTermsAndConditions = (content: string): { html: string; columnCount: number } => {
+  const formatTermsAndConditions = (content: string): string => {
     if (!content) {
-      return { html: '', columnCount: 0 };
+      return '';
     }
 
     const trimmed = content.trim();
     if (!trimmed) {
-      return { html: '', columnCount: 0 };
+      return '';
     }
 
+    const renderBlock = (block: TermsBlock): string => {
+      if (block.type === 'heading') {
+        return `<h3>${escapeHtml(block.text)}</h3>`;
+      }
+      return block.html;
+    };
+
     const hasHtmlTags = /<[^>]+>/.test(trimmed);
+    let blocks: TermsBlock[];
+    
     if (hasHtmlTags) {
       const normalizedBlocks = buildHtmlTermsBlocks(trimmed);
       if (normalizedBlocks) {
-        return renderTermsColumns(normalizedBlocks);
+        blocks = normalizedBlocks;
+      } else {
+        const textOnly = trimmed.replace(/<[^>]+>/g, ' ');
+        blocks = buildPlainTextTermsBlocks(textOnly);
       }
-
-      const textOnly = trimmed.replace(/<[^>]+>/g, ' ');
-      return renderTermsColumns(buildPlainTextTermsBlocks(textOnly));
+    } else {
+      blocks = buildPlainTextTermsBlocks(trimmed);
     }
 
-    return renderTermsColumns(buildPlainTextTermsBlocks(trimmed));
+    return blocks.map(renderBlock).join('');
   };
   let companyName = 'QUALITROL';
   let companyLogoUrl = '';
@@ -2981,7 +2586,7 @@ export const generateQuotePDF = async (
   const quoteIdDisplay = isDraft ? 'DRAFT' : quoteInfo.id || 'New Quote';
 
   const formattedTermsAndConditions = formatTermsAndConditions(termsAndConditions);
-  const hasTermsContent = formattedTermsAndConditions.columnCount > 0 && formattedTermsAndConditions.html.trim().length > 0;
+  const hasTermsContent = Boolean(formattedTermsAndConditions);
 
   const rackConfigurationHTML = (() => {
     const chassisItems = normalizedBomItems.filter(item =>
@@ -3122,7 +2727,7 @@ export const generateQuotePDF = async (
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
         * { box-sizing: border-box; }
         @page {
-          margin: 10mm 8mm;
+          margin: 8mm 6mm;
         }
         body {
           font-family: 'Inter', sans-serif;
@@ -3143,7 +2748,7 @@ export const generateQuotePDF = async (
           page-break-after: always;
         }
         .page:last-of-type { page-break-after: auto; }
-        .page-inner { padding: 26px 26px; }
+        .page-inner { padding: 20px 18px; }
         .header {
           border-bottom: 1px solid #e2e8f0;
           padding-bottom: 24px;
@@ -3213,37 +2818,16 @@ export const generateQuotePDF = async (
         .level4-raw { white-space: pre-wrap; font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', monospace; font-size: 10px; background: #0f172a; color: #f8fafc; padding: 16px; border-radius: 12px; margin-top: 18px; }
         .terms-columns {
           background: #f8fafc;
-          padding: 20px 22px;
+          padding: 18px 20px;
           border-radius: 14px;
           border: 1px solid #e2e8f0;
           margin-bottom: 20px;
           font-size: 10px;
           line-height: 1.6;
           color: #475569;
-          display: flex;
-          flex-direction: column;
-          gap: 24px;
-        }
-        .terms-columns-set {
-          display: grid;
-          grid-template-columns: repeat(2, minmax(0, 1fr));
-          gap: 22px;
-          align-items: start;
-        }
-        .terms-columns--single .terms-columns-set,
-        .terms-columns-set--single {
-          grid-template-columns: 1fr;
-        }
-        .terms-column {
-          display: flex;
-          flex-direction: column;
-          gap: 10px;
-          min-width: 0;
-        }
-        .terms-column > * {
-          display: block;
-          break-inside: avoid;
-          page-break-inside: avoid;
+          column-count: 2;
+          column-gap: 22px;
+          column-rule: 1px solid #e2e8f0;
         }
         .terms-columns h3 {
           font-size: 10px;
@@ -3254,22 +2838,25 @@ export const generateQuotePDF = async (
           margin: 14px 0 6px;
           break-after: avoid;
           page-break-after: avoid;
+          column-break-after: avoid;
         }
         .terms-columns h3:first-of-type {
           margin-top: 0;
         }
-        .terms-heading--intro {
-          font-size: 11px;
-          letter-spacing: 0.12em;
-        }
         .terms-columns p {
           margin: 0 0 10px;
           color: #475569;
+          break-inside: avoid;
+          page-break-inside: avoid;
+          column-break-inside: avoid;
         }
-        .terms-section ul,
-        .terms-section ol {
+        .terms-columns ul,
+        .terms-columns ol {
           margin: 0 0 12px 18px;
           padding: 0;
+          break-inside: avoid;
+          page-break-inside: avoid;
+          column-break-inside: avoid;
         }
         .terms-columns li {
           margin-bottom: 6px;
@@ -3278,6 +2865,9 @@ export const generateQuotePDF = async (
           width: 100%;
           border-collapse: collapse;
           margin: 6px 0 12px;
+          break-inside: avoid;
+          page-break-inside: avoid;
+          column-break-inside: avoid;
         }
         .terms-columns th,
         .terms-columns td {
@@ -3301,19 +2891,24 @@ export const generateQuotePDF = async (
         @media print {
           body { background: #ffffff; padding: 0; }
           .page { box-shadow: none; border-radius: 0; margin: 0 auto; max-width: none; width: auto; }
-          .page-inner { padding: 9mm 8mm; }
+          .page-inner { padding: 8mm 6mm; }
           .draft-warning, .date-info, .quote-header-fields, .rack-card, .level4-section { page-break-inside: avoid; }
-          .terms-columns { gap: 18px; }
-          .terms-columns-set {
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-            gap: 18px;
-            page-break-inside: avoid;
+          .terms-columns {
+            column-count: 2;
+            column-gap: 18px;
+            orphans: 3;
+            widows: 3;
           }
-          .terms-columns-set--single {
-            grid-template-columns: 1fr;
+          .terms-columns h3 {
+            break-after: avoid;
+            column-break-after: avoid;
           }
-          .terms-columns-set.terms-columns-set--paged {
-            page-break-after: always;
+          .terms-columns p,
+          .terms-columns ul,
+          .terms-columns ol,
+          .terms-columns table {
+            break-inside: avoid;
+            column-break-inside: avoid;
           }
         }
       </style>
@@ -3510,8 +3105,8 @@ export const generateQuotePDF = async (
         <div class="page page-terms">
           <div class="page-inner">
             <h2 class="section-title">Terms & Conditions</h2>
-            <div class="terms-columns${formattedTermsAndConditions.columnCount === 1 ? ' terms-columns--single' : ''}">
-              ${formattedTermsAndConditions.html}
+            <div class="terms-columns">
+              ${formattedTermsAndConditions}
             </div>
             ${footerHTML}
           </div>
