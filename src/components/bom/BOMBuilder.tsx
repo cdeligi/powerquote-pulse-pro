@@ -1310,6 +1310,7 @@ let loadedItems: BOMItem[] = [];
 } else {
         console.log('Loading BOM data from bom_items table (submitted/approved quote)');
         
+        // Query BOM items without join
         const { data: bomData, error: bomError } = await supabase
           .from('bom_items')
           .select(`
@@ -1318,14 +1319,7 @@ let loadedItems: BOMItem[] = [];
               id,
               level4_config_id,
               entries
-            ),
-          products!inner (
-            chassis_type,
-            rack_configurable,
-            product_level,
-            has_level4,
-            parent_product_id
-          )
+            )
           `)
           .eq('quote_id', quoteId);
           
@@ -1337,6 +1331,27 @@ let loadedItems: BOMItem[] = [];
             variant: "destructive"
           });
           throw bomError;
+        }
+
+        // Extract unique product IDs and query products separately
+        let productMetaMap = new Map();
+        if (bomData && bomData.length > 0) {
+          const productIds = [...new Set(bomData.map(item => item.product_id))];
+          
+          const { data: productsData, error: productsError } = await supabase
+            .from('products')
+            .select('id, parent_product_id, chassis_type, rack_configurable, product_level, has_level4')
+            .in('id', productIds);
+            
+          if (productsError) {
+            console.error('Error loading product metadata:', productsError);
+          } else {
+            productMetaMap = new Map(
+              productsData?.map(p => [p.id, p]) || []
+            );
+            console.log('✅ Loaded product metadata for:', productIds);
+            console.log('📦 Product metadata map:', Object.fromEntries(productMetaMap));
+          }
         }
         
         console.log(`Successfully loaded ${bomData?.length || 0} BOM items from database`);
@@ -1361,8 +1376,10 @@ let loadedItems: BOMItem[] = [];
           const slotLevel4 = storedSlotAssignments?.filter(assign => assign.level4Config || assign.level4Selections) || [];
           const mergedLevel4 = directLevel4 || (slotLevel4.length > 0 ? { slots: slotLevel4 } : null);
 
-          // Get product metadata from joined products table
-          const productMeta = (item as any).products;
+          // Get product metadata from manual lookup map
+          const productMeta = productMetaMap.get(item.product_id);
+          
+          console.log(`🔍 Product metadata for ${item.product_id}:`, productMeta);
           
           return {
             id: item.id,
@@ -1373,12 +1390,12 @@ let loadedItems: BOMItem[] = [];
               price: item.unit_price,
               cost: item.unit_cost,
               description: item.description,
-              chassisType: productMeta?.chassis_type || 'N/A',
+              chassisType: productMeta?.chassis_type || configData.chassisType || 'N/A',
               rack_configurable: productMeta?.rack_configurable || false,
               product_level: productMeta?.product_level || 2,
               has_level4: productMeta?.has_level4 || false,
-              parentProductId: productMeta?.parent_product_id,
-              parent_product_id: productMeta?.parent_product_id,
+              parentProductId: productMeta?.parent_product_id || configData.parentProductId,
+              parent_product_id: productMeta?.parent_product_id || configData.parent_product_id,
               ...configData
             },
             quantity: item.quantity,
