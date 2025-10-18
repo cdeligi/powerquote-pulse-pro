@@ -1346,16 +1346,30 @@ export const generateQuotePDF = async (
 
   const computeTermsBlockWeight = (block: TermsBlock): number => {
     if (block.type === 'heading') {
-      return 4;
+      return 6;
     }
 
     const textContent = block.html.replace(/<[^>]+>/g, ' ').trim();
     if (!textContent) {
-      return 1;
+      return 2;
     }
 
     const wordCount = textContent.split(/\s+/).length;
-    return Math.max(wordCount, 4);
+    const hasTable = /<table/i.test(block.html);
+    const hasList = /<(ul|ol)/i.test(block.html);
+    const hasBreakHeavyContent = /<(blockquote|pre)/i.test(block.html);
+
+    let weight = Math.max(wordCount, 6);
+
+    if (hasTable) {
+      weight = Math.max(weight * 2, weight + 160);
+    } else if (hasList) {
+      weight = Math.max(Math.round(weight * 1.35), weight + 28);
+    } else if (hasBreakHeavyContent) {
+      weight = Math.max(Math.round(weight * 1.5), weight + 80);
+    }
+
+    return weight;
   };
 
   const renderTermsColumns = (blocks: TermsBlock[]): { html: string; columnCount: number } => {
@@ -1389,7 +1403,7 @@ export const generateQuotePDF = async (
       return block.html;
     };
 
-    const MAX_COLUMN_WEIGHT = 480;
+    const MAX_COLUMN_WEIGHT = 340;
     const columns: TermsBlock[][] = [];
     let currentColumn: TermsBlock[] = [];
     let currentColumnWeight = 0;
