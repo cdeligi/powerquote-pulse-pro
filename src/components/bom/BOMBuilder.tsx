@@ -881,13 +881,18 @@ setCurrentQuote(quote); // Store the loaded quote data
 
 let loadedItems: BOMItem[] = [];
 
-// Check if this is a draft with data in draft_bom field
-if (
-  quote.status === 'draft' &&
-  quote.draft_bom &&
-  quote.draft_bom.items &&
-  Array.isArray(quote.draft_bom.items)
-) {
+    // Check if this is a cloned quote - force load from bom_items
+    const isClonedQuote = !!quote.source_quote_id;
+    
+    if (isClonedQuote) {
+      console.log('Loading cloned quote - querying bom_items table');
+      // Skip draft_bom, will load from bom_items below
+    } else if (
+      quote.status === 'draft' &&
+      quote.draft_bom &&
+      quote.draft_bom.items &&
+      Array.isArray(quote.draft_bom.items)
+    ) {
   console.log('Loading BOM data from draft_bom field');
   loadedItems = await Promise.all(
     quote.draft_bom.items.map(async (item: any) => {
@@ -1171,6 +1176,20 @@ if (
             partNumberContext: normalizePartNumberContext(partNumberContext),
           };
         });
+      }
+      
+      // Validation: Check if draft_bom and bom_items are in sync
+      if (quote.draft_bom?.items && Array.isArray(quote.draft_bom.items)) {
+        const draftBomCount = quote.draft_bom.items.length;
+        const bomItemsCount = loadedItems.length;
+        
+        if (draftBomCount !== bomItemsCount) {
+          console.warn(
+            `⚠️ Draft BOM out of sync: draft_bom has ${draftBomCount} items, bom_items has ${bomItemsCount} items`
+          );
+        } else {
+          console.log(`✓ Draft BOM in sync: ${bomItemsCount} items in both sources`);
+        }
       }
       
       setBomItems(loadedItems);
@@ -3140,9 +3159,50 @@ if (
     onBOMUpdate([]);
   };
 
-  const handleBOMUpdate = (updatedItems: BOMItem[]) => {
+  const handleBOMUpdate = async (updatedItems: BOMItem[]) => {
     setBomItems(updatedItems);
     onBOMUpdate(updatedItems);
+    
+    // Sync draft_bom with current items for draft quotes
+    if (currentQuoteId && isDraftMode) {
+      try {
+        const draftBomData = buildDraftBomSnapshot();
+        
+        // Find removed items (in bomItems but not in updatedItems)
+        const removedItems = bomItems.filter(
+          oldItem => !updatedItems.some(newItem => newItem.id === oldItem.id)
+        );
+        
+        // Delete removed items from bom_items table
+        if (removedItems.length > 0) {
+          const { error: deleteError } = await supabase
+            .from('bom_items')
+            .delete()
+            .in('id', removedItems.map(item => item.id));
+            
+          if (deleteError) {
+            console.error('Error deleting bom items:', deleteError);
+          } else {
+            console.log(`Deleted ${removedItems.length} item(s) from bom_items table`);
+          }
+        }
+        
+        // Update draft_bom field to stay in sync
+        const { error: updateError } = await supabase
+          .from('quotes')
+          .update({ draft_bom: draftBomData })
+          .eq('id', currentQuoteId)
+          .eq('status', 'draft');
+          
+        if (updateError) {
+          console.error('Error syncing draft_bom:', updateError);
+        } else {
+          console.log('draft_bom synced with current BOM items');
+        }
+      } catch (error) {
+        console.error('Error in handleBOMUpdate sync:', error);
+      }
+    }
   };
 
   const handleDiscountChange = (discount: number, justification: string) => {
