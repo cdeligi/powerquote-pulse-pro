@@ -508,198 +508,90 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
 
       let bomItems: any[] = [];
       
-      // Get BOM items
-      const normalizedDraftBom = ensureRecord(fullQuote?.draft_bom);
-      const draftBomItems = ensureArray(normalizedDraftBom ? normalizedDraftBom['items'] : undefined);
+      // ALWAYS query bom_items table first for accurate data
+      const { data: bomData, error: bomError } = await supabase
+        .from('bom_items')
+        .select(`
+          *,
+          bom_level4_values (
+            id,
+            level4_config_id,
+            entries
+          )
+        `)
+        .eq('quote_id', actualQuoteId);
 
-      if (fullQuote.status === 'draft' && Array.isArray(draftBomItems)) {
-        bomItems = (draftBomItems as any[]).map((item: any) => {
-          const productPrice = item.unit_price || item.product?.price || 0;
-          const storedSlotAssignments = item.slotAssignments as SerializedSlotAssignment[] | undefined;
-          const slotAssignments = deserializeSlotAssignments(storedSlotAssignments);
-          const rackLayout = item.rackConfiguration || buildRackLayoutFromAssignments(storedSlotAssignments);
-
-          return {
-            id: item.id || crypto.randomUUID(),
-            product: {
-              name: item.name || item.product?.name || 'Unknown Product',
-              description: item.description || item.product?.description || '',
-              price: productPrice
-            },
-            quantity: item.quantity || 1,
-            enabled: item.enabled !== false,
-            partNumber: item.partNumber || item.part_number || 'TBD',
-            slotAssignments,
-            rackConfiguration: rackLayout,
-            level4Config: item.level4Config || null,
-            level4Selections: item.level4Selections || null,
-          };
-        });
-      } else {
-        const { data: bomData, error: bomError } = await supabase
-          .from('bom_items')
-          .select(`
-            *,
-            bom_level4_values (
-              id,
-              level4_config_id,
-              entries
-            )
-          `)
-          .eq('quote_id', quote.id);
-
-        if (bomError) throw bomError;
-
+      // Use bom_items if available, otherwise fall back to draft_bom
+      if (!bomError && bomData && bomData.length > 0) {
+        // Use bom_items table data (most accurate)
         const productIdSet = new Set<string>();
-        (bomData || []).forEach(item => {
+        bomData.forEach(item => {
           const productId = coerceString((item as any)?.product_id);
           if (productId) {
             productIdSet.add(productId);
           }
         });
 
-        const productMetadataMap = new Map<
-          string,
-          {
-            productLevel?: 1 | 2 | 3 | 4;
-            productInfoUrl?: string;
-            parentLevel2Id?: string;
-          }
-        >();
+        const productIds = Array.from(productIdSet);
+        const { data: productsData } = productIds.length > 0
+          ? await supabase.from('products').select('*').in('id', productIds)
+          : { data: [] };
 
-        if (productIdSet.size > 0) {
-          try {
-            const { data: productRows, error: productError } = await supabase
-              .from('products')
-              .select('id, product_level, product_info_url, parent_product_id')
-              .in('id', Array.from(productIdSet));
+        const productsMap = new Map((productsData || []).map(p => [p.id, p]));
 
-            if (productError) {
-              console.error('Error fetching product metadata for BOM items:', productError);
-            } else {
-              (productRows || []).forEach(row => {
-                const id = coerceString((row as any)?.id);
-                if (!id) {
-                  return;
-                }
-
-                const productLevel = coerceProductLevel((row as any)?.product_level);
-                const productInfoUrl = coerceString((row as any)?.product_info_url);
-                const parentLevel2Id = coerceString((row as any)?.parent_product_id);
-
-                productMetadataMap.set(id, {
-                  productLevel,
-                  productInfoUrl,
-                  parentLevel2Id,
-                });
-              });
-            }
-          } catch (metadataError) {
-            console.error('Unexpected error enriching BOM product metadata:', metadataError);
-          }
-        }
-
-        bomItems = (bomData || []).map(item => {
-          const configData = item.configuration_data || {};
-          const storedSlotAssignments = configData.slotAssignments as SerializedSlotAssignment[] | undefined;
+        bomItems = (bomData || []).map((item: any) => {
+          const productId = coerceString(item.product_id);
+          const product = productId ? productsMap.get(productId) : null;
+          const storedSlotAssignments = item.configuration_data?.slotAssignments as SerializedSlotAssignment[] | undefined;
           const slotAssignments = deserializeSlotAssignments(storedSlotAssignments);
-          const rackLayout = configData.rackConfiguration || buildRackLayoutFromAssignments(storedSlotAssignments);
-
-          const relationLevel4 = Array.isArray(item.bom_level4_values) && item.bom_level4_values.length > 0
-            ? {
-                level4_config_id: item.bom_level4_values[0].level4_config_id,
-                entries: item.bom_level4_values[0].entries,
-              }
-            : null;
-
-          const normalizedLevel4Config = (() => {
-            const direct = configData.level4Config as any;
-
-            const mergeWithRelation = (candidate: any) => {
-              if (!relationLevel4) return candidate;
-
-              const templateType = candidate?.template_type ?? candidate?.templateType ?? candidate?.mode
-                ?? configData.level4Config?.template_type
-                ?? configData.level4Config?.templateType
-                ?? configData.level4Config?.mode;
-
-              const relationEntries = relationLevel4.entries;
-              const candidateEntries = candidate?.entries;
-              const relationHasEntries = Array.isArray(relationEntries)
-                ? relationEntries.length > 0
-                : relationEntries !== undefined && relationEntries !== null && relationEntries !== '';
-              const candidateHasEntries = Array.isArray(candidateEntries)
-                ? candidateEntries.length > 0
-                : candidateEntries !== undefined && candidateEntries !== null && candidateEntries !== '';
-
-              const merged: any = {
-                ...relationLevel4,
-                ...candidate,
-              };
-
-              if (candidateHasEntries && (!relationHasEntries || Array.isArray(candidateEntries))) {
-                merged.entries = candidateEntries;
-              }
-
-              if (templateType) {
-                merged.template_type = templateType;
-              }
-
-              return merged;
-            };
-
-            if (direct && typeof direct === 'object' && !Array.isArray(direct)) {
-              if (!('level4_config_id' in direct) && relationLevel4) {
-                return mergeWithRelation(direct);
-              }
-              return direct;
-            }
-
-            if (Array.isArray(direct) || typeof direct === 'string') {
-              const candidate = direct ? { entries: direct } : null;
-              return candidate ? mergeWithRelation(candidate) : relationLevel4;
-            }
-
-            if (relationLevel4) {
-              return relationLevel4;
-            }
-
-            return null;
-          })();
-
-          const productId = coerceString((item as any)?.product_id);
-          const productMetadata = productId ? productMetadataMap.get(productId) : undefined;
-          const productLevel = productMetadata?.productLevel;
-          const productInfoUrl = productMetadata?.productInfoUrl;
-          const parentLevel2Id = productMetadata?.parentLevel2Id;
-
-          const normalizedPrice = typeof item.unit_price === 'number' ? item.unit_price : 0;
-          const normalizedQuantity = typeof item.quantity === 'number' && item.quantity > 0 ? item.quantity : 1;
+          const rackLayout = item.configuration_data?.rackConfiguration || buildRackLayoutFromAssignments(storedSlotAssignments);
 
           return {
-            id: item.id,
+            id: item.id || crypto.randomUUID(),
             product: {
-              id: productId || item.id,
-              name: item.name,
-              description: item.description || '',
-              price: normalizedPrice,
-              product_level: productLevel,
-              productInfoUrl,
-              parent_product_id: parentLevel2Id,
-              parentProductId: parentLevel2Id,
+              name: item.name || product?.name || 'Unknown Product',
+              description: item.description || product?.description || '',
+              price: item.unit_price || product?.price || 0
             },
-            quantity: normalizedQuantity,
+            quantity: item.quantity || 1,
             enabled: true,
             partNumber: item.part_number || 'TBD',
-            level: productLevel,
-            parentLevel2Id: productLevel === 3 ? parentLevel2Id : undefined,
-            resolvedInfoUrl: productLevel === 2 ? productInfoUrl : undefined,
             slotAssignments,
             rackConfiguration: rackLayout,
-            level4Config: normalizedLevel4Config,
-            level4Selections: configData.level4Selections || null,
+            level4Config: item.configuration_data?.level4Config || null,
+            level4Selections: item.configuration_data?.level4Selections || null,
           };
         });
+      } else if (fullQuote.status === 'draft') {
+        // Fallback to draft_bom only if no bom_items exist
+        console.warn('No bom_items found, falling back to draft_bom');
+        const normalizedDraftBom = ensureRecord(fullQuote?.draft_bom);
+        const draftBomItems = ensureArray(normalizedDraftBom ? normalizedDraftBom['items'] : undefined);
+
+        if (Array.isArray(draftBomItems)) {
+          bomItems = (draftBomItems as any[]).map((item: any) => {
+            const productPrice = item.unit_price || item.product?.price || 0;
+            const storedSlotAssignments = item.slotAssignments as SerializedSlotAssignment[] | undefined;
+            const slotAssignments = deserializeSlotAssignments(storedSlotAssignments);
+            const rackLayout = item.rackConfiguration || buildRackLayoutFromAssignments(storedSlotAssignments);
+
+            return {
+              id: item.id || crypto.randomUUID(),
+              product: {
+                name: item.name || item.product?.name || 'Unknown Product',
+                description: item.description || item.product?.description || '',
+                price: productPrice
+              },
+              quantity: item.quantity || 1,
+              enabled: item.enabled !== false,
+              partNumber: item.partNumber || item.part_number || 'TBD',
+              slotAssignments,
+              rackConfiguration: rackLayout,
+              level4Config: item.level4Config || null,
+              level4Selections: item.level4Selections || null,
+            };
+          });
+        }
       }
 
       // Import and use the PDF generator
