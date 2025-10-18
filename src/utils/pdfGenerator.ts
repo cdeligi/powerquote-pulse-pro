@@ -1528,12 +1528,38 @@ export const generateQuotePDF = async (
       return paragraphFragments.map(html => ({ type: 'content', html }));
     }
 
-    const listMatch = block.html.match(/^<(ul|ol)[^>]*>[\s\S]*<\/\1>$/i);
+    const listMatch = block.html.match(/^<(ul|ol)([^>]*)>([\s\S]*)<\/\1>$/i);
     if (listMatch) {
       const listTag = listMatch[1].toLowerCase();
-      const listItems = block.html.match(/<li[^>]*>[\s\S]*?<\/li>/gi) || [];
+      const listAttributes = listMatch[2] || '';
+      const listBody = listMatch[3] || '';
+      const listItems = listBody.match(/<li[^>]*>[\s\S]*?<\/li>/gi) || [];
       if (listItems.length > 1) {
-        return listItems.map(item => ({ type: 'content', html: `<${listTag}>${item}</${listTag}>` }));
+        const normalizedAttributes = listAttributes
+          .replace(/\s+/g, ' ')
+          .replace(/\s*start\s*=\s*"?\d+"?/gi, '')
+          .trim();
+
+        const attributeSuffix = normalizedAttributes ? ` ${normalizedAttributes}` : '';
+
+        let startValue = 1;
+        if (listTag === 'ol') {
+          const explicitStart = listAttributes.match(/start\s*=\s*"?(\d+)"?/i);
+          if (explicitStart) {
+            const parsedStart = parseInt(explicitStart[1], 10);
+            if (!Number.isNaN(parsedStart)) {
+              startValue = parsedStart;
+            }
+          }
+        }
+
+        return listItems.map((item, index) => {
+          const startAttribute = listTag === 'ol' ? ` start="${startValue + index}"` : '';
+          return {
+            type: 'content',
+            html: `<${listTag}${attributeSuffix}${startAttribute}>${item}</${listTag}>`,
+          };
+        });
       }
     }
 
