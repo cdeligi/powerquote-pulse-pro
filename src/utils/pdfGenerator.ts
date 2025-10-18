@@ -1399,74 +1399,6 @@ export const generateQuotePDF = async (
     rightColumn: TermsBlock[];
   }
 
-  const paginateTermsIntoColumns = (blocks: TermsBlock[]): TermsPage[] => {
-    if (blocks.length === 0) {
-      return [];
-    }
-
-    const pages: TermsPage[] = [];
-    let currentPage: TermsPage = { leftColumn: [], rightColumn: [] };
-    let leftHeight = 0;
-    let rightHeight = 0;
-    const maxColumnHeight = TERMS_PAGE_HEIGHT / 2; // Each column gets half the page height
-
-    for (let i = 0; i < blocks.length; i++) {
-      const block = blocks[i];
-      const blockHeight = measureTermsBlockHeight(block);
-      
-      // Keep heading with next content block
-      const isHeading = block.type === 'heading';
-      const nextBlock = i + 1 < blocks.length ? blocks[i + 1] : null;
-      const nextBlockHeight = nextBlock ? measureTermsBlockHeight(nextBlock) : 0;
-      const keepTogether = isHeading && nextBlock;
-
-      // Try to add to left column first
-      if (leftHeight + blockHeight <= maxColumnHeight) {
-        currentPage.leftColumn.push(block);
-        leftHeight += blockHeight;
-        
-        if (keepTogether && leftHeight + nextBlockHeight <= maxColumnHeight) {
-          currentPage.leftColumn.push(nextBlock);
-          leftHeight += nextBlockHeight;
-          i++; // Skip next block since we added it
-        }
-      }
-      // If left is full, try right column
-      else if (rightHeight + blockHeight <= maxColumnHeight) {
-        currentPage.rightColumn.push(block);
-        rightHeight += blockHeight;
-        
-        if (keepTogether && rightHeight + nextBlockHeight <= maxColumnHeight) {
-          currentPage.rightColumn.push(nextBlock);
-          rightHeight += nextBlockHeight;
-          i++; // Skip next block since we added it
-        }
-      }
-      // Both columns full, start new page
-      else {
-        if (currentPage.leftColumn.length > 0 || currentPage.rightColumn.length > 0) {
-          pages.push(currentPage);
-        }
-        
-        currentPage = { leftColumn: [block], rightColumn: [] };
-        leftHeight = blockHeight;
-        rightHeight = 0;
-        
-        if (keepTogether && blockHeight + nextBlockHeight <= maxColumnHeight) {
-          currentPage.leftColumn.push(nextBlock);
-          leftHeight += nextBlockHeight;
-          i++; // Skip next block since we added it
-        }
-      }
-    }
-
-    // Add last page if it has content
-    if (currentPage.leftColumn.length > 0 || currentPage.rightColumn.length > 0) {
-      pages.push(currentPage);
-    }
-
-    return pages;
-  };
 
 
   const formatTermsAndConditions = (content: string): { html: string; pageCount: number } => {
@@ -1481,7 +1413,7 @@ export const generateQuotePDF = async (
 
     const renderBlock = (block: TermsBlock): string => {
       if (block.type === 'heading') {
-        return `<h3>${escapeHtml(block.text)}</h3>`;
+        return `<h3 class="terms-heading">${escapeHtml(block.text)}</h3>`;
       }
       return block.html;
     };
@@ -1501,46 +1433,14 @@ export const generateQuotePDF = async (
       blocks = buildPlainTextTermsBlocks(trimmed);
     }
 
-    const pages = paginateTermsIntoColumns(blocks);
-    
-    if (pages.length === 0) {
+    if (blocks.length === 0) {
       return { html: '', pageCount: 0 };
     }
 
-    const pagesHtml = pages.map((page, pageIndex) => {
-      const leftColumnHtml = page.leftColumn.map(renderBlock).join('');
-      const rightColumnHtml = page.rightColumn.map(renderBlock).join('');
-      
-      const pageContent = `
-      <div class="terms-page-columns">
-        <div class="terms-column-left">
-          ${leftColumnHtml}
-        </div>
-        <div class="terms-column-right">
-          ${rightColumnHtml}
-        </div>
-      </div>
-    `;
-      
-      // If not the last page, wrap in a page container with page break
-      if (pageIndex < pages.length - 1) {
-        return `
-      <div class="terms-page-wrapper">
-        ${pageContent}
-      </div>
-      <div class="page-break"></div>
-    `;
-      }
-      
-      // Last page doesn't need page break
-      return `
-      <div class="terms-page-wrapper">
-        ${pageContent}
-      </div>
-    `;
-    }).join('');
+    // Simple single-column layout
+    const htmlContent = `<div class="terms-content">${blocks.map(renderBlock).join('')}</div>`;
 
-    return { html: pagesHtml, pageCount: pages.length };
+    return { html: htmlContent, pageCount: 1 };
   };
   let companyName = 'QUALITROL';
   let companyLogoUrl = '';
@@ -2927,7 +2827,7 @@ export const generateQuotePDF = async (
         .rack-table tbody tr:nth-child(even) { background: #f8fafc; }
         .rack-empty { color: #64748b; font-style: italic; padding: 18px; background: #ffffff; border-radius: 12px; border: 1px dashed #cbd5f5; margin-top: 18px; }
         .rack-raw { white-space: pre-wrap; font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', monospace; font-size: 10px; background: #0f172a; color: #f8fafc; padding: 16px; border-radius: 12px; margin-top: 18px; overflow-x: auto; }
-        .level4-collection { display: flex; flex-direction: column; gap: 24px; margin-top: 48px; }
+        .level4-collection { display: flex; flex-direction: column; gap: 24px; }
         .level4-section { border: 1px solid #e2e8f0; border-radius: 16px; padding: 26px; background: linear-gradient(135deg, rgba(241,245,249,0.88), rgba(248,250,252,0.96)); }
         .level4-heading { margin: 0; font-size: 15px; font-weight: 600; color: #0f172a; }
         .level4-subheading { margin-top: 6px; color: #64748b; font-size: 11px; }
@@ -2939,94 +2839,61 @@ export const generateQuotePDF = async (
         .level4-option-meta { margin-top: 4px; font-size: 10px; color: #64748b; }
         .level4-empty { color: #64748b; font-style: italic; background: #ffffff; border: 1px dashed #cbd5f5; padding: 14px; border-radius: 12px; margin-top: 16px; }
         .level4-raw { white-space: pre-wrap; font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', monospace; font-size: 10px; background: #0f172a; color: #f8fafc; padding: 16px; border-radius: 12px; margin-top: 18px; }
-        .terms-page-wrapper {
-          margin-bottom: 20px;
-        }
-        .terms-page-columns {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 22px;
+        .terms-content {
+          max-width: 800px;
           font-size: 10px;
           line-height: 1.6;
           color: #475569;
         }
-        .terms-column-left,
-        .terms-column-right {
-          min-height: 100px;
-        }
-        .terms-page-columns h3,
-        .terms-column-left h3,
-        .terms-column-right h3 {
-          font-size: 15px;
+        .terms-heading {
+          font-size: 13px;
           font-weight: 600;
           color: #1e293b;
-          margin: 16px 0 10px 0;
+          margin: 18px 0 10px 0;
           line-height: 1.4;
         }
-        .terms-page-columns h3:first-child {
+        .terms-heading:first-child {
           margin-top: 0;
         }
-        .terms-page-columns p,
-        .terms-column-left p,
-        .terms-column-right p {
-          margin: 0 0 14px 0;
+        .terms-content p {
+          margin: 0 0 12px 0;
           line-height: 1.6;
           color: #334155;
         }
-        .terms-page-columns ul,
-        .terms-page-columns ol,
-        .terms-column-left ul,
-        .terms-column-left ol,
-        .terms-column-right ul,
-        .terms-column-right ol {
-          margin: 0 0 14px 0;
+        .terms-content ul,
+        .terms-content ol {
+          margin: 0 0 12px 0;
           padding-left: 24px;
         }
-        .terms-page-columns li,
-        .terms-column-left li,
-        .terms-column-right li {
-          margin: 6px 0;
+        .terms-content li {
+          margin: 5px 0;
           line-height: 1.5;
         }
-        .terms-page-columns table,
-        .terms-column-left table,
-        .terms-column-right table {
+        .terms-content table {
           width: 100%;
           border-collapse: collapse;
           margin: 12px 0;
         }
-        .terms-page-columns table th,
-        .terms-page-columns table td,
-        .terms-column-left table th,
-        .terms-column-left table td,
-        .terms-column-right table th,
-        .terms-column-right table td {
+        .terms-content table th,
+        .terms-content table td {
           border: 1px solid #e2e8f0;
           padding: 8px;
           text-align: left;
           font-size: 10px;
         }
-        .terms-page-columns table th,
-        .terms-column-left table th,
-        .terms-column-right table th {
+        .terms-content table th {
           background-color: #f8fafc;
           font-weight: 600;
         }
-        .terms-page-columns strong,
-        .terms-column-left strong,
-        .terms-column-right strong {
+        .terms-content strong {
           color: #0f172a;
           font-weight: 600;
         }
-        .terms-page-columns a,
-        .terms-column-left a,
-        .terms-column-right a {
+        .terms-content a {
           color: #2563eb;
           text-decoration: none;
         }
-        .terms-page-columns a:hover,
-        .terms-column-left a:hover,
-        .terms-column-right a:hover {
+        .terms-content a:hover {
           text-decoration: underline;
         }
         .page-break {
@@ -3245,7 +3112,7 @@ export const generateQuotePDF = async (
         <div class="page page-config">
           <div class="page-inner">
             ${rackConfigurationHTML ? `<h2 class="section-title">Rack Configuration</h2>${rackConfigurationHTML}` : ''}
-            ${level4SectionHTML ? `<h2 class="section-title">Level 4 Configuration Details</h2>${level4SectionHTML}` : ''}
+            ${level4SectionHTML ? `<h2 class="section-title" style="margin-top: 48px;">Level 4 Configuration Details</h2>${level4SectionHTML}` : ''}
             ${!hasTermsContent ? footerHTML : ''}
           </div>
         </div>
