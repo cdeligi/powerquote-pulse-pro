@@ -1101,7 +1101,11 @@ let loadedItems: BOMItem[] = [];
   // Extract unique product IDs and query products table for metadata
   let productMetaMap = new Map();
   const productIds = [...new Set(quote.draft_bom.items.map((item: any) => 
-    item.productId || item.product_id || item.product?.id
+    item.productId || 
+    item.product_id || 
+    item.product?.id || 
+    item.configuration_data?.id ||
+    (typeof item.configuration === 'object' && item.configuration?.id)
   ).filter(Boolean))];
   
   if (productIds.length > 0) {
@@ -1294,7 +1298,11 @@ let loadedItems: BOMItem[] = [];
         (rawConfiguration as any)?.configuration ||
         null;
 
-      const productId = item.productId || item.product_id || item.product?.id;
+      const productId = item.productId || 
+        item.product_id || 
+        item.product?.id || 
+        item.configuration_data?.id ||
+        (typeof item.configuration === 'object' && item.configuration?.id);
       const productMeta = productMetaMap.get(productId);
       
       console.log(`🔍 Draft BOM product metadata for ${productId}:`, productMeta);
