@@ -1319,12 +1319,13 @@ let loadedItems: BOMItem[] = [];
               level4_config_id,
               entries
             ),
-            products!inner (
-              chassis_type,
-              rack_configurable,
-              product_level,
-              has_level4
-            )
+          products!inner (
+            chassis_type,
+            rack_configurable,
+            product_level,
+            has_level4,
+            parent_product_id
+          )
           `)
           .eq('quote_id', quoteId);
           
@@ -1376,6 +1377,8 @@ let loadedItems: BOMItem[] = [];
               rack_configurable: productMeta?.rack_configurable || false,
               product_level: productMeta?.product_level || 2,
               has_level4: productMeta?.has_level4 || false,
+              parentProductId: productMeta?.parent_product_id,
+              parent_product_id: productMeta?.parent_product_id,
               ...configData
             },
             quantity: item.quantity,
