@@ -1354,17 +1354,20 @@ let loadedItems: BOMItem[] = [];
             item.product?.description ||
             (mergedConfigurationData as any)?.description ||
             '',
-          // Add product metadata from database
-          chassisType: productMeta?.chassis_type || mergedConfigurationData.chassisType || 'N/A',
-          chassis_type: productMeta?.chassis_type || mergedConfigurationData.chassis_type,
-          rack_configurable: productMeta?.rack_configurable ?? mergedConfigurationData.rack_configurable ?? false,
-          product_level: productMeta?.product_level || mergedConfigurationData.product_level || 2,
-          has_level4: productMeta?.has_level4 ?? mergedConfigurationData.has_level4 ?? false,
-          parentProductId: productMeta?.parent_product_id || mergedConfigurationData.parentProductId || mergedConfigurationData.parent_product_id,
-          parent_product_id: productMeta?.parent_product_id || mergedConfigurationData.parent_product_id,
-          ...mergedConfigurationData,
           price,
           cost,
+          // Spread merged configuration data FIRST (as base)
+          ...mergedConfigurationData,
+          // Then override with database metadata (takes precedence)
+          ...(productMeta && {
+            chassisType: productMeta.chassis_type || 'N/A',
+            chassis_type: productMeta.chassis_type,
+            rack_configurable: productMeta.rack_configurable ?? false,
+            product_level: productMeta.product_level || 2,
+            has_level4: productMeta.has_level4 ?? false,
+            parentProductId: productMeta.parent_product_id,
+            parent_product_id: productMeta.parent_product_id,
+          }),
         },
         quantity: item.quantity || 1,
         enabled: item.enabled !== false,
