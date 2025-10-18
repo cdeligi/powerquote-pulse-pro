@@ -1378,46 +1378,7 @@ export const generateQuotePDF = async (
       }
     });
 
-    const totalWeight = sections.reduce(
-      (sum, section) => sum + section.reduce((sectionSum, block) => sectionSum + computeTermsBlockWeight(block), 0),
-      0
-    );
-    const idealColumnWeight = totalWeight / 2;
-
-    const firstColumn: TermsBlock[] = [];
-    const secondColumn: TermsBlock[] = [];
-    let accumulatedWeight = 0;
-
-    sections.forEach((section, index) => {
-      const sectionWeight = section.reduce((sectionSum, block) => sectionSum + computeTermsBlockWeight(block), 0);
-      const isLastSection = index === sections.length - 1;
-
-      if (firstColumn.length === 0) {
-        firstColumn.push(...section);
-        accumulatedWeight += sectionWeight;
-        return;
-      }
-
-      if ((accumulatedWeight + sectionWeight <= idealColumnWeight) || (secondColumn.length === 0 && !isLastSection)) {
-        firstColumn.push(...section);
-        accumulatedWeight += sectionWeight;
-      } else {
-        secondColumn.push(...section);
-      }
-    });
-
-    if (secondColumn.length === 0 && sections.length > 1) {
-      const lastSection = sections[sections.length - 1];
-      if (lastSection) {
-        const removeCount = lastSection.length;
-        firstColumn.splice(Math.max(firstColumn.length - removeCount, 0), removeCount);
-        secondColumn.push(...lastSection);
-      }
-    }
-
-    const columns = secondColumn.length > 0 ? [firstColumn, secondColumn] : [firstColumn];
     const headingState = { count: 0 };
-
     const renderBlock = (block: TermsBlock): string => {
       if (block.type === 'heading') {
         const headingClass = `terms-heading${headingState.count === 0 ? ' terms-heading--intro' : ''}`;
@@ -1428,10 +1389,73 @@ export const generateQuotePDF = async (
       return block.html;
     };
 
-    const flattenedBlocks = sections.flat();
-    const html = flattenedBlocks.map(renderBlock).join('').trim();
+    const MAX_COLUMN_WEIGHT = 480;
+    const columns: TermsBlock[][] = [];
+    let currentColumn: TermsBlock[] = [];
+    let currentColumnWeight = 0;
 
-    return { html, columnCount: columns.length };
+    const pushCurrentColumn = () => {
+      if (currentColumn.length > 0) {
+        columns.push(currentColumn);
+        currentColumn = [];
+        currentColumnWeight = 0;
+      }
+    };
+
+    sections.forEach(section => {
+      const sectionWeight = section.reduce((sectionSum, block) => sectionSum + computeTermsBlockWeight(block), 0);
+
+      if (currentColumn.length > 0 && currentColumnWeight + sectionWeight > MAX_COLUMN_WEIGHT) {
+        pushCurrentColumn();
+      }
+
+      currentColumn.push(...section);
+      currentColumnWeight += sectionWeight;
+    });
+
+    pushCurrentColumn();
+
+    if (columns.length === 0) {
+      const html = blocks.map(renderBlock).join('').trim();
+      return { html, columnCount: 1 };
+    }
+
+    const pages: TermsBlock[][][] = [];
+    for (let i = 0; i < columns.length; i += 2) {
+      const leftColumn = columns[i];
+      const rightColumn = columns[i + 1] || [];
+      pages.push([leftColumn, rightColumn]);
+    }
+
+    const html = pages
+      .map((pageColumns, pageIndex) => {
+        const [leftColumn, rightColumn] = pageColumns;
+        const isSingleColumnPage = rightColumn.length === 0;
+        const classes = [
+          'terms-columns-set',
+          isSingleColumnPage ? 'terms-columns-set--single' : '',
+          pageIndex < pages.length - 1 ? 'terms-columns-set--paged' : '',
+        ].filter(Boolean);
+
+        const columnMarkup = [leftColumn, rightColumn]
+          .filter((columnBlocks, columnIndex) => columnBlocks.length > 0 || columnIndex === 0)
+          .map(columnBlocks => {
+            if (columnBlocks.length === 0) {
+              return '';
+            }
+
+            return `<div class="terms-column">${columnBlocks.map(renderBlock).join('')}</div>`;
+          })
+          .join('');
+
+        return `<div class="${classes.join(' ')}">${columnMarkup}</div>`;
+      })
+      .join('')
+      .trim();
+
+    const hasSecondColumn = pages.some(([, rightColumn]) => rightColumn.length > 0);
+
+    return { html, columnCount: hasSecondColumn ? 2 : 1 };
   };
 
   const formatTermsAndConditions = (content: string): { html: string; columnCount: number } => {
@@ -2858,14 +2882,27 @@ export const generateQuotePDF = async (
           font-size: 10px;
           line-height: 1.6;
           color: #475569;
-          column-count: 2;
-          column-gap: 22px;
-          column-fill: balance;
+          display: flex;
+          flex-direction: column;
+          gap: 24px;
         }
-        .terms-columns--single {
-          column-count: 1;
+        .terms-columns-set {
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 22px;
+          align-items: start;
         }
-        .terms-columns > * {
+        .terms-columns--single .terms-columns-set,
+        .terms-columns-set--single {
+          grid-template-columns: 1fr;
+        }
+        .terms-column {
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
+          min-width: 0;
+        }
+        .terms-column > * {
           display: block;
           break-inside: avoid;
           page-break-inside: avoid;
@@ -2928,17 +2965,17 @@ export const generateQuotePDF = async (
           .page { box-shadow: none; border-radius: 0; margin: 0 auto; max-width: none; width: auto; }
           .page-inner { padding: 9mm 8mm; }
           .draft-warning, .date-info, .quote-header-fields, .rack-card, .level4-section { page-break-inside: avoid; }
-          .terms-columns {
-            column-count: 2;
-            column-gap: 18px;
-            column-fill: balance;
-          }
-          .terms-columns--single {
-            column-count: 1;
-          }
-          .terms-columns > * {
-            break-inside: avoid-column;
+          .terms-columns { gap: 18px; }
+          .terms-columns-set {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 18px;
             page-break-inside: avoid;
+          }
+          .terms-columns-set--single {
+            grid-template-columns: 1fr;
+          }
+          .terms-columns-set.terms-columns-set--paged {
+            page-break-after: always;
           }
         }
       </style>
