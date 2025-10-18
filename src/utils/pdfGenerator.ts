@@ -65,15 +65,15 @@ type SpanAwareSlot = {
   rawSlot?: any;
 };
 
-// Terms pagination constants
-const TERMS_PAGE_HEIGHT = 1050;
+// Terms pagination constants (more conservative estimates for 10px font)
+const TERMS_PAGE_HEIGHT = 1200;
 const TERMS_COLUMN_WIDTH = 380;
 const TERMS_COLUMN_GAP = 22;
-const TERMS_HEADING_HEIGHT = 45;
-const TERMS_PARAGRAPH_BASE = 80;
-const TERMS_LIST_ITEM_HEIGHT = 26;
-const TERMS_TABLE_ROW_HEIGHT = 42;
-const TERMS_TABLE_BASE = 60;
+const TERMS_HEADING_HEIGHT = 35;
+const TERMS_PARAGRAPH_BASE = 50;
+const TERMS_LIST_ITEM_HEIGHT = 20;
+const TERMS_TABLE_ROW_HEIGHT = 30;
+const TERMS_TABLE_BASE = 40;
 
 const coerceNumber = (value: any): number | undefined => {
   if (value === undefined || value === null) {
@@ -1374,16 +1374,17 @@ export const generateQuotePDF = async (
 
     let height = 0;
 
-    height = Math.ceil(wordCount / 50) * 100;
+    // More accurate: 80 words per 100px for 10px font with line-height 1.6
+    height = Math.ceil(wordCount / 80) * 100;
     
     if (paragraphCount > 1) {
-      height += (paragraphCount - 1) * 24;
+      height += (paragraphCount - 1) * 18;
     }
 
-    height += breakCount * 20;
+    height += breakCount * 16;
 
     if (hasList) {
-      height += 40 + (listItemCount * TERMS_LIST_ITEM_HEIGHT);
+      height += 30 + (listItemCount * TERMS_LIST_ITEM_HEIGHT);
     }
 
     if (hasTable) {
@@ -1407,64 +1408,59 @@ export const generateQuotePDF = async (
     let currentPage: TermsPage = { leftColumn: [], rightColumn: [] };
     let leftHeight = 0;
     let rightHeight = 0;
-    let currentColumn: 'left' | 'right' = 'left';
+    const maxColumnHeight = TERMS_PAGE_HEIGHT / 2; // Each column gets half the page height
 
     for (let i = 0; i < blocks.length; i++) {
       const block = blocks[i];
       const blockHeight = measureTermsBlockHeight(block);
       
+      // Keep heading with next content block
       const isHeading = block.type === 'heading';
       const nextBlock = i + 1 < blocks.length ? blocks[i + 1] : null;
       const nextBlockHeight = nextBlock ? measureTermsBlockHeight(nextBlock) : 0;
-      const groupHeight = isHeading && nextBlock ? blockHeight + nextBlockHeight : blockHeight;
+      const keepTogether = isHeading && nextBlock;
 
-      if (currentColumn === 'left') {
-        if (leftHeight + groupHeight <= TERMS_PAGE_HEIGHT) {
-          currentPage.leftColumn.push(block);
-          leftHeight += blockHeight;
-          
-          if (isHeading && nextBlock && leftHeight + nextBlockHeight <= TERMS_PAGE_HEIGHT) {
-            currentPage.leftColumn.push(nextBlock);
-            leftHeight += nextBlockHeight;
-            i++;
-          }
-        } else {
-          currentColumn = 'right';
-          currentPage.rightColumn.push(block);
-          rightHeight += blockHeight;
-          
-          if (isHeading && nextBlock && rightHeight + nextBlockHeight <= TERMS_PAGE_HEIGHT) {
-            currentPage.rightColumn.push(nextBlock);
-            rightHeight += nextBlockHeight;
-            i++;
-          }
+      // Try to add to left column first
+      if (leftHeight + blockHeight <= maxColumnHeight) {
+        currentPage.leftColumn.push(block);
+        leftHeight += blockHeight;
+        
+        if (keepTogether && leftHeight + nextBlockHeight <= maxColumnHeight) {
+          currentPage.leftColumn.push(nextBlock);
+          leftHeight += nextBlockHeight;
+          i++; // Skip next block since we added it
         }
-      } else {
-        if (rightHeight + groupHeight <= TERMS_PAGE_HEIGHT) {
-          currentPage.rightColumn.push(block);
-          rightHeight += blockHeight;
-          
-          if (isHeading && nextBlock && rightHeight + nextBlockHeight <= TERMS_PAGE_HEIGHT) {
-            currentPage.rightColumn.push(nextBlock);
-            rightHeight += nextBlockHeight;
-            i++;
-          }
-        } else {
+      }
+      // If left is full, try right column
+      else if (rightHeight + blockHeight <= maxColumnHeight) {
+        currentPage.rightColumn.push(block);
+        rightHeight += blockHeight;
+        
+        if (keepTogether && rightHeight + nextBlockHeight <= maxColumnHeight) {
+          currentPage.rightColumn.push(nextBlock);
+          rightHeight += nextBlockHeight;
+          i++; // Skip next block since we added it
+        }
+      }
+      // Both columns full, start new page
+      else {
+        if (currentPage.leftColumn.length > 0 || currentPage.rightColumn.length > 0) {
           pages.push(currentPage);
-          currentPage = { leftColumn: [block], rightColumn: [] };
-          leftHeight = blockHeight;
-          rightHeight = 0;
-          currentColumn = 'left';
-          
-          if (isHeading && nextBlock && leftHeight + nextBlockHeight <= TERMS_PAGE_HEIGHT) {
-            currentPage.leftColumn.push(nextBlock);
-            leftHeight += nextBlockHeight;
-            i++;
-          }
+        }
+        
+        currentPage = { leftColumn: [block], rightColumn: [] };
+        leftHeight = blockHeight;
+        rightHeight = 0;
+        
+        if (keepTogether && blockHeight + nextBlockHeight <= maxColumnHeight) {
+          currentPage.leftColumn.push(nextBlock);
+          leftHeight += nextBlockHeight;
+          i++; // Skip next block since we added it
         }
       }
     }
 
+    // Add last page if it has content
     if (currentPage.leftColumn.length > 0 || currentPage.rightColumn.length > 0) {
       pages.push(currentPage);
     }
@@ -2931,7 +2927,7 @@ export const generateQuotePDF = async (
         .rack-table tbody tr:nth-child(even) { background: #f8fafc; }
         .rack-empty { color: #64748b; font-style: italic; padding: 18px; background: #ffffff; border-radius: 12px; border: 1px dashed #cbd5f5; margin-top: 18px; }
         .rack-raw { white-space: pre-wrap; font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', monospace; font-size: 10px; background: #0f172a; color: #f8fafc; padding: 16px; border-radius: 12px; margin-top: 18px; overflow-x: auto; }
-        .level4-collection { display: flex; flex-direction: column; gap: 24px; margin-top: 24px; }
+        .level4-collection { display: flex; flex-direction: column; gap: 24px; margin-top: 48px; }
         .level4-section { border: 1px solid #e2e8f0; border-radius: 16px; padding: 26px; background: linear-gradient(135deg, rgba(241,245,249,0.88), rgba(248,250,252,0.96)); }
         .level4-heading { margin: 0; font-size: 15px; font-weight: 600; color: #0f172a; }
         .level4-subheading { margin-top: 6px; color: #64748b; font-size: 11px; }
