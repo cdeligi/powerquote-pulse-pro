@@ -1108,21 +1108,41 @@ let loadedItems: BOMItem[] = [];
     (typeof item.configuration === 'object' && item.configuration?.id)
   ).filter(Boolean))];
   
+  console.log('🔍 Product IDs to query:', productIds);
+  console.log('🔢 Number of unique product IDs:', productIds.length);
+
   if (productIds.length > 0) {
+    console.log('🚀 Executing Supabase query for product metadata...');
     const { data: productsData, error: productsError } = await supabase
       .from('products')
       .select('id, parent_product_id, chassis_type, rack_configurable, product_level, has_level4')
       .in('id', productIds);
       
+    console.log('📥 Query response - data:', productsData);
+    console.log('📥 Query response - error:', productsError);
+      
     if (productsError) {
-      console.error('Error loading product metadata for draft:', productsError);
+      console.error('❌ Error loading product metadata for draft:', productsError);
+    } else if (!productsData || productsData.length === 0) {
+      console.warn('⚠️ Product metadata query returned NO results for IDs:', productIds);
+      console.warn('⚠️ This means these products do not exist in the database or the query failed');
     } else {
       productMetaMap = new Map(
         productsData?.map(p => [p.id, p]) || []
       );
       console.log('✅ Loaded product metadata for draft BOM:', productIds);
+      console.log('📦 Products found in database:', productsData.length, 'of', productIds.length);
       console.log('📦 Draft BOM product metadata map:', Object.fromEntries(productMetaMap));
+      
+      // Log which products were NOT found
+      const foundIds = new Set(productsData.map(p => p.id));
+      const missingIds = productIds.filter(id => !foundIds.has(id));
+      if (missingIds.length > 0) {
+        console.error('❌ Products NOT found in database:', missingIds);
+      }
     }
+  } else {
+    console.warn('⚠️ No product IDs extracted from draft BOM items!');
   }
   
   loadedItems = await Promise.all(
@@ -1305,7 +1325,23 @@ let loadedItems: BOMItem[] = [];
         (typeof item.configuration === 'object' && item.configuration?.id);
       const productMeta = productMetaMap.get(productId);
       
-      console.log(`🔍 Draft BOM product metadata for ${productId}:`, productMeta);
+      if (!productMeta) {
+        console.error(`❌ NO product metadata found for productId: "${productId}"`);
+        console.error('📋 Available product IDs in metadata map:', Array.from(productMetaMap.keys()));
+        console.error('📋 Item data used for extraction:', {
+          'item.productId': item.productId,
+          'item.product_id': item.product_id,
+          'item.product?.id': item.product?.id,
+          'item.configuration_data?.id': item.configuration_data?.id,
+          'item.configuration?.id': typeof item.configuration === 'object' ? item.configuration?.id : undefined,
+          'Final productId': productId
+        });
+      } else {
+        console.log(`✅ Draft BOM product metadata found for ${productId}:`, productMeta);
+        console.log(`   - parent_product_id: ${productMeta.parent_product_id}`);
+        console.log(`   - chassis_type: ${productMeta.chassis_type}`);
+        console.log(`   - rack_configurable: ${productMeta.rack_configurable}`);
+      }
 
       return {
         id: item.id || crypto.randomUUID(),
