@@ -201,11 +201,11 @@ const QuoteFieldsSection = ({ quoteFields, onFieldChange }: QuoteFieldsSectionPr
         <CardTitle className="text-white">Quote Information</CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
-        {/* Show validation errors if any */}
+        {/* Show validation errors if any - non-blocking informational message */}
         {!validation.isValid && validation.missingFields.length > 0 && (
-          <Alert className="border-red-500 bg-red-900/20">
-            <AlertDescription className="text-red-400">
-              Please fill in the following required fields: {validation.missingFields.join(', ')}
+          <Alert className="border-yellow-500 bg-yellow-900/20">
+            <AlertDescription className="text-yellow-400">
+              <strong>Required fields:</strong> {validation.missingFields.join(', ')}
             </AlertDescription>
           </Alert>
         )}

@@ -197,13 +197,29 @@ async function cloneQuoteClientSide(
 
   const clonedQuoteFields = (() => {
     const original = sourceQuote.quote_fields;
-    if (!original || typeof original !== 'object') {
-      return original;
-    }
-
+    const draftBomFields = sourceQuote.draft_bom && typeof sourceQuote.draft_bom === 'object' 
+      ? (sourceQuote.draft_bom as Record<string, unknown>).quoteFields 
+      : null;
+    
+    // Merge draft_bom.quoteFields with quote_fields, prioritizing quote_fields
+    const merged = {
+      ...(draftBomFields && typeof draftBomFields === 'object' ? draftBomFields : {}),
+      ...(original && typeof original === 'object' ? original : {}),
+    } as Record<string, unknown>;
+    
+    // Ensure required fields have values from source quote or sensible defaults
     return {
-      ...(original as Record<string, unknown>),
+      ...merged,
       customer_name: resolvedCustomerName,
+      account: merged.account || sourceQuote.customer_name || '',
+      contact_person: merged.contact_person || '',
+      quote_currency: merged.quote_currency || sourceQuote.currency || 'USD',
+      expected_close_date: merged.expected_close_date || '',
+      rep_involved: merged.rep_involved !== undefined ? merged.rep_involved : sourceQuote.is_rep_involved,
+      sfdc_opportunity: merged.sfdc_opportunity || sourceQuote.sfdc_opportunity || '',
+      priority: merged.priority || sourceQuote.priority || 'Medium',
+      payment_terms: merged.payment_terms || sourceQuote.payment_terms || 'Net 30',
+      shipping_terms: merged.shipping_terms || sourceQuote.shipping_terms || 'FOB',
     } as QuoteRow['quote_fields'];
   })();
 
