@@ -1046,6 +1046,10 @@ export const generateQuotePDF = async (
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;');
 
+  type TermsBlock =
+    | { type: 'heading'; text: string }
+    | { type: 'content'; html: string };
+
   const isLikelyTermsHeading = (value: string) => {
     const trimmed = value.trim();
     if (!trimmed) return false;
@@ -1075,94 +1079,180 @@ export const generateQuotePDF = async (
     return false;
   };
 
-  const buildTermsSection = (
-    heading: string | undefined,
-    paragraphs: string[],
-    index: number
-  ) => {
-    const safeHeading = heading ? escapeHtml(heading.trim()) : '';
-    const safeParagraphs = paragraphs
-      .map(paragraph => `<p>${sanitizeTermsParagraph(paragraph).replace(/\r?\n/g, '<br />')}</p>`)
-      .join('');
-
-    const headingClass = heading
-      ? `terms-heading${index === 0 ? ' terms-heading--intro' : ''}`
-      : '';
-
-    const headingHtml = heading
-      ? `<h3 class="${headingClass}">${safeHeading}</h3>`
-      : '';
-
-    return `<section class="terms-section">${headingHtml}${safeParagraphs}</section>`;
-  };
-
-  const formatPlainTextTerms = (content: string): string => {
+  const buildPlainTextTermsBlocks = (content: string): TermsBlock[] => {
     const normalized = content.replace(/\r\n/g, '\n');
-    const rawParagraphs = normalized
-      .split(/\n{2,}/)
-      .map(paragraph => paragraph.trim())
-      .filter(Boolean);
+    const lines = normalized.split('\n');
+    const paragraphs: string[] = [];
+    let buffer: string[] = [];
 
-    if (rawParagraphs.length === 0) {
-      return buildTermsSection(undefined, [content], 0);
-    }
-
-    const sections: Array<{ heading?: string; paragraphs: string[] }> = [];
-    let currentSection: { heading?: string; paragraphs: string[] } | null = null;
-
-    const finalizeSection = () => {
-      if (!currentSection) return;
-      if (!currentSection.heading && currentSection.paragraphs.length === 0) return;
-      sections.push(currentSection);
-      currentSection = null;
+    const flushBuffer = () => {
+      if (buffer.length === 0) return;
+      const combined = buffer.join(' ').trim();
+      if (combined) {
+        paragraphs.push(combined);
+      }
+      buffer = [];
     };
 
-    rawParagraphs.forEach(paragraph => {
-      const [firstLine, ...rest] = paragraph.split('\n');
-      const remainder = rest.join('\n').trim();
-      const candidateHeading = firstLine.trim();
-
-      if (isLikelyTermsHeading(candidateHeading)) {
-        finalizeSection();
-        currentSection = {
-          heading: candidateHeading,
-          paragraphs: remainder ? [remainder] : [],
-        };
+    lines.forEach(rawLine => {
+      const line = rawLine.trim();
+      if (!line) {
+        flushBuffer();
         return;
       }
 
-      if (!currentSection) {
-        currentSection = {
-          heading: undefined,
-          paragraphs: [paragraph],
-        };
-        return;
+      if (buffer.length > 0 && /[.!?]$/.test(buffer[buffer.length - 1])) {
+        flushBuffer();
       }
 
-      if (!currentSection.heading && isLikelyTermsHeading(paragraph)) {
-        finalizeSection();
-        currentSection = {
-          heading: paragraph,
-          paragraphs: [],
-        };
-        return;
-      }
-
-      currentSection.paragraphs.push(paragraph);
+      buffer.push(line);
     });
 
-    finalizeSection();
+    flushBuffer();
 
-    if (sections.length === 0) {
-      return buildTermsSection(undefined, rawParagraphs, 0);
+    if (paragraphs.length === 0) {
+      return [
+        {
+          type: 'content',
+          html: `<p>${sanitizeTermsParagraph(content).replace(/\r?\n/g, '<br />')}</p>`,
+        },
+      ];
     }
 
-    return sections
-      .map((section, index) => buildTermsSection(section.heading, section.paragraphs, index))
-      .join('');
+    const blocks: TermsBlock[] = [];
+
+    paragraphs.forEach(paragraph => {
+      if (isLikelyTermsHeading(paragraph)) {
+        blocks.push({ type: 'heading', text: paragraph });
+        return;
+      }
+
+      const headingMatch = paragraph.match(/^(.{1,120}?)(?:\s*[.:\-]\s+)(.+)$/);
+      if (headingMatch) {
+        const candidateHeading = headingMatch[1].trim();
+        const remainder = headingMatch[2].trim();
+
+        if (candidateHeading && isLikelyTermsHeading(candidateHeading)) {
+          blocks.push({ type: 'heading', text: candidateHeading });
+          if (remainder) {
+            blocks.push({
+              type: 'content',
+              html: `<p>${sanitizeTermsParagraph(remainder)}</p>`,
+            });
+          }
+          return;
+        }
+      }
+
+      blocks.push({
+        type: 'content',
+        html: `<p>${sanitizeTermsParagraph(paragraph)}</p>`,
+      });
+    });
+
+    return blocks;
   };
 
-  const tryFormatHtmlTerms = (content: string): string | null => {
+  const sanitizeAllowedElement = (element: HTMLElement) => {
+    const allowedTags = new Set([
+      'P',
+      'UL',
+      'OL',
+      'LI',
+      'TABLE',
+      'THEAD',
+      'TBODY',
+      'TFOOT',
+      'TR',
+      'TH',
+      'TD',
+      'BR',
+      'EM',
+      'STRONG',
+      'B',
+      'I',
+      'U',
+      'SPAN',
+      'A',
+    ]);
+
+    const walker = document.createTreeWalker(element, NodeFilter.SHOW_ELEMENT, null);
+    const toRemove: Element[] = [];
+
+    while (walker.nextNode()) {
+      const current = walker.currentNode as HTMLElement;
+      if (!allowedTags.has(current.tagName.toUpperCase())) {
+        toRemove.push(current);
+        continue;
+      }
+
+      Array.from(current.attributes).forEach(attr => {
+        const name = attr.name.toLowerCase();
+        if (name === 'href') {
+          const href = current.getAttribute('href');
+          if (!href || !/^https?:/i.test(href)) {
+            current.removeAttribute('href');
+          }
+          return;
+        }
+
+        if (name === 'target') {
+          const target = current.getAttribute('target');
+          if (target && ['_blank', '_self'].includes(target)) {
+            return;
+          }
+          current.removeAttribute('target');
+          return;
+        }
+
+        if (name === 'rel') {
+          return;
+        }
+
+        current.removeAttribute(attr.name);
+      });
+    }
+
+    toRemove.forEach(el => {
+      const parent = el.parentElement;
+      if (!parent) {
+        el.remove();
+        return;
+      }
+      while (el.firstChild) {
+        parent.insertBefore(el.firstChild, el);
+      }
+      el.remove();
+    });
+  };
+
+  const extractHeadingFromParagraphElement = (element: HTMLElement): string | null => {
+    const firstChild = element.firstChild;
+    if (!firstChild) return null;
+
+    if (firstChild.nodeType !== Node.ELEMENT_NODE) {
+      const text = firstChild.textContent?.trim() || '';
+      if (text && isLikelyTermsHeading(text)) {
+        firstChild.textContent = '';
+        return text;
+      }
+      return null;
+    }
+
+    const firstElement = firstChild as HTMLElement;
+    const tagName = firstElement.tagName.toUpperCase();
+    if (tagName === 'STRONG' || tagName === 'B' || tagName === 'SPAN') {
+      const text = firstElement.textContent?.trim() || '';
+      if (text && isLikelyTermsHeading(text)) {
+        element.removeChild(firstElement);
+        return text;
+      }
+    }
+
+    return null;
+  };
+
+  const buildHtmlTermsBlocks = (content: string): TermsBlock[] | null => {
     if (typeof document === 'undefined') {
       return null;
     }
@@ -1171,17 +1261,18 @@ export const generateQuotePDF = async (
       const tempContainer = document.createElement('div');
       tempContainer.innerHTML = content;
 
-      const sections: Array<{ heading?: string; body: string[] }> = [];
-      let current: { heading?: string; body: string[] } | null = null;
+      const blocks: TermsBlock[] = [];
 
-      const pushCurrent = () => {
-        if (!current) return;
-        if (!current.heading && current.body.length === 0) {
-          current = null;
-          return;
-        }
-        sections.push(current);
-        current = null;
+      const pushHeading = (text: string) => {
+        const normalized = text.trim();
+        if (!normalized) return;
+        blocks.push({ type: 'heading', text: normalized });
+      };
+
+      const pushContent = (html: string) => {
+        const trimmed = html.trim();
+        if (!trimmed) return;
+        blocks.push({ type: 'content', html: trimmed });
       };
 
       const processNode = (node: Node) => {
@@ -1190,29 +1281,33 @@ export const generateQuotePDF = async (
           const tagName = element.tagName.toUpperCase();
 
           if (/^H[1-6]$/.test(tagName)) {
-            pushCurrent();
-            const headingText = element.textContent?.trim() || '';
-            current = {
-              heading: headingText,
-              body: [],
-            };
+            pushHeading(element.textContent || '');
             return;
           }
 
-          if (tagName === 'P' || tagName === 'UL' || tagName === 'OL' || tagName === 'TABLE') {
-            if (!current) {
-              current = { heading: undefined, body: [] };
+          if (tagName === 'P') {
+            const clone = element.cloneNode(true) as HTMLElement;
+            sanitizeAllowedElement(clone);
+            const headingText = extractHeadingFromParagraphElement(clone);
+            if (headingText) {
+              pushHeading(headingText);
             }
-            current.body.push(element.outerHTML);
+            const html = clone.innerHTML.trim();
+            if (html) {
+              pushContent(`<p>${html}</p>`);
+            }
             return;
           }
 
-          if (tagName === 'STRONG' && isLikelyTermsHeading(element.textContent || '')) {
-            pushCurrent();
-            current = {
-              heading: element.textContent?.trim() || '',
-              body: [],
-            };
+          if (tagName === 'UL' || tagName === 'OL' || tagName === 'TABLE') {
+            const clone = element.cloneNode(true) as HTMLElement;
+            sanitizeAllowedElement(clone);
+            pushContent(clone.outerHTML);
+            return;
+          }
+
+          if ((tagName === 'STRONG' || tagName === 'B') && isLikelyTermsHeading(element.textContent || '')) {
+            pushHeading(element.textContent || '');
             return;
           }
 
@@ -1220,10 +1315,7 @@ export const generateQuotePDF = async (
           if (childNodes.length === 0) {
             const text = element.textContent?.trim();
             if (text) {
-              if (!current) {
-                current = { heading: undefined, body: [] };
-              }
-              current.body.push(`<p>${escapeHtml(text)}</p>`);
+              pushContent(`<p>${escapeHtml(text)}</p>`);
             }
             return;
           }
@@ -1235,38 +1327,41 @@ export const generateQuotePDF = async (
         if (node.nodeType === Node.TEXT_NODE) {
           const text = node.textContent?.trim();
           if (text) {
-            if (!current) {
-              current = { heading: undefined, body: [] };
-            }
-            current.body.push(`<p>${escapeHtml(text)}</p>`);
+            pushContent(`<p>${escapeHtml(text)}</p>`);
           }
         }
       };
 
       Array.from(tempContainer.childNodes).forEach(processNode);
-      pushCurrent();
-
-      if (sections.length === 0) {
+      if (blocks.length === 0) {
         return null;
       }
 
-      return sections
-        .map((section, index) => {
-          const heading = section.heading ? escapeHtml(section.heading.trim()) : '';
-          const headingClass = section.heading
-            ? `terms-heading${index === 0 ? ' terms-heading--intro' : ''}`
-            : '';
-          const headingHtml = section.heading
-            ? `<h3 class="${headingClass}">${heading}</h3>`
-            : '';
-          const bodyHtml = section.body.join('');
-          return `<section class="terms-section">${headingHtml}${bodyHtml}</section>`;
-        })
-        .join('');
+      return blocks;
     } catch (error) {
       console.warn('Could not normalize Terms & Conditions HTML for PDF:', error);
       return null;
     }
+  };
+
+  const renderTermsBlocks = (blocks: TermsBlock[]): string => {
+    if (blocks.length === 0) {
+      return '';
+    }
+
+    let headingCount = 0;
+
+    return blocks
+      .map(block => {
+        if (block.type === 'heading') {
+          const headingClass = `terms-heading${headingCount === 0 ? ' terms-heading--intro' : ''}`;
+          headingCount += 1;
+          return `<h3 class="${headingClass}">${escapeHtml(block.text)}</h3>`;
+        }
+
+        return block.html;
+      })
+      .join('');
   };
 
   const formatTermsAndConditions = (content: string): string => {
@@ -1281,11 +1376,16 @@ export const generateQuotePDF = async (
 
     const hasHtmlTags = /<[^>]+>/.test(trimmed);
     if (hasHtmlTags) {
-      const normalized = tryFormatHtmlTerms(trimmed);
-      return normalized ?? trimmed;
+      const normalizedBlocks = buildHtmlTermsBlocks(trimmed);
+      if (normalizedBlocks) {
+        return renderTermsBlocks(normalizedBlocks);
+      }
+
+      const textOnly = trimmed.replace(/<[^>]+>/g, ' ');
+      return renderTermsBlocks(buildPlainTextTermsBlocks(textOnly));
     }
 
-    return formatPlainTextTerms(trimmed);
+    return renderTermsBlocks(buildPlainTextTermsBlocks(trimmed));
   };
   let companyName = 'QUALITROL';
   let companyLogoUrl = '';
@@ -2696,45 +2796,35 @@ export const generateQuotePDF = async (
           -moz-column-count: 2;
           -moz-column-gap: 24px;
         }
-        .terms-columns > div:not(.terms-section),
-        .terms-columns > section:not(.terms-section),
-        .terms-columns > article,
-        .terms-columns > ul,
-        .terms-columns > ol,
-        .terms-columns div:not(.terms-section),
-        .terms-columns .terms-grid,
-        .terms-columns .grid,
-        .terms-columns .column,
-        .terms-columns .columns-2,
-        .terms-columns .space-y-1,
-        .terms-columns .space-y-2,
-        .terms-columns .space-y-3,
-        .terms-columns .space-y-4,
-        .terms-columns .space-y-5,
-        .terms-columns .space-y-6,
-        .terms-columns .space-y-7,
-        .terms-columns .space-y-8 {
-          display: contents;
-        }
-        .terms-section {
-          break-inside: avoid;
-          display: block;
-          margin-bottom: 18px;
-        }
-        .terms-heading {
+        .terms-columns h3 {
           font-size: 10px;
           letter-spacing: 0.08em;
           text-transform: uppercase;
           color: #0f172a;
           font-weight: 700;
-          margin: 0 0 6px;
+          margin: 14px 0 6px;
+          break-after: avoid-column;
+          -webkit-column-break-after: avoid;
+          page-break-after: avoid;
+        }
+        .terms-columns h3:first-of-type {
+          margin-top: 0;
         }
         .terms-heading--intro {
           font-size: 11px;
           letter-spacing: 0.12em;
         }
-        .terms-section:first-of-type .terms-heading {
-          margin-top: 0;
+        .terms-columns p,
+        .terms-columns ul,
+        .terms-columns ol,
+        .terms-columns table {
+          break-inside: avoid-column;
+          -webkit-column-break-inside: avoid;
+          page-break-inside: avoid;
+        }
+        .terms-columns p {
+          margin: 0 0 10px;
+          color: #475569;
         }
         .terms-section p,
         .terms-section li {
@@ -2749,12 +2839,31 @@ export const generateQuotePDF = async (
           margin: 0 0 12px 18px;
           padding: 0;
         }
-        .terms-section li {
+        .terms-columns li {
           margin-bottom: 6px;
+        }
+        .terms-columns table {
+          width: 100%;
+          border-collapse: collapse;
+          margin: 6px 0 12px;
+        }
+        .terms-columns th,
+        .terms-columns td {
+          border: 1px solid #cbd5f5;
+          padding: 6px 8px;
+          text-align: left;
+          font-size: 10px;
         }
         .terms-columns strong {
           color: #0f172a;
           font-weight: 600;
+        }
+        .terms-columns a {
+          color: #2563eb;
+          text-decoration: none;
+        }
+        .terms-columns a:hover {
+          text-decoration: underline;
         }
         .footer { margin-top: 48px; border-top: 1px solid #e2e8f0; padding-top: 18px; font-size: 10px; color: #64748b; }
         @media print {
