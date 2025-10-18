@@ -934,7 +934,157 @@ let loadedItems: BOMItem[] = [];
     
     if (isClonedQuote) {
       console.log('Loading cloned quote - querying bom_items table');
-      // Skip draft_bom, will load from bom_items below
+      
+      // Add retry logic for cloned quotes (handles timing/transaction issues)
+      let retryCount = 0;
+      const maxRetries = 3;
+      let bomData = null;
+      let bomError = null;
+      
+      while (retryCount <= maxRetries) {
+        const result = await supabase
+          .from('bom_items')
+          .select(`
+            *,
+            bom_level4_values (
+              id,
+              level4_config_id,
+              entries
+            )
+          `)
+          .eq('quote_id', quoteId);
+          
+        bomError = result.error;
+        bomData = result.data;
+        
+        if (bomError) {
+          console.error('Error loading BOM items:', bomError);
+          toast({
+            title: "Error Loading BOM Items",
+            description: `Failed to load BOM items: ${bomError.message}`,
+            variant: "destructive"
+          });
+          throw bomError;
+        }
+        
+        // If we got items, great!
+        if (bomData && bomData.length > 0) {
+          console.log(`Successfully loaded ${bomData.length} BOM items from database`);
+          break;
+        }
+        
+        // If no items but draft_bom has items, wait and retry
+        if (quote.draft_bom?.items?.length > 0 && retryCount < maxRetries) {
+          console.log(`Retry ${retryCount + 1}/${maxRetries}: Waiting for BOM items to be committed...`);
+          await new Promise(resolve => setTimeout(resolve, 500));
+          retryCount++;
+        } else {
+          break;
+        }
+      }
+      
+      // Fallback: if still no items but draft_bom exists, use it
+      if ((!bomData || bomData.length === 0) && quote.draft_bom?.items?.length > 0) {
+        console.log('⚠️ Fallback: Loading from draft_bom since bom_items is empty');
+        toast({
+          title: "Loading from Backup",
+          description: "Initializing BOM data from draft backup...",
+          duration: 2000,
+        });
+        
+        // Use draft_bom loading logic
+        loadedItems = await Promise.all(
+          quote.draft_bom.items.map(async (item: any) => {
+            const configData = item.configuration_data || item.product?.configuration_data || {};
+            const embeddedPartNumberContext = configData?.partNumberContext;
+            if (embeddedPartNumberContext) {
+              delete configData.partNumberContext;
+            }
+
+            const partNumberContext = resolvePartNumberContext(
+              item.partNumberContext,
+              embeddedPartNumberContext,
+              configData
+            );
+            const storedSlotAssignments = configData.slotAssignments as SerializedSlotAssignment[] | undefined;
+            const slotAssignmentsMap = deserializeSlotAssignments(storedSlotAssignments);
+            const rackLayout = configData.rackConfiguration || buildRackLayoutFromAssignments(storedSlotAssignments);
+
+            return {
+              id: item.id || crypto.randomUUID(),
+              product: {
+                id: item.product_id || item.product?.id,
+                name: item.name || item.product?.name,
+                partNumber: item.part_number || item.product?.partNumber,
+                price: item.unit_price || item.product?.price,
+                cost: item.unit_cost || item.product?.cost,
+                description: item.description || item.product?.description,
+                ...configData
+              },
+              quantity: item.quantity,
+              enabled: true,
+              partNumber: item.part_number || item.product?.partNumber,
+              level4Values: [],
+              slotAssignments: slotAssignmentsMap,
+              rackConfiguration: rackLayout,
+              level4Config: configData.level4Config || undefined,
+              level4Selections: configData.level4Selections || undefined,
+              partNumberContext: normalizePartNumberContext(partNumberContext),
+            };
+          })
+        );
+        
+        // Trigger background sync to populate bom_items table
+        syncDraftBomToDatabase(quoteId, loadedItems).catch(err => {
+          console.error('Background sync failed:', err);
+        });
+      } else {
+        // Convert BOM items back to local format with proper structure
+        loadedItems = (bomData || []).map(item => {
+          const configData = item.configuration_data || {};
+          const embeddedPartNumberContext = (configData as any)?.partNumberContext;
+          if (embeddedPartNumberContext) {
+            delete (configData as any).partNumberContext;
+          }
+
+          const partNumberContext = resolvePartNumberContext(
+            item.partNumberContext,
+            embeddedPartNumberContext,
+            configData
+          );
+          const storedSlotAssignments = configData.slotAssignments as SerializedSlotAssignment[] | undefined;
+          const slotAssignmentsMap = deserializeSlotAssignments(storedSlotAssignments);
+          const rackLayout = configData.rackConfiguration || buildRackLayoutFromAssignments(storedSlotAssignments);
+          const directLevel4 = configData.level4Config ?? null;
+          const slotLevel4 = storedSlotAssignments?.filter(assign => assign.level4Config || assign.level4Selections) || [];
+          const mergedLevel4 = directLevel4 || (slotLevel4.length > 0 ? { slots: slotLevel4 } : null);
+
+          return {
+            id: item.id,
+            product: {
+              id: item.product_id,
+              name: item.name,
+              partNumber: item.part_number,
+              price: item.unit_price,
+              cost: item.unit_cost,
+              description: item.description,
+              ...configData
+            },
+            quantity: item.quantity,
+            enabled: true,
+            partNumber: item.part_number,
+            level4Values: item.bom_level4_values || [],
+            original_unit_price: item.original_unit_price || item.unit_price,
+            approved_unit_price: item.approved_unit_price || item.unit_price,
+            priceHistory: item.price_adjustment_history || [],
+            slotAssignments: slotAssignmentsMap,
+            rackConfiguration: rackLayout,
+            level4Config: mergedLevel4 || undefined,
+            level4Selections: configData.level4Selections || undefined,
+            partNumberContext: normalizePartNumberContext(partNumberContext),
+          };
+        });
+      }
     } else if (
       quote.status === 'draft' &&
       quote.draft_bom &&
@@ -1153,115 +1303,34 @@ let loadedItems: BOMItem[] = [];
   );
   console.log(`Loaded ${loadedItems.length} items from draft_bom`);
 } else {
-        console.log('Loading BOM data from bom_items table');
+        console.log('Loading BOM data from bom_items table (submitted/approved quote)');
         
-        // Add retry logic for cloned quotes (handles timing/transaction issues)
-        let retryCount = 0;
-        const maxRetries = isClonedQuote ? 3 : 0;
-        let bomData = null;
-        let bomError = null;
-        
-        while (retryCount <= maxRetries) {
-          const result = await supabase
-            .from('bom_items')
-            .select(`
-              *,
-              bom_level4_values (
-                id,
-                level4_config_id,
-                entries
-              )
-            `)
-            .eq('quote_id', quoteId);
-            
-          bomError = result.error;
-          bomData = result.data;
+        const { data: bomData, error: bomError } = await supabase
+          .from('bom_items')
+          .select(`
+            *,
+            bom_level4_values (
+              id,
+              level4_config_id,
+              entries
+            )
+          `)
+          .eq('quote_id', quoteId);
           
-          if (bomError) {
-            console.error('Error loading BOM items:', bomError);
-            toast({
-              title: "Error Loading BOM Items",
-              description: `Failed to load BOM items: ${bomError.message}`,
-              variant: "destructive"
-            });
-            throw bomError;
-          }
-          
-          // If we got items, great!
-          if (bomData && bomData.length > 0) {
-            console.log(`Successfully loaded ${bomData.length} BOM items from database`);
-            break;
-          }
-          
-          // If no items but draft_bom has items, wait and retry
-          if (isClonedQuote && quote.draft_bom?.items?.length > 0 && retryCount < maxRetries) {
-            console.log(`Retry ${retryCount + 1}/${maxRetries}: Waiting for BOM items to be committed...`);
-            await new Promise(resolve => setTimeout(resolve, 500));
-            retryCount++;
-          } else {
-            console.log(`Successfully loaded ${bomData?.length || 0} BOM items from database`);
-            break;
-          }
+        if (bomError) {
+          console.error('Error loading BOM items:', bomError);
+          toast({
+            title: "Error Loading BOM Items",
+            description: `Failed to load BOM items: ${bomError.message}`,
+            variant: "destructive"
+          });
+          throw bomError;
         }
         
-        // Fallback: if still no items but draft_bom exists, use it
-        if ((!bomData || bomData.length === 0) && quote.draft_bom?.items?.length > 0) {
-          console.log('⚠️ Fallback: Loading from draft_bom since bom_items is empty');
-          toast({
-            title: "Loading from Backup",
-            description: "Initializing BOM data from draft backup...",
-            duration: 2000,
-          });
-          
-          // Use draft_bom loading logic
-          loadedItems = await Promise.all(
-            quote.draft_bom.items.map(async (item: any) => {
-              const configData = item.configuration_data || item.product?.configuration_data || {};
-              const embeddedPartNumberContext = configData?.partNumberContext;
-              if (embeddedPartNumberContext) {
-                delete configData.partNumberContext;
-              }
-
-              const partNumberContext = resolvePartNumberContext(
-                item.partNumberContext,
-                embeddedPartNumberContext,
-                configData
-              );
-              const storedSlotAssignments = configData.slotAssignments as SerializedSlotAssignment[] | undefined;
-              const slotAssignmentsMap = deserializeSlotAssignments(storedSlotAssignments);
-              const rackLayout = configData.rackConfiguration || buildRackLayoutFromAssignments(storedSlotAssignments);
-
-              return {
-                id: item.id || crypto.randomUUID(),
-                product: {
-                  id: item.product_id || item.product?.id,
-                  name: item.name || item.product?.name,
-                  partNumber: item.part_number || item.product?.partNumber,
-                  price: item.unit_price || item.product?.price,
-                  cost: item.unit_cost || item.product?.cost,
-                  description: item.description || item.product?.description,
-                  ...configData
-                },
-                quantity: item.quantity,
-                enabled: true,
-                partNumber: item.part_number || item.product?.partNumber,
-                level4Values: [],
-                slotAssignments: slotAssignmentsMap,
-                rackConfiguration: rackLayout,
-                level4Config: configData.level4Config || undefined,
-                level4Selections: configData.level4Selections || undefined,
-                partNumberContext: normalizePartNumberContext(partNumberContext),
-              };
-            })
-          );
-          
-          // Trigger background sync to populate bom_items table
-          syncDraftBomToDatabase(quoteId, loadedItems).catch(err => {
-            console.error('Background sync failed:', err);
-          });
-        } else {
-          // Convert BOM items back to local format with proper structure
-          loadedItems = (bomData || []).map(item => {
+        console.log(`Successfully loaded ${bomData?.length || 0} BOM items from database`);
+        
+        // Convert BOM items back to local format with proper structure
+        loadedItems = (bomData || []).map(item => {
           const configData = item.configuration_data || {};
           const embeddedPartNumberContext = (configData as any)?.partNumberContext;
           if (embeddedPartNumberContext) {
@@ -1305,7 +1374,6 @@ let loadedItems: BOMItem[] = [];
             partNumberContext: normalizePartNumberContext(partNumberContext),
           };
         });
-        }
       }
       
       // Validation: Check if draft_bom and bom_items are in sync
