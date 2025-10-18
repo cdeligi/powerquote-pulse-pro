@@ -828,6 +828,54 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
     }
   };
 
+  // Background sync function to populate bom_items from draft_bom
+  const syncDraftBomToDatabase = async (quoteId: string, items: BOMItem[]) => {
+    try {
+      console.log('Background sync: Populating bom_items from draft_bom');
+      
+      // Delete any existing items (should be 0, but just in case)
+      await supabase
+        .from('bom_items')
+        .delete()
+        .eq('quote_id', quoteId);
+      
+      // Insert all items
+      const bomPayload = items.map(item => ({
+        quote_id: quoteId,
+        product_id: item.product.id,
+        name: item.product.name,
+        description: item.product.description,
+        part_number: item.partNumber,
+        quantity: item.quantity,
+        unit_price: item.product.price,
+        unit_cost: item.product.cost,
+        total_price: item.product.price * item.quantity,
+        total_cost: item.product.cost * item.quantity,
+        margin: ((item.product.price - item.product.cost) / item.product.price) * 100,
+        product_type: (item.product as any).category || 'standard',
+        configuration_data: {
+          slotAssignments: item.slotAssignments ? serializeSlotAssignments(item.slotAssignments) : undefined,
+          rackConfiguration: item.rackConfiguration,
+          level4Config: item.level4Config,
+          level4Selections: item.level4Selections,
+          ...item.product
+        },
+      }));
+      
+      const { error: insertError } = await supabase
+        .from('bom_items')
+        .insert(bomPayload);
+        
+      if (insertError) {
+        throw insertError;
+      }
+        
+      console.log('✓ Background sync completed:', bomPayload.length, 'items');
+    } catch (error) {
+      console.error('Background sync failed:', error);
+    }
+  };
+
   const loadQuote = async (quoteId: string) => {
     if (!quoteId) {
       console.log('No quote ID provided');
@@ -1106,33 +1154,114 @@ let loadedItems: BOMItem[] = [];
   console.log(`Loaded ${loadedItems.length} items from draft_bom`);
 } else {
         console.log('Loading BOM data from bom_items table');
-        // Load BOM items with Level 4 configurations from database table
-        const { data: bomData, error: bomError } = await supabase
-          .from('bom_items')
-          .select(`
-            *,
-            bom_level4_values (
-              id,
-              level4_config_id,
-              entries
-            )
-          `)
-          .eq('quote_id', quoteId);
+        
+        // Add retry logic for cloned quotes (handles timing/transaction issues)
+        let retryCount = 0;
+        const maxRetries = isClonedQuote ? 3 : 0;
+        let bomData = null;
+        let bomError = null;
+        
+        while (retryCount <= maxRetries) {
+          const result = await supabase
+            .from('bom_items')
+            .select(`
+              *,
+              bom_level4_values (
+                id,
+                level4_config_id,
+                entries
+              )
+            `)
+            .eq('quote_id', quoteId);
+            
+          bomError = result.error;
+          bomData = result.data;
           
-        if (bomError) {
-          console.error('Error loading BOM items:', bomError);
-          toast({
-            title: "Error Loading BOM Items",
-            description: `Failed to load BOM items: ${bomError.message}`,
-            variant: "destructive"
-          });
-          throw bomError;
+          if (bomError) {
+            console.error('Error loading BOM items:', bomError);
+            toast({
+              title: "Error Loading BOM Items",
+              description: `Failed to load BOM items: ${bomError.message}`,
+              variant: "destructive"
+            });
+            throw bomError;
+          }
+          
+          // If we got items, great!
+          if (bomData && bomData.length > 0) {
+            console.log(`Successfully loaded ${bomData.length} BOM items from database`);
+            break;
+          }
+          
+          // If no items but draft_bom has items, wait and retry
+          if (isClonedQuote && quote.draft_bom?.items?.length > 0 && retryCount < maxRetries) {
+            console.log(`Retry ${retryCount + 1}/${maxRetries}: Waiting for BOM items to be committed...`);
+            await new Promise(resolve => setTimeout(resolve, 500));
+            retryCount++;
+          } else {
+            console.log(`Successfully loaded ${bomData?.length || 0} BOM items from database`);
+            break;
+          }
         }
         
-        console.log(`Successfully loaded ${bomData?.length || 0} BOM items from database`);
-        
-        // Convert BOM items back to local format with proper structure
-        loadedItems = (bomData || []).map(item => {
+        // Fallback: if still no items but draft_bom exists, use it
+        if ((!bomData || bomData.length === 0) && quote.draft_bom?.items?.length > 0) {
+          console.log('⚠️ Fallback: Loading from draft_bom since bom_items is empty');
+          toast({
+            title: "Loading from Backup",
+            description: "Initializing BOM data from draft backup...",
+            duration: 2000,
+          });
+          
+          // Use draft_bom loading logic
+          loadedItems = await Promise.all(
+            quote.draft_bom.items.map(async (item: any) => {
+              const configData = item.configuration_data || item.product?.configuration_data || {};
+              const embeddedPartNumberContext = configData?.partNumberContext;
+              if (embeddedPartNumberContext) {
+                delete configData.partNumberContext;
+              }
+
+              const partNumberContext = resolvePartNumberContext(
+                item.partNumberContext,
+                embeddedPartNumberContext,
+                configData
+              );
+              const storedSlotAssignments = configData.slotAssignments as SerializedSlotAssignment[] | undefined;
+              const slotAssignmentsMap = deserializeSlotAssignments(storedSlotAssignments);
+              const rackLayout = configData.rackConfiguration || buildRackLayoutFromAssignments(storedSlotAssignments);
+
+              return {
+                id: item.id || crypto.randomUUID(),
+                product: {
+                  id: item.product_id || item.product?.id,
+                  name: item.name || item.product?.name,
+                  partNumber: item.part_number || item.product?.partNumber,
+                  price: item.unit_price || item.product?.price,
+                  cost: item.unit_cost || item.product?.cost,
+                  description: item.description || item.product?.description,
+                  ...configData
+                },
+                quantity: item.quantity,
+                enabled: true,
+                partNumber: item.part_number || item.product?.partNumber,
+                level4Values: [],
+                slotAssignments: slotAssignmentsMap,
+                rackConfiguration: rackLayout,
+                level4Config: configData.level4Config || undefined,
+                level4Selections: configData.level4Selections || undefined,
+                partNumberContext: normalizePartNumberContext(partNumberContext),
+              };
+            })
+          );
+          
+          // Trigger background sync to populate bom_items table
+          syncDraftBomToDatabase(quoteId, loadedItems).catch(err => {
+            console.error('Background sync failed:', err);
+          });
+        } else {
+          // Convert BOM items back to local format with proper structure
+          loadedItems = (bomData || []).map(item => {
           const configData = item.configuration_data || {};
           const embeddedPartNumberContext = (configData as any)?.partNumberContext;
           if (embeddedPartNumberContext) {
@@ -1176,6 +1305,7 @@ let loadedItems: BOMItem[] = [];
             partNumberContext: normalizePartNumberContext(partNumberContext),
           };
         });
+        }
       }
       
       // Validation: Check if draft_bom and bom_items are in sync

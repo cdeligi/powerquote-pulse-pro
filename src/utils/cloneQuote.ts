@@ -315,6 +315,15 @@ async function cloneQuoteClientSide(
       }
 
       insertedBomItems = insertedBomRows ?? [];
+      
+      // Verify items were actually inserted
+      if (insertedBomItems.length !== sourceBomItems.length) {
+        console.warn(
+          `⚠️ BOM item count mismatch: expected ${sourceBomItems.length}, got ${insertedBomItems.length}`
+        );
+      } else {
+        console.log(`✓ Successfully cloned ${insertedBomItems.length} BOM items`);
+      }
 
       const oldToNewMap = new Map<string, string>();
       sourceBomItems.forEach((item, index) => {
