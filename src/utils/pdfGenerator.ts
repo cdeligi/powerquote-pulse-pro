@@ -81,13 +81,6 @@ type ExpandedSlotDisplay = {
   cardKey: string;
 };
 
-type ExpandedSlotDisplay = {
-  slot: number;
-  cardName: string;
-  partNumber?: string;
-  cardKey: string;
-};
-
 // Terms pagination constants (more conservative estimates for 10px font)
 const TERMS_PAGE_HEIGHT = 1200;
 const TERMS_COLUMN_WIDTH = 380;
@@ -2233,56 +2226,84 @@ export const generateQuotePDF = async (
   } | undefined => {
     if (!item) return undefined;
 
-    if (item.rackConfiguration && typeof item.rackConfiguration === 'object') {
-      if (Array.isArray(item.rackConfiguration.slots)) {
-        return { slots: toSlotEntries(item.rackConfiguration.slots, allBomItems) };
+    const rackConfigurationCandidates = [
+      item?.rackConfiguration,
+      item?.rack_configuration,
+      item?.configuration?.rackConfiguration,
+      item?.configuration?.rack_configuration,
+      item?.configuration_data?.rackConfiguration,
+      item?.configuration_data?.rack_configuration,
+    ];
+
+    for (const candidate of rackConfigurationCandidates) {
+      if (!candidate || typeof candidate !== 'object') {
+        continue;
       }
 
-      if (Array.isArray(item.rackConfiguration)) {
-        return { slots: toSlotEntries(item.rackConfiguration, allBomItems) };
+      if (Array.isArray((candidate as any).slots)) {
+        return { slots: toSlotEntries((candidate as any).slots, allBomItems) };
+      }
+
+      if (Array.isArray(candidate)) {
+        return { slots: toSlotEntries(candidate, allBomItems) };
       }
     }
 
-    if (Array.isArray(item.slotAssignments)) {
-      return { slots: toSlotEntries(item.slotAssignments, allBomItems) };
-    }
+    const slotAssignmentCandidates = [
+      item?.slotAssignments,
+      item?.slot_assignments,
+      item?.configuration?.slotAssignments,
+      item?.configuration?.slot_assignments,
+      item?.configuration_data?.slotAssignments,
+      item?.configuration_data?.slot_assignments,
+    ];
 
-    if (item.slotAssignments && typeof item.slotAssignments === 'object') {
-      const entries = Object.entries(item.slotAssignments).map(([slotKey, slotData], index) => {
-        const data = slotData as any;
-        return {
-          slot: normalizeSlotNumber(slotKey, index),
-          cardName: data?.displayName || data?.name || data?.product?.name || `Slot ${slotKey}`,
-          partNumber: data?.partNumber || data?.product?.partNumber || data?.part_number || undefined,
-          level4Config: data?.level4Config || null,
-          level4Selections: data?.level4Selections || null,
-          level4BomItemId:
-            data?.level4BomItemId ||
-            data?.level4_bom_item_id ||
-            data?.level4Config?.bomItemId ||
-            data?.level4Config?.bom_item_id ||
-            data?.configuration?.bomItemId ||
-            data?.configuration?.bom_item_id,
-          isSharedLevel4Config:
-            Boolean(
-              data?.isSharedLevel4Config ||
-              data?.sharedLevel4Config ||
-              data?.is_shared_level4_config ||
-              data?.isBushingSecondary ||
-              data?.is_bushing_secondary
-            ),
-          isBushingSecondary: Boolean(data?.isBushingSecondary || data?.is_bushing_secondary),
-          sharedFromSlot:
-            data?.sharedFromSlot ??
-            data?.shared_from_slot ??
-            data?.bushingPairSlot ??
-            data?.bushing_pair_slot ??
-            undefined,
-        };
-      }).filter(entry => entry.slot !== undefined && entry.slot !== null);
+    for (const candidate of slotAssignmentCandidates) {
+      if (!candidate) {
+        continue;
+      }
 
-      if (entries.length > 0) {
-        return { slots: entries };
+      if (Array.isArray(candidate)) {
+        return { slots: toSlotEntries(candidate, allBomItems) };
+      }
+
+      if (typeof candidate === 'object') {
+        const entries = Object.entries(candidate).map(([slotKey, slotData], index) => {
+          const data = slotData as any;
+          return {
+            slot: normalizeSlotNumber(slotKey, index),
+            cardName: data?.displayName || data?.name || data?.product?.name || `Slot ${slotKey}`,
+            partNumber: data?.partNumber || data?.product?.partNumber || data?.part_number || undefined,
+            level4Config: data?.level4Config || null,
+            level4Selections: data?.level4Selections || null,
+            level4BomItemId:
+              data?.level4BomItemId ||
+              data?.level4_bom_item_id ||
+              data?.level4Config?.bomItemId ||
+              data?.level4Config?.bom_item_id ||
+              data?.configuration?.bomItemId ||
+              data?.configuration?.bom_item_id,
+            isSharedLevel4Config:
+              Boolean(
+                data?.isSharedLevel4Config ||
+                data?.sharedLevel4Config ||
+                data?.is_shared_level4_config ||
+                data?.isBushingSecondary ||
+                data?.is_bushing_secondary
+              ),
+            isBushingSecondary: Boolean(data?.isBushingSecondary || data?.is_bushing_secondary),
+            sharedFromSlot:
+              data?.sharedFromSlot ??
+              data?.shared_from_slot ??
+              data?.bushingPairSlot ??
+              data?.bushing_pair_slot ??
+              undefined,
+          };
+        }).filter(entry => entry.slot !== undefined && entry.slot !== null);
+
+        if (entries.length > 0) {
+          return { slots: entries };
+        }
       }
     }
 
@@ -2578,8 +2599,11 @@ export const generateQuotePDF = async (
         item.level2_product,
         item.parentProduct,
         item.configuration?.rackConfiguration,
+        item.configuration?.rack_configuration,
         item.rackConfiguration,
-        item.slotAssignments
+        item.rack_configuration,
+        item.slotAssignments,
+        item.slot_assignments
       );
 
       candidates.forEach(candidate => productIdsToFetch.add(candidate));
@@ -2609,14 +2633,17 @@ export const generateQuotePDF = async (
             item.configuration?.selectedProduct,
             item.configuration?.selectedLevel2Product,
             item.configuration?.level2Product,
-            item.configuration?.selectedProducts,
-            item.level2Product,
-            item.level2_product,
-            item.parentProduct,
-            item.configuration?.rackConfiguration,
-            item.rackConfiguration,
-            item.slotAssignments
-          );
+          item.configuration?.selectedProducts,
+          item.level2Product,
+          item.level2_product,
+          item.parentProduct,
+          item.configuration?.rackConfiguration,
+          item.configuration?.rack_configuration,
+          item.rackConfiguration,
+          item.rack_configuration,
+          item.slotAssignments,
+          item.slot_assignments
+        );
 
           for (const candidate of candidates) {
             const matchedUrl = candidate ? infoUrlMap.get(candidate) : undefined;
