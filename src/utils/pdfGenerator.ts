@@ -81,13 +81,6 @@ type ExpandedSlotDisplay = {
   cardKey: string;
 };
 
-type ExpandedSlotDisplay = {
-  slot: number;
-  cardName: string;
-  partNumber?: string;
-  cardKey: string;
-};
-
 // Terms pagination constants (more conservative estimates for 10px font)
 const TERMS_PAGE_HEIGHT = 1200;
 const TERMS_COLUMN_WIDTH = 380;
