@@ -1290,6 +1290,7 @@ export type Database = {
           display_order: number | null
           enabled: boolean
           id: string
+          conditional_logic: Json | null
           include_in_pdf: boolean | null
           label: string
           options: Json | null
@@ -1302,6 +1303,7 @@ export type Database = {
           display_order?: number | null
           enabled?: boolean
           id: string
+          conditional_logic?: Json | null
           include_in_pdf?: boolean | null
           label: string
           options?: Json | null
@@ -1314,6 +1316,7 @@ export type Database = {
           display_order?: number | null
           enabled?: boolean
           id?: string
+          conditional_logic?: Json | null
           include_in_pdf?: boolean | null
           label?: string
           options?: Json | null
@@ -2027,6 +2030,10 @@ export type Database = {
       get_admin_user_ids: {
         Args: Record<PropertyKey, never>
         Returns: string[]
+      }
+      reload_postgrest_schema: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
       }
       get_dga_products: {
         Args: Record<PropertyKey, never>

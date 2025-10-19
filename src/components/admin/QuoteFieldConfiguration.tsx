@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import type { PostgrestSingleResponse } from "@supabase/supabase-js";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -34,7 +35,33 @@ import {
 } from "@/utils/quoteFieldNormalization";
 
 const supabase = getSupabaseClient();
-const supabaseAdmin = getSupabaseAdminClient();;
+const supabaseAdmin = getSupabaseAdminClient();
+const POSTGREST_SCHEMA_RELOAD_ERROR_CODE = "PGRST204";
+
+async function waitForSchemaReload(delayMs = 300) {
+  await new Promise((resolve) => setTimeout(resolve, delayMs));
+}
+
+async function runWithPostgrestSchemaRetry<T>(
+  operation: () => Promise<PostgrestSingleResponse<T>>
+): Promise<PostgrestSingleResponse<T>> {
+  const result = await operation();
+
+  if (result.error?.code !== POSTGREST_SCHEMA_RELOAD_ERROR_CODE) {
+    return result;
+  }
+
+  console.warn("PostgREST schema cache out of date, reloading before retrying mutation");
+
+  const reloadResult = await supabase.rpc("reload_postgrest_schema");
+  if (reloadResult.error) {
+    console.error("Failed to trigger PostgREST schema reload", reloadResult.error);
+    return result;
+  }
+
+  await waitForSchemaReload();
+  return operation();
+}
 
 type QuoteField = QuoteFieldConfig;
 
@@ -229,19 +256,21 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
 
   const createQuoteField = async (fieldData: Omit<QuoteField, 'id'>) => {
     try {
-      const { error } = await supabase
-        .from('quote_fields')
-        .insert({
-          id: `field-${Date.now()}`,
-          label: fieldData.label,
-          type: fieldData.type,
-          required: fieldData.required,
-          enabled: fieldData.enabled,
-          options: fieldData.options && fieldData.options.length ? JSON.stringify(fieldData.options) : null,
-          display_order: fieldData.display_order,
-          include_in_pdf: fieldData.include_in_pdf || false,
-          conditional_logic: fieldData.conditional_logic ?? [],
-        });
+      const { error } = await runWithPostgrestSchemaRetry(() =>
+        supabase
+          .from('quote_fields')
+          .insert({
+            id: `field-${Date.now()}`,
+            label: fieldData.label,
+            type: fieldData.type,
+            required: fieldData.required,
+            enabled: fieldData.enabled,
+            options: fieldData.options && fieldData.options.length ? JSON.stringify(fieldData.options) : null,
+            display_order: fieldData.display_order,
+            include_in_pdf: fieldData.include_in_pdf || false,
+            conditional_logic: fieldData.conditional_logic ?? [],
+          })
+      );
 
       if (error) throw error;
 
@@ -262,19 +291,21 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
 
   const updateQuoteField = async (fieldId: string, fieldData: Omit<QuoteField, 'id'>) => {
     try {
-      const { error } = await supabase
-        .from('quote_fields')
-        .update({
-          label: fieldData.label,
-          type: fieldData.type,
-          required: fieldData.required,
-          enabled: fieldData.enabled,
-          options: fieldData.options && fieldData.options.length ? JSON.stringify(fieldData.options) : null,
-          display_order: fieldData.display_order,
-          include_in_pdf: fieldData.include_in_pdf || false,
-          conditional_logic: fieldData.conditional_logic ?? [],
-        })
-        .eq('id', fieldId);
+      const { error } = await runWithPostgrestSchemaRetry(() =>
+        supabase
+          .from('quote_fields')
+          .update({
+            label: fieldData.label,
+            type: fieldData.type,
+            required: fieldData.required,
+            enabled: fieldData.enabled,
+            options: fieldData.options && fieldData.options.length ? JSON.stringify(fieldData.options) : null,
+            display_order: fieldData.display_order,
+            include_in_pdf: fieldData.include_in_pdf || false,
+            conditional_logic: fieldData.conditional_logic ?? [],
+          })
+          .eq('id', fieldId)
+      );
 
       if (error) throw error;
 
