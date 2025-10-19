@@ -14,6 +14,8 @@ export interface SerializedSlotAssignment {
   isBushingPrimary?: boolean;
   isBushingSecondary?: boolean;
   bushingPairSlot?: number | null;
+  slotRequirement?: number | null;
+  slotSpan?: number | null;
 }
 
 const safeNumber = (value: unknown): number | undefined => {
@@ -36,6 +38,17 @@ export const serializeSlotAssignments = (
     const slotNumber = Number.parseInt(slotKey, 10);
     const extended = card as Level3Product & Record<string, any>;
 
+    const resolvedSlotRequirement =
+      safeNumber((extended as any).slotRequirement) ??
+      safeNumber((extended.specifications as any)?.slotRequirement) ??
+      null;
+
+    const resolvedSlotSpan =
+      safeNumber((extended as any).slotSpan) ??
+      safeNumber((extended as any).span) ??
+      resolvedSlotRequirement ??
+      null;
+
     return {
       slot: Number.isNaN(slotNumber) ? 0 : slotNumber,
       productId: card.id,
@@ -54,6 +67,8 @@ export const serializeSlotAssignments = (
       isBushingSecondary: Boolean(extended.isBushingSecondary),
       bushingPairSlot:
         safeNumber(extended.bushingPairSlot) ?? safeNumber(extended.bushing_pair_slot) ?? null,
+      slotRequirement: resolvedSlotRequirement,
+      slotSpan: resolvedSlotSpan,
     };
   });
 };
@@ -90,6 +105,8 @@ export const deserializeSlotAssignments = (
       isBushingPrimary: entry.isBushingPrimary ?? false,
       isBushingSecondary: entry.isBushingSecondary ?? false,
       bushingPairSlot: entry.bushingPairSlot ?? undefined,
+      slotRequirement: entry.slotRequirement ?? undefined,
+      slotSpan: entry.slotSpan ?? undefined,
     } as Level3Product & Record<string, any>;
 
     return acc;
@@ -107,13 +124,45 @@ export const buildRackLayoutFromAssignments = (
     slots: assignments
       .slice()
       .sort((a, b) => (safeNumber(a.slot) ?? 0) - (safeNumber(b.slot) ?? 0))
-      .map(slot => ({
-        slot: safeNumber(slot.slot) ?? undefined,
-        cardName: slot.displayName || slot.name,
-        partNumber: slot.partNumber,
-        level4Config: slot.level4Config ?? null,
-        level4Selections: slot.level4Selections ?? null,
-        level4BomItemId: slot.level4BomItemId,
-      })),
+      .map(slot => {
+        const slotNumber = safeNumber(slot.slot) ?? undefined;
+        const pairSlot = safeNumber(slot.bushingPairSlot) ?? undefined;
+        const resolvedSpan =
+          safeNumber(slot.slotSpan) ??
+          safeNumber(slot.slotRequirement) ??
+          (slotNumber !== undefined && pairSlot !== undefined
+            ? Math.abs(pairSlot - slotNumber) + 1
+            : undefined);
+
+        const explicitPrimary = safeNumber((slot as any).primarySlot);
+        const explicitShared =
+          safeNumber((slot as any).sharedFromSlot) ??
+          safeNumber((slot as any).shared_from_slot);
+
+        const isSecondary = Boolean(slot.isBushingSecondary);
+
+        return {
+          slot: slotNumber,
+          cardName: slot.displayName || slot.name,
+          partNumber: slot.partNumber,
+          level4Config: slot.level4Config ?? null,
+          level4Selections: slot.level4Selections ?? null,
+          level4BomItemId: slot.level4BomItemId,
+          slotRequirement: resolvedSpan,
+          slotSpan: resolvedSpan,
+          span: resolvedSpan,
+          isBushingPrimary: Boolean(slot.isBushingPrimary),
+          isBushingSecondary: isSecondary,
+          bushingPairSlot: pairSlot,
+          primarySlot:
+            explicitPrimary ??
+            (isSecondary
+              ? pairSlot
+              : slotNumber),
+          sharedFromSlot:
+            explicitShared ??
+            (isSecondary ? pairSlot : undefined),
+        };
+      }),
   };
 };
