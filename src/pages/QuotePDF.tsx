@@ -5,6 +5,90 @@ import { generateQuotePDF } from '@/utils/pdfGenerator';
 import { Loader2 } from 'lucide-react';
 import type { Quote } from '@/types/quote';
 import type { BOMItem } from '@/types/bom';
+import {
+  buildRackLayoutFromAssignments,
+  deserializeSlotAssignments,
+  type SerializedSlotAssignment,
+} from '@/utils/slotAssignmentUtils';
+
+const ensureRecord = (value: unknown): Record<string, any> | null => {
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    return value as Record<string, any>;
+  }
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value);
+      return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+        ? (parsed as Record<string, any>)
+        : null;
+    } catch {
+      return null;
+    }
+  }
+  return null;
+};
+
+const ensureArray = (value: unknown): unknown[] | null => {
+  if (Array.isArray(value)) {
+    return value as unknown[];
+  }
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed) ? (parsed as unknown[]) : null;
+    } catch {
+      return null;
+    }
+  }
+  return null;
+};
+
+const mapDraftItemsToBomItems = (items: any[]): BOMItem[] =>
+  items.map((item: any) => {
+    const storedSlotAssignments = item.slotAssignments as SerializedSlotAssignment[] | undefined;
+    const slotAssignments = deserializeSlotAssignments(storedSlotAssignments);
+    const rackLayout = item.rackConfiguration || buildRackLayoutFromAssignments(storedSlotAssignments);
+    const productPrice = item.unit_price || item.product?.price || 0;
+
+    return {
+      id: item.id || crypto.randomUUID(),
+      product: {
+        name: item.name || item.product?.name || 'Unknown Product',
+        description: item.description || item.product?.description || '',
+        price: productPrice,
+      },
+      quantity: item.quantity || 1,
+      enabled: item.enabled !== false,
+      partNumber: item.partNumber || item.part_number || item.product?.partNumber || 'TBD',
+      slotAssignments,
+      rackConfiguration: rackLayout,
+      level4Config: item.level4Config || null,
+      level4Selections: item.level4Selections || null,
+    } as BOMItem;
+  });
+
+const mapBomRowsToBomItems = (rows: any[]): BOMItem[] =>
+  rows.map(row => {
+    const storedSlotAssignments = row.configuration_data?.slotAssignments as SerializedSlotAssignment[] | undefined;
+    const slotAssignments = deserializeSlotAssignments(storedSlotAssignments);
+    const rackLayout = row.configuration_data?.rackConfiguration || buildRackLayoutFromAssignments(storedSlotAssignments);
+
+    return {
+      id: row.id || crypto.randomUUID(),
+      product: {
+        name: row.name || 'Unknown Product',
+        description: row.description || '',
+        price: row.unit_price || 0,
+      },
+      quantity: row.quantity || 1,
+      enabled: row.enabled !== false,
+      partNumber: row.part_number || 'TBD',
+      slotAssignments,
+      rackConfiguration: rackLayout,
+      level4Config: row.configuration_data?.level4Config || null,
+      level4Selections: row.configuration_data?.level4Selections || null,
+    } as BOMItem;
+  });
 
 const QuotePDF = () => {
   const { quoteId } = useParams<{ quoteId: string }>();
@@ -34,20 +118,40 @@ const QuotePDF = () => {
           return;
         }
 
-        // Fetch BOM items
-        const { data: bomItems, error: bomError } = await supabase
+        // Fetch BOM items from persistent storage
+        const { data: bomRows, error: bomError } = await supabase
           .from('bom_items')
-          .select('*')
+          .select(`
+            *,
+            bom_level4_values (
+              id,
+              level4_config_id,
+              entries
+            )
+          `)
           .eq('quote_id', quoteId);
 
-        if (bomError) {
-          setError('Failed to load quote items');
-          setLoading(false);
-          return;
+        const normalizedDraftBom = ensureRecord(quote.draft_bom);
+        const draftItems = ensureArray(normalizedDraftBom ? normalizedDraftBom['items'] : undefined);
+        const hasDraftItems = Array.isArray(draftItems) && draftItems.length > 0;
+
+        let resolvedBomItems: BOMItem[] = [];
+
+        if (hasDraftItems && quote.status === 'draft') {
+          resolvedBomItems = mapDraftItemsToBomItems(draftItems as any[]);
+        } else if (!bomError && Array.isArray(bomRows) && bomRows.length > 0) {
+          resolvedBomItems = mapBomRowsToBomItems(bomRows as any[]);
+        } else if (hasDraftItems) {
+          console.warn('QuotePDF: falling back to draft_bom data for quote', quoteId);
+          resolvedBomItems = mapDraftItemsToBomItems(draftItems as any[]);
+        } else {
+          if (bomError) {
+            throw new Error('Failed to load quote items');
+          }
         }
 
-        // Generate PDF using existing utility
-        await generateQuotePDF(bomItems || [], quote as Partial<Quote>, true, 'download');
+        // Generate PDF using normalized BOM items
+        await generateQuotePDF(resolvedBomItems, quote as Partial<Quote>, true, 'download');
         
         setLoading(false);
       } catch (err: any) {
