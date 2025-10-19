@@ -124,20 +124,20 @@ const ConditionalLogicEditor = ({ rules, onChange, parentFieldLabel }: Condition
 
   return (
     <div className="space-y-4">
-      {rules.map((rule, index) => (
+      {rules.map((rule, ruleIndex) => (
         <Card key={rule.id} className="bg-gray-900 border-gray-800">
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center justify-between text-white text-sm">
               <span className="flex items-center gap-2">
                 <Layers className="h-4 w-4 text-red-400" />
-                Conditional Rule {index + 1}
+                Conditional Rule {ruleIndex + 1}
               </span>
               <Button
                 type="button"
                 variant="ghost"
                 size="sm"
                 className="text-red-400 hover:text-red-300"
-                onClick={() => handleRemoveRule(index)}
+                onClick={() => handleRemoveRule(ruleIndex)}
               >
                 <Trash2 className="h-4 w-4" />
               </Button>
@@ -149,7 +149,7 @@ const ConditionalLogicEditor = ({ rules, onChange, parentFieldLabel }: Condition
                 <Label className="text-white text-sm">Trigger Values (one per line)</Label>
                 <Textarea
                   value={rule.triggerValues.join('\n')}
-                  onChange={(event) => handleTriggerValuesChange(index, event.target.value)}
+                  onChange={(event) => handleTriggerValuesChange(ruleIndex, event.target.value)}
                   className="bg-gray-800 border-gray-700 text-white"
                   placeholder={'Yes\nAP\nNEO'}
                   rows={4}
@@ -161,7 +161,7 @@ const ConditionalLogicEditor = ({ rules, onChange, parentFieldLabel }: Condition
                   <Select
                     value={rule.displayMode}
                     onValueChange={(value) =>
-                      handleRuleChange(index, {
+                      handleRuleChange(ruleIndex, {
                         ...rule,
                         displayMode: value as QuoteFieldConditionalRule['displayMode'],
                       })
@@ -184,7 +184,7 @@ const ConditionalLogicEditor = ({ rules, onChange, parentFieldLabel }: Condition
                   <Label className="text-white text-sm">Modal Title (optional)</Label>
                   <Input
                     value={rule.title ?? ''}
-                    onChange={(event) => handleRuleChange(index, { ...rule, title: event.target.value })}
+                    onChange={(event) => handleRuleChange(ruleIndex, { ...rule, title: event.target.value })}
                     className="bg-gray-800 border-gray-700 text-white"
                     placeholder="Additional Information"
                   />
@@ -193,7 +193,7 @@ const ConditionalLogicEditor = ({ rules, onChange, parentFieldLabel }: Condition
                   <Label className="text-white text-sm">Modal Description (optional)</Label>
                   <Textarea
                     value={rule.description ?? ''}
-                    onChange={(event) => handleRuleChange(index, { ...rule, description: event.target.value })}
+                    onChange={(event) => handleRuleChange(ruleIndex, { ...rule, description: event.target.value })}
                     className="bg-gray-800 border-gray-700 text-white"
                     rows={3}
                     placeholder="Provide more context for the follow-up question."
@@ -209,7 +209,7 @@ const ConditionalLogicEditor = ({ rules, onChange, parentFieldLabel }: Condition
                   type="button"
                   size="sm"
                   className="bg-red-600 hover:bg-red-700"
-                  onClick={() => handleAddField(index)}
+                  onClick={() => handleAddField(ruleIndex)}
                 >
                   <Plus className="h-4 w-4 mr-2" /> Add Field
                 </Button>
