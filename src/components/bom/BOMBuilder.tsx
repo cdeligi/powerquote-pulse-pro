@@ -41,6 +41,8 @@ import {
 } from '@/utils/slotAssignmentUtils';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { getCachedRates, fetchLiveExchangeRates, convertCurrencySync } from '@/utils/currencyConverter';
+import { ExchangeRateDisplay } from '@/components/common/ExchangeRateDisplay';
 
 const supabase = getSupabaseClient();
 const supabaseAdmin = getSupabaseAdminClient();
@@ -540,6 +542,12 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
   const [assetTypes, setAssetTypes] = useState<AssetType[]>([]);
   const [selectedAssetType, setSelectedAssetType] = useState<string>('');
 
+  // Currency conversion state
+  const [exchangeRates, setExchangeRates] = useState<any>(null);
+  const [isConvertingCurrency, setIsConvertingCurrency] = useState(false);
+  const [currentCurrency, setCurrentCurrency] = useState<string>('USD');
+  const [originalUsdPrices, setOriginalUsdPrices] = useState<Map<string, { price: number; cost: number }>>(new Map());
+
   // Hints for standard slot positions not yet filled (top-level to avoid conditional hooks)
   const standardSlotHints = useMemo(() => {
     const hints: Record<number, string[]> = {};
@@ -677,6 +685,33 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
     [isFieldRequired, resolveQuoteFieldValue]
   );
   
+  // Load exchange rates on mount
+  useEffect(() => {
+    const loadExchangeRates = async () => {
+      try {
+        // Try cached rates first
+        const cached = getCachedRates();
+        if (cached) {
+          setExchangeRates({ rates: cached, fetchedAt: new Date().toISOString() });
+          return;
+        }
+        
+        // Fetch live rates
+        const rates = await fetchLiveExchangeRates();
+        setExchangeRates({ rates, fetchedAt: new Date().toISOString() });
+      } catch (error) {
+        console.error('Failed to load exchange rates:', error);
+        toast({
+          title: 'Warning',
+          description: 'Using fallback exchange rates. Currency conversion may not be accurate.',
+          variant: 'destructive'
+        });
+      }
+    };
+    
+    loadExchangeRates();
+  }, []);
+
   useEffect(() => {
     const fetchQuoteFields = async () => {
       try {
@@ -757,7 +792,7 @@ const BOMBuilder = ({ onBOMUpdate, canSeePrices, canSeeCosts = false, quoteId, m
       const resolvedPriority = getStringFieldValue('priority', 'Medium');
       const resolvedShippingTerms = getStringFieldValue('shipping_terms', 'TBD', 'TBD');
       const resolvedPaymentTerms = getStringFieldValue('payment_terms', 'TBD', 'TBD');
-      const resolvedCurrency = getStringFieldValue('currency', 'USD');
+      const resolvedCurrency = getStringFieldValue('quote-currency', 'USD');
       const rawRepInvolved = resolveQuoteFieldValue('is_rep_involved', false);
       const resolvedRepInvolved =
         typeof rawRepInvolved === 'string'
@@ -1802,7 +1837,7 @@ let loadedItems: BOMItem[] = [];
         const resolvedPriority = getStringFieldValue('priority', 'Medium');
         const resolvedShippingTerms = getStringFieldValue('shipping_terms', 'Ex-Works', 'Ex-Works');
         const resolvedPaymentTerms = getStringFieldValue('payment_terms', 'Net 30', 'Net 30');
-        const resolvedCurrency = getStringFieldValue('currency', 'USD');
+        const resolvedCurrency = getStringFieldValue('quote-currency', 'USD');
         const rawRepInvolved = resolveQuoteFieldValue('is_rep_involved', false);
         const resolvedRepInvolved =
           typeof rawRepInvolved === 'string'
@@ -2022,8 +2057,88 @@ let loadedItems: BOMItem[] = [];
   // Use quote validation hook
   const { validation, validateFields } = useQuoteValidation(quoteFields, availableQuoteFields);
 
+  // Currency conversion handler
+  const handleCurrencyConversion = async (newCurrency: string) => {
+    if (!exchangeRates) {
+      toast({
+        title: 'Error',
+        description: 'Exchange rates not loaded. Cannot convert currency.',
+        variant: 'destructive'
+      });
+      return;
+    }
+    
+    setIsConvertingCurrency(true);
+    
+    try {
+      // Fetch latest rates
+      const freshRates = await fetchLiveExchangeRates();
+      setExchangeRates({ rates: freshRates, fetchedAt: new Date().toISOString() });
+      
+      // Convert all BOM items
+      const convertedItems = bomItems.map(item => {
+        // Get original USD price or use current price
+        const itemKey = `${item.product.id}-${item.product.partNumber || ''}`;
+        const originalPrices = originalUsdPrices.get(itemKey) || {
+          price: item.product.price,
+          cost: item.product.cost || 0
+        };
+        
+        // If we don't have original prices stored, store current ones
+        if (!originalUsdPrices.has(itemKey) && currentCurrency === 'USD') {
+          originalUsdPrices.set(itemKey, originalPrices);
+        }
+        
+        const convertedPrice = convertCurrencySync(
+          originalPrices.price,
+          'USD',
+          newCurrency,
+          freshRates
+        );
+        
+        const convertedCost = convertCurrencySync(
+          originalPrices.cost,
+          'USD',
+          newCurrency,
+          freshRates
+        );
+        
+        return {
+          ...item,
+          product: {
+            ...item.product,
+            price: convertedPrice.convertedAmount,
+            cost: convertedCost.convertedAmount
+          }
+        };
+      });
+      
+      setBomItems(convertedItems);
+      setCurrentCurrency(newCurrency);
+      
+      toast({
+        title: 'Currency Converted',
+        description: `All prices converted to ${newCurrency} using live exchange rates.`,
+      });
+    } catch (error) {
+      console.error('Currency conversion failed:', error);
+      toast({
+        title: 'Conversion Failed',
+        description: 'Could not convert currency. Prices remain in original currency.',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsConvertingCurrency(false);
+    }
+  };
+
   // Fixed field change handler to match expected signature
-  const handleQuoteFieldChange = (fieldId: string, value: any) => {
+  const handleQuoteFieldChange = async (fieldId: string, value: any) => {
+    // If currency field changed, trigger conversion
+    if (fieldId === 'quote-currency' && value !== currentCurrency) {
+      await handleCurrencyConversion(value);
+    }
+    
     setQuoteFields(prev => {
       const nextFields = { ...prev, [fieldId]: value };
 
@@ -3836,7 +3951,7 @@ let loadedItems: BOMItem[] = [];
       const priorityValue = getStringFieldValue('priority', 'Medium');
       const shippingTermsValue = getStringFieldValue('shipping_terms', 'TBD', 'N/A');
       const paymentTermsValue = getStringFieldValue('payment_terms', 'TBD', 'N/A');
-      const currencyValue = getStringFieldValue('currency', 'USD');
+      const currencyValue = getStringFieldValue('quote-currency', 'USD');
       const rawRepInvolvedFinal = resolveQuoteFieldValue('is_rep_involved', false);
       const isRepInvolvedFinal =
         typeof rawRepInvolvedFinal === 'string'
@@ -3856,6 +3971,14 @@ let loadedItems: BOMItem[] = [];
       const grossProfit = discountedValue - totalCost;
       const discountedMargin =
         discountedValue > 0 ? (grossProfit / discountedValue) * 100 : 0;
+
+      // Prepare exchange rate metadata if currency is not USD
+      const exchangeRateMetadata = currentCurrency !== 'USD' && exchangeRates ? {
+        currency: currentCurrency,
+        rate: exchangeRates.rates?.[currentCurrency] || 1,
+        fetchedAt: exchangeRates.fetchedAt,
+        convertedFrom: 'USD'
+      } : null;
 
       let quoteError: any = null;
       
@@ -3886,6 +4009,7 @@ let loadedItems: BOMItem[] = [];
                 : 0,
             discounted_margin: discountedMargin,
             quote_fields: quoteFields,
+            exchange_rate_metadata: exchangeRateMetadata,
             updated_at: new Date().toISOString()
           })
           .eq('id', quoteId);
@@ -3919,6 +4043,7 @@ let loadedItems: BOMItem[] = [];
             payment_terms: paymentTermsValue,
             shipping_terms: shippingTermsValue,
             is_rep_involved: isRepInvolvedFinal,
+            exchange_rate_metadata: exchangeRateMetadata,
           });
         quoteError = error;
       }
@@ -4330,11 +4455,37 @@ let loadedItems: BOMItem[] = [];
     <div className="space-y-6">
       {/* Level 4 Configuration Modal handled via configuringLevel4Item */}
       
-      {/* Quote Fields Section */}
-      <QuoteFieldsSection
-        quoteFields={quoteFields}
-        onFieldChange={handleQuoteFieldChange}
-      />
+      {/* Quote Fields Section with Currency Display */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold">Quote Configuration</h2>
+          <ExchangeRateDisplay
+            currentCurrency={currentCurrency}
+            rates={exchangeRates}
+            onRefresh={async () => {
+              try {
+                const freshRates = await fetchLiveExchangeRates();
+                setExchangeRates({ rates: freshRates, fetchedAt: new Date().toISOString() });
+                toast({
+                  title: 'Exchange Rates Updated',
+                  description: 'Latest exchange rates have been loaded.',
+                });
+              } catch (error) {
+                toast({
+                  title: 'Update Failed',
+                  description: 'Could not refresh exchange rates.',
+                  variant: 'destructive'
+                });
+              }
+            }}
+            isRefreshing={isConvertingCurrency}
+          />
+        </div>
+        <QuoteFieldsSection
+          quoteFields={quoteFields}
+          onFieldChange={handleQuoteFieldChange}
+        />
+      </div>
 
       {/* Main Layout: Product Selection (Left) and BOM Display (Right) */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

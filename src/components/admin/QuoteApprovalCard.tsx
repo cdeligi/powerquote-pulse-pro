@@ -38,7 +38,7 @@ import {
   calculateItemRevenue,
   calculateDiscountedMargin
 } from '@/utils/marginCalculations';
-import { convertCurrency, getSupportedCurrencies } from '@/utils/currencyConverter';
+import { getSupportedCurrencies } from '@/utils/currencyConverter';
 import { QuoteStatus, getStatusDisplayName, getStatusColor } from '@/utils/quotePipeline';
 
 interface QuoteApprovalData {
@@ -89,16 +89,11 @@ const QuoteApprovalCard = ({ quote, onApprove, onReject, onCounterOffer, onUpdat
   });
   const [originalCurrency] = useState(quote.quoteCurrency);
   const [exchangeRate, setExchangeRate] = useState(1);
+  const [exchangeRates, setExchangeRates] = useState<any>(null);
+  const [displayRevenue, setDisplayRevenue] = useState(0);
+  const [displayCost, setDisplayCost] = useState(0);
 
   const { totalRevenue, totalCost, marginPercentage, grossProfit } = calculateTotalMargin(quote.bomItems);
-  
-  // Convert amounts if currency changed
-  const displayRevenue = editableTerms.quoteCurrency !== originalCurrency 
-    ? convertCurrency(totalRevenue, originalCurrency, editableTerms.quoteCurrency).convertedAmount
-    : totalRevenue;
-  const displayCost = editableTerms.quoteCurrency !== originalCurrency
-    ? convertCurrency(totalCost, originalCurrency, editableTerms.quoteCurrency).convertedAmount
-    : totalCost;
 
   const discountedPrice = displayRevenue * (1 - quote.discountRequested / 100);
   const discountedMargin = displayCost > 0 ? ((discountedPrice - displayCost) / discountedPrice) * 100 : 0;
@@ -107,14 +102,36 @@ const QuoteApprovalCard = ({ quote, onApprove, onReject, onCounterOffer, onUpdat
   const counterDiscountNum = Number(counterDiscount) || 0;
   const counterOfferMetrics = calculateDiscountedMargin(quote.bomItems, counterDiscountNum);
 
+  // Fetch exchange rates and perform conversions
   useEffect(() => {
-    if (editableTerms.quoteCurrency !== originalCurrency) {
-      const conversion = convertCurrency(1, originalCurrency, editableTerms.quoteCurrency);
-      setExchangeRate(conversion.exchangeRate);
-    } else {
-      setExchangeRate(1);
-    }
-  }, [editableTerms.quoteCurrency, originalCurrency]);
+    const loadRatesAndConvert = async () => {
+      const { getCachedRates, fetchLiveExchangeRates, convertCurrencySync } = await import('@/utils/currencyConverter');
+      
+      // Get rates (cached or fetch new)
+      let rates = getCachedRates();
+      if (!rates) {
+        rates = await fetchLiveExchangeRates();
+      }
+      setExchangeRates(rates);
+
+      // Convert amounts if currency changed
+      if (editableTerms.quoteCurrency !== originalCurrency) {
+        const revenueConversion = convertCurrencySync(totalRevenue, originalCurrency, editableTerms.quoteCurrency, rates);
+        const costConversion = convertCurrencySync(totalCost, originalCurrency, editableTerms.quoteCurrency, rates);
+        const rateConversion = convertCurrencySync(1, originalCurrency, editableTerms.quoteCurrency, rates);
+        
+        setDisplayRevenue(revenueConversion.convertedAmount);
+        setDisplayCost(costConversion.convertedAmount);
+        setExchangeRate(rateConversion.exchangeRate);
+      } else {
+        setDisplayRevenue(totalRevenue);
+        setDisplayCost(totalCost);
+        setExchangeRate(1);
+      }
+    };
+
+    loadRatesAndConvert();
+  }, [editableTerms.quoteCurrency, originalCurrency, totalRevenue, totalCost]);
 
   // ... keep existing code (utility functions getMarginColor, getPriorityColor)
   const getMarginColor = (margin: number) => {
