@@ -206,37 +206,20 @@ const handleCardSelect = (card: any) => {
     displayName: card.displayName || card.name  // Ensure displayName is always set
   };
 
-  // If it's a bushing card, mark it as a primary card and create a secondary card for the next slot
-  if (isBushingCard(card)) {
-    const primaryCard = {
-      ...cardWithDisplay,
-      isBushingPrimary: true,
-      bushingPairSlot: slot + 1,
-      specifications: {
-        ...cardWithDisplay.specifications,
-        slotRequirement: 2 // Ensure bushing cards always take 2 slots
+  const cardToAssign = isBushingCard(card)
+    ? {
+        ...cardWithDisplay,
+        specifications: {
+          ...cardWithDisplay.specifications,
+          slotRequirement: 2 // Ensure bushing cards always take 2 slots
+        }
       }
-    };
-    
-    const secondaryCard = {
-      ...cardWithDisplay,
-      isBushingSecondary: true,
-      bushingPairSlot: slot,
-      displayName: cardWithDisplay.displayName,  // Use the same display name as primary
-      specifications: {
-        ...cardWithDisplay.specifications,
-        slotRequirement: 2 // Ensure bushing cards always take 2 slots
-      }
-    };
-    
-    // Call onCardSelect for both slots
-    onCardSelect(primaryCard, slot);
-    onCardSelect(secondaryCard, slot + 1);
-  } else {
-    // For non-bushing cards, just assign to the selected slot
-    onCardSelect(cardWithDisplay, slot);
-  }
-  
+    : cardWithDisplay;
+
+  // Notify parent about the selected card. The parent handles any multi-slot logic
+  // (including bushing placement) to avoid duplicate updates during dialog close.
+  onCardSelect(cardToAssign, slot);
+
   // Close the selector dialog
   onClose();
 };
