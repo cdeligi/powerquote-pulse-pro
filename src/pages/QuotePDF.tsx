@@ -43,11 +43,49 @@ const ensureArray = (value: unknown): unknown[] | null => {
   return null;
 };
 
+const extractSlotAssignments = (item: any): SerializedSlotAssignment[] | undefined => {
+  const candidates = [
+    item?.slotAssignments,
+    item?.slot_assignments,
+    item?.configuration?.slotAssignments,
+    item?.configuration?.slot_assignments,
+    item?.configuration_data?.slotAssignments,
+    item?.configuration_data?.slot_assignments,
+  ];
+
+  for (const candidate of candidates) {
+    if (Array.isArray(candidate)) {
+      return candidate as SerializedSlotAssignment[];
+    }
+  }
+
+  return undefined;
+};
+
+const extractRackConfiguration = (item: any): any => {
+  const candidates = [
+    item?.rackConfiguration,
+    item?.rack_configuration,
+    item?.configuration?.rackConfiguration,
+    item?.configuration?.rack_configuration,
+    item?.configuration_data?.rackConfiguration,
+    item?.configuration_data?.rack_configuration,
+  ];
+
+  for (const candidate of candidates) {
+    if (candidate && typeof candidate === 'object') {
+      return candidate;
+    }
+  }
+
+  return undefined;
+};
+
 const mapDraftItemsToBomItems = (items: any[]): BOMItem[] =>
   items.map((item: any) => {
-    const storedSlotAssignments = item.slotAssignments as SerializedSlotAssignment[] | undefined;
+    const storedSlotAssignments = extractSlotAssignments(item);
     const slotAssignments = deserializeSlotAssignments(storedSlotAssignments);
-    const rackLayout = item.rackConfiguration || buildRackLayoutFromAssignments(storedSlotAssignments);
+    const rackLayout = extractRackConfiguration(item) || buildRackLayoutFromAssignments(storedSlotAssignments);
     const productPrice = item.unit_price || item.product?.price || 0;
 
     return {
@@ -69,9 +107,9 @@ const mapDraftItemsToBomItems = (items: any[]): BOMItem[] =>
 
 const mapBomRowsToBomItems = (rows: any[]): BOMItem[] =>
   rows.map(row => {
-    const storedSlotAssignments = row.configuration_data?.slotAssignments as SerializedSlotAssignment[] | undefined;
+    const storedSlotAssignments = extractSlotAssignments(row?.configuration_data);
     const slotAssignments = deserializeSlotAssignments(storedSlotAssignments);
-    const rackLayout = row.configuration_data?.rackConfiguration || buildRackLayoutFromAssignments(storedSlotAssignments);
+    const rackLayout = extractRackConfiguration(row?.configuration_data) || buildRackLayoutFromAssignments(storedSlotAssignments);
 
     return {
       id: row.id || crypto.randomUUID(),
