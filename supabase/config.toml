@@ -1,5 +1,8 @@
 project_id = "cwhmxpitwblqxgrvaigg"
 
+[functions.fetch-exchange-rates]
+verify_jwt = false
+
 [functions.send-quote-notifications]
 verify_jwt = false
 

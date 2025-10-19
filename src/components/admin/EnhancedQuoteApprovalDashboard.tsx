@@ -72,6 +72,7 @@ interface ExpandedQuoteState {
   [quoteId: string]: boolean;
 }
 
+
 const resolveCustomerName = (
   fields: Record<string, any> | undefined,
   fallback: string | null | undefined,
@@ -86,6 +87,43 @@ const resolveCustomerName = (
   }
 
   return 'Pending Customer';
+};
+
+const getQuoteCurrency = (quote: Quote): string => {
+  // Try exchange_rate_metadata first
+  if (quote.exchange_rate_metadata && typeof quote.exchange_rate_metadata === 'object') {
+    const metadata = quote.exchange_rate_metadata as any;
+    if (metadata.currency && typeof metadata.currency === 'string') {
+      return metadata.currency;
+    }
+  }
+  
+  // Fallback to quote_fields
+  if (quote.quote_fields && typeof quote.quote_fields === 'object') {
+    const fields = quote.quote_fields as Record<string, any>;
+    if (fields['quote-currency']) {
+      return String(fields['quote-currency']);
+    }
+  }
+  
+  // Last fallback to currency field
+  return quote.currency || 'USD';
+};
+
+const formatQuoteCurrency = (amount: number, quote: Quote): string => {
+  const currency = getQuoteCurrency(quote);
+  
+  try {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: currency,
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(amount);
+  } catch {
+    // Fallback if currency code is invalid
+    return `${currency} ${amount.toLocaleString()}`;
+  }
 };
 
 const isMissingBomUpdatedAtColumnError = (error: PostgrestError | null | undefined) => {
@@ -657,10 +695,13 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
                             <Badge className={`${getPriorityColor(quote.priority)} border-current`} variant="outline">
                               {quote.priority}
                             </Badge>
+                            <Badge variant="secondary" className="font-mono">
+                              {getQuoteCurrency(quote)}
+                            </Badge>
                           </div>
                           
                           <div className="text-white font-bold">
-                            ${quote.discounted_value.toLocaleString()}
+                            {formatQuoteCurrency(quote.discounted_value, quote)}
                           </div>
                         </div>
                       </div>
@@ -736,10 +777,13 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
                           
                           <div className="flex items-center space-x-2">
                             {getStatusBadge(quote.status)}
+                            <Badge variant="secondary" className="font-mono">
+                              {getQuoteCurrency(quote)}
+                            </Badge>
                           </div>
                           
                           <div className="text-white font-bold">
-                            ${quote.discounted_value.toLocaleString()}
+                            {formatQuoteCurrency(quote.discounted_value, quote)}
                           </div>
                         </div>
                       </div>
