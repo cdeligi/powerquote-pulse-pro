@@ -65,6 +65,13 @@ type SpanAwareSlot = {
   rawSlot?: any;
 };
 
+type ExpandedSlotDisplay = {
+  slot: number;
+  cardName: string;
+  partNumber?: string;
+  cardKey: string;
+};
+
 // Terms pagination constants (more conservative estimates for 10px font)
 const TERMS_PAGE_HEIGHT = 1200;
 const TERMS_COLUMN_WIDTH = 380;
@@ -944,6 +951,102 @@ const dedupeSpanAwareSlots = <T extends SpanAwareSlot>(slots: T[]): T[] => {
     markPrimary(cardKey, slotNumber, dedupeKey, level4Id);
     return true;
   });
+};
+
+const mapSlotForDisplay = (slot: SpanAwareSlot, index: number): ExpandedSlotDisplay | undefined => {
+  const slotNumber = resolveSlotNumber(slot, index);
+  if (!Number.isFinite(slotNumber)) {
+    return undefined;
+  }
+
+  const rawSlot = (slot.rawSlot ?? slot) as any;
+  const cardName =
+    coerceString(slot.cardName) ||
+    coerceString(rawSlot?.cardName) ||
+    coerceString(slot.name) ||
+    coerceString(rawSlot?.name) ||
+    coerceString(slot.product?.name) ||
+    coerceString(rawSlot?.product?.name) ||
+    'Empty';
+
+  const partNumber =
+    coerceString(slot.partNumber) ||
+    coerceString(slot.product?.partNumber) ||
+    coerceString(slot.product?.part_number) ||
+    coerceString(rawSlot?.partNumber) ||
+    coerceString(rawSlot?.product?.partNumber) ||
+    coerceString(rawSlot?.product?.part_number) ||
+    undefined;
+
+  const cardKey = resolveCardKey(slot, cardName, partNumber ?? '');
+
+  return {
+    slot: slotNumber,
+    cardName,
+    partNumber: partNumber ?? undefined,
+    cardKey,
+  };
+};
+
+const expandSpanAwareSlots = (slots: SpanAwareSlot[]): ExpandedSlotDisplay[] => {
+  if (!Array.isArray(slots) || slots.length === 0) {
+    return [];
+  }
+
+  const seenPairs = new Set<string>();
+  const expanded: ExpandedSlotDisplay[] = [];
+
+  slots.forEach((entry, index) => {
+    const display = mapSlotForDisplay(entry, index);
+    if (!display) {
+      return;
+    }
+
+    const { span, primarySlot, sharedFromSlot } = resolveSpanDetails(entry);
+    const anchor =
+      typeof primarySlot === 'number'
+        ? primarySlot
+        : typeof sharedFromSlot === 'number'
+          ? sharedFromSlot
+          : display.slot;
+    const normalizedAnchor = Number.isFinite(anchor) ? anchor : display.slot;
+    const normalizedSpan = Number.isFinite(span) ? span : 1;
+    const effectiveSpan = Math.max(1, Math.round(normalizedSpan));
+
+    for (let offset = 0; offset < effectiveSpan; offset++) {
+      const targetSlot = normalizedAnchor + offset;
+      if (!Number.isFinite(targetSlot)) {
+        continue;
+      }
+
+      const pairKey = `${display.cardKey}|${targetSlot}`;
+      if (seenPairs.has(pairKey)) {
+        continue;
+      }
+
+      seenPairs.add(pairKey);
+      expanded.push({
+        slot: targetSlot,
+        cardName: display.cardName,
+        partNumber: display.partNumber,
+        cardKey: display.cardKey,
+      });
+    }
+
+    const directKey = `${display.cardKey}|${display.slot}`;
+    if (!seenPairs.has(directKey)) {
+      seenPairs.add(directKey);
+      expanded.push({
+        slot: display.slot,
+        cardName: display.cardName,
+        partNumber: display.partNumber,
+        cardKey: display.cardKey,
+      });
+    }
+  });
+
+  expanded.sort((a, b) => a.slot - b.slot);
+  return expanded;
 };
 
 export const generateQuotePDF = async (
@@ -2651,7 +2754,7 @@ export const generateQuotePDF = async (
   const generateChassisVisualHTML = (
     chassisTypeCode: string,
     totalSlots: number,
-    slotAssignments: any[],
+    slotAssignments: ExpandedSlotDisplay[],
     partNumber: string | undefined
   ): string => {
     // Determine layout based on chassis type
@@ -2690,14 +2793,10 @@ export const generateQuotePDF = async (
     }
 
     // Create slot assignment map
-    const slotMap = new Map<number, { name: string; partNumber: string }>();
-    slotAssignments.forEach((slot: any) => {
-      const slotNum = slot?.slot ?? slot?.slotNumber ?? slot?.position;
-      const cardName = slot?.cardName || slot?.name || slot?.product?.name || '';
-      const slotPartNumber = slot?.partNumber || slot?.product?.partNumber || '';
-      
-      if (slotNum !== null && slotNum !== undefined && cardName !== 'Empty') {
-        slotMap.set(Number(slotNum), { name: cardName, partNumber: slotPartNumber });
+    const slotMap = new Map<number, { name: string; partNumber?: string }>();
+    slotAssignments.forEach(slot => {
+      if (slot.slot !== null && slot.slot !== undefined && slot.cardName !== 'Empty') {
+        slotMap.set(Number(slot.slot), { name: slot.cardName, partNumber: slot.partNumber });
       }
     });
 
@@ -2731,7 +2830,7 @@ export const generateQuotePDF = async (
     if (partNumber) {
       gridHTML += `<div class="chassis-part-number">Part Number: ${escapeHtml(partNumber)}</div>`;
     }
-    
+
     gridHTML += '</div>';
 
     return gridHTML;
@@ -2804,38 +2903,43 @@ export const generateQuotePDF = async (
           <h3 class="rack-card-title">${safeTitle}${safePartNumber ? ` · ${safePartNumber}` : ''}</h3>
       `;
 
-      const normalizedSlots = Array.isArray(slots) ? dedupeSpanAwareSlots(slots as SpanAwareSlot[]) : [];
+      const sourceSlots = Array.isArray(slots) ? (slots as SpanAwareSlot[]) : [];
+      const normalizedSlots = dedupeSpanAwareSlots(sourceSlots);
+      const tableRows = (() => {
+        const expanded = expandSpanAwareSlots(sourceSlots);
+        if (expanded.length > 0) {
+          return expanded;
+        }
+
+        return normalizedSlots
+          .map((slot, idx) => mapSlotForDisplay(slot as SpanAwareSlot, idx))
+          .filter((entry): entry is ExpandedSlotDisplay => Boolean(entry))
+          .sort((a, b) => a.slot - b.slot);
+      })();
 
       // Add visual chassis grid if we have slots
-      if (normalizedSlots.length > 0 && chassisTypeCode) {
-        const totalSlots = normalizedSlots.filter((s: any) => {
-          const cardName = s?.cardName || s?.name || s?.product?.name || '';
-          return cardName !== 'Empty';
-        }).length;
-        
+      if (tableRows.length > 0 && chassisTypeCode) {
+        const occupiedSlots = tableRows.filter(entry => entry.cardName !== 'Empty').length;
+
         const visualGridHTML = generateChassisVisualHTML(
           chassisTypeCode,
-          totalSlots,
-          normalizedSlots,
+          occupiedSlots,
+          tableRows,
           partNumber
         );
-        
+
         rackConfigHTML += visualGridHTML;
       }
 
-      if (normalizedSlots.length > 0) {
+      if (tableRows.length > 0) {
         rackConfigHTML += '<table class="rack-table"><thead><tr><th>Slot</th><th>Card Type</th><th>Part Number</th></tr></thead><tbody>';
 
-        normalizedSlots.forEach((slot: any, idx: number) => {
-          const slotNumber = slot?.slot ?? slot?.slotNumber ?? slot?.position ?? (idx + 1);
-          const cardName = slot?.cardName || slot?.name || slot?.product?.name || 'Empty';
-          const slotPartNumber = slot?.partNumber || slot?.product?.partNumber || '-';
-
+        tableRows.forEach(slot => {
           rackConfigHTML += `
             <tr>
-              <td>Slot ${escapeHtml(String(slotNumber))}</td>
-              <td>${escapeHtml(cardName)}</td>
-              <td>${escapeHtml(String(slotPartNumber))}</td>
+              <td>Slot ${escapeHtml(String(slot.slot))}</td>
+              <td>${escapeHtml(slot.cardName)}</td>
+              <td>${slot.partNumber ? escapeHtml(String(slot.partNumber)) : '-'}</td>
             </tr>
           `;
         });
