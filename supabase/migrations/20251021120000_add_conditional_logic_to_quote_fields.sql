@@ -8,3 +8,6 @@ SET conditional_logic = '[]'::jsonb
 WHERE conditional_logic IS NULL;
 
 COMMENT ON COLUMN public.quote_fields.conditional_logic IS 'Configurable conditional follow-up questions for quote field responses';
+
+-- Refresh PostgREST cache so the new column is available immediately
+NOTIFY pgrst, 'reload schema';
