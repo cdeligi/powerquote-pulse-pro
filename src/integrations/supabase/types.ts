@@ -486,6 +486,36 @@ export type Database = {
           },
         ]
       }
+      exchange_rates: {
+        Row: {
+          base_currency: string
+          created_at: string | null
+          error_message: string | null
+          fetched_at: string
+          id: string
+          rates: Json
+          success: boolean | null
+        }
+        Insert: {
+          base_currency?: string
+          created_at?: string | null
+          error_message?: string | null
+          fetched_at?: string
+          id?: string
+          rates: Json
+          success?: boolean | null
+        }
+        Update: {
+          base_currency?: string
+          created_at?: string | null
+          error_message?: string | null
+          fetched_at?: string
+          id?: string
+          rates?: Json
+          success?: boolean | null
+        }
+        Relationships: []
+      }
       features: {
         Row: {
           created_at: string | null
