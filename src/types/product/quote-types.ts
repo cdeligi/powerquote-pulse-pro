@@ -21,7 +21,7 @@ export type PaymentTerms =
   | (string & {});
 
 export type QuotePriority = 'High' | 'Medium' | 'Low' | 'Urgent';
-export type Currency = 'USD' | 'EURO' | 'GBP' | 'CAD';
+export type Currency = 'USD' | 'EURO' | 'GBP' | 'CAD' | 'BRL';
 
 export interface Quote {
   id: string;

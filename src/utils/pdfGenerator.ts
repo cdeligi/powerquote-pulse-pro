@@ -1009,10 +1009,26 @@ export const generateQuotePDF = async (
   const additionalQuoteInfo =
     extractAdditionalQuoteInformation(quoteInfo, normalizedQuoteFields) ?? '';
 
-  const resolvedCurrency = (() => {
-    const raw = typeof quoteInfo?.currency === 'string' ? quoteInfo.currency.trim().toUpperCase() : '';
-    return /^[A-Z]{3}$/.test(raw) ? raw : 'USD';
-  })();
+  // Helper to extract currency from quote_fields or fallback to top-level currency
+  const extractCurrency = (quoteInfo: any): string => {
+    // Try quote_fields first
+    if (quoteInfo?.quote_fields?.['quote-currency']) {
+      const fromFields = String(quoteInfo.quote_fields['quote-currency']).trim().toUpperCase();
+      if (/^[A-Z]{3}$/.test(fromFields)) {
+        return fromFields;
+      }
+    }
+    // Fallback to top-level currency
+    if (typeof quoteInfo?.currency === 'string') {
+      const fromCurrency = quoteInfo.currency.trim().toUpperCase();
+      if (/^[A-Z]{3}$/.test(fromCurrency)) {
+        return fromCurrency;
+      }
+    }
+    return 'USD';
+  };
+
+  const resolvedCurrency = extractCurrency(quoteInfo);
 
   const currencyFormatter = (() => {
     try {

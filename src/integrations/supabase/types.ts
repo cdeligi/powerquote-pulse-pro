@@ -1383,6 +1383,7 @@ export type Database = {
           discounted_value: number
           display_number: number
           draft_bom: Json | null
+          exchange_rate_metadata: Json | null
           gross_profit: number
           id: string
           is_rep_involved: boolean
@@ -1427,6 +1428,7 @@ export type Database = {
           discounted_value: number
           display_number?: number
           draft_bom?: Json | null
+          exchange_rate_metadata?: Json | null
           gross_profit: number
           id: string
           is_rep_involved?: boolean
@@ -1471,6 +1473,7 @@ export type Database = {
           discounted_value?: number
           display_number?: number
           draft_bom?: Json | null
+          exchange_rate_metadata?: Json | null
           gross_profit?: number
           id?: string
           is_rep_involved?: boolean
