@@ -63,6 +63,22 @@ type SpanAwareSlot = {
   level4Selections?: any;
   product?: { id?: string; name?: string; partNumber?: string; part_number?: string };
   rawSlot?: any;
+  slotSpan?: number;
+  span?: number;
+  slotRequirement?: number;
+  spanIndex?: number;
+  primarySlot?: number;
+  sharedFromSlot?: number;
+  bushingPairSlot?: number;
+  isBushingPrimary?: boolean;
+  isBushingSecondary?: boolean;
+};
+
+type ExpandedSlotDisplay = {
+  slot: number;
+  cardName: string;
+  partNumber?: string;
+  cardKey: string;
 };
 
 type ExpandedSlotDisplay = {
@@ -781,6 +797,8 @@ const resolveSpanDetails = (slot: SpanAwareSlot) => {
     'is_span_continuation',
     'isSecondarySpan',
     'is_secondary_span',
+    'isBushingSecondary',
+    'is_bushing_secondary',
   ]) || false;
 
   return {
