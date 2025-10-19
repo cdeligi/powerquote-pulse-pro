@@ -2675,31 +2675,50 @@ let loadedItems: BOMItem[] = [];
       displayName: displayName,
       hasLevel4Configuration: requiresLevel4Configuration
     };
-    
+
+    let level4Slot = slot;
+
     // Handle bushing cards
     if (isBushingCard(card)) {
-      // For bushing cards, always assign to the primary slot (6 or 13) and the next slot
-      // Ensure we're using the correct primary slot (6 or 13)
-      const primarySlot = slot === 7 ? 6 : (slot === 14 ? 13 : slot);
-      const secondarySlot = primarySlot + 1;
-      
-      // Assign to primary slot
-      updatedAssignments[primarySlot] = {
+      const activeChassis = configuringChassis ?? selectedChassis;
+      const placement = activeChassis
+        ? findOptimalBushingPlacement(activeChassis, updatedAssignments)
+        : null;
+
+      if (!placement) {
+        toast({
+          title: 'Cannot place bushing card',
+          description: 'No valid adjacent slots are available for this bushing card.',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      if (placement.shouldClearExisting) {
+        placement.existingSlotsToClear.forEach(removeExistingAssignment);
+      }
+
+      // Always clear the placement targets before assigning
+      removeExistingAssignment(placement.primarySlot);
+      removeExistingAssignment(placement.secondarySlot);
+
+      updatedAssignments[placement.primarySlot] = {
         ...cardWithDisplayName,
         isBushingPrimary: true,
-        bushingPairSlot: secondarySlot,
-        displayName: displayName, // Use the display name from level 3 config
+        bushingPairSlot: placement.secondarySlot,
+        displayName: displayName,
         hasLevel4Configuration: requiresLevel4Configuration
       };
 
-      // Assign to secondary slot
-      updatedAssignments[secondarySlot] = {
+      updatedAssignments[placement.secondarySlot] = {
         ...cardWithDisplayName,
         isBushingSecondary: true,
-        bushingPairSlot: primarySlot,
-        displayName: displayName, // Use the same display name as primary slot
+        bushingPairSlot: placement.primarySlot,
+        displayName: displayName,
         hasLevel4Configuration: requiresLevel4Configuration
       };
+
+      level4Slot = placement.primarySlot;
     } else {
       // Regular card assignment
       updatedAssignments[slot] = cardWithDisplayName;
@@ -2720,10 +2739,10 @@ let loadedItems: BOMItem[] = [];
       has_level4: (card as any).has_level4,
       requires_level4_config: (card as any).requires_level4_config
     });
-    
+
     if ((card as any).has_level4 || (card as any).requires_level4_config) {
       console.log('Triggering Level 4 modal for:', card.name);
-      
+
       // Create BOM item that will be saved to database
       const newItem = {
         id: crypto.randomUUID(), // Temporary ID, will be replaced with database ID
@@ -2732,16 +2751,16 @@ let loadedItems: BOMItem[] = [];
         enabled: true,
         partNumber: card.partNumber,
         displayName: displayName,
-        slot: slot,
+        slot: level4Slot,
         [SLOT_LEVEL4_FLAG]: true,
       } as BOMItem & { [SLOT_LEVEL4_FLAG]: true };
-      
+
       // Save BOM item to database immediately to enable Level 4 configuration
       handleLevel4Setup(newItem);
     } else {
       // Removed the call to updateBOMItems here
     }
-    
+
     setSelectedSlot(null);
   };
   
