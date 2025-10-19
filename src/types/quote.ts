@@ -2,7 +2,7 @@
 import { BOMItem } from "./product";
 
 export type QuotePriority = 'High' | 'Medium' | 'Low' | 'Urgent';
-export type Currency = 'USD' | 'EURO' | 'GBP' | 'CAD';
+export type Currency = 'USD' | 'EURO' | 'GBP' | 'CAD' | 'BRL';
 export type QuoteStatus = 'draft' | 'pending_approval' | 'approved' | 'rejected' | 'under-review';
 
 export interface Quote {
@@ -44,6 +44,12 @@ export interface Quote {
   created_at: string;
   updated_at: string;
   bom_items?: BOMItem[];
+  exchange_rate_metadata?: {
+    currency: string;
+    rate: number;
+    fetchedAt: string;
+    convertedFrom: string;
+  } | null;
 }
 
 export interface QuoteItem {
