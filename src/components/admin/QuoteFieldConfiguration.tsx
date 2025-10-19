@@ -591,7 +591,7 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
 
       {/* Create/Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="bg-gray-900 border-gray-800 max-w-2xl">
+        <DialogContent className="bg-gray-900 border-gray-800 max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-white">
               {editingField ? 'Edit' : 'Create'} Quote Field
