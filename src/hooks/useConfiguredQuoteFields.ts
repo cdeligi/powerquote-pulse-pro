@@ -1,25 +1,78 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { SYSTEM_ADDITIONAL_QUOTE_INFO_KEY } from '@/utils/additionalQuoteInformation';
+import {
+  QuoteFieldConfiguration as QuoteFieldConfig,
+  QuoteFieldConditionalRule,
+  QuoteFieldType,
+} from "@/types/quote-field";
+import {
+  normalizeQuoteFieldConditionalRules,
+  normalizeQuoteFieldOptions,
+} from "@/utils/quoteFieldNormalization";
 
-export interface ConfiguredQuoteField {
+export interface ConfiguredQuoteField extends QuoteFieldConfig {}
+
+export interface FormattedQuoteField {
   id: string;
   label: string;
   type: string;
   required: boolean;
   enabled: boolean;
-  display_order?: number;
   include_in_pdf?: boolean;
-}
-
-export interface FormattedQuoteField extends ConfiguredQuoteField {
+  display_order?: number;
   formattedValue: string;
+  isConditional?: boolean;
+  parentFieldId?: string;
 }
 
 export interface UnmappedQuoteField {
   key: string;
   value: unknown;
 }
+
+const normalizeTriggerValue = (value: string) => {
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "yes") return "true";
+  if (normalized === "no") return "false";
+  return normalized;
+};
+
+const normalizeValueList = (value: unknown): string[] => {
+  if (value === null || value === undefined) {
+    return [];
+  }
+
+  const list = Array.isArray(value) ? value : [value];
+  return list
+    .map((item) => {
+      if (typeof item === "boolean") {
+        return item ? "true" : "false";
+      }
+      return normalizeTriggerValue(String(item));
+    })
+    .filter((item) => item.length > 0);
+};
+
+const getActiveConditionalRules = (
+  field: ConfiguredQuoteField,
+  value: unknown,
+): QuoteFieldConditionalRule[] => {
+  if (!field.conditional_logic || field.conditional_logic.length === 0) {
+    return [];
+  }
+
+  const currentValues = normalizeValueList(value);
+  if (!currentValues.length) {
+    return [];
+  }
+
+  const valueSet = new Set(currentValues);
+  return field.conditional_logic.filter((rule) => {
+    const triggers = (rule.triggerValues || []).map(normalizeTriggerValue);
+    return triggers.some((trigger) => valueSet.has(trigger));
+  });
+};
 
 const formatQuoteFieldValue = (value: unknown, type: string): string => {
   if (value === null || value === undefined) {
@@ -87,7 +140,7 @@ export const useConfiguredQuoteFields = (
       try {
         const { data, error } = await supabase
           .from("quote_fields")
-          .select("id,label,type,required,enabled,display_order,include_in_pdf")
+          .select("id,label,type,required,enabled,display_order,include_in_pdf,options,conditional_logic")
           .eq("enabled", true)
           .order("display_order", { ascending: true });
 
@@ -100,7 +153,10 @@ export const useConfiguredQuoteFields = (
           setConfiguredFields(
             (data || []).map((field) => ({
               ...field,
+              type: (field.type as QuoteFieldType) ?? "text",
               include_in_pdf: Boolean(field.include_in_pdf),
+              options: normalizeQuoteFieldOptions(field.options),
+              conditional_logic: normalizeQuoteFieldConditionalRules(field.conditional_logic),
             }))
           );
         }
@@ -128,24 +184,64 @@ export const useConfiguredQuoteFields = (
     return configuredFields.filter((field) => field.include_in_pdf);
   }, [configuredFields, includeInQuoteOnly]);
 
-  const formattedFields: FormattedQuoteField[] = useMemo(() => {
-    if (!filteredConfiguredFields.length) return [];
+  const { formattedFields, handledFieldIds } = useMemo(() => {
+    if (!filteredConfiguredFields.length) {
+      return { formattedFields: [] as FormattedQuoteField[], handledFieldIds: new Set<string>() };
+    }
 
     const fieldValues = quoteFields || {};
-    return filteredConfiguredFields.map((field) => ({
-      ...field,
-      formattedValue: formatQuoteFieldValue(fieldValues[field.id], field.type),
-    }));
+    const formatted: FormattedQuoteField[] = [];
+    const handledIds = new Set<string>();
+
+    filteredConfiguredFields.forEach((field) => {
+      formatted.push({
+        id: field.id,
+        label: field.label,
+        type: field.type,
+        required: field.required,
+        enabled: field.enabled,
+        include_in_pdf: field.include_in_pdf,
+        display_order: field.display_order,
+        formattedValue: formatQuoteFieldValue(fieldValues[field.id], field.type),
+      });
+      handledIds.add(field.id);
+
+      const activeRules = getActiveConditionalRules(field, fieldValues[field.id]);
+      activeRules.forEach((rule) => {
+        rule.fields.forEach((conditionalField) => {
+          if (includeInQuoteOnly && !conditionalField.include_in_pdf) {
+            return;
+          }
+
+          const formattedConditional: FormattedQuoteField = {
+            id: conditionalField.id,
+            label: conditionalField.label,
+            type: conditionalField.type,
+            required: conditionalField.required,
+            enabled: conditionalField.enabled ?? true,
+            include_in_pdf: conditionalField.include_in_pdf ?? false,
+            formattedValue: formatQuoteFieldValue(fieldValues[conditionalField.id], conditionalField.type),
+            isConditional: true,
+            parentFieldId: field.id,
+          };
+
+          formatted.push(formattedConditional);
+          handledIds.add(conditionalField.id);
+        });
+      });
+    });
+
+    return { formattedFields: formatted, handledFieldIds: handledIds };
   }, [filteredConfiguredFields, quoteFields]);
 
   const unmappedFields: UnmappedQuoteField[] = useMemo(() => {
     if (!quoteFields) return [];
-    const mappedIds = new Set(filteredConfiguredFields.map((field) => field.id));
+    const mappedIds = handledFieldIds;
 
     return Object.entries(quoteFields)
       .filter(([key]) => !mappedIds.has(key) && key !== SYSTEM_ADDITIONAL_QUOTE_INFO_KEY)
       .map(([key, value]) => ({ key, value }));
-  }, [filteredConfiguredFields, quoteFields]);
+  }, [handledFieldIds, quoteFields]);
 
   return { configuredFields: filteredConfiguredFields, formattedFields, unmappedFields };
 };
