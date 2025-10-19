@@ -23,20 +23,20 @@ import {
 import { User } from "@/types/auth";
 import { useToast } from "@/hooks/use-toast";
 import { getSupabaseClient, getSupabaseAdminClient, isAdminAvailable } from "@/integrations/supabase/client";
+import ConditionalLogicEditor from "@/components/admin/ConditionalLogicEditor";
+import {
+  QuoteFieldConfiguration as QuoteFieldConfig,
+  QuoteFieldType,
+} from "@/types/quote-field";
+import {
+  normalizeQuoteFieldConditionalRules,
+  normalizeQuoteFieldOptions,
+} from "@/utils/quoteFieldNormalization";
 
 const supabase = getSupabaseClient();
 const supabaseAdmin = getSupabaseAdminClient();;
 
-interface QuoteField {
-  id: string;
-  label: string;
-  type: 'text' | 'textarea' | 'number' | 'select' | 'date' | 'email' | 'tel';
-  required: boolean;
-  enabled: boolean;
-  options?: string[];
-  display_order: number;
-  include_in_pdf?: boolean;
-}
+type QuoteField = QuoteFieldConfig;
 
 interface QuoteFieldConfigurationProps {
   user: User;
@@ -158,16 +158,17 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
 
       if (error) throw error;
 
-      const fields = data.map(field => ({
+      const fields = (data ?? []).map((field) => ({
         id: field.id,
         label: field.label,
-        type: field.type as QuoteField['type'],
-        required: field.required || false,
-        enabled: field.enabled || true,
-        options: field.options ? (Array.isArray(field.options) ? field.options : JSON.parse(field.options)) : undefined,
-        display_order: field.display_order || 0,
-        include_in_pdf: field.include_in_pdf || false
-      }));
+        type: (field.type as QuoteFieldType) ?? 'text',
+        required: Boolean(field.required),
+        enabled: field.enabled ?? true,
+        options: normalizeQuoteFieldOptions(field.options),
+        display_order: field.display_order ?? 0,
+        include_in_pdf: Boolean(field.include_in_pdf),
+        conditional_logic: normalizeQuoteFieldConditionalRules(field.conditional_logic),
+      })) as QuoteField[];
 
       // Sort fields by display_order and then by label
       fields.sort((a, b) => {
@@ -236,9 +237,10 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
           type: fieldData.type,
           required: fieldData.required,
           enabled: fieldData.enabled,
-          options: fieldData.options ? JSON.stringify(fieldData.options) : null,
+          options: fieldData.options && fieldData.options.length ? JSON.stringify(fieldData.options) : null,
           display_order: fieldData.display_order,
-          include_in_pdf: fieldData.include_in_pdf || false
+          include_in_pdf: fieldData.include_in_pdf || false,
+          conditional_logic: fieldData.conditional_logic ?? [],
         });
 
       if (error) throw error;
@@ -267,9 +269,10 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
           type: fieldData.type,
           required: fieldData.required,
           enabled: fieldData.enabled,
-          options: fieldData.options ? JSON.stringify(fieldData.options) : null,
+          options: fieldData.options && fieldData.options.length ? JSON.stringify(fieldData.options) : null,
           display_order: fieldData.display_order,
-          include_in_pdf: fieldData.include_in_pdf || false
+          include_in_pdf: fieldData.include_in_pdf || false,
+          conditional_logic: fieldData.conditional_logic ?? [],
         })
         .eq('id', fieldId);
 
@@ -510,12 +513,20 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
                         </CardTitle>
                       </div>
                        <div className="flex gap-1 mt-1">
-                        <Badge 
-                          variant="outline" 
+                        <Badge
+                          variant="outline"
                           className="text-xs capitalize border-gray-600 text-gray-400"
                         >
                           {field.type.toUpperCase()}
                         </Badge>
+                        {field.conditional_logic && field.conditional_logic.length > 0 && (
+                          <Badge
+                            variant="outline"
+                            className="text-xs border-red-600 text-red-300 bg-red-900/20"
+                          >
+                            Conditional
+                          </Badge>
+                        )}
                         {field.include_in_pdf && (
                           <Badge 
                             variant="outline" 
@@ -612,7 +623,8 @@ const QuoteFieldForm = ({ onSubmit, initialData, onCancel }: QuoteFieldFormProps
     enabled: initialData?.enabled ?? true,
     options: initialData?.options || [],
     display_order: initialData?.display_order || 1,
-    include_in_pdf: initialData?.include_in_pdf ?? false
+    include_in_pdf: initialData?.include_in_pdf ?? false,
+    conditional_logic: initialData?.conditional_logic ?? [],
   });
 
   const [optionsText, setOptionsText] = useState(
@@ -621,9 +633,41 @@ const QuoteFieldForm = ({ onSubmit, initialData, onCancel }: QuoteFieldFormProps
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    const sanitizedOptions = formData.type === 'select'
+      ? optionsText
+          .split('\n')
+          .map(option => option.trim())
+          .filter(option => option.length > 0)
+      : [];
+
+    const sanitizedConditionalLogic = (formData.conditional_logic ?? [])
+      .map((rule) => ({
+        ...rule,
+        triggerValues: (rule.triggerValues || [])
+          .map((value) => value.trim())
+          .filter((value) => value.length > 0),
+        fields: (rule.fields || [])
+          .map((field) => ({
+            ...field,
+            id: field.id.trim(),
+            label: field.label.trim(),
+            include_in_pdf: field.include_in_pdf ?? false,
+            enabled: field.enabled ?? true,
+            options:
+              field.type === 'select'
+                ? (field.options || [])
+                    .map((option) => option.trim())
+                    .filter((option) => option.length > 0)
+                : undefined,
+          }))
+          .filter((field) => field.id.length > 0 && field.label.length > 0),
+      }))
+      .filter((rule) => rule.triggerValues.length > 0 && rule.fields.length > 0);
+
     const finalData = {
       ...formData,
-      options: formData.type === 'select' ? optionsText.split('\n').filter(o => o.trim()) : undefined
+      options: formData.type === 'select' ? sanitizedOptions : [],
+      conditional_logic: sanitizedConditionalLogic,
     };
     onSubmit(finalData);
   };
@@ -645,7 +689,16 @@ const QuoteFieldForm = ({ onSubmit, initialData, onCancel }: QuoteFieldFormProps
           <Label htmlFor="type" className="text-white">Field Type</Label>
           <Select
             value={formData.type}
-            onValueChange={(value: QuoteField['type']) => setFormData({ ...formData, type: value })}
+            onValueChange={(value: QuoteFieldType) => {
+              setFormData({
+                ...formData,
+                type: value,
+                options: value === 'select' ? formData.options : [],
+              });
+              if (value !== 'select') {
+                setOptionsText('');
+              }
+            }}
           >
             <SelectTrigger className="bg-gray-800 border-gray-700 text-white">
               <SelectValue />
@@ -658,6 +711,7 @@ const QuoteFieldForm = ({ onSubmit, initialData, onCancel }: QuoteFieldFormProps
               <SelectItem value="date" className="text-white">Date</SelectItem>
               <SelectItem value="email" className="text-white">Email</SelectItem>
               <SelectItem value="tel" className="text-white">Phone</SelectItem>
+              <SelectItem value="checkbox" className="text-white">Checkbox</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -688,6 +742,21 @@ const QuoteFieldForm = ({ onSubmit, initialData, onCancel }: QuoteFieldFormProps
           />
         </div>
       )}
+
+      <div className="space-y-2">
+        <div>
+          <Label className="text-white">Conditional Follow-up Questions</Label>
+          <p className="text-xs text-gray-400">
+            Configure additional prompts that appear when a user selects specific answers for this field. Use this to
+            collect product-specific details or require clarifications such as representative incentives.
+          </p>
+        </div>
+        <ConditionalLogicEditor
+          rules={formData.conditional_logic ?? []}
+          onChange={(rules) => setFormData({ ...formData, conditional_logic: rules })}
+          parentFieldLabel={formData.label || 'Quote Field'}
+        />
+      </div>
 
       <div className="grid grid-cols-3 gap-4">
         <div className="flex items-center space-x-2">
