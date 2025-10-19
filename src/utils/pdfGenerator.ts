@@ -146,6 +146,116 @@ const coerceString = (value: any): string | undefined => {
   return undefined;
 };
 
+const maybeParseJson = (value: any): any => {
+  if (typeof value !== 'string') {
+    return value;
+  }
+
+  try {
+    return JSON.parse(value);
+  } catch {
+    return value;
+  }
+};
+
+const convertObjectMapToSlots = (
+  value: Record<string, any>
+): SpanAwareSlot[] | undefined => {
+  const entries = Object.entries(value)
+    .map(([key, raw]) => {
+      if (!raw || typeof raw !== 'object') {
+        return undefined;
+      }
+
+      const normalized = { ...(raw as Record<string, any>) } as SpanAwareSlot;
+      const explicitSlot = coerceNumber((normalized as any).slot ?? (normalized as any).slotNumber);
+      const keySlot = coerceNumber(key);
+
+      if (explicitSlot === undefined && keySlot !== undefined) {
+        if (normalized.slot === undefined) {
+          normalized.slot = keySlot;
+        } else if ((normalized as any).slotNumber === undefined) {
+          (normalized as any).slotNumber = keySlot;
+        }
+      }
+
+      return normalized;
+    })
+    .filter((entry): entry is SpanAwareSlot => Boolean(entry));
+
+  if (entries.length === 0) {
+    return undefined;
+  }
+
+  const sorted = entries.slice().sort((a, b) => {
+    const slotA = coerceNumber((a as any).slot ?? (a as any).slotNumber ?? (a as any).position);
+    const slotB = coerceNumber((b as any).slot ?? (b as any).slotNumber ?? (b as any).position);
+    if (slotA === undefined && slotB === undefined) return 0;
+    if (slotA === undefined) return 1;
+    if (slotB === undefined) return -1;
+    return slotA - slotB;
+  });
+
+  return sorted;
+};
+
+const resolveSlotArrayCandidate = (
+  input: any,
+  seen: Set<any> = new Set()
+): SpanAwareSlot[] | undefined => {
+  if (input === undefined || input === null) {
+    return undefined;
+  }
+
+  const parsed = maybeParseJson(input);
+
+  if (Array.isArray(parsed)) {
+    return parsed as SpanAwareSlot[];
+  }
+
+  if (typeof parsed !== 'object') {
+    return undefined;
+  }
+
+  if (seen.has(parsed)) {
+    return undefined;
+  }
+
+  seen.add(parsed);
+
+  const candidateObject = parsed as Record<string, any>;
+
+  const nestedKeys = [
+    'slots',
+    'layout',
+    'layoutSlots',
+    'layout_slots',
+    'slotAssignments',
+    'slot_assignments',
+    'rackSlots',
+    'rack_slots',
+    'items',
+    'values',
+    'entries',
+  ];
+
+  for (const key of nestedKeys) {
+    if (Object.prototype.hasOwnProperty.call(candidateObject, key)) {
+      const nested = resolveSlotArrayCandidate(candidateObject[key], seen);
+      if (nested && nested.length > 0) {
+        return nested;
+      }
+    }
+  }
+
+  return convertObjectMapToSlots(candidateObject);
+};
+
+const resolveRackSlots = (value: any): SpanAwareSlot[] => {
+  const resolved = resolveSlotArrayCandidate(value);
+  return Array.isArray(resolved) ? (resolved as SpanAwareSlot[]) : [];
+};
+
 const PRODUCT_INFO_KEY_VARIANTS = [
   'productInfoUrl',
   'product_info_url',
@@ -2914,30 +3024,28 @@ export const generateQuotePDF = async (
 
     const renderedRackLayoutKeys = new Set<string>();
 
-    const buildRackLayoutKey = (title: string, partNumber: string | undefined, slots: any[]) => {
+    const buildRackLayoutKey = (title: string, partNumber: string | undefined, slots: SpanAwareSlot[]) => {
       const normalizedTitle = typeof title === 'string' ? title.trim().toLowerCase() : '';
       const normalizedPart = typeof partNumber === 'string' ? partNumber.trim().toLowerCase() : '';
-      const normalizedSlots = Array.isArray(slots)
-        ? slots.map(slot => ({
-            slot:
-              slot?.slot ??
-              slot?.slotNumber ??
-              slot?.position ??
-              null,
-            partNumber:
-              typeof slot?.partNumber === 'string'
-                ? slot.partNumber.trim().toLowerCase()
-                : typeof slot?.product?.partNumber === 'string'
-                  ? slot.product.partNumber.trim().toLowerCase()
-                  : null,
-            cardName:
-              typeof slot?.cardName === 'string'
-                ? slot.cardName.trim().toLowerCase()
-                : typeof slot?.name === 'string'
-                  ? slot.name.trim().toLowerCase()
-                  : null,
-          }))
-        : [];
+      const normalizedSlots = slots.map(slot => ({
+        slot:
+          slot?.slot ??
+          slot?.slotNumber ??
+          slot?.position ??
+          null,
+        partNumber:
+          typeof slot?.partNumber === 'string'
+            ? slot.partNumber.trim().toLowerCase()
+            : typeof slot?.product?.partNumber === 'string'
+              ? slot.product.partNumber.trim().toLowerCase()
+              : null,
+        cardName:
+          typeof slot?.cardName === 'string'
+            ? slot.cardName.trim().toLowerCase()
+            : typeof slot?.name === 'string'
+              ? slot.name.trim().toLowerCase()
+              : null,
+      }));
 
       try {
         return `${normalizedTitle}|${normalizedPart}|${JSON.stringify(normalizedSlots)}`;
@@ -2946,7 +3054,13 @@ export const generateQuotePDF = async (
       }
     };
 
-    const renderRackLayout = (title: string, partNumber: string | undefined, slots: any[], chassisTypeCode?: string) => {
+    const renderRackLayout = (
+      title: string,
+      partNumber: string | undefined,
+      rawSlots: any,
+      chassisTypeCode?: string
+    ) => {
+      const slots = resolveRackSlots(rawSlots);
       const layoutKey = buildRackLayoutKey(title, partNumber, slots);
       if (layoutKey && renderedRackLayoutKeys.has(layoutKey)) {
         return;
@@ -2964,10 +3078,9 @@ export const generateQuotePDF = async (
           <h3 class="rack-card-title">${safeTitle}${safePartNumber ? ` · ${safePartNumber}` : ''}</h3>
       `;
 
-      const sourceSlots = Array.isArray(slots) ? (slots as SpanAwareSlot[]) : [];
-      const normalizedSlots = dedupeSpanAwareSlots(sourceSlots);
+      const normalizedSlots = dedupeSpanAwareSlots(slots);
       const tableRows = (() => {
-        const expanded = expandSpanAwareSlots(sourceSlots);
+        const expanded = expandSpanAwareSlots(slots);
         if (expanded.length > 0) {
           return expanded;
         }
@@ -3016,15 +3129,12 @@ export const generateQuotePDF = async (
     chassisItems.forEach(chassisItem => {
       const config = chassisItem.rackConfiguration;
       const chassisType = chassisItem.product?.id || chassisItem.product?.name || '';
-      renderRackLayout(chassisItem.product.name, chassisItem.partNumber, config?.slots || [], chassisType);
+      renderRackLayout(chassisItem.product.name, chassisItem.partNumber, config, chassisType);
     });
 
     fallbackRackLayouts.forEach(layout => {
-      const slots = layout?.layout?.slots || layout?.slots;
-      if (Array.isArray(slots) && slots.length > 0) {
-        const chassisType = layout.productId || layout.productName || '';
-        renderRackLayout(layout.productName || 'Configured Rack', layout.partNumber, slots, chassisType);
-      }
+      const chassisType = layout.productId || layout.productName || '';
+      renderRackLayout(layout.productName || 'Configured Rack', layout.partNumber, layout, chassisType);
     });
 
     if (quoteInfo.draft_bom?.rackConfiguration) {
