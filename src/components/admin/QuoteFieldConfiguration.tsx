@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import type { PostgrestSingleResponse, SupabaseClient } from "@supabase/supabase-js";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -22,21 +23,84 @@ import {
 } from "lucide-react";
 import { User } from "@/types/auth";
 import { useToast } from "@/hooks/use-toast";
-import { getSupabaseClient, getSupabaseAdminClient, isAdminAvailable } from "@/integrations/supabase/client";
+import { getSupabaseClient, getSupabaseAdminClient } from "@/integrations/supabase/client";
+import ConditionalLogicEditor from "@/components/admin/ConditionalLogicEditor";
+import {
+  QuoteFieldConfiguration as QuoteFieldConfig,
+  QuoteFieldType,
+} from "@/types/quote-field";
+import {
+  normalizeQuoteFieldConditionalRules,
+  normalizeQuoteFieldOptions,
+} from "@/utils/quoteFieldNormalization";
 
 const supabase = getSupabaseClient();
-const supabaseAdmin = getSupabaseAdminClient();;
+const supabaseAdmin = getSupabaseAdminClient();
+const POSTGREST_SCHEMA_RELOAD_ERROR_CODE = "PGRST204";
 
-interface QuoteField {
-  id: string;
-  label: string;
-  type: 'text' | 'textarea' | 'number' | 'select' | 'date' | 'email' | 'tel';
-  required: boolean;
-  enabled: boolean;
-  options?: string[];
-  display_order: number;
-  include_in_pdf?: boolean;
+const getMutationErrorMessage = (error: { code?: string; message?: string }) => {
+  if (error?.code === POSTGREST_SCHEMA_RELOAD_ERROR_CODE) {
+    return "Supabase is still refreshing its schema. Please wait a moment and try saving again.";
+  }
+
+  return error?.message || "Failed to save quote field changes";
+};
+
+async function waitForSchemaReload(delayMs = 1000) {
+  await new Promise((resolve) => setTimeout(resolve, delayMs));
 }
+
+interface PostgrestSchemaRetryOptions {
+  reloadClient?: SupabaseClient | null;
+  maxAttempts?: number;
+}
+
+async function runWithPostgrestSchemaRetry<T>(
+  operation: () => Promise<PostgrestSingleResponse<T>>,
+  { reloadClient = supabaseAdmin ?? supabase, maxAttempts = 6 }: PostgrestSchemaRetryOptions = {}
+): Promise<PostgrestSingleResponse<T>> {
+  let lastResult: PostgrestSingleResponse<T> | null = null;
+
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    const result = await operation();
+    lastResult = result;
+
+    if (result.error?.code !== POSTGREST_SCHEMA_RELOAD_ERROR_CODE) {
+      return result;
+    }
+
+    const waitMs = Math.min(8000, 1000 * Math.pow(2, attempt));
+    const client = reloadClient ?? supabase;
+    console.warn(
+      `PostgREST schema cache out of date (attempt ${attempt + 1}/${maxAttempts}). Reloading before retrying mutation after ${waitMs}ms.`
+    );
+
+    const reloadResult = await client.rpc("reload_postgrest_schema");
+    if (reloadResult.error) {
+      console.error("Failed to trigger PostgREST schema reload", reloadResult.error);
+      break;
+    }
+
+    await waitForSchemaReload(waitMs);
+
+    const probeResult = await client.from("quote_fields").select("id, conditional_logic").limit(1);
+    if (probeResult.error?.code === POSTGREST_SCHEMA_RELOAD_ERROR_CODE) {
+      console.warn("PostgREST schema still reloading; will retry mutation once cache is refreshed.");
+      continue;
+    }
+
+    if (probeResult.error) {
+      console.error("Unexpected error while verifying quote_fields schema", probeResult.error);
+      break;
+    }
+
+    console.info("PostgREST schema refreshed for quote_fields; retrying mutation.");
+  }
+
+  return lastResult as PostgrestSingleResponse<T>;
+}
+
+type QuoteField = QuoteFieldConfig;
 
 interface QuoteFieldConfigurationProps {
   user: User;
@@ -88,8 +152,9 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
     setQuoteFields(updatedFields);
     
     // Save new orders to database
-    Promise.all(updatedFields.map(field => 
-      supabase
+    const orderClient = supabaseAdmin ?? supabase;
+    Promise.all(updatedFields.map(field =>
+      orderClient
         .from('quote_fields')
         .update({ display_order: field.display_order })
         .eq('id', field.id)
@@ -158,16 +223,17 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
 
       if (error) throw error;
 
-      const fields = data.map(field => ({
+      const fields = (data ?? []).map((field) => ({
         id: field.id,
         label: field.label,
-        type: field.type as QuoteField['type'],
-        required: field.required || false,
-        enabled: field.enabled || true,
-        options: field.options ? (Array.isArray(field.options) ? field.options : JSON.parse(field.options)) : undefined,
-        display_order: field.display_order || 0,
-        include_in_pdf: field.include_in_pdf || false
-      }));
+        type: (field.type as QuoteFieldType) ?? 'text',
+        required: Boolean(field.required),
+        enabled: field.enabled ?? true,
+        options: normalizeQuoteFieldOptions(field.options),
+        display_order: field.display_order ?? 0,
+        include_in_pdf: Boolean(field.include_in_pdf),
+        conditional_logic: normalizeQuoteFieldConditionalRules(field.conditional_logic),
+      })) as QuoteField[];
 
       // Sort fields by display_order and then by label
       fields.sort((a, b) => {
@@ -228,18 +294,24 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
 
   const createQuoteField = async (fieldData: Omit<QuoteField, 'id'>) => {
     try {
-      const { error } = await supabase
-        .from('quote_fields')
-        .insert({
-          id: `field-${Date.now()}`,
-          label: fieldData.label,
-          type: fieldData.type,
-          required: fieldData.required,
-          enabled: fieldData.enabled,
-          options: fieldData.options ? JSON.stringify(fieldData.options) : null,
-          display_order: fieldData.display_order,
-          include_in_pdf: fieldData.include_in_pdf || false
-        });
+      const mutationClient = supabaseAdmin ?? supabase;
+      const { error } = await runWithPostgrestSchemaRetry(
+        () =>
+          mutationClient
+            .from('quote_fields')
+            .insert({
+              id: `field-${Date.now()}`,
+              label: fieldData.label,
+              type: fieldData.type,
+              required: fieldData.required,
+              enabled: fieldData.enabled,
+              options: fieldData.options && fieldData.options.length ? JSON.stringify(fieldData.options) : null,
+              display_order: fieldData.display_order,
+              include_in_pdf: fieldData.include_in_pdf || false,
+              conditional_logic: fieldData.conditional_logic ?? [],
+            }),
+        { reloadClient: mutationClient }
+      );
 
       if (error) throw error;
 
@@ -252,7 +324,7 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
       console.error('Error creating quote field:', error);
       toast({
         title: "Error",
-        description: error.message || "Failed to create quote field",
+        description: getMutationErrorMessage(error),
         variant: "destructive"
       });
     }
@@ -260,18 +332,24 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
 
   const updateQuoteField = async (fieldId: string, fieldData: Omit<QuoteField, 'id'>) => {
     try {
-      const { error } = await supabase
-        .from('quote_fields')
-        .update({
-          label: fieldData.label,
-          type: fieldData.type,
-          required: fieldData.required,
-          enabled: fieldData.enabled,
-          options: fieldData.options ? JSON.stringify(fieldData.options) : null,
-          display_order: fieldData.display_order,
-          include_in_pdf: fieldData.include_in_pdf || false
-        })
-        .eq('id', fieldId);
+      const mutationClient = supabaseAdmin ?? supabase;
+      const { error } = await runWithPostgrestSchemaRetry(
+        () =>
+          mutationClient
+            .from('quote_fields')
+            .update({
+              label: fieldData.label,
+              type: fieldData.type,
+              required: fieldData.required,
+              enabled: fieldData.enabled,
+              options: fieldData.options && fieldData.options.length ? JSON.stringify(fieldData.options) : null,
+              display_order: fieldData.display_order,
+              include_in_pdf: fieldData.include_in_pdf || false,
+              conditional_logic: fieldData.conditional_logic ?? [],
+            })
+            .eq('id', fieldId),
+        { reloadClient: mutationClient }
+      );
 
       if (error) throw error;
 
@@ -284,7 +362,7 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
       console.error('Error updating quote field:', error);
       toast({
         title: "Error",
-        description: error.message || "Failed to update quote field",
+        description: getMutationErrorMessage(error),
         variant: "destructive"
       });
     }
@@ -292,7 +370,8 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
 
   const deleteQuoteField = async (fieldId: string) => {
     try {
-      const { error } = await supabase
+      const deletionClient = supabaseAdmin ?? supabase;
+      const { error } = await deletionClient
         .from('quote_fields')
         .delete()
         .eq('id', fieldId);
@@ -510,12 +589,20 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
                         </CardTitle>
                       </div>
                        <div className="flex gap-1 mt-1">
-                        <Badge 
-                          variant="outline" 
+                        <Badge
+                          variant="outline"
                           className="text-xs capitalize border-gray-600 text-gray-400"
                         >
                           {field.type.toUpperCase()}
                         </Badge>
+                        {field.conditional_logic && field.conditional_logic.length > 0 && (
+                          <Badge
+                            variant="outline"
+                            className="text-xs border-red-600 text-red-300 bg-red-900/20"
+                          >
+                            Conditional
+                          </Badge>
+                        )}
                         {field.include_in_pdf && (
                           <Badge 
                             variant="outline" 
@@ -580,7 +667,7 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
 
       {/* Create/Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="bg-gray-900 border-gray-800 max-w-2xl">
+        <DialogContent className="bg-gray-900 border-gray-800 max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-white">
               {editingField ? 'Edit' : 'Create'} Quote Field
@@ -612,7 +699,8 @@ const QuoteFieldForm = ({ onSubmit, initialData, onCancel }: QuoteFieldFormProps
     enabled: initialData?.enabled ?? true,
     options: initialData?.options || [],
     display_order: initialData?.display_order || 1,
-    include_in_pdf: initialData?.include_in_pdf ?? false
+    include_in_pdf: initialData?.include_in_pdf ?? false,
+    conditional_logic: initialData?.conditional_logic ?? [],
   });
 
   const [optionsText, setOptionsText] = useState(
@@ -621,9 +709,41 @@ const QuoteFieldForm = ({ onSubmit, initialData, onCancel }: QuoteFieldFormProps
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    const sanitizedOptions = formData.type === 'select'
+      ? optionsText
+          .split('\n')
+          .map(option => option.trim())
+          .filter(option => option.length > 0)
+      : [];
+
+    const sanitizedConditionalLogic = (formData.conditional_logic ?? [])
+      .map((rule) => ({
+        ...rule,
+        triggerValues: (rule.triggerValues || [])
+          .map((value) => value.trim())
+          .filter((value) => value.length > 0),
+        fields: (rule.fields || [])
+          .map((field) => ({
+            ...field,
+            id: field.id.trim(),
+            label: field.label.trim(),
+            include_in_pdf: field.include_in_pdf ?? false,
+            enabled: field.enabled ?? true,
+            options:
+              field.type === 'select'
+                ? (field.options || [])
+                    .map((option) => option.trim())
+                    .filter((option) => option.length > 0)
+                : undefined,
+          }))
+          .filter((field) => field.id.length > 0 && field.label.length > 0),
+      }))
+      .filter((rule) => rule.triggerValues.length > 0 && rule.fields.length > 0);
+
     const finalData = {
       ...formData,
-      options: formData.type === 'select' ? optionsText.split('\n').filter(o => o.trim()) : undefined
+      options: formData.type === 'select' ? sanitizedOptions : [],
+      conditional_logic: sanitizedConditionalLogic,
     };
     onSubmit(finalData);
   };
@@ -645,7 +765,16 @@ const QuoteFieldForm = ({ onSubmit, initialData, onCancel }: QuoteFieldFormProps
           <Label htmlFor="type" className="text-white">Field Type</Label>
           <Select
             value={formData.type}
-            onValueChange={(value: QuoteField['type']) => setFormData({ ...formData, type: value })}
+            onValueChange={(value: QuoteFieldType) => {
+              setFormData({
+                ...formData,
+                type: value,
+                options: value === 'select' ? formData.options : [],
+              });
+              if (value !== 'select') {
+                setOptionsText('');
+              }
+            }}
           >
             <SelectTrigger className="bg-gray-800 border-gray-700 text-white">
               <SelectValue />
@@ -658,6 +787,7 @@ const QuoteFieldForm = ({ onSubmit, initialData, onCancel }: QuoteFieldFormProps
               <SelectItem value="date" className="text-white">Date</SelectItem>
               <SelectItem value="email" className="text-white">Email</SelectItem>
               <SelectItem value="tel" className="text-white">Phone</SelectItem>
+              <SelectItem value="checkbox" className="text-white">Checkbox</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -688,6 +818,21 @@ const QuoteFieldForm = ({ onSubmit, initialData, onCancel }: QuoteFieldFormProps
           />
         </div>
       )}
+
+      <div className="space-y-2">
+        <div>
+          <Label className="text-white">Conditional Follow-up Questions</Label>
+          <p className="text-xs text-gray-400">
+            Configure additional prompts that appear when a user selects specific answers for this field. Use this to
+            collect product-specific details or require clarifications such as representative incentives.
+          </p>
+        </div>
+        <ConditionalLogicEditor
+          rules={formData.conditional_logic ?? []}
+          onChange={(rules) => setFormData({ ...formData, conditional_logic: rules })}
+          parentFieldLabel={formData.label || 'Quote Field'}
+        />
+      </div>
 
       <div className="grid grid-cols-3 gap-4">
         <div className="flex items-center space-x-2">
