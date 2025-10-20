@@ -521,9 +521,37 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
         `)
         .eq('quote_id', actualQuoteId);
 
-      // Use bom_items if available, otherwise fall back to draft_bom
-      if (!bomError && bomData && bomData.length > 0) {
-        // Use bom_items table data (most accurate)
+      const mapDraftItemsToBom = (items: any[]): any[] =>
+        items.map((item: any) => {
+          const storedSlotAssignments = item.slotAssignments as SerializedSlotAssignment[] | undefined;
+          const slotAssignments = deserializeSlotAssignments(storedSlotAssignments);
+          const rackLayout = item.rackConfiguration || buildRackLayoutFromAssignments(storedSlotAssignments);
+          const productPrice = item.unit_price || item.product?.price || 0;
+
+          return {
+            id: item.id || crypto.randomUUID(),
+            product: {
+              name: item.name || item.product?.name || 'Unknown Product',
+              description: item.description || item.product?.description || '',
+              price: productPrice,
+            },
+            quantity: item.quantity || 1,
+            enabled: item.enabled !== false,
+            partNumber: item.partNumber || item.part_number || item.product?.partNumber || 'TBD',
+            slotAssignments,
+            rackConfiguration: rackLayout,
+            level4Config: item.level4Config || null,
+            level4Selections: item.level4Selections || null,
+          };
+        });
+
+      const normalizedDraftBom = ensureRecord(fullQuote?.draft_bom);
+      const draftBomItems = ensureArray(normalizedDraftBom ? normalizedDraftBom['items'] : undefined);
+      const hasDraftItems = Array.isArray(draftBomItems) && draftBomItems.length > 0;
+
+      if (hasDraftItems && fullQuote.status === 'draft') {
+        bomItems = mapDraftItemsToBom(draftBomItems as any[]);
+      } else if (!bomError && bomData && bomData.length > 0) {
         const productIdSet = new Set<string>();
         bomData.forEach(item => {
           const productId = coerceString((item as any)?.product_id);
@@ -551,7 +579,7 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
             product: {
               name: item.name || product?.name || 'Unknown Product',
               description: item.description || product?.description || '',
-              price: item.unit_price || product?.price || 0
+              price: item.unit_price || product?.price || 0,
             },
             quantity: item.quantity || 1,
             enabled: true,
@@ -562,36 +590,9 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
             level4Selections: item.configuration_data?.level4Selections || null,
           };
         });
-      } else if (fullQuote.status === 'draft') {
-        // Fallback to draft_bom only if no bom_items exist
-        console.warn('No bom_items found, falling back to draft_bom');
-        const normalizedDraftBom = ensureRecord(fullQuote?.draft_bom);
-        const draftBomItems = ensureArray(normalizedDraftBom ? normalizedDraftBom['items'] : undefined);
-
-        if (Array.isArray(draftBomItems)) {
-          bomItems = (draftBomItems as any[]).map((item: any) => {
-            const productPrice = item.unit_price || item.product?.price || 0;
-            const storedSlotAssignments = item.slotAssignments as SerializedSlotAssignment[] | undefined;
-            const slotAssignments = deserializeSlotAssignments(storedSlotAssignments);
-            const rackLayout = item.rackConfiguration || buildRackLayoutFromAssignments(storedSlotAssignments);
-
-            return {
-              id: item.id || crypto.randomUUID(),
-              product: {
-                name: item.name || item.product?.name || 'Unknown Product',
-                description: item.description || item.product?.description || '',
-                price: productPrice
-              },
-              quantity: item.quantity || 1,
-              enabled: item.enabled !== false,
-              partNumber: item.partNumber || item.part_number || 'TBD',
-              slotAssignments,
-              rackConfiguration: rackLayout,
-              level4Config: item.level4Config || null,
-              level4Selections: item.level4Selections || null,
-            };
-          });
-        }
+      } else if (hasDraftItems) {
+        console.warn('No up-to-date bom_items found, falling back to draft_bom data');
+        bomItems = mapDraftItemsToBom(draftBomItems as any[]);
       }
 
       // Import and use the PDF generator
