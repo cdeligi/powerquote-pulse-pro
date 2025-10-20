@@ -3216,6 +3216,14 @@ let loadedItems: BOMItem[] = [];
     const margin = totalPrice > 0 ? ((totalPrice - totalCost) / totalPrice) * 100 : 100;
 
     // Create a new BOM item for the chassis with its configuration
+    const serializedAssignments = Object.keys(slotAssignments).length > 0
+      ? serializeSlotAssignments(slotAssignments)
+      : undefined;
+
+    const rackLayout = serializedAssignments
+      ? buildRackLayoutFromAssignments(serializedAssignments)
+      : undefined;
+
     const newItem: BOMItem = {
       id: `chassis-${Date.now()}`,
       product: {
@@ -3241,11 +3249,12 @@ let loadedItems: BOMItem[] = [];
       margin,
       original_unit_price: totalPrice,
       approved_unit_price: totalPrice,
+      rackConfiguration: rackLayout,
     };
 
     // Add chassis to BOM
     const updatedItems = [...bomItems, newItem];
-    
+
     // Add selected accessories to BOM with proper part numbers from codeMap
     const accessoryItems = level3Products
       .filter(p => selectedAccessories.has(p.id))
@@ -3270,9 +3279,8 @@ let loadedItems: BOMItem[] = [];
       });
 
     const allItems = [...updatedItems, ...accessoryItems];
-    
-    setBomItems(allItems);
-    onBOMUpdate(allItems);
+
+    void handleBOMUpdate(allItems);
 
     // Reset chassis configuration state
     setSelectedChassis(null);
@@ -3302,6 +3310,14 @@ let loadedItems: BOMItem[] = [];
       {};
 
     const normalizedCurrentAssignments = Object.keys(slotAssignments).length > 0 ? slotAssignments : {};
+
+    const serializedAssignments = Object.keys(slotAssignments).length > 0
+      ? serializeSlotAssignments(slotAssignments)
+      : undefined;
+
+    const rackLayout = serializedAssignments
+      ? buildRackLayoutFromAssignments(serializedAssignments)
+      : undefined;
 
     const generatedPartNumber = buildQTMSPartNumber({
       chassis: selectedChassis,
@@ -3388,6 +3404,7 @@ let loadedItems: BOMItem[] = [];
       partNumber: partNumber,
       displayName: selectedChassis.name,
       slotAssignments: { ...slotAssignments },
+      rackConfiguration: rackLayout,
       configuration: {
         hasRemoteDisplay,
       },
@@ -3441,8 +3458,7 @@ let loadedItems: BOMItem[] = [];
       ...bomItems.slice(endOfOriginalAccessoriesIndex) // Items after the original chassis and its accessories
     ];
 
-    setBomItems(finalBomItems);
-    onBOMUpdate(finalBomItems);
+    void handleBOMUpdate(finalBomItems);
 
     // Reset state
     setSelectedChassis(null);
@@ -3751,7 +3767,7 @@ let loadedItems: BOMItem[] = [];
     if (currentQuoteId && isDraftMode) {
       try {
         // Pass updatedItems directly to avoid stale state
-        const draftBomData = buildDraftBomSnapshot(updatedItems);
+        const { draftBomData } = buildDraftBomSnapshot(updatedItems);
         
         // Find removed items more reliably
         const removedItems = bomItems.filter(oldItem => {
@@ -3817,11 +3833,12 @@ let loadedItems: BOMItem[] = [];
           .update({ draft_bom: draftBomData })
           .eq('id', currentQuoteId)
           .eq('status', 'draft');
-          
+
         if (updateError) {
           console.error('Error syncing draft_bom:', updateError);
         } else {
           console.log('draft_bom synced with current BOM items');
+          setCurrentQuote(prev => (prev ? { ...prev, draft_bom: draftBomData } : prev));
         }
       } catch (error) {
         console.error('Error in handleBOMUpdate sync:', error);
