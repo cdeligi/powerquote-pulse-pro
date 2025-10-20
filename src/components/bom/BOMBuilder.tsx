@@ -3767,7 +3767,7 @@ let loadedItems: BOMItem[] = [];
     if (currentQuoteId && isDraftMode) {
       try {
         // Pass updatedItems directly to avoid stale state
-        const draftBomData = buildDraftBomSnapshot(updatedItems);
+        const { draftBomData } = buildDraftBomSnapshot(updatedItems);
         
         // Find removed items more reliably
         const removedItems = bomItems.filter(oldItem => {
@@ -3833,11 +3833,12 @@ let loadedItems: BOMItem[] = [];
           .update({ draft_bom: draftBomData })
           .eq('id', currentQuoteId)
           .eq('status', 'draft');
-          
+
         if (updateError) {
           console.error('Error syncing draft_bom:', updateError);
         } else {
           console.log('draft_bom synced with current BOM items');
+          setCurrentQuote(prev => (prev ? { ...prev, draft_bom: draftBomData } : prev));
         }
       } catch (error) {
         console.error('Error in handleBOMUpdate sync:', error);
