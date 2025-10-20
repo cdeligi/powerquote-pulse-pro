@@ -38,31 +38,51 @@ const supabase = getSupabaseClient();
 const supabaseAdmin = getSupabaseAdminClient();
 const POSTGREST_SCHEMA_RELOAD_ERROR_CODE = "PGRST204";
 
+const getMutationErrorMessage = (error: { code?: string; message?: string }) => {
+  if (error?.code === POSTGREST_SCHEMA_RELOAD_ERROR_CODE) {
+    return "Supabase is still refreshing its schema. Please wait a moment and try saving again.";
+  }
+
+  return error?.message || "Failed to save quote field changes";
+};
+
 async function waitForSchemaReload(delayMs = 1000) {
   await new Promise((resolve) => setTimeout(resolve, delayMs));
 }
 
 async function runWithPostgrestSchemaRetry<T>(
   operation: () => Promise<PostgrestSingleResponse<T>>,
-  reloadClient: SupabaseClient | null = supabaseAdmin ?? supabase
+  reloadClient: SupabaseClient | null = supabaseAdmin ?? supabase,
+  maxAttempts = 3
 ): Promise<PostgrestSingleResponse<T>> {
-  const result = await operation();
+  let attempt = 0;
+  let lastResult: PostgrestSingleResponse<T> | null = null;
 
-  if (result.error?.code !== POSTGREST_SCHEMA_RELOAD_ERROR_CODE) {
-    return result;
+  while (attempt < maxAttempts) {
+    const result = await operation();
+    lastResult = result;
+
+    if (result.error?.code !== POSTGREST_SCHEMA_RELOAD_ERROR_CODE) {
+      return result;
+    }
+
+    attempt += 1;
+    const waitMs = 750 * Math.pow(2, attempt - 1);
+    console.warn(
+      `PostgREST schema cache out of date (attempt ${attempt}/${maxAttempts}). Reloading before retrying mutation after ${waitMs}ms.`
+    );
+
+    const client = reloadClient ?? supabase;
+    const reloadResult = await client.rpc("reload_postgrest_schema");
+    if (reloadResult.error) {
+      console.error("Failed to trigger PostgREST schema reload", reloadResult.error);
+      break;
+    }
+
+    await waitForSchemaReload(waitMs);
   }
 
-  console.warn("PostgREST schema cache out of date, reloading before retrying mutation");
-
-  const client = reloadClient ?? supabase;
-  const reloadResult = await client.rpc("reload_postgrest_schema");
-  if (reloadResult.error) {
-    console.error("Failed to trigger PostgREST schema reload", reloadResult.error);
-    return result;
-  }
-
-  await waitForSchemaReload();
-  return operation();
+  return lastResult as PostgrestSingleResponse<T>;
 }
 
 type QuoteField = QuoteFieldConfig;
@@ -289,7 +309,7 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
       console.error('Error creating quote field:', error);
       toast({
         title: "Error",
-        description: error.message || "Failed to create quote field",
+        description: getMutationErrorMessage(error),
         variant: "destructive"
       });
     }
@@ -327,7 +347,7 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
       console.error('Error updating quote field:', error);
       toast({
         title: "Error",
-        description: error.message || "Failed to update quote field",
+        description: getMutationErrorMessage(error),
         variant: "destructive"
       });
     }
