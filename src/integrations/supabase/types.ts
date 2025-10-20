@@ -1286,11 +1286,11 @@ export type Database = {
       }
       quote_fields: {
         Row: {
+          conditional_logic: Json | null
           created_at: string
           display_order: number | null
           enabled: boolean
           id: string
-          conditional_logic: Json | null
           include_in_pdf: boolean | null
           label: string
           options: Json | null
@@ -1299,11 +1299,11 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          conditional_logic?: Json | null
           created_at?: string
           display_order?: number | null
           enabled?: boolean
           id: string
-          conditional_logic?: Json | null
           include_in_pdf?: boolean | null
           label: string
           options?: Json | null
@@ -1312,11 +1312,11 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          conditional_logic?: Json | null
           created_at?: string
           display_order?: number | null
           enabled?: boolean
           id?: string
-          conditional_logic?: Json | null
           include_in_pdf?: boolean | null
           label?: string
           options?: Json | null
@@ -2030,10 +2030,6 @@ export type Database = {
       get_admin_user_ids: {
         Args: Record<PropertyKey, never>
         Returns: string[]
-      }
-      reload_postgrest_schema: {
-        Args: Record<PropertyKey, never>
-        Returns: boolean
       }
       get_dga_products: {
         Args: Record<PropertyKey, never>
