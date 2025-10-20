@@ -690,7 +690,7 @@ const attachInfoUrlForPdf = async <T extends Record<string, any>>(items: T[]): P
     try {
       const { data: level2Rows, error: level2Error } = await supabase
         .from('products')
-        .select('id, product_info_url')
+        .select('id, product_info_url, parent_product_id')
         .in('id', Array.from(level2IdsToFetch));
 
       if (level2Error) throw level2Error;
@@ -772,6 +772,17 @@ const attachInfoUrlForPdf = async <T extends Record<string, any>>(items: T[]): P
       product: mergedProduct,
       resolvedInfoUrl: sanitizedResolved,
     };
+  }).map(item => {
+    // Debug logging for URL resolution
+    const normalizedLevel = determineBomItemLevel(item);
+    if ((normalizedLevel === 2 || normalizedLevel === 3) && !item.resolvedInfoUrl) {
+      console.warn(`🔍 PDF: Missing URL for Level ${normalizedLevel} item:`, {
+        productId: extractBomProductId(item),
+        parentLevel2Id: item.parentLevel2Id,
+        name: item.name || item.product?.name
+      });
+    }
+    return item;
   });
 };
 
@@ -2711,9 +2722,7 @@ export const generateQuotePDF = async (
         item.configuration?.rackConfiguration,
         item.configuration?.rack_configuration,
         item.rackConfiguration,
-        item.rack_configuration,
-        item.slotAssignments,
-        item.slot_assignments
+        item.slotAssignments
       );
 
       candidates.forEach(candidate => productIdsToFetch.add(candidate));
@@ -2722,17 +2731,39 @@ export const generateQuotePDF = async (
     if (productIdsToFetch.size > 0) {
       const { data: productInfoRows } = await supabase
         .from('products')
-        .select('id, product_info_url')
+        .select('id, product_info_url, product_level, parent_product_id')
         .in('id', Array.from(productIdsToFetch));
 
       if (Array.isArray(productInfoRows) && productInfoRows.length > 0) {
         const infoUrlMap = new Map<string, string>();
+        const level3ParentIds = new Set<string>();
+
         productInfoRows.forEach(row => {
           const infoUrl = coerceString((row as any)?.product_info_url);
           if (infoUrl) {
             infoUrlMap.set(String((row as any).id), infoUrl);
           }
+          
+          // Track Level 3 products that need parent URLs
+          if ((row as any)?.product_level === 3 && (row as any)?.parent_product_id && !infoUrl) {
+            level3ParentIds.add(String((row as any).parent_product_id));
+          }
         });
+
+        // Fetch parent URLs for Level 3 products
+        if (level3ParentIds.size > 0) {
+          const { data: parentRows } = await supabase
+            .from('products')
+            .select('id, product_info_url')
+            .in('id', Array.from(level3ParentIds));
+
+          parentRows?.forEach(parent => {
+            const parentUrl = coerceString((parent as any)?.product_info_url);
+            if (parentUrl) {
+              infoUrlMap.set(String((parent as any).id), parentUrl);
+            }
+          });
+        }
 
         itemsMissingProductInfo.forEach(item => {
           const candidates = collectProductIdCandidates(
@@ -2750,9 +2781,7 @@ export const generateQuotePDF = async (
           item.configuration?.rackConfiguration,
           item.configuration?.rack_configuration,
           item.rackConfiguration,
-          item.rack_configuration,
-          item.slotAssignments,
-          item.slot_assignments
+          item.slotAssignments
         );
 
           for (const candidate of candidates) {
