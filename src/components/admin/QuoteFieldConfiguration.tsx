@@ -50,15 +50,18 @@ async function waitForSchemaReload(delayMs = 1000) {
   await new Promise((resolve) => setTimeout(resolve, delayMs));
 }
 
+interface PostgrestSchemaRetryOptions {
+  reloadClient?: SupabaseClient | null;
+  maxAttempts?: number;
+}
+
 async function runWithPostgrestSchemaRetry<T>(
   operation: () => Promise<PostgrestSingleResponse<T>>,
-  reloadClient: SupabaseClient | null = supabaseAdmin ?? supabase,
-  maxAttempts = 3
+  { reloadClient = supabaseAdmin ?? supabase, maxAttempts = 6 }: PostgrestSchemaRetryOptions = {}
 ): Promise<PostgrestSingleResponse<T>> {
-  let attempt = 0;
   let lastResult: PostgrestSingleResponse<T> | null = null;
 
-  while (attempt < maxAttempts) {
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
     const result = await operation();
     lastResult = result;
 
@@ -66,13 +69,12 @@ async function runWithPostgrestSchemaRetry<T>(
       return result;
     }
 
-    attempt += 1;
-    const waitMs = 750 * Math.pow(2, attempt - 1);
+    const waitMs = Math.min(8000, 1000 * Math.pow(2, attempt));
+    const client = reloadClient ?? supabase;
     console.warn(
-      `PostgREST schema cache out of date (attempt ${attempt}/${maxAttempts}). Reloading before retrying mutation after ${waitMs}ms.`
+      `PostgREST schema cache out of date (attempt ${attempt + 1}/${maxAttempts}). Reloading before retrying mutation after ${waitMs}ms.`
     );
 
-    const client = reloadClient ?? supabase;
     const reloadResult = await client.rpc("reload_postgrest_schema");
     if (reloadResult.error) {
       console.error("Failed to trigger PostgREST schema reload", reloadResult.error);
@@ -80,6 +82,19 @@ async function runWithPostgrestSchemaRetry<T>(
     }
 
     await waitForSchemaReload(waitMs);
+
+    const probeResult = await client.from("quote_fields").select("id, conditional_logic").limit(1);
+    if (probeResult.error?.code === POSTGREST_SCHEMA_RELOAD_ERROR_CODE) {
+      console.warn("PostgREST schema still reloading; will retry mutation once cache is refreshed.");
+      continue;
+    }
+
+    if (probeResult.error) {
+      console.error("Unexpected error while verifying quote_fields schema", probeResult.error);
+      break;
+    }
+
+    console.info("PostgREST schema refreshed for quote_fields; retrying mutation.");
   }
 
   return lastResult as PostgrestSingleResponse<T>;
@@ -295,7 +310,7 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
               include_in_pdf: fieldData.include_in_pdf || false,
               conditional_logic: fieldData.conditional_logic ?? [],
             }),
-        mutationClient
+        { reloadClient: mutationClient }
       );
 
       if (error) throw error;
@@ -333,7 +348,7 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
               conditional_logic: fieldData.conditional_logic ?? [],
             })
             .eq('id', fieldId),
-        mutationClient
+        { reloadClient: mutationClient }
       );
 
       if (error) throw error;
