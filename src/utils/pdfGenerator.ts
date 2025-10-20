@@ -81,13 +81,6 @@ type ExpandedSlotDisplay = {
   cardKey: string;
 };
 
-type ExpandedSlotDisplay = {
-  slot: number;
-  cardName: string;
-  partNumber?: string;
-  cardKey: string;
-};
-
 // Terms pagination constants (more conservative estimates for 10px font)
 const TERMS_PAGE_HEIGHT = 1200;
 const TERMS_COLUMN_WIDTH = 380;
@@ -151,6 +144,116 @@ const coerceString = (value: any): string | undefined => {
   }
 
   return undefined;
+};
+
+const maybeParseJson = (value: any): any => {
+  if (typeof value !== 'string') {
+    return value;
+  }
+
+  try {
+    return JSON.parse(value);
+  } catch {
+    return value;
+  }
+};
+
+const convertObjectMapToSlots = (
+  value: Record<string, any>
+): SpanAwareSlot[] | undefined => {
+  const entries = Object.entries(value)
+    .map(([key, raw]) => {
+      if (!raw || typeof raw !== 'object') {
+        return undefined;
+      }
+
+      const normalized = { ...(raw as Record<string, any>) } as SpanAwareSlot;
+      const explicitSlot = coerceNumber((normalized as any).slot ?? (normalized as any).slotNumber);
+      const keySlot = coerceNumber(key);
+
+      if (explicitSlot === undefined && keySlot !== undefined) {
+        if (normalized.slot === undefined) {
+          normalized.slot = keySlot;
+        } else if ((normalized as any).slotNumber === undefined) {
+          (normalized as any).slotNumber = keySlot;
+        }
+      }
+
+      return normalized;
+    })
+    .filter((entry): entry is SpanAwareSlot => Boolean(entry));
+
+  if (entries.length === 0) {
+    return undefined;
+  }
+
+  const sorted = entries.slice().sort((a, b) => {
+    const slotA = coerceNumber((a as any).slot ?? (a as any).slotNumber ?? (a as any).position);
+    const slotB = coerceNumber((b as any).slot ?? (b as any).slotNumber ?? (b as any).position);
+    if (slotA === undefined && slotB === undefined) return 0;
+    if (slotA === undefined) return 1;
+    if (slotB === undefined) return -1;
+    return slotA - slotB;
+  });
+
+  return sorted;
+};
+
+const resolveSlotArrayCandidate = (
+  input: any,
+  seen: Set<any> = new Set()
+): SpanAwareSlot[] | undefined => {
+  if (input === undefined || input === null) {
+    return undefined;
+  }
+
+  const parsed = maybeParseJson(input);
+
+  if (Array.isArray(parsed)) {
+    return parsed as SpanAwareSlot[];
+  }
+
+  if (typeof parsed !== 'object') {
+    return undefined;
+  }
+
+  if (seen.has(parsed)) {
+    return undefined;
+  }
+
+  seen.add(parsed);
+
+  const candidateObject = parsed as Record<string, any>;
+
+  const nestedKeys = [
+    'slots',
+    'layout',
+    'layoutSlots',
+    'layout_slots',
+    'slotAssignments',
+    'slot_assignments',
+    'rackSlots',
+    'rack_slots',
+    'items',
+    'values',
+    'entries',
+  ];
+
+  for (const key of nestedKeys) {
+    if (Object.prototype.hasOwnProperty.call(candidateObject, key)) {
+      const nested = resolveSlotArrayCandidate(candidateObject[key], seen);
+      if (nested && nested.length > 0) {
+        return nested;
+      }
+    }
+  }
+
+  return convertObjectMapToSlots(candidateObject);
+};
+
+const resolveRackSlots = (value: any): SpanAwareSlot[] => {
+  const resolved = resolveSlotArrayCandidate(value);
+  return Array.isArray(resolved) ? (resolved as SpanAwareSlot[]) : [];
 };
 
 const PRODUCT_INFO_KEY_VARIANTS = [
@@ -2233,56 +2336,84 @@ export const generateQuotePDF = async (
   } | undefined => {
     if (!item) return undefined;
 
-    if (item.rackConfiguration && typeof item.rackConfiguration === 'object') {
-      if (Array.isArray(item.rackConfiguration.slots)) {
-        return { slots: toSlotEntries(item.rackConfiguration.slots, allBomItems) };
+    const rackConfigurationCandidates = [
+      item?.rackConfiguration,
+      item?.rack_configuration,
+      item?.configuration?.rackConfiguration,
+      item?.configuration?.rack_configuration,
+      item?.configuration_data?.rackConfiguration,
+      item?.configuration_data?.rack_configuration,
+    ];
+
+    for (const candidate of rackConfigurationCandidates) {
+      if (!candidate || typeof candidate !== 'object') {
+        continue;
       }
 
-      if (Array.isArray(item.rackConfiguration)) {
-        return { slots: toSlotEntries(item.rackConfiguration, allBomItems) };
+      if (Array.isArray((candidate as any).slots)) {
+        return { slots: toSlotEntries((candidate as any).slots, allBomItems) };
+      }
+
+      if (Array.isArray(candidate)) {
+        return { slots: toSlotEntries(candidate, allBomItems) };
       }
     }
 
-    if (Array.isArray(item.slotAssignments)) {
-      return { slots: toSlotEntries(item.slotAssignments, allBomItems) };
-    }
+    const slotAssignmentCandidates = [
+      item?.slotAssignments,
+      item?.slot_assignments,
+      item?.configuration?.slotAssignments,
+      item?.configuration?.slot_assignments,
+      item?.configuration_data?.slotAssignments,
+      item?.configuration_data?.slot_assignments,
+    ];
 
-    if (item.slotAssignments && typeof item.slotAssignments === 'object') {
-      const entries = Object.entries(item.slotAssignments).map(([slotKey, slotData], index) => {
-        const data = slotData as any;
-        return {
-          slot: normalizeSlotNumber(slotKey, index),
-          cardName: data?.displayName || data?.name || data?.product?.name || `Slot ${slotKey}`,
-          partNumber: data?.partNumber || data?.product?.partNumber || data?.part_number || undefined,
-          level4Config: data?.level4Config || null,
-          level4Selections: data?.level4Selections || null,
-          level4BomItemId:
-            data?.level4BomItemId ||
-            data?.level4_bom_item_id ||
-            data?.level4Config?.bomItemId ||
-            data?.level4Config?.bom_item_id ||
-            data?.configuration?.bomItemId ||
-            data?.configuration?.bom_item_id,
-          isSharedLevel4Config:
-            Boolean(
-              data?.isSharedLevel4Config ||
-              data?.sharedLevel4Config ||
-              data?.is_shared_level4_config ||
-              data?.isBushingSecondary ||
-              data?.is_bushing_secondary
-            ),
-          isBushingSecondary: Boolean(data?.isBushingSecondary || data?.is_bushing_secondary),
-          sharedFromSlot:
-            data?.sharedFromSlot ??
-            data?.shared_from_slot ??
-            data?.bushingPairSlot ??
-            data?.bushing_pair_slot ??
-            undefined,
-        };
-      }).filter(entry => entry.slot !== undefined && entry.slot !== null);
+    for (const candidate of slotAssignmentCandidates) {
+      if (!candidate) {
+        continue;
+      }
 
-      if (entries.length > 0) {
-        return { slots: entries };
+      if (Array.isArray(candidate)) {
+        return { slots: toSlotEntries(candidate, allBomItems) };
+      }
+
+      if (typeof candidate === 'object') {
+        const entries = Object.entries(candidate).map(([slotKey, slotData], index) => {
+          const data = slotData as any;
+          return {
+            slot: normalizeSlotNumber(slotKey, index),
+            cardName: data?.displayName || data?.name || data?.product?.name || `Slot ${slotKey}`,
+            partNumber: data?.partNumber || data?.product?.partNumber || data?.part_number || undefined,
+            level4Config: data?.level4Config || null,
+            level4Selections: data?.level4Selections || null,
+            level4BomItemId:
+              data?.level4BomItemId ||
+              data?.level4_bom_item_id ||
+              data?.level4Config?.bomItemId ||
+              data?.level4Config?.bom_item_id ||
+              data?.configuration?.bomItemId ||
+              data?.configuration?.bom_item_id,
+            isSharedLevel4Config:
+              Boolean(
+                data?.isSharedLevel4Config ||
+                data?.sharedLevel4Config ||
+                data?.is_shared_level4_config ||
+                data?.isBushingSecondary ||
+                data?.is_bushing_secondary
+              ),
+            isBushingSecondary: Boolean(data?.isBushingSecondary || data?.is_bushing_secondary),
+            sharedFromSlot:
+              data?.sharedFromSlot ??
+              data?.shared_from_slot ??
+              data?.bushingPairSlot ??
+              data?.bushing_pair_slot ??
+              undefined,
+          };
+        }).filter(entry => entry.slot !== undefined && entry.slot !== null);
+
+        if (entries.length > 0) {
+          return { slots: entries };
+        }
       }
     }
 
@@ -2578,8 +2709,11 @@ export const generateQuotePDF = async (
         item.level2_product,
         item.parentProduct,
         item.configuration?.rackConfiguration,
+        item.configuration?.rack_configuration,
         item.rackConfiguration,
-        item.slotAssignments
+        item.rack_configuration,
+        item.slotAssignments,
+        item.slot_assignments
       );
 
       candidates.forEach(candidate => productIdsToFetch.add(candidate));
@@ -2609,14 +2743,17 @@ export const generateQuotePDF = async (
             item.configuration?.selectedProduct,
             item.configuration?.selectedLevel2Product,
             item.configuration?.level2Product,
-            item.configuration?.selectedProducts,
-            item.level2Product,
-            item.level2_product,
-            item.parentProduct,
-            item.configuration?.rackConfiguration,
-            item.rackConfiguration,
-            item.slotAssignments
-          );
+          item.configuration?.selectedProducts,
+          item.level2Product,
+          item.level2_product,
+          item.parentProduct,
+          item.configuration?.rackConfiguration,
+          item.configuration?.rack_configuration,
+          item.rackConfiguration,
+          item.rack_configuration,
+          item.slotAssignments,
+          item.slot_assignments
+        );
 
           for (const candidate of candidates) {
             const matchedUrl = candidate ? infoUrlMap.get(candidate) : undefined;
@@ -2887,30 +3024,28 @@ export const generateQuotePDF = async (
 
     const renderedRackLayoutKeys = new Set<string>();
 
-    const buildRackLayoutKey = (title: string, partNumber: string | undefined, slots: any[]) => {
+    const buildRackLayoutKey = (title: string, partNumber: string | undefined, slots: SpanAwareSlot[]) => {
       const normalizedTitle = typeof title === 'string' ? title.trim().toLowerCase() : '';
       const normalizedPart = typeof partNumber === 'string' ? partNumber.trim().toLowerCase() : '';
-      const normalizedSlots = Array.isArray(slots)
-        ? slots.map(slot => ({
-            slot:
-              slot?.slot ??
-              slot?.slotNumber ??
-              slot?.position ??
-              null,
-            partNumber:
-              typeof slot?.partNumber === 'string'
-                ? slot.partNumber.trim().toLowerCase()
-                : typeof slot?.product?.partNumber === 'string'
-                  ? slot.product.partNumber.trim().toLowerCase()
-                  : null,
-            cardName:
-              typeof slot?.cardName === 'string'
-                ? slot.cardName.trim().toLowerCase()
-                : typeof slot?.name === 'string'
-                  ? slot.name.trim().toLowerCase()
-                  : null,
-          }))
-        : [];
+      const normalizedSlots = slots.map(slot => ({
+        slot:
+          slot?.slot ??
+          slot?.slotNumber ??
+          slot?.position ??
+          null,
+        partNumber:
+          typeof slot?.partNumber === 'string'
+            ? slot.partNumber.trim().toLowerCase()
+            : typeof slot?.product?.partNumber === 'string'
+              ? slot.product.partNumber.trim().toLowerCase()
+              : null,
+        cardName:
+          typeof slot?.cardName === 'string'
+            ? slot.cardName.trim().toLowerCase()
+            : typeof slot?.name === 'string'
+              ? slot.name.trim().toLowerCase()
+              : null,
+      }));
 
       try {
         return `${normalizedTitle}|${normalizedPart}|${JSON.stringify(normalizedSlots)}`;
@@ -2919,7 +3054,13 @@ export const generateQuotePDF = async (
       }
     };
 
-    const renderRackLayout = (title: string, partNumber: string | undefined, slots: any[], chassisTypeCode?: string) => {
+    const renderRackLayout = (
+      title: string,
+      partNumber: string | undefined,
+      rawSlots: any,
+      chassisTypeCode?: string
+    ) => {
+      const slots = resolveRackSlots(rawSlots);
       const layoutKey = buildRackLayoutKey(title, partNumber, slots);
       if (layoutKey && renderedRackLayoutKeys.has(layoutKey)) {
         return;
@@ -2937,10 +3078,9 @@ export const generateQuotePDF = async (
           <h3 class="rack-card-title">${safeTitle}${safePartNumber ? ` · ${safePartNumber}` : ''}</h3>
       `;
 
-      const sourceSlots = Array.isArray(slots) ? (slots as SpanAwareSlot[]) : [];
-      const normalizedSlots = dedupeSpanAwareSlots(sourceSlots);
+      const normalizedSlots = dedupeSpanAwareSlots(slots);
       const tableRows = (() => {
-        const expanded = expandSpanAwareSlots(sourceSlots);
+        const expanded = expandSpanAwareSlots(slots);
         if (expanded.length > 0) {
           return expanded;
         }
@@ -2989,15 +3129,12 @@ export const generateQuotePDF = async (
     chassisItems.forEach(chassisItem => {
       const config = chassisItem.rackConfiguration;
       const chassisType = chassisItem.product?.id || chassisItem.product?.name || '';
-      renderRackLayout(chassisItem.product.name, chassisItem.partNumber, config?.slots || [], chassisType);
+      renderRackLayout(chassisItem.product.name, chassisItem.partNumber, config, chassisType);
     });
 
     fallbackRackLayouts.forEach(layout => {
-      const slots = layout?.layout?.slots || layout?.slots;
-      if (Array.isArray(slots) && slots.length > 0) {
-        const chassisType = layout.productId || layout.productName || '';
-        renderRackLayout(layout.productName || 'Configured Rack', layout.partNumber, slots, chassisType);
-      }
+      const chassisType = layout.productId || layout.productName || '';
+      renderRackLayout(layout.productName || 'Configured Rack', layout.partNumber, layout, chassisType);
     });
 
     if (quoteInfo.draft_bom?.rackConfiguration) {
