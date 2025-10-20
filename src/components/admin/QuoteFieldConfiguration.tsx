@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import type { PostgrestSingleResponse } from "@supabase/supabase-js";
+import type { PostgrestSingleResponse, SupabaseClient } from "@supabase/supabase-js";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -23,7 +23,7 @@ import {
 } from "lucide-react";
 import { User } from "@/types/auth";
 import { useToast } from "@/hooks/use-toast";
-import { getSupabaseClient, getSupabaseAdminClient, isAdminAvailable } from "@/integrations/supabase/client";
+import { getSupabaseClient, getSupabaseAdminClient } from "@/integrations/supabase/client";
 import ConditionalLogicEditor from "@/components/admin/ConditionalLogicEditor";
 import {
   QuoteFieldConfiguration as QuoteFieldConfig,
@@ -38,12 +38,13 @@ const supabase = getSupabaseClient();
 const supabaseAdmin = getSupabaseAdminClient();
 const POSTGREST_SCHEMA_RELOAD_ERROR_CODE = "PGRST204";
 
-async function waitForSchemaReload(delayMs = 300) {
+async function waitForSchemaReload(delayMs = 1000) {
   await new Promise((resolve) => setTimeout(resolve, delayMs));
 }
 
 async function runWithPostgrestSchemaRetry<T>(
-  operation: () => Promise<PostgrestSingleResponse<T>>
+  operation: () => Promise<PostgrestSingleResponse<T>>,
+  reloadClient: SupabaseClient | null = supabaseAdmin ?? supabase
 ): Promise<PostgrestSingleResponse<T>> {
   const result = await operation();
 
@@ -53,7 +54,8 @@ async function runWithPostgrestSchemaRetry<T>(
 
   console.warn("PostgREST schema cache out of date, reloading before retrying mutation");
 
-  const reloadResult = await supabase.rpc("reload_postgrest_schema");
+  const client = reloadClient ?? supabase;
+  const reloadResult = await client.rpc("reload_postgrest_schema");
   if (reloadResult.error) {
     console.error("Failed to trigger PostgREST schema reload", reloadResult.error);
     return result;
@@ -115,8 +117,9 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
     setQuoteFields(updatedFields);
     
     // Save new orders to database
-    Promise.all(updatedFields.map(field => 
-      supabase
+    const orderClient = supabaseAdmin ?? supabase;
+    Promise.all(updatedFields.map(field =>
+      orderClient
         .from('quote_fields')
         .update({ display_order: field.display_order })
         .eq('id', field.id)
@@ -256,20 +259,23 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
 
   const createQuoteField = async (fieldData: Omit<QuoteField, 'id'>) => {
     try {
-      const { error } = await runWithPostgrestSchemaRetry(() =>
-        supabase
-          .from('quote_fields')
-          .insert({
-            id: `field-${Date.now()}`,
-            label: fieldData.label,
-            type: fieldData.type,
-            required: fieldData.required,
-            enabled: fieldData.enabled,
-            options: fieldData.options && fieldData.options.length ? JSON.stringify(fieldData.options) : null,
-            display_order: fieldData.display_order,
-            include_in_pdf: fieldData.include_in_pdf || false,
-            conditional_logic: fieldData.conditional_logic ?? [],
-          })
+      const mutationClient = supabaseAdmin ?? supabase;
+      const { error } = await runWithPostgrestSchemaRetry(
+        () =>
+          mutationClient
+            .from('quote_fields')
+            .insert({
+              id: `field-${Date.now()}`,
+              label: fieldData.label,
+              type: fieldData.type,
+              required: fieldData.required,
+              enabled: fieldData.enabled,
+              options: fieldData.options && fieldData.options.length ? JSON.stringify(fieldData.options) : null,
+              display_order: fieldData.display_order,
+              include_in_pdf: fieldData.include_in_pdf || false,
+              conditional_logic: fieldData.conditional_logic ?? [],
+            }),
+        mutationClient
       );
 
       if (error) throw error;
@@ -291,20 +297,23 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
 
   const updateQuoteField = async (fieldId: string, fieldData: Omit<QuoteField, 'id'>) => {
     try {
-      const { error } = await runWithPostgrestSchemaRetry(() =>
-        supabase
-          .from('quote_fields')
-          .update({
-            label: fieldData.label,
-            type: fieldData.type,
-            required: fieldData.required,
-            enabled: fieldData.enabled,
-            options: fieldData.options && fieldData.options.length ? JSON.stringify(fieldData.options) : null,
-            display_order: fieldData.display_order,
-            include_in_pdf: fieldData.include_in_pdf || false,
-            conditional_logic: fieldData.conditional_logic ?? [],
-          })
-          .eq('id', fieldId)
+      const mutationClient = supabaseAdmin ?? supabase;
+      const { error } = await runWithPostgrestSchemaRetry(
+        () =>
+          mutationClient
+            .from('quote_fields')
+            .update({
+              label: fieldData.label,
+              type: fieldData.type,
+              required: fieldData.required,
+              enabled: fieldData.enabled,
+              options: fieldData.options && fieldData.options.length ? JSON.stringify(fieldData.options) : null,
+              display_order: fieldData.display_order,
+              include_in_pdf: fieldData.include_in_pdf || false,
+              conditional_logic: fieldData.conditional_logic ?? [],
+            })
+            .eq('id', fieldId),
+        mutationClient
       );
 
       if (error) throw error;
@@ -326,7 +335,8 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
 
   const deleteQuoteField = async (fieldId: string) => {
     try {
-      const { error } = await supabase
+      const deletionClient = supabaseAdmin ?? supabase;
+      const { error } = await deletionClient
         .from('quote_fields')
         .delete()
         .eq('id', fieldId);
