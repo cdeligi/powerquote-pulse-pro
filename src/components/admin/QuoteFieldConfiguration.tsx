@@ -296,8 +296,8 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
     try {
       const mutationClient = supabaseAdmin ?? supabase;
       const { error } = await runWithPostgrestSchemaRetry(
-        () =>
-          mutationClient
+        async () =>
+          await mutationClient
             .from('quote_fields')
             .insert({
               id: `field-${Date.now()}`,
@@ -334,8 +334,8 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
     try {
       const mutationClient = supabaseAdmin ?? supabase;
       const { error } = await runWithPostgrestSchemaRetry(
-        () =>
-          mutationClient
+        async () =>
+          await mutationClient
             .from('quote_fields')
             .update({
               label: fieldData.label,
