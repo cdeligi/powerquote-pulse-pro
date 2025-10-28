@@ -1971,7 +1971,7 @@ export type Database = {
         Returns: Json
       }
       admin_list_users: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           created_at: string
           department: string
@@ -1988,10 +1988,7 @@ export type Database = {
         Args: { p_status: string; p_user_id: string }
         Returns: Json
       }
-      array_all_positive: {
-        Args: { arr: number[] }
-        Returns: boolean
-      }
+      array_all_positive: { Args: { arr: number[] }; Returns: boolean }
       calculate_bom_total_cost: {
         Args: { quote_id_param: string }
         Returns: number
@@ -2011,14 +2008,8 @@ export type Database = {
         }
         Returns: string
       }
-      deactivate_user: {
-        Args: { target_user_id: string }
-        Returns: boolean
-      }
-      execute_sql: {
-        Args: { query: string }
-        Returns: Json
-      }
+      deactivate_user: { Args: { target_user_id: string }; Returns: boolean }
+      execute_sql: { Args: { query: string }; Returns: Json }
       finalize_draft_quote_id: {
         Args: { draft_quote_id: string }
         Returns: string
@@ -2027,12 +2018,9 @@ export type Database = {
         Args: { is_draft?: boolean; user_email: string }
         Returns: string
       }
-      get_admin_user_ids: {
-        Args: Record<PropertyKey, never>
-        Returns: string[]
-      }
+      get_admin_user_ids: { Args: never; Returns: string[] }
       get_dga_products: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           category: string
           cost: number
@@ -2050,7 +2038,7 @@ export type Database = {
         }[]
       }
       get_level1_products_with_asset_types: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           asset_type_id: string
           asset_type_name: string
@@ -2107,7 +2095,7 @@ export type Database = {
         }[]
       }
       get_pd_products: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           category: string
           cost: number
@@ -2144,10 +2132,7 @@ export type Database = {
           subcategory: string
         }[]
       }
-      get_user_role: {
-        Args: { user_id: string }
-        Returns: string
-      }
+      get_user_role: { Args: { user_id: string }; Returns: string }
       has_permission: {
         Args: {
           _permission_type: string
@@ -2157,25 +2142,11 @@ export type Database = {
         }
         Returns: boolean
       }
-      is_admin: {
-        Args: Record<PropertyKey, never>
-        Returns: boolean
-      }
-      is_admin_user: {
-        Args: Record<PropertyKey, never>
-        Returns: boolean
-      }
-      log_security_event: {
-        Args:
-          | {
-              p_action: string
-              p_details: string
-              p_ip_address: string
-              p_severity?: string
-              p_user_agent: string
-              p_user_id: string
-            }
-          | {
+      is_admin: { Args: never; Returns: boolean }
+      is_admin_user: { Args: never; Returns: boolean }
+      log_security_event:
+        | {
+            Args: {
               p_action: string
               p_details?: Json
               p_ip_address?: string
@@ -2183,8 +2154,19 @@ export type Database = {
               p_user_agent?: string
               p_user_id: string
             }
-        Returns: string
-      }
+            Returns: string
+          }
+        | {
+            Args: {
+              p_action: string
+              p_details: string
+              p_ip_address: string
+              p_severity?: string
+              p_user_agent: string
+              p_user_id: string
+            }
+            Returns: undefined
+          }
       log_user_security_event: {
         Args: {
           p_action: string
@@ -2197,7 +2179,7 @@ export type Database = {
         Returns: undefined
       }
       repair_draft_bom_prices: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           items_repaired: number
           items_with_issues: number
@@ -2223,16 +2205,10 @@ export type Database = {
         }
         Returns: string
       }
-      update_product_display_name: {
-        Args:
-          | { p_display_name: string; p_id: string }
-          | { p_display_name: string; p_id: string }
-        Returns: Json
-      }
-      update_quote_analytics: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
-      }
+      update_product_display_name:
+        | { Args: { p_display_name: string; p_id: string }; Returns: Json }
+        | { Args: { p_display_name: string; p_id: string }; Returns: Json }
+      update_quote_analytics: { Args: never; Returns: undefined }
       update_session_activity: {
         Args: { p_session_token: string }
         Returns: boolean
