@@ -536,8 +536,16 @@ const collectProductIdCandidates = (...sources: Array<any>): string[] => {
       coerceNumber(record.level) ??
       undefined;
 
-    if (productLevel === 2 || record.parentProductId || record.parent_product_id) {
+    // Add Level 2 product IDs
+    if (productLevel === 2) {
       addCandidate(record.id);
+    }
+    
+    // For Level 3 products, also add the parent product ID
+    if (record.parentProductId || record.parent_product_id) {
+      addCandidate(record.id); // Add the Level 3 ID itself
+      addCandidate(record.parentProductId); // Add parent ID
+      addCandidate(record.parent_product_id); // Add parent ID (snake_case)
     }
 
     for (const [key, raw] of Object.entries(record)) {
