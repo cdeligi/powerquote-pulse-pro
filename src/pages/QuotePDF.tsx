@@ -4,7 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { generateQuotePDF } from '@/utils/pdfGenerator';
 import { Loader2 } from 'lucide-react';
 import type { Quote } from '@/types/quote';
-import type { BOMItem } from '@/types/bom';
+import type { BOMItem } from '@/types/product';
 import {
   buildRackLayoutFromAssignments,
   deserializeSlotAssignments,
@@ -91,7 +91,9 @@ const mapDraftItemsToBomItems = (items: any[]): BOMItem[] =>
     return {
       id: item.id || crypto.randomUUID(),
       product: {
+        id: item.product?.id || item.id || crypto.randomUUID(),
         name: item.name || item.product?.name || 'Unknown Product',
+        partNumber: item.partNumber || item.part_number || item.product?.partNumber || 'TBD',
         description: item.description || item.product?.description || '',
         price: productPrice,
       },
@@ -102,6 +104,8 @@ const mapDraftItemsToBomItems = (items: any[]): BOMItem[] =>
       rackConfiguration: rackLayout,
       level4Config: item.level4Config || null,
       level4Selections: item.level4Selections || null,
+      parentProduct: item.parentProduct || null,
+      configuration: item.configuration || null,
     } as BOMItem;
   });
 
@@ -114,10 +118,14 @@ const mapBomRowsToBomItems = (rows: any[]): BOMItem[] =>
     return {
       id: row.id || crypto.randomUUID(),
       product: {
+        id: row.product_id || row.id || crypto.randomUUID(),
         name: row.name || 'Unknown Product',
+        partNumber: row.part_number || row.partNumber || 'TBD',
         description: row.description || '',
         price: row.unit_price || 0,
       },
+      parentProduct: null,
+      configuration: row.configuration_data || null,
       quantity: row.quantity || 1,
       enabled: row.enabled !== false,
       partNumber: row.part_number || 'TBD',

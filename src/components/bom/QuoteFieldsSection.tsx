@@ -143,7 +143,7 @@ interface RenderFieldInputArgs {
 
 const renderFieldInput = ({ field, value, onValueChange, isRequired }: RenderFieldInputArgs) => {
   const hasValue = hasMeaningfulValue(value);
-  const baseInputClass = `bg-gray-700 border-gray-600 text-white ${isRequired && !hasValue ? 'border-red-500' : ''}`;
+  const baseInputClass = `bg-white border-gray-300 text-gray-900 hover:border-gray-400 focus:border-primary ${isRequired && !hasValue ? 'border-red-500' : ''}`;
 
   switch (field.type) {
     case 'textarea':
@@ -167,7 +167,7 @@ const renderFieldInput = ({ field, value, onValueChange, isRequired }: RenderFie
           <SelectTrigger className={baseInputClass}>
             <SelectValue placeholder={`Select ${field.label.toLowerCase()}...`} />
           </SelectTrigger>
-          <SelectContent className="bg-gray-700 border-gray-600">
+          <SelectContent className="bg-white border-gray-200 shadow-lg">
             {options.map((option) => (
               <SelectItem key={option} value={option}>
                 {option}
@@ -185,9 +185,9 @@ const renderFieldInput = ({ field, value, onValueChange, isRequired }: RenderFie
             id={field.id}
             checked={value === true || value === 'true'}
             onCheckedChange={(checked) => onValueChange(Boolean(checked))}
-            className="border-gray-600 data-[state=checked]:bg-red-600 data-[state=checked]:border-red-600"
+            className="border-gray-300 data-[state=checked]:bg-primary data-[state=checked]:border-primary"
           />
-          <span className="text-sm text-gray-200">{value === true || value === 'true' ? 'Yes' : 'No'}</span>
+          <span className="text-sm text-gray-700">{value === true || value === 'true' ? 'Yes' : 'No'}</span>
         </div>
       );
 
@@ -209,8 +209,8 @@ const renderFieldInput = ({ field, value, onValueChange, isRequired }: RenderFie
             <Button
               variant="outline"
               className={cn(
-                'w-full justify-start text-left font-normal bg-gray-700 border-gray-600 text-white hover:bg-gray-600',
-                !value && 'text-gray-400',
+                'w-full justify-start text-left font-normal bg-white border-gray-300 text-gray-900 hover:bg-gray-50 hover:border-gray-400',
+                !value && 'text-gray-500',
                 isRequired && !hasValue && 'border-red-500',
               )}
             >
@@ -218,7 +218,7 @@ const renderFieldInput = ({ field, value, onValueChange, isRequired }: RenderFie
               {value ? format(new Date(value), 'PPP') : <span>Pick a date</span>}
             </Button>
           </PopoverTrigger>
-          <PopoverContent className="w-auto p-0 bg-gray-800 border-gray-600" align="start">
+          <PopoverContent className="w-auto p-0 bg-white border-gray-200 shadow-xl" align="start">
             <Calendar
               mode="single"
               selected={value ? new Date(value) : undefined}
@@ -375,12 +375,12 @@ const QuoteFieldsSection = ({ quoteFields, onFieldChange }: QuoteFieldsSectionPr
             return (
               <div
                 key={rule.id}
-                className="rounded-md border border-red-600/40 bg-red-900/10 p-3 text-sm text-gray-200"
+                className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-gray-900"
               >
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                   <div>
-                    <p className="font-medium text-red-200">Additional information required</p>
-                    <p className="text-xs text-gray-300">
+                    <p className="font-medium text-red-700">Additional information required</p>
+                    <p className="text-xs text-gray-700">
                       {rule.description || `Provide follow-up details for ${field.label}.`}
                     </p>
                   </div>
@@ -393,11 +393,11 @@ const QuoteFieldsSection = ({ quoteFields, onFieldChange }: QuoteFieldsSectionPr
                     {hasAnyValues ? 'Review details' : 'Add details'}
                   </Button>
                 </div>
-                <div className="mt-3 space-y-1 text-xs text-gray-300">
+                <div className="mt-3 space-y-1 text-xs text-gray-600">
                   {rule.fields.map((conditionalField) => (
                     <div key={conditionalField.id} className="flex items-center justify-between gap-3">
                       <span>{conditionalField.label}</span>
-                      <span className="text-gray-100">{formatDisplayValue(quoteFields[conditionalField.id])}</span>
+                      <span className="text-gray-900 font-medium">{formatDisplayValue(quoteFields[conditionalField.id])}</span>
                     </div>
                   ))}
                 </div>
@@ -406,20 +406,20 @@ const QuoteFieldsSection = ({ quoteFields, onFieldChange }: QuoteFieldsSectionPr
           }
 
           return (
-            <div key={rule.id} className="space-y-3 border-l border-gray-700 pl-4 pt-2 text-sm">
-              <p className="text-xs uppercase tracking-wide text-gray-400">
+            <div key={rule.id} className="space-y-3 border-l border-gray-300 pl-4 pt-2 text-sm">
+              <p className="text-xs uppercase tracking-wide text-gray-600">
                 Additional details required for &ldquo;{field.label}&rdquo;
               </p>
               {rule.fields.map((conditionalField) => (
                 <div key={conditionalField.id} className="space-y-2">
-                  <Label htmlFor={conditionalField.id} className="text-white flex items-center gap-2">
+                  <Label htmlFor={conditionalField.id} className="text-gray-700 font-medium flex items-center gap-2">
                     {conditionalField.label}
                     {conditionalField.include_in_pdf && (
-                      <Badge variant="outline" className="text-xs bg-blue-900/30 text-blue-400 border-blue-600">
+                      <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200">
                         QUOTE
                       </Badge>
                     )}
-                    <Badge variant="outline" className="text-xs border-red-600 text-red-300 bg-red-900/20">
+                    <Badge variant="outline" className="text-xs bg-red-50 text-red-700 border-red-200">
                       Conditional
                     </Badge>
                   </Label>
@@ -443,15 +443,15 @@ const QuoteFieldsSection = ({ quoteFields, onFieldChange }: QuoteFieldsSectionPr
 
     return (
       <div key={field.id} className="space-y-2">
-        <Label htmlFor={field.id} className="text-white flex items-center gap-2">
+        <Label htmlFor={field.id} className="text-gray-700 font-medium flex items-center gap-2">
           {field.label}
           {field.include_in_pdf && (
-            <Badge variant="outline" className="text-xs bg-blue-900/30 text-blue-400 border-blue-600">
+            <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200">
               QUOTE
             </Badge>
           )}
           {field.conditional_logic && field.conditional_logic.length > 0 && (
-            <Badge variant="outline" className="text-xs border-red-600 text-red-300 bg-red-900/20">
+            <Badge variant="outline" className="text-xs bg-red-50 text-red-700 border-red-200">
               Conditional
             </Badge>
           )}
@@ -487,9 +487,9 @@ const QuoteFieldsSection = ({ quoteFields, onFieldChange }: QuoteFieldsSectionPr
 
   if (loading) {
     return (
-      <Card className="bg-gray-800 border-gray-700">
+      <Card className="bg-white border-gray-200">
         <CardContent className="p-6">
-          <div className="text-white">Loading quote fields...</div>
+          <div className="text-gray-900">Loading quote fields...</div>
         </CardContent>
       </Card>
     );
@@ -497,21 +497,21 @@ const QuoteFieldsSection = ({ quoteFields, onFieldChange }: QuoteFieldsSectionPr
 
   return (
     <>
-      <Card className="bg-gray-800 border-gray-700">
+      <Card className="bg-white border-gray-200">
         <CardHeader>
-          <CardTitle className="text-white">Quote Information</CardTitle>
+          <CardTitle className="text-gray-900">Quote Information</CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
           {!validation.isValid && validation.missingFields.length > 0 && (
-            <Alert className="border-yellow-500 bg-yellow-900/20">
-              <AlertDescription className="text-yellow-400">
+            <Alert className="border-yellow-200 bg-yellow-50">
+              <AlertDescription className="text-yellow-800">
                 <strong>Required fields:</strong> {validation.missingFields.join(', ')}
               </AlertDescription>
             </Alert>
           )}
 
           {configuredFields.length === 0 ? (
-            <div className="text-gray-400 text-center py-4">
+            <div className="text-gray-500 text-center py-4">
               No quote fields have been configured. Please contact your administrator to set up quote fields.
             </div>
           ) : (
@@ -523,13 +523,13 @@ const QuoteFieldsSection = ({ quoteFields, onFieldChange }: QuoteFieldsSectionPr
       </Card>
 
       <Dialog open={Boolean(activeModalContext)} onOpenChange={(open) => !open && setActiveModal(null)}>
-        <DialogContent className="bg-gray-900 border-gray-800 text-white max-w-2xl">
+        <DialogContent className="bg-white border-gray-200 max-w-2xl">
           <DialogHeader>
-            <DialogTitle>
+            <DialogTitle className="text-gray-900">
               {activeModalContext?.rule.title || `Additional details: ${activeModalContext?.parentField.label}`}
             </DialogTitle>
             {(activeModalContext?.rule.description || activeModalContext?.rule.triggerValues?.length) && (
-              <DialogDescription className="text-gray-300">
+              <DialogDescription className="text-gray-600">
                 {activeModalContext?.rule.description || 'Provide the required follow-up information to continue.'}
               </DialogDescription>
             )}
@@ -537,15 +537,15 @@ const QuoteFieldsSection = ({ quoteFields, onFieldChange }: QuoteFieldsSectionPr
           <div className="space-y-4">
             {activeModalContext?.rule.fields.map((conditionalField) => (
               <div key={conditionalField.id} className="space-y-2">
-                <Label htmlFor={conditionalField.id} className="text-white flex items-center gap-2">
+                <Label htmlFor={conditionalField.id} className="text-gray-700 font-medium flex items-center gap-2">
                   {conditionalField.label}
                   {conditionalField.required && (
-                    <Badge variant="outline" className="text-xs border-red-600 text-red-300 bg-red-900/20">
+                    <Badge variant="outline" className="text-xs bg-red-50 text-red-700 border-red-200">
                       Required
                     </Badge>
                   )}
                   {conditionalField.include_in_pdf && (
-                    <Badge variant="outline" className="text-xs bg-blue-900/30 text-blue-400 border-blue-600">
+                    <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200">
                       QUOTE
                     </Badge>
                   )}
@@ -563,7 +563,7 @@ const QuoteFieldsSection = ({ quoteFields, onFieldChange }: QuoteFieldsSectionPr
             <Button
               type="button"
               variant="outline"
-              className="border-gray-600 bg-gray-800 text-gray-200 hover:text-white"
+              className="border-gray-300 bg-white text-gray-700 hover:bg-gray-50 hover:text-gray-900"
               onClick={() => setActiveModal(null)}
             >
               Done
