@@ -91,12 +91,19 @@ const mapDraftItemsToBomItems = (items: any[]): BOMItem[] =>
     return {
       id: item.id || crypto.randomUUID(),
       product: {
-        id: item.product?.id || item.id || crypto.randomUUID(),
+        id: item.product?.id || item.product_id || item.id || crypto.randomUUID(),
         name: item.name || item.product?.name || 'Unknown Product',
         partNumber: item.partNumber || item.part_number || item.product?.partNumber || 'TBD',
         description: item.description || item.product?.description || '',
         price: productPrice,
-      },
+        // Preserve product metadata for URL resolution
+        product_level: item.product?.product_level || item.product?.productLevel,
+        productLevel: item.product?.product_level || item.product?.productLevel,
+        parent_product_id: item.product?.parent_product_id || item.product?.parentProductId,
+        parentProductId: item.product?.parent_product_id || item.product?.parentProductId,
+        product_info_url: item.product?.product_info_url || item.product?.productInfoUrl,
+        productInfoUrl: item.product?.product_info_url || item.product?.productInfoUrl,
+      } as any,
       quantity: item.quantity || 1,
       enabled: item.enabled !== false,
       partNumber: item.partNumber || item.part_number || item.product?.partNumber || 'TBD',
@@ -114,21 +121,30 @@ const mapBomRowsToBomItems = (rows: any[]): BOMItem[] =>
     const storedSlotAssignments = extractSlotAssignments(row?.configuration_data);
     const slotAssignments = deserializeSlotAssignments(storedSlotAssignments);
     const rackLayout = extractRackConfiguration(row?.configuration_data) || buildRackLayoutFromAssignments(storedSlotAssignments);
+    
+    // Use joined product data if available, fallback to row data
+    const productData = row.product || {};
 
     return {
       id: row.id || crypto.randomUUID(),
       product: {
-        id: row.product_id || row.id || crypto.randomUUID(),
-        name: row.name || 'Unknown Product',
-        partNumber: row.part_number || row.partNumber || 'TBD',
-        description: row.description || '',
-        price: row.unit_price || 0,
-      },
+        id: productData.id || row.product_id || crypto.randomUUID(),
+        name: productData.name || row.name || 'Unknown Product',
+        partNumber: productData.part_number || row.part_number || row.partNumber || 'TBD',
+        description: productData.description || row.description || '',
+        price: productData.price || row.unit_price || 0,
+        product_level: productData.product_level,
+        productLevel: productData.product_level,
+        parent_product_id: productData.parent_product_id,
+        parentProductId: productData.parent_product_id,
+        product_info_url: productData.product_info_url,
+        productInfoUrl: productData.product_info_url,
+      } as any,
       parentProduct: null,
       configuration: row.configuration_data || null,
       quantity: row.quantity || 1,
       enabled: row.enabled !== false,
-      partNumber: row.part_number || 'TBD',
+      partNumber: productData.part_number || row.part_number || 'TBD',
       slotAssignments,
       rackConfiguration: rackLayout,
       level4Config: row.configuration_data?.level4Config || null,
@@ -164,11 +180,21 @@ const QuotePDF = () => {
           return;
         }
 
-        // Fetch BOM items from persistent storage
+        // Fetch BOM items from persistent storage with product data
         const { data: bomRows, error: bomError } = await supabase
           .from('bom_items')
           .select(`
             *,
+            product:products!bom_items_product_id_fkey (
+              id,
+              name,
+              description,
+              price,
+              product_level,
+              parent_product_id,
+              product_info_url,
+              part_number
+            ),
             bom_level4_values (
               id,
               level4_config_id,
