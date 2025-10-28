@@ -766,10 +766,11 @@ const attachInfoUrlForPdf = async <T extends Record<string, any>>(items: T[]): P
           : sanitizeHttpUrl(item.resolvedInfoUrl) ?? sanitizedExistingProductUrl;
 
     const mergedProduct =
-      level === 2
+      level === 2 || level === 3
         ? {
             ...(item?.product ?? {}),
             productInfoUrl: sanitizedResolved ?? sanitizedExistingProductUrl ?? undefined,
+            product_info_url: sanitizedResolved ?? sanitizedExistingProductUrl ?? undefined,
           }
         : item?.product;
 
@@ -3516,20 +3517,6 @@ export const generateQuotePDF = async (
                         sanitizeHttpUrl((parentLevel2Item?.product as any)?.productInfoUrl) ??
                         sanitizeHttpUrl((parentLevel2Item?.product as any)?.product_info_url)
                       : undefined);
-
-                  // Debug logging
-                  if (normalizedLevel === 2 || normalizedLevel === 3) {
-                    console.log(`📄 PDF Link Debug - ${item.product.name}:`, {
-                      level: normalizedLevel,
-                      resolvedInfoUrl: item?.resolvedInfoUrl,
-                      productInfoUrl: (item?.product as any)?.productInfoUrl,
-                      product_info_url: (item?.product as any)?.product_info_url,
-                      parentLevel2Id,
-                      hasParentItem: !!parentLevel2Item,
-                      parentResolvedUrl: parentLevel2Item?.resolvedInfoUrl,
-                      finalInfoUrl: infoUrl
-                    });
-                  }
 
                   const shouldRenderLink =
                     !!infoUrl && normalizedLevel !== 1 && normalizedLevel !== 4;
