@@ -409,7 +409,7 @@ class ProductDataService {
 
   async updateLevel1Product(id: string, productData: Partial<Level1Product>): Promise<Level1Product> {
     try {
-      const { displayName, asset_type_id, category, rackConfigurable, ...restOfProductData } = productData;
+      const { displayName, asset_type_id, category, rackConfigurable, type, ...restOfProductData } = productData;
       const { data: currentProduct, error: fetchError } = await supabase
         .from('products')
         .select('*')
@@ -910,7 +910,36 @@ class ProductDataService {
     }
   };
   
-  deleteLevel1Product = async (id: string) => {};
+  deleteLevel1Product = async (id: string) => {
+    try {
+      // First delete any level1_level2_relationships
+      const { error: relationshipError } = await supabase
+        .from('level1_level2_relationships')
+        .delete()
+        .eq('level1_product_id', id);
+
+      if (relationshipError) {
+        console.error('Error deleting level1_level2_relationships:', relationshipError);
+      }
+
+      // Delete the product
+      const { error: productError } = await supabase
+        .from('products')
+        .delete()
+        .eq('id', id)
+        .eq('product_level', 1);
+
+      if (productError) {
+        throw productError;
+      }
+
+      // Update local cache
+      this.level1Products = this.level1Products.filter(product => product.id !== id);
+    } catch (error) {
+      console.error('Error deleting Level 1 product:', error);
+      throw error;
+    }
+  };
   
   async updateLevel2Product(id: string, productData: Partial<Level2Product>): Promise<Level2Product> {
     try {
@@ -961,7 +990,66 @@ class ProductDataService {
     }
   }
   
-  deleteLevel2Product = async (id: string) => {};
+  deleteLevel2Product = async (id: string) => {
+    try {
+      // Delete level2_level3_relationships
+      const { error: rel3Error } = await supabase
+        .from('level2_level3_relationships')
+        .delete()
+        .eq('level2_product_id', id);
+
+      if (rel3Error) {
+        console.error('Error deleting level2_level3_relationships:', rel3Error);
+      }
+
+      // Delete level1_level2_relationships
+      const { error: rel1Error } = await supabase
+        .from('level1_level2_relationships')
+        .delete()
+        .eq('level2_product_id', id);
+
+      if (rel1Error) {
+        console.error('Error deleting level1_level2_relationships:', rel1Error);
+      }
+
+      // Delete chassis_configurations
+      const { error: chassisError } = await supabase
+        .from('chassis_configurations')
+        .delete()
+        .eq('level2_product_id', id);
+
+      if (chassisError) {
+        console.error('Error deleting chassis_configurations:', chassisError);
+      }
+
+      // Delete part_number_configs
+      const { error: partNumberError } = await supabase
+        .from('part_number_configs')
+        .delete()
+        .eq('level2_product_id', id);
+
+      if (partNumberError) {
+        console.error('Error deleting part_number_configs:', partNumberError);
+      }
+
+      // Delete the product
+      const { error: productError } = await supabase
+        .from('products')
+        .delete()
+        .eq('id', id)
+        .eq('product_level', 2);
+
+      if (productError) {
+        throw productError;
+      }
+
+      // Update local cache
+      this.level2Products = this.level2Products.filter(product => product.id !== id);
+    } catch (error) {
+      console.error('Error deleting Level 2 product:', error);
+      throw error;
+    }
+  };
   deleteLevel3Product = async (id: string) => {
     try {
       const { error: relationshipDeleteError } = await supabase
