@@ -503,6 +503,30 @@ export class Level4Service {
   }
 
   /**
+   * Delete a Level 4 configuration
+   */
+  static async deleteLevel4Config(configId: string): Promise<void> {
+    try {
+      const supabase = getSupabaseClient();
+      
+      const { error } = await supabase
+        .from('level4_configs')
+        .delete()
+        .eq('id', configId);
+
+      if (error) {
+        throw error;
+      }
+      
+      console.log('Level 4 config deleted successfully:', configId);
+    } catch (error) {
+      console.error('Error deleting Level 4 config:', error);
+      throw error;
+    }
+  }
+
+
+  /**
    * Save BOM Level 4 configuration value with robust validation and session management
    */
   static async saveBOMLevel4Value(
