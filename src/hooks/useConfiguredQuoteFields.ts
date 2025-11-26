@@ -209,7 +209,11 @@ export const useConfiguredQuoteFields = (
       const activeRules = getActiveConditionalRules(field, fieldValues[field.id]);
       activeRules.forEach((rule) => {
         rule.fields.forEach((conditionalField) => {
-          if (includeInQuoteOnly && !conditionalField.include_in_pdf) {
+          // Use explicit Boolean check for include_in_pdf
+          const shouldIncludeInPdf = Boolean(conditionalField.include_in_pdf);
+          
+          // Skip if we only want quote fields and this isn't marked for PDF inclusion
+          if (includeInQuoteOnly && !shouldIncludeInPdf) {
             return;
           }
 
@@ -219,7 +223,7 @@ export const useConfiguredQuoteFields = (
             type: conditionalField.type,
             required: conditionalField.required,
             enabled: conditionalField.enabled ?? true,
-            include_in_pdf: conditionalField.include_in_pdf ?? false,
+            include_in_pdf: shouldIncludeInPdf,
             formattedValue: formatQuoteFieldValue(fieldValues[conditionalField.id], conditionalField.type),
             isConditional: true,
             parentFieldId: field.id,
