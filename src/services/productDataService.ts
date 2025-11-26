@@ -455,8 +455,12 @@ class ProductDataService {
 
   async createLevel2Product(productData: Omit<Level2Product, 'id'>): Promise<Level2Product> {
     try {
-      // Generate a unique ID from the product name
-      const productId = generateSlug(productData.name);
+      // Generate a unique ID from the product name with timestamp to avoid collisions
+      const baseSlug = generateSlug(productData.name);
+      const timestamp = Date.now();
+      const productId = `${baseSlug}-${timestamp}`;
+      
+      console.log('Creating Level 2 product with ID:', productId, 'from name:', productData.name);
       
       const { parentProductId, chassisType, image, productInfoUrl, type, ...restOfProductData } = productData;
       const { data, error } = await supabase
@@ -480,7 +484,10 @@ class ProductDataService {
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Database error creating Level 2 product:', error);
+        throw error;
+      }
 
       const newProduct: Level2Product = {
         id: data.id,
