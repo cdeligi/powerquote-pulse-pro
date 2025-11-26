@@ -33,24 +33,48 @@ export const normalizeQuoteFieldConditionalRules = (raw: unknown): QuoteFieldCon
     return [];
   }
 
+  let rules: any[];
+  
   if (Array.isArray(raw)) {
-    return raw as QuoteFieldConditionalRule[];
-  }
-
-  if (typeof raw === 'object') {
-    return raw as QuoteFieldConditionalRule[];
-  }
-
-  if (typeof raw === 'string') {
+    rules = raw;
+  } else if (typeof raw === 'string') {
     try {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed)) {
-        return parsed as QuoteFieldConditionalRule[];
+        rules = parsed;
+      } else {
+        return [];
       }
     } catch (error) {
       console.warn('Failed to parse conditional logic JSON', error);
+      return [];
     }
+  } else if (typeof raw === 'object') {
+    rules = [raw];
+  } else {
+    return [];
   }
 
-  return [];
+  // Deep normalize each rule and its fields
+  return rules.map((rule) => ({
+    ...rule,
+    id: rule.id || '',
+    triggerValues: Array.isArray(rule.triggerValues) ? rule.triggerValues : [],
+    displayMode: rule.displayMode || 'inline',
+    title: rule.title || '',
+    description: rule.description || '',
+    fields: Array.isArray(rule.fields) 
+      ? rule.fields.map((field: any) => ({
+          ...field,
+          id: field.id || '',
+          label: field.label || '',
+          type: field.type || 'text',
+          required: Boolean(field.required),
+          enabled: field.enabled !== false, // Default to true if undefined
+          include_in_pdf: Boolean(field.include_in_pdf), // Ensure boolean
+          options: field.options ? normalizeQuoteFieldOptions(field.options) : undefined,
+          helperText: field.helperText || '',
+        }))
+      : [],
+  }));
 };
