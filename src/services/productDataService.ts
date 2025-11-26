@@ -455,7 +455,7 @@ class ProductDataService {
 
   async createLevel2Product(productData: Omit<Level2Product, 'id'>): Promise<Level2Product> {
     try {
-      const { parentProductId, chassisType, image, productInfoUrl, ...restOfProductData } = productData;
+      const { parentProductId, chassisType, image, productInfoUrl, type, ...restOfProductData } = productData;
       const { data, error } = await supabase
         .from('products')
         .insert({
