@@ -1786,6 +1786,43 @@ export const generateQuotePDF = async (
       .replace(/'/g, '&#39;');
   };
 
+  // Helper function to extract conditional fields that should be included in PDF
+  const getActiveConditionalFields = (
+    parentField: any,
+    fieldValue: any,
+    combinedQuoteFields: Record<string, any>
+  ): Array<{ id: string; label: string; value: any }> => {
+    if (!parentField.conditional_logic || !Array.isArray(parentField.conditional_logic)) {
+      return [];
+    }
+    
+    // Normalize the trigger value for comparison
+    const normalizeValue = (val: any) => String(val).trim().toLowerCase();
+    const currentValue = normalizeValue(fieldValue);
+    
+    const results: Array<{ id: string; label: string; value: any }> = [];
+    
+    parentField.conditional_logic.forEach((rule: any) => {
+      // Check if current value triggers this rule
+      const triggers = (rule.triggerValues || []).map(normalizeValue);
+      if (!triggers.includes(currentValue)) return;
+      
+      // Include conditional fields that have include_in_pdf = true
+      (rule.fields || []).forEach((condField: any) => {
+        if (condField.include_in_pdf) {
+          const value = combinedQuoteFields[condField.id] || 'Not specified';
+          results.push({
+            id: condField.id,
+            label: condField.label,
+            value
+          });
+        }
+      });
+    });
+    
+    return results;
+  };
+
   const normalizeLevel4Options = (rawOptions: any): NormalizedLevel4Option[] => {
     if (!rawOptions) return [];
 
@@ -3464,12 +3501,37 @@ export const generateQuotePDF = async (
                 value = String(value).replace(/</g, '&lt;').replace(/>/g, '&gt;');
               }
 
-              return `
+              // Get conditional fields that should be included based on parent field value
+              const conditionalFields = getActiveConditionalFields(field, found, combinedQuoteFields);
+              
+              // Render parent field
+              const parentHTML = `
                 <div class="field-row">
                   <div class="field-label">${field.label}:</div>
                   <div class="field-value">${value}</div>
                 </div>
               `;
+              
+              // Render conditional fields
+              const conditionalHTML = conditionalFields.map(cf => {
+                let cfValue = cf.value;
+                if (cfValue && typeof cfValue === 'object') {
+                  cfValue = JSON.stringify(cfValue);
+                } else if (cfValue === null || cfValue === undefined || cfValue === '') {
+                  cfValue = 'Not specified';
+                } else {
+                  cfValue = escapeHtml(cfValue);
+                }
+                
+                return `
+                  <div class="field-row">
+                    <div class="field-label">${escapeHtml(cf.label)}:</div>
+                    <div class="field-value">${cfValue}</div>
+                  </div>
+                `;
+              }).join('');
+              
+              return parentHTML + conditionalHTML;
             }).join('')}
 
           </div>
