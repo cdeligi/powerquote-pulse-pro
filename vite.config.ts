@@ -1,8 +1,6 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
-// Temporarily disabled lovable-tagger due to WS_TOKEN error
-// import { componentTagger } from "lovable-tagger";
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
@@ -13,8 +11,6 @@ export default defineConfig(({ mode }) => ({
   },
   plugins: [
     react(),
-    // Temporarily disabled lovable-tagger due to WS_TOKEN error
-    // mode === 'development' && componentTagger(),
   ].filter(Boolean),
   resolve: {
     alias: {
