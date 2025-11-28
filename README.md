@@ -1,80 +1,60 @@
-# Welcome to your Lovable project
+# PowerQuote Pulse Pro
 
-## Project info
+**Copyright © 2025 Carlos Deligi. All Rights Reserved.**
 
-**URL**: https://lovable.dev/projects/8d08ecff-3bea-40af-9fd0-71cf8c824485
+**Project Timeline:** May 2025 - December 2025
 
-## How can I edit this code?
+## Overview
 
-There are several ways of editing your application.
+PowerQuote Pulse Pro is a comprehensive enterprise quoting system designed for power monitoring and control equipment. The application provides advanced product configuration, quote management, and approval workflows for electrical monitoring systems.
 
-**Use Lovable**
-
-Simply visit the [Lovable Project](https://lovable.dev/projects/8d08ecff-3bea-40af-9fd0-71cf8c824485) and start prompting.
-
-Changes made via Lovable will be committed automatically to this repo.
-
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Create a `.env` file from the included template.
-cp .env.example .env
-# Edit the new `.env` file and set the variables listed below.
-
-# Step 5: Start the development server with auto-reloading and an instant preview.
-npm run dev
-```
-
-**Edit a file directly in GitHub**
-
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
-
-**Use GitHub Codespaces**
-
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
-
-## What technologies are used for this project?
+## Technologies
 
 This project is built with:
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+- **Frontend:** React 18, TypeScript, Vite
+- **UI Framework:** shadcn-ui, Tailwind CSS, Radix UI
+- **Backend:** Supabase (PostgreSQL, Authentication, Edge Functions)
+- **State Management:** TanStack Query, React Context
+- **Additional Libraries:** React Router, React Hook Form, Zod validation
 
-## How can I deploy this project?
+## Getting Started
 
-Simply open [Lovable](https://lovable.dev/projects/8d08ecff-3bea-40af-9fd0-71cf8c824485) and click on Share -> Publish.
+### Prerequisites
 
-## Can I connect a custom domain to my Lovable project?
+- Node.js 18+ and npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+- Supabase account and project
 
-Yes, you can!
+### Installation
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+1. Clone the repository:
+```sh
+git clone <YOUR_GIT_URL>
+cd <YOUR_PROJECT_NAME>
+```
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+2. Install dependencies:
+```sh
+npm install
+```
+
+3. Configure environment variables:
+```sh
+cp .env.example .env
+```
+
+Edit `.env` and add your Supabase credentials:
+```dotenv
+VITE_SUPABASE_URL=<your-supabase-url>
+VITE_SUPABASE_ANON_KEY=<your-supabase-anon-key>
+```
+
+4. Start the development server:
+```sh
+npm run dev
+```
+
+The application will be available at `http://localhost:8080`
 
 ## Environment Variables
 
@@ -109,24 +89,36 @@ By default, Vite listens on <http://localhost:5173>. This project overrides the
 port to `8080` in [`vite.config.ts`](vite.config.ts) under `server.port`. Adjust
 that value if you'd like to run the server on a different port.
 
-## Running Supabase Migrations
+## Database Migrations
 
-With the Supabase CLI installed and authenticated, apply the migrations in the `supabase` directory with:
+With the Supabase CLI installed and authenticated, apply migrations:
 
 ```sh
 npx supabase db push
 ```
 
-## Cypress Tests
+## Testing
 
-End-to-end tests are located in the `cypress/` folder. Execute them in headless mode with:
+End-to-end tests are located in the `cypress/` folder:
 
 ```sh
+# Run tests in headless mode
 npx cypress run
+
+# Open interactive test runner
+npx cypress open
 ```
 
-You can also open the interactive runner using `npx cypress open`.
+## Deployment
+
+The application can be deployed to any static hosting provider that supports SPA routing. Ensure environment variables are configured in your hosting platform.
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is proprietary software.
+
+**Copyright © 2025 Carlos Deligi. All Rights Reserved.**
+
+Unauthorized copying, modification, distribution, or use of this software, via any medium, is strictly prohibited without explicit written permission from the copyright holder.
+
+See the [LICENSE](LICENSE) file for full terms.
