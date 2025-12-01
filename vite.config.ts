@@ -7,28 +7,15 @@ export default defineConfig(({ mode }) => ({
   server: {
     host: "::",
     port: 8080,
-    hmr: false,
+    hmr: false, // Explicitly disable HMR
   },
   plugins: [
     react(),
-  ],
+  ].filter(Boolean),
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
     },
   },
-  optimizeDeps: {
-    include: ['zod'],
-    esbuildOptions: {
-      target: 'es2020',
-    },
-  },
-  build: {
-    target: 'es2020',
-    commonjsOptions: {
-      include: [/node_modules/],
-      transformMixedEsModules: true,
-    },
-  },
-  envPrefix: ['VITE_'],
+  envPrefix: ['VITE_'], // This is crucial for loading environment variables
 }));
