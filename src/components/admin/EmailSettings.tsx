@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import DOMPurify from 'dompurify';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -502,7 +503,7 @@ export const EmailSettings = () => {
               <CardContent>
                 <div
                   className="border rounded p-4 bg-white"
-                  dangerouslySetInnerHTML={{ __html: previewHtml }}
+                  dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(previewHtml) }}
                 />
               </CardContent>
             </Card>

@@ -88,10 +88,11 @@ export default function UserRequestsTab() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error('No session found');
 
-      const response = await fetch(`https://cwhmxpitwblqxgrvaigg.supabase.co/functions/v1/admin-users/approve-request`, {
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-users/approve-request`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${session.access_token}`,
+          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ requestId }),
@@ -130,10 +131,11 @@ export default function UserRequestsTab() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error('No session found');
 
-      const response = await fetch(`https://cwhmxpitwblqxgrvaigg.supabase.co/functions/v1/admin-users/reject-request`, {
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-users/reject-request`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${session.access_token}`,
+          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ 
