@@ -1,10 +1,9 @@
 import { useEffect, useState } from 'react';
-import { getSupabaseClient, getSupabaseAdminClient, isAdminAvailable } from "@/integrations/supabase/client";
-
-const supabase = getSupabaseClient();
-const supabaseAdmin = getSupabaseAdminClient();;
+import { getSupabaseClient } from "@/integrations/supabase/client";
 import { useAuth } from '@/hooks/useAuth';
 import { Role, UserFeatureOverride } from '@/types/auth';
+
+const supabase = getSupabaseClient();
 
 interface PermissionData {
   features: Record<string, boolean>;
