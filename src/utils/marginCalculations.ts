@@ -168,13 +168,21 @@ export const extractCommissionFromQuoteFields = (quoteFields: Record<string, any
   const totalCommissionRate = contractCommissionRate + specBonusRate;
   
   // Get benefit type - Discount vs Commission
+  // Default to 'commission' when rep is involved and there are rates set
   const benefitType = quoteFields['conditional-6a274080-0a55-4ba0-b6c4-fe70892baf4c'] ||
                       quoteFields['benefit_type'] ||
                       quoteFields['benefitType'];
   
-  const commissionType: 'discount' | 'commission' | null = 
-    benefitType === 'Commission' || benefitType === 'commission' ? 'commission' :
-    benefitType === 'Discount' || benefitType === 'discount' ? 'discount' : null;
+  let commissionType: 'discount' | 'commission' | null = null;
+  
+  if (benefitType === 'Commission' || benefitType === 'commission') {
+    commissionType = 'commission';
+  } else if (benefitType === 'Discount' || benefitType === 'discount') {
+    commissionType = 'discount';
+  } else if (totalCommissionRate > 0) {
+    // Default to 'commission' when rates are set but benefit type not specified
+    commissionType = 'commission';
+  }
   
   return { isRepInvolved, contractCommissionRate, specBonusRate, totalCommissionRate, commissionType };
 };
