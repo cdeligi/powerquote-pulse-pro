@@ -126,49 +126,57 @@ export const parseCommissionRate = (value: string | number | undefined | null): 
 
 /**
  * Extract commission information from quote fields
+ * Sums Contract Commission Rate + Spec Bonus Granted for total commission
  */
 export const extractCommissionFromQuoteFields = (quoteFields: Record<string, any> | null | undefined): {
   isRepInvolved: boolean;
-  commissionRate: number;
+  contractCommissionRate: number;
+  specBonusRate: number;
+  totalCommissionRate: number;
   commissionType: 'discount' | 'commission' | null;
 } => {
   if (!quoteFields) {
-    return { isRepInvolved: false, commissionRate: 0, commissionType: null };
+    return { isRepInvolved: false, contractCommissionRate: 0, specBonusRate: 0, totalCommissionRate: 0, commissionType: null };
   }
   
-  // Check for rep involvement - look for common field patterns
-  const repInvolvedValue = quoteFields['rep-involved'] || 
+  // Check for rep involvement - actual field ID is 'is-rep-involved'
+  const repInvolvedValue = quoteFields['is-rep-involved'] || 
+                           quoteFields['rep-involved'] || 
                            quoteFields['is_rep_involved'] || 
-                           quoteFields['isRepInvolved'] ||
-                           quoteFields['conditional-21e36d35-e1c2-4e10-81e4-d1a2fdb8cc90']; // Known rep involved field ID
+                           quoteFields['isRepInvolved'];
   
   const isRepInvolved = repInvolvedValue === 'Yes' || 
                         repInvolvedValue === true || 
                         repInvolvedValue === 'true';
   
   if (!isRepInvolved) {
-    return { isRepInvolved: false, commissionRate: 0, commissionType: null };
+    return { isRepInvolved: false, contractCommissionRate: 0, specBonusRate: 0, totalCommissionRate: 0, commissionType: null };
   }
   
-  // Get commission rate - look for common field patterns
-  const rateValue = quoteFields['partner-spec-change-bonus'] ||
-                    quoteFields['commission_rate'] ||
-                    quoteFields['commissionRate'] ||
-                    quoteFields['contract_commission_rate'];
+  // Get Contract Commission Rate (e.g., "10%", "15%")
+  const contractRateValue = quoteFields['partner-spec-change-bonus'] ||
+                            quoteFields['commission_rate'] ||
+                            quoteFields['contract_commission_rate'];
+  const contractCommissionRate = parseCommissionRate(contractRateValue);
   
-  const commissionRate = parseCommissionRate(rateValue);
+  // Get Spec Bonus Granted (e.g., "5%", "NO")
+  const specBonusValue = quoteFields['conditional-1223ea02-0d3b-43bd-a483-143d4a4f2ee0'] ||
+                         quoteFields['spec_bonus_granted'];
+  const specBonusRate = specBonusValue === 'NO' || !specBonusValue ? 0 : parseCommissionRate(specBonusValue);
   
-  // Get benefit type - look for the conditional field that asks discount vs commission
+  // Total commission is sum of both rates
+  const totalCommissionRate = contractCommissionRate + specBonusRate;
+  
+  // Get benefit type - Discount vs Commission
   const benefitType = quoteFields['conditional-6a274080-0a55-4ba0-b6c4-fe70892baf4c'] ||
                       quoteFields['benefit_type'] ||
-                      quoteFields['benefitType'] ||
-                      quoteFields['partner_benefit_type'];
+                      quoteFields['benefitType'];
   
   const commissionType: 'discount' | 'commission' | null = 
     benefitType === 'Commission' || benefitType === 'commission' ? 'commission' :
     benefitType === 'Discount' || benefitType === 'discount' ? 'discount' : null;
   
-  return { isRepInvolved, commissionRate, commissionType };
+  return { isRepInvolved, contractCommissionRate, specBonusRate, totalCommissionRate, commissionType };
 };
 
 /**

@@ -203,13 +203,19 @@ const QuoteDetails = ({
     const totalRevenue = bomItems.reduce((sum, item) => sum + (item.unit_price * item.quantity), 0);
     const totalCost = bomItems.reduce((sum, item) => sum + (item.unit_cost * item.quantity), 0);
     
-    // Extract commission info from quote fields
+    // Extract commission info from quote fields (includes contract rate + spec bonus)
     const commissionInfo = extractCommissionFromQuoteFields(quote.quote_fields as Record<string, any>);
+    
+    // Calculate using TOTAL commission rate (contract + spec bonus)
     const partnerCommissionCost = calculatePartnerCommission(
       totalRevenue,
-      commissionInfo.commissionRate,
+      commissionInfo.totalCommissionRate,
       commissionInfo.commissionType
     );
+    
+    // Individual breakdown amounts
+    const contractCommissionAmount = calculatePartnerCommission(totalRevenue, commissionInfo.contractCommissionRate, commissionInfo.commissionType);
+    const specBonusAmount = calculatePartnerCommission(totalRevenue, commissionInfo.specBonusRate, commissionInfo.commissionType);
     
     const effectiveTotalCost = totalCost + partnerCommissionCost;
     const grossProfit = totalRevenue - effectiveTotalCost;
@@ -219,6 +225,8 @@ const QuoteDetails = ({
       totalRevenue, 
       totalCost, 
       partnerCommissionCost,
+      contractCommissionAmount,
+      specBonusAmount,
       effectiveTotalCost,
       grossProfit, 
       marginPercentage,
@@ -442,14 +450,29 @@ const QuoteDetails = ({
                   <span className="text-white font-medium">{formatCurrency(totals.totalRevenue)}</span>
                 </div>
                 
-                {/* Partner Commission Display */}
+                {/* Partner Commission Display with Breakdown */}
                 {canShowPartnerCommission && totals.partnerCommissionCost > 0 && (
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-gray-400 flex items-center gap-1">
-                      <Users className="h-3 w-3" />
-                      Partner Commission ({(totals.commissionInfo.commissionRate * 100).toFixed(0)}%)
-                    </span>
-                    <span className="text-purple-400 font-medium">{formatCurrency(totals.partnerCommissionCost)}</span>
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-gray-400 flex items-center gap-1">
+                        <Users className="h-3 w-3" />
+                        Partner Commission ({(totals.commissionInfo.totalCommissionRate * 100).toFixed(0)}%)
+                      </span>
+                      <span className="text-purple-400 font-medium">{formatCurrency(totals.partnerCommissionCost)}</span>
+                    </div>
+                    {/* Show breakdown if both rates are present */}
+                    {totals.commissionInfo.contractCommissionRate > 0 && totals.commissionInfo.specBonusRate > 0 && (
+                      <div className="pl-5 space-y-0.5 text-xs">
+                        <div className="flex items-center justify-between text-gray-500">
+                          <span>Contract Rate ({(totals.commissionInfo.contractCommissionRate * 100).toFixed(0)}%)</span>
+                          <span>{formatCurrency(totals.contractCommissionAmount)}</span>
+                        </div>
+                        <div className="flex items-center justify-between text-gray-500">
+                          <span>Spec Bonus ({(totals.commissionInfo.specBonusRate * 100).toFixed(0)}%)</span>
+                          <span>{formatCurrency(totals.specBonusAmount)}</span>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
                 
