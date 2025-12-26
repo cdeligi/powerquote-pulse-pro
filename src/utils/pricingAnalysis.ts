@@ -506,9 +506,10 @@ export function calculatePricingKPIs(dataPoints: PricingDataPoint[], missingCoun
 
 export interface ScatterPoint {
   x: number; // month index 0-11
-  y: number; // delta % or delta $
+  y: number; // delta % or approved price (in dollar mode)
   month: string;
   dataPoint: PricingDataPoint;
+  isListPrice?: boolean; // true for list price reference markers
 }
 
 export function prepareScatterData(
@@ -517,9 +518,24 @@ export function prepareScatterData(
 ): ScatterPoint[] {
   return dataPoints.map((dp) => ({
     x: dp.monthIndex,
-    y: mode === "percent" ? dp.deltaPercent : dp.deltaDollar,
+    // For dollar mode, show actual approved price instead of delta
+    y: mode === "percent" ? dp.deltaPercent : dp.approvedPrice,
     month: dp.month,
     dataPoint: dp,
+    isListPrice: false,
+  }));
+}
+
+// Create list price reference points for dollar view
+export function prepareListPriceData(
+  dataPoints: PricingDataPoint[]
+): ScatterPoint[] {
+  return dataPoints.map((dp) => ({
+    x: dp.monthIndex,
+    y: dp.listPrice,
+    month: dp.month,
+    dataPoint: dp,
+    isListPrice: true,
   }));
 }
 
