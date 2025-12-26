@@ -409,10 +409,10 @@ export function transformToDataPoints(
     let approvedPrice = row.approved_unit_price ?? row.unit_price;
     
     // Apply quote-level discount if present (approved_discount takes priority over requested_discount)
+    // Discount is stored as a decimal (e.g., 0.20 means 20%)
     const quoteDiscount = quote.approved_discount ?? quote.requested_discount ?? 0;
     if (quoteDiscount > 0 && approvedPrice != null) {
-      // Discount is stored as a percentage (e.g., 5 means 5%), apply it
-      approvedPrice = approvedPrice * (1 - quoteDiscount / 100);
+      approvedPrice = approvedPrice * (1 - quoteDiscount);
     }
 
     // Check validity
