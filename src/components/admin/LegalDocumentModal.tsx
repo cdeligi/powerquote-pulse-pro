@@ -2,10 +2,9 @@ import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
-import { getSupabaseClient, getSupabaseAdminClient, isAdminAvailable } from "@/integrations/supabase/client";
+import { getSupabaseClient } from "@/integrations/supabase/client";
 
 const supabase = getSupabaseClient();
-const supabaseAdmin = getSupabaseAdminClient();;
 
 interface LegalDocumentModalProps {
   isOpen: boolean;

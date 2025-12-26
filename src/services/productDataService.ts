@@ -7,11 +7,10 @@ import {
   BushingTapModelOption
 } from "@/types/product";
 import { ChassisType, ChassisTypeFormData } from "@/types/product/chassis-types";
-import { getSupabaseClient, getSupabaseAdminClient, isAdminAvailable } from "@/integrations/supabase/client";
+import { getSupabaseClient } from "@/integrations/supabase/client";
 import { v4 as uuidv4 } from 'uuid';
 
 const supabase = getSupabaseClient();
-const supabaseAdmin = getSupabaseAdminClient();;
 
 // Helper function to generate a slug from a name
 function generateSlug(name: string): string {

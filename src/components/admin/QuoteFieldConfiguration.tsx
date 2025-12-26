@@ -23,7 +23,7 @@ import {
 } from "lucide-react";
 import { User } from "@/types/auth";
 import { useToast } from "@/hooks/use-toast";
-import { getSupabaseClient, getSupabaseAdminClient } from "@/integrations/supabase/client";
+import { getSupabaseClient } from "@/integrations/supabase/client";
 import ConditionalLogicEditor from "@/components/admin/ConditionalLogicEditor";
 import {
   QuoteFieldConfiguration as QuoteFieldConfig,
@@ -35,7 +35,6 @@ import {
 } from "@/utils/quoteFieldNormalization";
 
 const supabase = getSupabaseClient();
-const supabaseAdmin = getSupabaseAdminClient();
 const POSTGREST_SCHEMA_RELOAD_ERROR_CODE = "PGRST204";
 
 const getMutationErrorMessage = (error: { code?: string; message?: string }) => {
@@ -57,7 +56,7 @@ interface PostgrestSchemaRetryOptions {
 
 async function runWithPostgrestSchemaRetry<T>(
   operation: () => Promise<PostgrestSingleResponse<T>>,
-  { reloadClient = supabaseAdmin ?? supabase, maxAttempts = 6 }: PostgrestSchemaRetryOptions = {}
+  { reloadClient = supabase, maxAttempts = 6 }: PostgrestSchemaRetryOptions = {}
 ): Promise<PostgrestSingleResponse<T>> {
   let lastResult: PostgrestSingleResponse<T> | null = null;
 
@@ -152,7 +151,7 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
     setQuoteFields(updatedFields);
     
     // Save new orders to database
-    const orderClient = supabaseAdmin ?? supabase;
+    const orderClient = supabase;
     Promise.all(updatedFields.map(field =>
       orderClient
         .from('quote_fields')
@@ -294,7 +293,7 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
 
   const createQuoteField = async (fieldData: Omit<QuoteField, 'id'>) => {
     try {
-      const mutationClient = supabaseAdmin ?? supabase;
+      const mutationClient = supabase;
       const { error } = await runWithPostgrestSchemaRetry(
         async () =>
           await mutationClient
@@ -332,7 +331,7 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
 
   const updateQuoteField = async (fieldId: string, fieldData: Omit<QuoteField, 'id'>) => {
     try {
-      const mutationClient = supabaseAdmin ?? supabase;
+      const mutationClient = supabase;
       const { error } = await runWithPostgrestSchemaRetry(
         async () =>
           await mutationClient
@@ -370,7 +369,7 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
 
   const deleteQuoteField = async (fieldId: string) => {
     try {
-      const deletionClient = supabaseAdmin ?? supabase;
+      const deletionClient = supabase;
       const { error } = await deletionClient
         .from('quote_fields')
         .delete()
