@@ -11,6 +11,7 @@ import {
   Menu,
   Wrench,
   FileText,
+  BarChart3,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -43,6 +44,7 @@ export function ModernSidebar({ user, onLogout }: ModernSidebarProps) {
     { title: 'Dashboard', icon: LayoutDashboard, path: '/', viewId: 'overview', useHash: true },
     { title: 'BOM Builder', icon: Wrench, path: '/bom-new', viewId: 'bom', useHash: false },
     { title: 'Quotes', icon: FileText, path: '/', viewId: 'quotes', useHash: true },
+    { title: 'Pricing Analysis', icon: BarChart3, path: '/', viewId: 'pricing-analysis', useHash: true },
     ...(user.role === 'ADMIN'
       ? [{ title: 'Admin Panel', icon: Settings, path: '/', viewId: 'admin', useHash: true }]
       : []),
