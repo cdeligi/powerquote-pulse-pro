@@ -32,24 +32,18 @@ export interface QuoteData {
   createdAt: string;
 }
 
-// Fiscal year starts October 1st
-// FY2025 = Oct 1, 2024 - Sep 30, 2025
+// Fiscal year uses calendar year (January 1st start)
+// FY2025 = Jan 1, 2025 - Dec 31, 2025
 export const getFiscalYear = (date: Date): string => {
-  const month = date.getMonth(); // 0-11
   const year = date.getFullYear();
-  
-  // If month is October (9) or later, it's the next fiscal year
-  if (month >= 9) {
-    return `FY${year + 1}`;
-  }
   return `FY${year}`;
 };
 
 export const getFiscalYearRange = (fiscalYear: string): { start: Date; end: Date } => {
   const year = parseInt(fiscalYear.replace('FY', ''), 10);
   return {
-    start: new Date(year - 1, 9, 1), // October 1 of previous calendar year
-    end: new Date(year, 8, 30, 23, 59, 59, 999) // September 30 of fiscal year
+    start: new Date(year, 0, 1), // January 1
+    end: new Date(year, 11, 31, 23, 59, 59, 999) // December 31
   };
 };
 
