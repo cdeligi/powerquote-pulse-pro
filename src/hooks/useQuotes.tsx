@@ -1,9 +1,8 @@
 import { useState, useEffect } from 'react';
-import { getSupabaseClient, getSupabaseAdminClient, isAdminAvailable } from "@/integrations/supabase/client";
+import { getSupabaseClient } from "@/integrations/supabase/client";
+import { useToast } from '@/hooks/use-toast';
 
 const supabase = getSupabaseClient();
-const supabaseAdmin = getSupabaseAdminClient();
-import { useToast } from '@/hooks/use-toast';
 import {
   extractAdditionalQuoteInformation,
   parseQuoteFieldsValue,
@@ -211,7 +210,7 @@ export const useQuotes = () => {
         updateData.rejection_reason = trimmedReason ? trimmedReason : null;
       }
 
-      const client = supabaseAdmin ?? supabase;
+      const client = supabase;
 
       const currentQuote = quotes.find((quote) => quote.id === quoteId);
       const { error } = await updateQuoteWithAdditionalInfo({

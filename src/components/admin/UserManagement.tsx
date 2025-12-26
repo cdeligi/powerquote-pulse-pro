@@ -19,10 +19,9 @@ import {
   Edit,
   Trash2
 } from "lucide-react";
-import { getSupabaseClient, getSupabaseAdminClient, isAdminAvailable } from "@/integrations/supabase/client";
+import { getSupabaseClient } from "@/integrations/supabase/client";
 
 const supabase = getSupabaseClient();
-const supabaseAdmin = getSupabaseAdminClient();;
 import { toast } from "@/hooks/use-toast";
 import UserEditDialog from "./UserEditDialog";
 import UserRequestsTab from "./UserRequestsTab";
@@ -141,7 +140,7 @@ const UserManagement = ({ user }: UserManagementProps) => {
   useEffect(() => {
     const initialize = async () => {
       try {
-        await supabaseAdmin.auth.getSession();
+        await supabase.auth.getSession();
         setAdminClientReady(true);
         setAdminClientError(null);
         if (!initialLoadAttempted) {
@@ -149,8 +148,8 @@ const UserManagement = ({ user }: UserManagementProps) => {
           await loadUsers();
         }
       } catch (error: any) {
-        console.error('Failed to initialize admin client:', error);
-        setAdminClientError(error.message || 'Failed to initialize admin client');
+        console.error('Failed to initialize client:', error);
+        setAdminClientError(error.message || 'Failed to initialize client');
         setAdminClientReady(false);
       }
     };
@@ -158,57 +157,39 @@ const UserManagement = ({ user }: UserManagementProps) => {
     initialize();
   }, []);
 
-  // Load real users directly from database
+  // Load real users via edge function
   const loadUsers = async () => {
-    console.log('Attempting to load users');
+    console.log('Attempting to load users via edge function');
     
     try {
       setLoadingUsers(true);
       
-      if (!isAdminAvailable()) {
-        console.log('Admin client not available');
-        throw new Error('Admin client not initialized. Please refresh the page.');
+      // Get session for auth header
+      const session = await supabase.auth.getSession();
+      if (!session.data.session) {
+        throw new Error('Not authenticated');
       }
 
-      console.log('Fetching users from profiles table...');
+      console.log('Fetching users via admin-users edge function...');
       
-      // Fetch directly from profiles table with all fields
-      const { data: profilesData, error: profilesError } = await supabaseAdmin
-        .from('profiles')
-        .select('*');
-
-      console.log('Profiles query result:', {
-        data: profilesData,
-        error: profilesError
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-users/users`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${session.data.session.access_token}`,
+          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+          'Content-Type': 'application/json'
+        }
       });
 
-      if (profilesError) {
-        console.error('Error fetching profiles:', profilesError);
-        throw profilesError;
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to load users');
       }
 
-      console.log('Profiles data:', profilesData);
-      
-      // Transform profiles data to match expected format
-      const transformedUsers = profilesData?.map(profile => ({
-        id: profile.id,
-        email: profile.email,
-        fullName: `${profile.first_name || ''} ${profile.last_name || ''}`.trim(),
-        role: profile.role,
-        department: profile.department,
-        userStatus: profile.user_status || 'active',
-        jobTitle: profile.job_title,
-        phoneNumber: profile.phone_number,
-        managerEmail: profile.manager_email,
-        companyName: profile.company_name,
-        businessJustification: profile.business_justification,
-        confirmedAt: profile.confirmed_at,
-        lastSignInAt: profile.last_sign_in_at,
-        createdAt: profile.created_at
-      })) || [];
+      const { users: usersData } = await response.json();
 
-      console.log('Transformed users:', transformedUsers);
-      setUsers(transformedUsers);
+      console.log('Users data from edge function:', usersData);
+      setUsers(usersData || []);
     } catch (error: any) {
       console.error('Error loading users:', error);
       toast({
@@ -231,10 +212,6 @@ const UserManagement = ({ user }: UserManagementProps) => {
   // Create new user via admin edge function
   const handleCreateUser = async () => {
     try {
-      if (!supabaseAdmin) {
-        throw new Error('Admin client not initialized. Please refresh the page.');
-      }
-
       // Validate form
       if (!createUserForm.email || !createUserForm.firstName || !createUserForm.lastName || !createUserForm.department) {
         toast({
@@ -263,70 +240,45 @@ const UserManagement = ({ user }: UserManagementProps) => {
         }
       }
 
-      // First check if user already exists
-      const { data: existingUser, error: checkError } = await supabaseAdmin
-        .from('profiles')
-        .select('id')
-        .eq('email', createUserForm.email)
-        .single();
-
-      if (checkError && checkError.code !== 'PGRST116') {
-        throw checkError;
+      // Get session for auth header
+      const session = await supabase.auth.getSession();
+      if (!session.data.session) {
+        throw new Error('Not authenticated');
       }
 
-      if (existingUser) {
-        throw new Error('User with this email already exists');
-      }
-
-      // Create user in Supabase auth first using regular client
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: createUserForm.email,
-        password: createUserForm.password || Math.random().toString(36).substr(2, 10),
-        options: {
-          data: {
-            first_name: createUserForm.firstName,
-            last_name: createUserForm.lastName,
-            role: createUserForm.role,
-            department: createUserForm.department,
-            job_title: createUserForm.jobTitle,
-            phone_number: createUserForm.phoneNumber,
-            manager_email: createUserForm.managerEmail,
-            company_name: createUserForm.companyName,
-            business_justification: createUserForm.businessJustification
-          }
-        }
-      });
-
-      if (authError) {
-        throw authError;
-      }
-
-      // Now create or update the profile record using admin client
-      const { error: profileError } = await supabaseAdmin
-        .from('profiles')
-        .upsert({
-          id: authData.user.id,
+      // Create user via edge function
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-users/users`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session.data.session.access_token}`,
+          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
           email: createUserForm.email,
-          first_name: createUserForm.firstName,
-          last_name: createUserForm.lastName,
+          firstName: createUserForm.firstName,
+          lastName: createUserForm.lastName,
           role: createUserForm.role,
           department: createUserForm.department,
-          job_title: createUserForm.jobTitle,
-          phone_number: createUserForm.phoneNumber,
-          manager_email: createUserForm.managerEmail,
-          company_name: createUserForm.companyName,
-          business_justification: createUserForm.businessJustification
-        });
+          password: createUserForm.password,
+          jobTitle: createUserForm.jobTitle,
+          phoneNumber: createUserForm.phoneNumber,
+          managerEmail: createUserForm.managerEmail,
+          companyName: createUserForm.companyName,
+          businessJustification: createUserForm.businessJustification
+        })
+      });
 
-      if (profileError) {
-        // If profile creation fails, we don't need to delete the auth user
-        // as it will be handled by Supabase's auth system
-        throw profileError;
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to create user');
       }
+
+      const result = await response.json();
 
       toast({
         title: 'Success',
-        description: 'User created successfully!'
+        description: `User created successfully! Temporary password: ${result.tempPassword}`
       });
 
       // Reset form and close dialog
@@ -360,10 +312,6 @@ const UserManagement = ({ user }: UserManagementProps) => {
   // Update user via admin edge function
   const handleUpdateUser = async (userData: any) => {
     try {
-      if (!supabaseAdmin) {
-        throw new Error('Supabase client not initialized');
-      }
-
       // Get session from regular client
       const session = await supabase.auth.getSession();
       if (!session.data.session) {

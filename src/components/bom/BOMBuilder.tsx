@@ -22,7 +22,7 @@ import { productDataService } from '@/services/productDataService';
 import QuoteFieldsSection from './QuoteFieldsSection';
 
 import { toast } from '@/components/ui/use-toast';
-import { getSupabaseClient, getSupabaseAdminClient, isAdminAvailable } from "@/integrations/supabase/client";
+import { getSupabaseClient } from "@/integrations/supabase/client";
 import { generateUniqueDraftName } from '@/utils/draftName';
 import { generateSubmittedQuoteId, normalizeQuoteId, persistNormalizedQuoteId } from '@/utils/quoteIdGenerator';
 import QTMSConfigurationEditor from './QTMSConfigurationEditor';
@@ -45,7 +45,6 @@ import { getCachedRates, fetchLiveExchangeRates, convertCurrencySync } from '@/u
 import { ExchangeRateDisplay } from '@/components/common/ExchangeRateDisplay';
 
 const supabase = getSupabaseClient();
-const supabaseAdmin = getSupabaseAdminClient();
 
 const coalesce = <T,>(...values: Array<T | undefined | null>) => {
   for (const value of values) {

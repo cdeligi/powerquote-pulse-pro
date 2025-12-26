@@ -2148,17 +2148,6 @@ export type Database = {
         | {
             Args: {
               p_action: string
-              p_details?: Json
-              p_ip_address?: string
-              p_severity?: string
-              p_user_agent?: string
-              p_user_id: string
-            }
-            Returns: string
-          }
-        | {
-            Args: {
-              p_action: string
               p_details: string
               p_ip_address: string
               p_severity?: string
@@ -2166,6 +2155,17 @@ export type Database = {
               p_user_id: string
             }
             Returns: undefined
+          }
+        | {
+            Args: {
+              p_action: string
+              p_details?: Json
+              p_ip_address?: string
+              p_severity?: string
+              p_user_agent?: string
+              p_user_id: string
+            }
+            Returns: string
           }
       log_user_security_event: {
         Args: {
