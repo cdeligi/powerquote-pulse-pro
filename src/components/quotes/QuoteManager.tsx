@@ -961,6 +961,20 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
 
         {/* Pipeline Summary Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+          {/* Total Quotes */}
+          <Card className="bg-gray-900 border-gray-800">
+            <CardHeader className="pb-2">
+              <div className="flex items-center gap-2">
+                <FileText className="h-4 w-4 text-blue-500" />
+                <CardTitle className="text-white text-sm">Total Quotes</CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold text-white">{fiscalYearAnalytics.totalQuotes}</div>
+              <p className="text-xs text-gray-400 mt-1">{selectedFiscalYear}</p>
+            </CardContent>
+          </Card>
+
           {/* Quotes In Progress - Consolidated */}
           <Card 
             className="bg-gray-900 border-gray-800 cursor-pointer hover:border-gray-600 transition-colors"
@@ -975,20 +989,6 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
             <CardContent>
               <div className="text-3xl font-bold text-white">{fiscalYearAnalytics.quotesInProgress}</div>
               <p className="text-xs text-gray-400 mt-1">Drafts & Pending</p>
-            </CardContent>
-          </Card>
-
-          {/* Total Quotes */}
-          <Card className="bg-gray-900 border-gray-800">
-            <CardHeader className="pb-2">
-              <div className="flex items-center gap-2">
-                <FileText className="h-4 w-4 text-blue-500" />
-                <CardTitle className="text-white text-sm">Total Quotes</CardTitle>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-white">{fiscalYearAnalytics.totalQuotes}</div>
-              <p className="text-xs text-gray-400 mt-1">{selectedFiscalYear}</p>
             </CardContent>
           </Card>
 
