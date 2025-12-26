@@ -50,6 +50,7 @@ import {
   transformToDataPoints,
   calculatePricingKPIs,
   prepareScatterData,
+  prepareListPriceData,
   filterByMonthRange,
   PricingDataPoint,
   LevelSelection,
@@ -141,6 +142,12 @@ export default function PricingAnalysisDashboard() {
   const scatterData = useMemo(() => {
     if (!pricingResult?.dataPoints) return [];
     return prepareScatterData(pricingResult.dataPoints, viewMode);
+  }, [pricingResult?.dataPoints, viewMode]);
+
+  // Prepare list price reference data for dollar mode
+  const listPriceData = useMemo(() => {
+    if (!pricingResult?.dataPoints || viewMode !== "dollar") return [];
+    return prepareListPriceData(pricingResult.dataPoints);
   }, [pricingResult?.dataPoints, viewMode]);
 
   // Level dropdown options
@@ -560,7 +567,9 @@ export default function PricingAnalysisDashboard() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <BarChart3 className="h-5 w-5 text-primary" />
-              <CardTitle>Price Delta vs List Price</CardTitle>
+              <CardTitle>
+                {viewMode === "percent" ? "Price Delta vs List Price" : "Approved Price vs List Price"}
+              </CardTitle>
             </div>
             <div className="flex items-center gap-2">
               <span className="text-xs text-muted-foreground">View:</span>
@@ -577,7 +586,7 @@ export default function PricingAnalysisDashboard() {
                   size="sm"
                   onClick={() => setViewMode("dollar")}
                 >
-                  Delta $
+                  Price $
                 </Button>
               </div>
             </div>
@@ -637,19 +646,44 @@ export default function PricingAnalysisDashboard() {
                     }
                   />
                   <Tooltip content={<CustomTooltip />} />
-                  <ReferenceLine
-                    y={0}
-                    stroke="hsl(var(--primary))"
-                    strokeWidth={2}
-                    strokeDasharray="5 5"
-                    label={{
-                      value: "List Price",
-                      position: "insideTopRight",
-                      fill: "hsl(var(--primary))",
-                      fontSize: 12,
-                    }}
-                  />
-                  <Scatter data={scatterData} fill="hsl(var(--primary))">
+                  {/* Reference line only for percent mode */}
+                  {viewMode === "percent" && (
+                    <ReferenceLine
+                      y={0}
+                      stroke="hsl(var(--primary))"
+                      strokeWidth={2}
+                      strokeDasharray="5 5"
+                      label={{
+                        value: "List Price",
+                        position: "insideTopRight",
+                        fill: "hsl(var(--primary))",
+                        fontSize: 12,
+                      }}
+                    />
+                  )}
+                  {/* List price markers for dollar mode */}
+                  {viewMode === "dollar" && (
+                    <Scatter 
+                      data={listPriceData} 
+                      fill="hsl(var(--primary))"
+                      name="List Price"
+                      shape="diamond"
+                    >
+                      {listPriceData.map((_, index) => (
+                        <Cell
+                          key={`list-${index}`}
+                          fill="hsl(var(--primary))"
+                          opacity={0.4}
+                        />
+                      ))}
+                    </Scatter>
+                  )}
+                  {/* Approved price / delta points */}
+                  <Scatter 
+                    data={scatterData} 
+                    fill="hsl(var(--primary))"
+                    name={viewMode === "dollar" ? "Approved Price" : "Delta"}
+                  >
                     {scatterData.map((entry, index) => (
                       <Cell
                         key={`cell-${index}`}
@@ -664,19 +698,42 @@ export default function PricingAnalysisDashboard() {
           )}
 
           {/* Legend */}
-          <div className="flex items-center justify-center gap-6 mt-4 text-sm">
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-red-500" />
-              <span className="text-muted-foreground">Below List (&lt;-0.5%)</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-muted-foreground" />
-              <span className="text-muted-foreground">At List (±0.5%)</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full" style={{ backgroundColor: "hsl(142, 71%, 45%)" }} />
-              <span className="text-muted-foreground">Above List (&gt;0.5%)</span>
-            </div>
+          <div className="flex items-center justify-center gap-6 mt-4 text-sm flex-wrap">
+            {viewMode === "dollar" ? (
+              <>
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rotate-45 bg-primary opacity-40" />
+                  <span className="text-muted-foreground">List Price</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-red-500" />
+                  <span className="text-muted-foreground">Approved (Below List)</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-muted-foreground" />
+                  <span className="text-muted-foreground">Approved (At List)</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: "hsl(142, 71%, 45%)" }} />
+                  <span className="text-muted-foreground">Approved (Above List)</span>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-red-500" />
+                  <span className="text-muted-foreground">Below List (&lt;-0.5%)</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-muted-foreground" />
+                  <span className="text-muted-foreground">At List (±0.5%)</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: "hsl(142, 71%, 45%)" }} />
+                  <span className="text-muted-foreground">Above List (&gt;0.5%)</span>
+                </div>
+              </>
+            )}
           </div>
         </CardContent>
       </Card>
