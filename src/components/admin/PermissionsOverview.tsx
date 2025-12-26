@@ -44,8 +44,12 @@ const DEFAULT_FEATURES: Feature[] = [
     key: 'FEATURE_BOM_EDIT_PRICE',
     label: 'Edit Prices',
     description: 'Allows users to edit product prices in BOM',
+  },
+  {
+    key: 'FEATURE_BOM_SHOW_PARTNER_COMMISSION',
+    label: 'View Partner Commission',
+    description: 'Allows users to view partner commission costs in BOM',
   }
-  // ... other features
 ];
 
 export default function PermissionsOverview() {
@@ -55,34 +59,54 @@ export default function PermissionsOverview() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        
-        // Try to fetch features from database
-        const featuresResult = await supabase.from('features').select('*').order('label');
-        
-        // If no features in DB, use defaults
-        const features = featuresResult.data?.length ? featuresResult.data : DEFAULT_FEATURES;
-        
-        // Ensure all default features exist in the database
-        if (!featuresResult.data?.length) {
-          await supabase.from('features').upsert(DEFAULT_FEATURES);
-        }
-
-        const roleDefaultsResult = await supabase.from('role_feature_defaults').select('*');
-        
-        setFeatures(features);
-        setRoleDefaults(roleDefaultsResult.data || []);
-      } catch (err) {
-        console.error('Error fetching permissions data:', err);
-        setError(err instanceof Error ? err.message : 'Unknown error');
-      } finally {
-        setLoading(false);
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      // Try to fetch features from database
+      const featuresResult = await supabase.from('features').select('*').order('label');
+      
+      if (featuresResult.error) {
+        console.error('Error fetching features:', featuresResult.error);
+        toast({
+          title: "Warning",
+          description: "Could not fetch features from database, using defaults.",
+          variant: "destructive",
+        });
       }
-    };
+      
+      // Merge DB features with DEFAULT_FEATURES (union by key)
+      const dbFeatures = featuresResult.data || [];
+      const dbFeatureKeys = new Set(dbFeatures.map(f => f.key));
+      const missingDefaults = DEFAULT_FEATURES.filter(f => !dbFeatureKeys.has(f.key));
+      const mergedFeatures = [...dbFeatures, ...missingDefaults];
+      
+      // Ensure all default features exist in the database
+      if (missingDefaults.length > 0) {
+        const { error: upsertError } = await supabase.from('features').upsert(missingDefaults, { onConflict: 'key' });
+        if (upsertError) {
+          console.error('Error upserting missing features:', upsertError);
+        }
+      }
 
+      const roleDefaultsResult = await supabase.from('role_feature_defaults').select('*');
+      
+      if (roleDefaultsResult.error) {
+        console.error('Error fetching role defaults:', roleDefaultsResult.error);
+      }
+      
+      setFeatures(mergedFeatures);
+      setRoleDefaults(roleDefaultsResult.data || []);
+    } catch (err) {
+      console.error('Error fetching permissions data:', err);
+      setError(err instanceof Error ? err.message : 'Unknown error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
     fetchData();
   }, []);
 
@@ -173,7 +197,18 @@ export default function PermissionsOverview() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Permissions Overview</CardTitle>
+        <div className="flex items-center justify-between">
+          <CardTitle>Permissions Overview</CardTitle>
+          <Button
+            onClick={fetchData}
+            disabled={loading || saving}
+            variant="outline"
+            size="sm"
+          >
+            <Loader2 className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : 'hidden'}`} />
+            Refresh
+          </Button>
+        </div>
         <p className="text-sm text-muted-foreground">
           View feature permissions by role. This shows the default permissions for each role.
         </p>
