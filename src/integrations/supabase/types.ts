@@ -1396,6 +1396,9 @@ export type Database = {
           original_prices: Json | null
           original_quote_value: number
           original_submitted_at: string | null
+          partner_commission_rate: number | null
+          partner_commission_type: string | null
+          partner_commission_value: number | null
           payment_terms: string
           price_adjustments: Json | null
           price_override_history: Json | null
@@ -1441,6 +1444,9 @@ export type Database = {
           original_prices?: Json | null
           original_quote_value: number
           original_submitted_at?: string | null
+          partner_commission_rate?: number | null
+          partner_commission_type?: string | null
+          partner_commission_value?: number | null
           payment_terms?: string
           price_adjustments?: Json | null
           price_override_history?: Json | null
@@ -1486,6 +1492,9 @@ export type Database = {
           original_prices?: Json | null
           original_quote_value?: number
           original_submitted_at?: string | null
+          partner_commission_rate?: number | null
+          partner_commission_type?: string | null
+          partner_commission_value?: number | null
           payment_terms?: string
           price_adjustments?: Json | null
           price_override_history?: Json | null
