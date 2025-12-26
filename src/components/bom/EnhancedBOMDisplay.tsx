@@ -8,6 +8,11 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { BOMItem } from '@/types/product';
 import { Quote, QuotePriority, Currency, QuoteStatus } from '@/types/quote';
+import { FEATURES, usePermissions } from '@/hooks/usePermissions';
+import { 
+  extractCommissionFromQuoteFields, 
+  calculatePartnerCommission 
+} from '@/utils/marginCalculations';
 import { 
   ShoppingCart, 
   FileText, 
@@ -23,7 +28,8 @@ import {
   AlertTriangle,
   Percent,
   Download,
-  Eye
+  Eye,
+  Users
 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { generateQuotePDF } from '@/utils/pdfGenerator';
@@ -74,19 +80,35 @@ export const EnhancedBOMDisplay = ({
   const [localDiscountPercentage, setLocalDiscountPercentage] = useState(discountPercentage);
   const [localDiscountJustification, setLocalDiscountJustification] = useState(discountJustification);
 
+  const { has } = usePermissions();
+  const canShowPartnerCommission = has(FEATURES.BOM_SHOW_PARTNER_COMMISSION);
+
+  // Extract commission info from quote fields
+  const commissionInfo = extractCommissionFromQuoteFields(quoteFields);
+  
   // Calculate totals with price adjustments
   const subtotal = bomItems.reduce((sum, item) => {
     const adjustedPrice = editingPrices[item.id] || item.product.price;
     return sum + (adjustedPrice * item.quantity);
   }, 0);
   const totalCost = bomItems.reduce((sum, item) => sum + ((item.product.cost || 0) * item.quantity), 0);
-  const grossProfit = subtotal - totalCost;
+  
+  // Calculate partner commission
+  const partnerCommissionCost = calculatePartnerCommission(
+    subtotal,
+    commissionInfo.commissionRate,
+    commissionInfo.commissionType
+  );
+  
+  // Effective total cost includes partner commission
+  const effectiveTotalCost = totalCost + partnerCommissionCost;
+  const grossProfit = subtotal - effectiveTotalCost;
   const margin = subtotal > 0 ? (grossProfit / subtotal) * 100 : 0;
   
   // Discount calculations
   const discountAmount = subtotal * (localDiscountPercentage / 100);
   const discountedSubtotal = subtotal - discountAmount;
-  const discountedGrossProfit = discountedSubtotal - totalCost;
+  const discountedGrossProfit = discountedSubtotal - effectiveTotalCost;
   const discountedMargin = discountedSubtotal > 0 ? (discountedGrossProfit / discountedSubtotal) * 100 : 0;
 
   const handleQuantityChange = (itemId: string, newQuantity: number) => {
@@ -596,12 +618,30 @@ export const EnhancedBOMDisplay = ({
                 <span className="text-white">{formatCurrency(subtotal)}</span>
               </div>
               
+              {/* Partner Commission Display */}
+              {canShowPartnerCommission && partnerCommissionCost > 0 && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-400 flex items-center gap-1">
+                    <Users className="h-3 w-3" />
+                    Partner Commission ({(commissionInfo.commissionRate * 100).toFixed(0)}%):
+                  </span>
+                  <span className="text-purple-400">{formatCurrency(partnerCommissionCost)}</span>
+                </div>
+              )}
+              
               {canSeeCosts && (
                 <>
                   <div className="flex justify-between text-sm">
-                    <span className="text-gray-400">Total Cost:</span>
+                    <span className="text-gray-400">Product Cost:</span>
                     <span className="text-orange-400">{formatCurrency(totalCost)}</span>
                   </div>
+                  
+                  {partnerCommissionCost > 0 && canShowPartnerCommission && (
+                    <div className="flex justify-between text-sm font-medium">
+                      <span className="text-gray-400">Total Cost (incl. Commission):</span>
+                      <span className="text-orange-400">{formatCurrency(effectiveTotalCost)}</span>
+                    </div>
+                  )}
                   
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-400">Gross Profit:</span>
