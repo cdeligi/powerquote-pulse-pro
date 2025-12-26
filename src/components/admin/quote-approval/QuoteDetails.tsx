@@ -5,14 +5,15 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { CheckCircle, XCircle, Edit3, Save, X, Settings } from "lucide-react";
+import { CheckCircle, XCircle, Edit3, Save, X, Settings, Users } from "lucide-react";
 import QTMSConfigurationEditor from "@/components/bom/QTMSConfigurationEditor";
 import { consolidateQTMSConfiguration, QTMSConfiguration, ConsolidatedQTMS } from "@/utils/qtmsConsolidation";
 import { useState, useEffect, useMemo } from "react";
 import { Quote, BOMItemWithDetails } from "@/types/quote";
 import { User } from "@/types/auth";
 import { useConfiguredQuoteFields } from "@/hooks/useConfiguredQuoteFields";
-
+import { FEATURES, usePermissions } from "@/hooks/usePermissions";
+import { extractCommissionFromQuoteFields, calculatePartnerCommission } from "@/utils/marginCalculations";
 interface QuoteDetailsProps {
   quote: Quote;
   onApprove: (payload: {
@@ -65,6 +66,8 @@ const QuoteDetails = ({
   const [approvedDiscountInput, setApprovedDiscountInput] = useState('0');
   const { formattedFields: formattedConfiguredFields } =
     useConfiguredQuoteFields(quote.quote_fields);
+  const { has } = usePermissions();
+  const canShowPartnerCommission = has(FEATURES.BOM_SHOW_PARTNER_COMMISSION);
 
   useEffect(() => {
     setBomItems(initialBOMItems);
@@ -199,11 +202,29 @@ const QuoteDetails = ({
   const totals = useMemo(() => {
     const totalRevenue = bomItems.reduce((sum, item) => sum + (item.unit_price * item.quantity), 0);
     const totalCost = bomItems.reduce((sum, item) => sum + (item.unit_cost * item.quantity), 0);
-    const grossProfit = totalRevenue - totalCost;
+    
+    // Extract commission info from quote fields
+    const commissionInfo = extractCommissionFromQuoteFields(quote.quote_fields as Record<string, any>);
+    const partnerCommissionCost = calculatePartnerCommission(
+      totalRevenue,
+      commissionInfo.commissionRate,
+      commissionInfo.commissionType
+    );
+    
+    const effectiveTotalCost = totalCost + partnerCommissionCost;
+    const grossProfit = totalRevenue - effectiveTotalCost;
     const marginPercentage = totalRevenue > 0 ? (grossProfit / totalRevenue) * 100 : 0;
 
-    return { totalRevenue, totalCost, grossProfit, marginPercentage };
-  }, [bomItems]);
+    return { 
+      totalRevenue, 
+      totalCost, 
+      partnerCommissionCost,
+      effectiveTotalCost,
+      grossProfit, 
+      marginPercentage,
+      commissionInfo
+    };
+  }, [bomItems, quote.quote_fields]);
 
   const requestedDiscountPercentage = normalizeDiscountPercentage(quote.requested_discount);
   const approvedDiscountFromQuote = typeof quote.approved_discount === 'number'
@@ -216,7 +237,7 @@ const QuoteDetails = ({
   const discountFraction = effectiveDiscountPercentage / 100;
   const discountAmount = totals.totalRevenue * discountFraction;
   const discountedTotal = totals.totalRevenue - discountAmount;
-  const discountedGrossProfit = discountedTotal - totals.totalCost;
+  const discountedGrossProfit = discountedTotal - totals.effectiveTotalCost;
   const discountedMargin = discountedTotal > 0 ? (discountedGrossProfit / discountedTotal) * 100 : 0;
   const showDiscountBreakdown =
     quote.status === 'pending_approval' ||
@@ -420,10 +441,31 @@ const QuoteDetails = ({
                   <span className="text-gray-400">Subtotal</span>
                   <span className="text-white font-medium">{formatCurrency(totals.totalRevenue)}</span>
                 </div>
+                
+                {/* Partner Commission Display */}
+                {canShowPartnerCommission && totals.partnerCommissionCost > 0 && (
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-gray-400 flex items-center gap-1">
+                      <Users className="h-3 w-3" />
+                      Partner Commission ({(totals.commissionInfo.commissionRate * 100).toFixed(0)}%)
+                    </span>
+                    <span className="text-purple-400 font-medium">{formatCurrency(totals.partnerCommissionCost)}</span>
+                  </div>
+                )}
+                
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-gray-400">Total Cost</span>
+                  <span className="text-gray-400">Product Cost</span>
                   <span className="text-orange-400 font-medium">{formatCurrency(totals.totalCost)}</span>
                 </div>
+                
+                {/* Total Cost including Commission */}
+                {canShowPartnerCommission && totals.partnerCommissionCost > 0 && (
+                  <div className="flex items-center justify-between text-sm font-medium">
+                    <span className="text-gray-400">Total Cost (incl. Commission)</span>
+                    <span className="text-orange-400">{formatCurrency(totals.effectiveTotalCost)}</span>
+                  </div>
+                )}
+                
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-gray-400">Gross Profit</span>
                   <span className="text-green-400 font-medium">{formatCurrency(totals.grossProfit)}</span>

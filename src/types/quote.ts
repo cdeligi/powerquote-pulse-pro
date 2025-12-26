@@ -50,6 +50,9 @@ export interface Quote {
     fetchedAt: string;
     convertedFrom: string;
   } | null;
+  partner_commission_rate?: number;
+  partner_commission_type?: 'discount' | 'commission' | null;
+  partner_commission_value?: number;
 }
 
 export interface QuoteItem {
