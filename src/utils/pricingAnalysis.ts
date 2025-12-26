@@ -15,7 +15,7 @@ export interface PricingRow {
   approved_unit_price: number | null;
   original_unit_price: number | null;
   created_at: string;
-  quotes: Array<{
+  quotes: {
     id: string;
     status: string;
     created_at: string;
@@ -23,7 +23,7 @@ export interface PricingRow {
     customer_name: string;
     currency: string;
     exchange_rate_metadata: unknown;
-  }>;
+  };
 }
 
 export interface ProductNode {
@@ -208,7 +208,7 @@ export async function fetchPricingAnalysisRows({
   if (errA) throw errA;
   if (errB) throw errB;
 
-  const merged = [...(a ?? []), ...(b ?? [])] as PricingRow[];
+  const merged = [...(a ?? []), ...(b ?? [])] as unknown as PricingRow[];
   const deduped = Array.from(new Map(merged.map((r) => [r.id, r])).values());
 
   return deduped;
@@ -386,11 +386,8 @@ export function transformToDataPoints(
   let missingListPriceCount = 0;
 
   for (const row of rows) {
-    // Handle quotes as array from Supabase join - use first element
-    const quotesArray = row.quotes;
-    const quote = Array.isArray(quotesArray) ? quotesArray[0] : quotesArray;
-    
-    if (!quote) continue; // Skip if no quote data
+    const quote = row.quotes;
+    if (!quote) continue;
     
     const product = productMap.get(row.product_id);
 
