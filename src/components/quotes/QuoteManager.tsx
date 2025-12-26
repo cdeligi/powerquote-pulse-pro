@@ -4,8 +4,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Search, Eye, Download, Edit, Share, Plus, Trash, Copy } from "lucide-react";
-import { useState, useEffect } from "react";
+import { Search, Eye, Download, Edit, Share, Plus, Trash, Copy, FileText, CheckCircle, XCircle, Clock, ChevronDown } from "lucide-react";
+import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuotes } from "@/hooks/useQuotes";
 import { toast } from "@/hooks/use-toast";
@@ -23,6 +23,18 @@ import {
   buildRackLayoutFromAssignments,
   type SerializedSlotAssignment,
 } from '@/utils/slotAssignmentUtils';
+import {
+  getFiscalYear,
+  getAvailableFiscalYears,
+  calculateFiscalYearAnalytics,
+} from '@/utils/quoteAnalytics';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface QuoteManagerProps {
   user: User;
@@ -101,9 +113,10 @@ const ensureArray = (value: unknown): unknown[] | null => {
 const QuoteManager = ({ user }: QuoteManagerProps) => {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState("");
-  const [priorityFilter, setPriorityFilter] = useState<'All' | 'High' | 'Medium' | 'Low' | 'Draft'>('All');
+  const [priorityFilter, setPriorityFilter] = useState<'All' | 'High' | 'Medium' | 'Low' | 'Draft' | 'InProgress'>('All');
+  const [selectedFiscalYear, setSelectedFiscalYear] = useState<string>(getFiscalYear(new Date()));
   const { quotes, loading, error, fetchQuotes } = useQuotes();
-  
+
   const [pdfLoadingStates, setPdfLoadingStates] = useState<Record<string, boolean>>({});
   
   // Fetch BOM item count for each quote
@@ -392,6 +405,26 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
     return priorityConfig[priority as keyof typeof priorityConfig] || priorityConfig.Medium;
   };
 
+  // Calculate fiscal year analytics
+  const availableFiscalYears = useMemo(() => 
+    getAvailableFiscalYears(quotes.map(q => ({ created_at: q.created_at }))), 
+    [quotes]
+  );
+
+  const fiscalYearAnalytics = useMemo(() => 
+    calculateFiscalYearAnalytics(
+      quotes.map(q => ({
+        id: q.id,
+        status: q.status,
+        created_at: q.created_at,
+        original_quote_value: q.original_quote_value,
+        discounted_value: q.discounted_value,
+      })),
+      selectedFiscalYear
+    ),
+    [quotes, selectedFiscalYear]
+  );
+
   const filteredQuotes = processedQuotes.filter(quote => {
     const lowerSearch = searchTerm.toLowerCase();
     const matchesSearch = quote.customer.toLowerCase().includes(lowerSearch) ||
@@ -399,11 +432,15 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
                          quote.oracleCustomerId.toLowerCase().includes(lowerSearch) ||
                          (quote.displayLabel?.toLowerCase().includes(lowerSearch)) ||
                          (quote.account ? quote.account.toLowerCase().includes(lowerSearch) : false);
+    
+    const inProgressStatuses = ['draft', 'pending_approval'];
     const matchesPriority = priorityFilter === 'All' || 
                            (priorityFilter === 'Draft' && quote.status === 'draft') ||
-                           (priorityFilter !== 'Draft' && quote.priority === priorityFilter);
+                           (priorityFilter === 'InProgress' && inProgressStatuses.includes(quote.status)) ||
+                           (priorityFilter !== 'Draft' && priorityFilter !== 'InProgress' && quote.priority === priorityFilter);
     return matchesSearch && matchesPriority;
   });
+
 
   const handleDeleteQuote = async (quoteId: string) => {
     const confirmDelete = window.confirm('Are you sure you want to delete this draft quote? This action cannot be undone.');
@@ -903,51 +940,99 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
         </Button>
       </div>
 
-      {/* Pipeline Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-        {['High', 'Medium', 'Low'].map(priority => {
-          const count = processedQuotes.filter(q => q.priority === priority && q.status !== 'approved' && q.status !== 'rejected').length;
-          const badge = getPriorityBadge(priority);
-          return (
-            <Card key={priority} className="bg-gray-900 border-gray-800">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-white text-sm">{priority} Priority</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-white">{count}</div>
-                <Badge className={`${badge.color} text-white mt-2`}>
-                  In Progress
-                </Badge>
-              </CardContent>
-            </Card>
-           );
-        })}
-        <Card className="bg-gray-900 border-gray-800">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-white text-sm">Draft Quotes</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-white">
-              {processedQuotes.filter(q => q.status === 'draft').length}
-            </div>
-            <Badge className="bg-gray-600 text-white mt-2">
-              In Progress
-            </Badge>
-          </CardContent>
-        </Card>
-        <Card className="bg-gray-900 border-gray-800">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-white text-sm">Total Pipeline</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-white">
-              {canSeePrices ? `$${processedQuotes.filter(q => q.status !== 'rejected').reduce((sum, q) => sum + q.value, 0).toLocaleString()}` : '—'}
-            </div>
-            <Badge className="bg-blue-600 text-white mt-2">
-              Active Value
-            </Badge>
-          </CardContent>
-        </Card>
+      {/* Fiscal Year Selector and Pipeline Summary Cards */}
+      <div className="space-y-4">
+        {/* Fiscal Year Selector */}
+        <div className="flex items-center gap-3">
+          <span className="text-sm text-gray-400">Fiscal Year:</span>
+          <Select value={selectedFiscalYear} onValueChange={setSelectedFiscalYear}>
+            <SelectTrigger className="w-32 bg-gray-800 border-gray-700 text-white">
+              <SelectValue placeholder="Select FY" />
+            </SelectTrigger>
+            <SelectContent className="bg-gray-800 border-gray-700">
+              {availableFiscalYears.map(fy => (
+                <SelectItem key={fy} value={fy} className="text-white hover:bg-gray-700">
+                  {fy}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Pipeline Summary Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+          {/* Quotes In Progress - Consolidated */}
+          <Card 
+            className="bg-gray-900 border-gray-800 cursor-pointer hover:border-gray-600 transition-colors"
+            onClick={() => setPriorityFilter('InProgress')}
+          >
+            <CardHeader className="pb-2">
+              <div className="flex items-center gap-2">
+                <Clock className="h-4 w-4 text-yellow-500" />
+                <CardTitle className="text-white text-sm">In Progress</CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold text-white">{fiscalYearAnalytics.quotesInProgress}</div>
+              <p className="text-xs text-gray-400 mt-1">Drafts & Pending</p>
+            </CardContent>
+          </Card>
+
+          {/* Total Quotes */}
+          <Card className="bg-gray-900 border-gray-800">
+            <CardHeader className="pb-2">
+              <div className="flex items-center gap-2">
+                <FileText className="h-4 w-4 text-blue-500" />
+                <CardTitle className="text-white text-sm">Total Quotes</CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold text-white">{fiscalYearAnalytics.totalQuotes}</div>
+              <p className="text-xs text-gray-400 mt-1">{selectedFiscalYear}</p>
+            </CardContent>
+          </Card>
+
+          {/* Quotes Approved */}
+          <Card className="bg-gray-900 border-gray-800">
+            <CardHeader className="pb-2">
+              <div className="flex items-center gap-2">
+                <CheckCircle className="h-4 w-4 text-green-500" />
+                <CardTitle className="text-white text-sm">Approved</CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold text-green-400">{fiscalYearAnalytics.quotesApproved}</div>
+              <p className="text-xs text-gray-400 mt-1">{selectedFiscalYear}</p>
+            </CardContent>
+          </Card>
+
+          {/* Quotes Rejected */}
+          <Card className="bg-gray-900 border-gray-800">
+            <CardHeader className="pb-2">
+              <div className="flex items-center gap-2">
+                <XCircle className="h-4 w-4 text-red-500" />
+                <CardTitle className="text-white text-sm">Rejected</CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold text-red-400">{fiscalYearAnalytics.quotesRejected}</div>
+              <p className="text-xs text-gray-400 mt-1">{selectedFiscalYear}</p>
+            </CardContent>
+          </Card>
+
+          {/* Total Pipeline Value */}
+          <Card className="bg-gray-900 border-gray-800">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-white text-sm">Pipeline Value</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-white">
+                {canSeePrices ? `$${fiscalYearAnalytics.totalPipelineValue.toLocaleString()}` : '—'}
+              </div>
+              <p className="text-xs text-gray-400 mt-1">{selectedFiscalYear}</p>
+            </CardContent>
+          </Card>
+        </div>
       </div>
 
       {/* Search and Filters */}
@@ -972,7 +1057,8 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
               className="bg-gray-800 border border-gray-700 text-white rounded-md px-3 py-2"
             >
               <option value="All">All Quotes</option>
-              <option value="Draft">Draft Quotes</option>
+              <option value="InProgress">In Progress</option>
+              <option value="Draft">Draft Only</option>
               <option value="High">High Priority</option>
               <option value="Medium">Medium Priority</option>
               <option value="Low">Low Priority</option>
@@ -980,6 +1066,7 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
           </div>
         </CardContent>
       </Card>
+
 
       {/* Quotes Table */}
       <Card className="bg-gray-900 border-gray-800">
