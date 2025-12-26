@@ -629,6 +629,7 @@ export default function PricingAnalysisDashboard() {
                   <YAxis
                     type="number"
                     dataKey="y"
+                    domain={['auto', 'auto']}
                     stroke="hsl(var(--muted-foreground))"
                     fontSize={12}
                     tickFormatter={(val) =>
