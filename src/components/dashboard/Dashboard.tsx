@@ -12,13 +12,14 @@ import { BOMItem } from "@/types/product";
 import { usePermissions, FEATURES } from "@/hooks/usePermissions";
 import { productDataService } from "@/services/productDataService";
 import { BOMProvider } from "@/context/BOMContext";
+import PricingAnalysisDashboard from "./PricingAnalysisDashboard";
 
 interface DashboardProps {
   user: User;
   onLogout: () => void;
 }
 
-type ActiveView = 'overview' | 'bom' | 'quotes' | 'admin';
+type ActiveView = 'overview' | 'bom' | 'quotes' | 'admin' | 'pricing-analysis';
 
 const Dashboard = ({ user, onLogout }: DashboardProps) => {
   const [activeView, setActiveView] = useState<ActiveView>('overview');
@@ -62,6 +63,8 @@ const Dashboard = ({ user, onLogout }: DashboardProps) => {
         setActiveView('admin');
       } else if (hash === '#bom') {
         setActiveView('bom');
+      } else if (hash === '#pricing-analysis') {
+        setActiveView('pricing-analysis');
       }
     };
 
@@ -147,6 +150,8 @@ const Dashboard = ({ user, onLogout }: DashboardProps) => {
         );
       case 'quotes':
         return <QuoteManager user={user} />;
+      case 'pricing-analysis':
+        return <PricingAnalysisDashboard />;
       case 'admin':
         return user.role === 'ADMIN' ? <AdminPanel user={user} /> : <div className="text-white">Access Denied</div>;
       default:
