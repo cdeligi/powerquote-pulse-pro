@@ -5,7 +5,6 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { Badge } from '@/components/ui/badge';
 import {
-  LayoutDashboard,
   Settings,
   LogOut,
   Menu,
@@ -41,7 +40,6 @@ export function ModernSidebar({ user, onLogout }: ModernSidebarProps) {
   }, []);
 
   const menuItems = [
-    { title: 'Dashboard', icon: LayoutDashboard, path: '/', viewId: 'overview', useHash: true },
     { title: 'BOM Builder', icon: Wrench, path: '/bom-new', viewId: 'bom', useHash: false },
     { title: 'Quotes', icon: FileText, path: '/', viewId: 'quotes', useHash: true },
     { title: 'Pricing Analysis', icon: BarChart3, path: '/', viewId: 'pricing-analysis', useHash: true },
@@ -52,9 +50,8 @@ export function ModernSidebar({ user, onLogout }: ModernSidebarProps) {
 
   const isActive = (item: any) => {
     if (item.useHash) {
-      // Active if we're on root path with matching hash, or root with no hash for overview
       const onRootPath = location.pathname === '/';
-      const hashMatches = currentHash === `#${item.viewId}` || (item.viewId === 'overview' && (currentHash === '' || currentHash === '#'));
+      const hashMatches = currentHash === `#${item.viewId}`;
       return onRootPath && hashMatches;
     }
     return location.pathname === item.path || (item.path === '/bom-new' && location.pathname.startsWith('/bom'));

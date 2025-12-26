@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import { useLocation, Routes, Route, Navigate } from "react-router-dom";
 import { User } from "@/types/auth";
 import { ModernSidebar } from "./ModernSidebar";
-import DashboardOverview from "./DashboardOverview";
 import BOMBuilder from "../bom/BOMBuilder";
 import QuoteManager from "../quotes/QuoteManager";
 import QuoteViewer from "../bom/QuoteViewer";
@@ -19,10 +18,10 @@ interface DashboardProps {
   onLogout: () => void;
 }
 
-type ActiveView = 'overview' | 'bom' | 'quotes' | 'admin' | 'pricing-analysis';
+type ActiveView = 'quotes' | 'bom' | 'admin' | 'pricing-analysis';
 
 const Dashboard = ({ user, onLogout }: DashboardProps) => {
-  const [activeView, setActiveView] = useState<ActiveView>('overview');
+  const [activeView, setActiveView] = useState<ActiveView>('quotes');
   const [bomItems, setBomItems] = useState<BOMItem[]>([]);
   const { has } = usePermissions();
   const location = useLocation();
@@ -53,11 +52,9 @@ const Dashboard = ({ user, onLogout }: DashboardProps) => {
   useEffect(() => {
     const handleHashChange = () => {
       const hash = window.location.hash;
-      console.log('Hash changed to:', hash); // Debug log
+      console.log('Hash changed to:', hash);
       
-      if (hash === '#overview' || hash === '' || hash === '#') {
-        setActiveView('overview');
-      } else if (hash === '#quotes') {
+      if (hash === '#quotes' || hash === '' || hash === '#') {
         setActiveView('quotes');
       } else if (hash === '#admin') {
         setActiveView('admin');
@@ -135,8 +132,6 @@ const Dashboard = ({ user, onLogout }: DashboardProps) => {
 
     // Legacy hash-based routing
     switch (activeView) {
-      case 'overview':
-        return <DashboardOverview user={user} />;
       case 'bom':
         return (
           <BOMProvider>
@@ -155,7 +150,7 @@ const Dashboard = ({ user, onLogout }: DashboardProps) => {
       case 'admin':
         return user.role === 'ADMIN' ? <AdminPanel user={user} /> : <div className="text-white">Access Denied</div>;
       default:
-        return <DashboardOverview user={user} />;
+        return <QuoteManager user={user} />;
     }
   };
 
