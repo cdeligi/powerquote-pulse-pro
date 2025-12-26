@@ -23,6 +23,8 @@ export interface PricingRow {
     customer_name: string;
     currency: string;
     exchange_rate_metadata: unknown;
+    approved_discount: number | null;
+    requested_discount: number | null;
   };
 }
 
@@ -155,7 +157,9 @@ const SELECT_PRICING_ROWS = `
     reviewed_at,
     customer_name,
     currency,
-    exchange_rate_metadata
+    exchange_rate_metadata,
+    approved_discount,
+    requested_discount
   )
 `;
 
@@ -401,8 +405,15 @@ export function transformToDataPoints(
       listPrice = product.price;
     }
 
-    // Determine approved/quoted unit price
-    const approvedPrice = row.approved_unit_price ?? row.unit_price;
+    // Determine approved/quoted unit price, applying quote-level discount
+    let approvedPrice = row.approved_unit_price ?? row.unit_price;
+    
+    // Apply quote-level discount if present (approved_discount takes priority over requested_discount)
+    const quoteDiscount = quote.approved_discount ?? quote.requested_discount ?? 0;
+    if (quoteDiscount > 0 && approvedPrice != null) {
+      // Discount is stored as a percentage (e.g., 5 means 5%), apply it
+      approvedPrice = approvedPrice * (1 - quoteDiscount / 100);
+    }
 
     // Check validity
     if (listPrice == null || listPrice <= 0) {
