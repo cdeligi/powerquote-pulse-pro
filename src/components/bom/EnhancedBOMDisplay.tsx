@@ -83,7 +83,7 @@ export const EnhancedBOMDisplay = ({
   const { has } = usePermissions();
   const canShowPartnerCommission = has(FEATURES.BOM_SHOW_PARTNER_COMMISSION);
 
-  // Extract commission info from quote fields
+  // Extract commission info from quote fields (includes contract rate + spec bonus)
   const commissionInfo = extractCommissionFromQuoteFields(quoteFields);
   
   // Calculate totals with price adjustments
@@ -93,12 +93,16 @@ export const EnhancedBOMDisplay = ({
   }, 0);
   const totalCost = bomItems.reduce((sum, item) => sum + ((item.product.cost || 0) * item.quantity), 0);
   
-  // Calculate partner commission
+  // Calculate partner commission using TOTAL rate (contract + spec bonus)
   const partnerCommissionCost = calculatePartnerCommission(
     subtotal,
-    commissionInfo.commissionRate,
+    commissionInfo.totalCommissionRate,
     commissionInfo.commissionType
   );
+  
+  // Individual commission breakdowns for display
+  const contractCommissionAmount = calculatePartnerCommission(subtotal, commissionInfo.contractCommissionRate, commissionInfo.commissionType);
+  const specBonusAmount = calculatePartnerCommission(subtotal, commissionInfo.specBonusRate, commissionInfo.commissionType);
   
   // Effective total cost includes partner commission
   const effectiveTotalCost = totalCost + partnerCommissionCost;
@@ -618,14 +622,29 @@ export const EnhancedBOMDisplay = ({
                 <span className="text-white">{formatCurrency(subtotal)}</span>
               </div>
               
-              {/* Partner Commission Display */}
+              {/* Partner Commission Display with Breakdown */}
               {canShowPartnerCommission && partnerCommissionCost > 0 && (
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-400 flex items-center gap-1">
-                    <Users className="h-3 w-3" />
-                    Partner Commission ({(commissionInfo.commissionRate * 100).toFixed(0)}%):
-                  </span>
-                  <span className="text-purple-400">{formatCurrency(partnerCommissionCost)}</span>
+                <div className="space-y-1">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-400 flex items-center gap-1">
+                      <Users className="h-3 w-3" />
+                      Partner Commission ({(commissionInfo.totalCommissionRate * 100).toFixed(0)}%):
+                    </span>
+                    <span className="text-purple-400">{formatCurrency(partnerCommissionCost)}</span>
+                  </div>
+                  {/* Show breakdown if both rates are present */}
+                  {commissionInfo.contractCommissionRate > 0 && commissionInfo.specBonusRate > 0 && (
+                    <div className="pl-4 space-y-0.5 text-xs">
+                      <div className="flex justify-between text-gray-500">
+                        <span>Contract Rate ({(commissionInfo.contractCommissionRate * 100).toFixed(0)}%):</span>
+                        <span>{formatCurrency(contractCommissionAmount)}</span>
+                      </div>
+                      <div className="flex justify-between text-gray-500">
+                        <span>Spec Bonus ({(commissionInfo.specBonusRate * 100).toFixed(0)}%):</span>
+                        <span>{formatCurrency(specBonusAmount)}</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
               
