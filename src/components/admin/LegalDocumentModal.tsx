@@ -3,6 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
 import { getSupabaseClient } from "@/integrations/supabase/client";
+import DOMPurify from 'dompurify';
 
 const supabase = getSupabaseClient();
 
@@ -45,15 +46,18 @@ const LegalDocumentModal = ({ isOpen, onClose, documentType }: LegalDocumentModa
 
   const title = documentType === 'terms' ? 'Terms of Service' : 'Privacy Policy';
 
-  // Simple markdown to HTML converter for basic formatting
+  // Simple markdown to HTML converter for basic formatting with XSS protection
   const formatContent = (text: string) => {
-    return text
+    const html = text
       .replace(/^# (.*$)/gim, '<h1 class="text-xl font-bold mb-4 text-white">$1</h1>')
       .replace(/^## (.*$)/gim, '<h2 class="text-lg font-semibold mb-3 text-white">$1</h2>')
       .replace(/^### (.*$)/gim, '<h3 class="text-md font-medium mb-2 text-white">$1</h3>')
       .replace(/^\- (.*$)/gim, '<li class="ml-4 mb-1 text-gray-300">$1</li>')
       .replace(/\n\n/g, '</p><p class="mb-3 text-gray-300">')
       .replace(/^(.*)$/gim, '<p class="mb-3 text-gray-300">$1</p>');
+    
+    // Sanitize HTML to prevent XSS attacks
+    return DOMPurify.sanitize(html);
   };
 
   return (
