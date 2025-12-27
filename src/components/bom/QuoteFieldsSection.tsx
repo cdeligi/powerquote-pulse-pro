@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { format } from 'date-fns';
-import { CalendarIcon } from 'lucide-react';
+import { CalendarIcon, ChevronDown, ChevronUp, CheckCircle2, AlertCircle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -12,6 +12,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import {
   Dialog,
   DialogContent,
@@ -246,6 +247,7 @@ const QuoteFieldsSection = ({ quoteFields, onFieldChange }: QuoteFieldsSectionPr
   const [configuredFields, setConfiguredFields] = useState<QuoteField[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeModal, setActiveModal] = useState<ActiveModalState>(null);
+  const [isExpanded, setIsExpanded] = useState(true);
 
   const validationFields = useMemo<ValidationQuoteField[]>(() => {
     if (!configuredFields.length) {
@@ -283,6 +285,11 @@ const QuoteFieldsSection = ({ quoteFields, onFieldChange }: QuoteFieldsSectionPr
   }, [configuredFields, quoteFields]);
 
   const { validation } = useQuoteValidation(quoteFields, validationFields);
+
+  // Calculate filled fields count for summary display
+  const filledFieldsCount = useMemo(() => {
+    return configuredFields.filter(field => hasMeaningfulValue(quoteFields[field.id])).length;
+  }, [configuredFields, quoteFields]);
 
   const fetchQuoteFields = useCallback(async () => {
     console.log('Fetching quote field configurations...');
@@ -497,30 +504,73 @@ const QuoteFieldsSection = ({ quoteFields, onFieldChange }: QuoteFieldsSectionPr
 
   return (
     <>
-      <Card className="bg-white border-gray-200">
-        <CardHeader>
-          <CardTitle className="text-gray-900">Quote Information</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          {!validation.isValid && validation.missingFields.length > 0 && (
-            <Alert className="border-yellow-200 bg-yellow-50">
-              <AlertDescription className="text-yellow-800">
-                <strong>Required fields:</strong> {validation.missingFields.join(', ')}
-              </AlertDescription>
-            </Alert>
-          )}
+      <Collapsible open={isExpanded} onOpenChange={setIsExpanded}>
+        <Card className="bg-white border-gray-200">
+          <CollapsibleTrigger asChild>
+            <CardHeader className="cursor-pointer hover:bg-gray-50 transition-colors select-none">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <CardTitle className="text-gray-900">Quote Information</CardTitle>
+                  {!isExpanded && configuredFields.length > 0 && (
+                    <Badge 
+                      variant="outline" 
+                      className={cn(
+                        "text-xs transition-colors",
+                        filledFieldsCount === configuredFields.length 
+                          ? "bg-green-50 text-green-700 border-green-200" 
+                          : "bg-gray-50 text-gray-600 border-gray-200"
+                      )}
+                    >
+                      {filledFieldsCount}/{configuredFields.length} filled
+                    </Badge>
+                  )}
+                  {configuredFields.length > 0 && (
+                    validation.isValid ? (
+                      <CheckCircle2 className="h-4 w-4 text-green-500" />
+                    ) : (
+                      <AlertCircle className="h-4 w-4 text-yellow-500" />
+                    )
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  {!isExpanded && !validation.isValid && validation.missingFields.length > 0 && (
+                    <span className="text-xs text-yellow-600 hidden sm:inline">
+                      {validation.missingFields.length} required
+                    </span>
+                  )}
+                  {isExpanded ? (
+                    <ChevronUp className="h-5 w-5 text-gray-500 transition-transform" />
+                  ) : (
+                    <ChevronDown className="h-5 w-5 text-gray-500 transition-transform" />
+                  )}
+                </div>
+              </div>
+            </CardHeader>
+          </CollapsibleTrigger>
+          
+          <CollapsibleContent className="animate-accordion-down data-[state=closed]:animate-accordion-up">
+            <CardContent className="space-y-6 pt-0">
+              {!validation.isValid && validation.missingFields.length > 0 && (
+                <Alert className="border-yellow-200 bg-yellow-50">
+                  <AlertDescription className="text-yellow-800">
+                    <strong>Required fields:</strong> {validation.missingFields.join(', ')}
+                  </AlertDescription>
+                </Alert>
+              )}
 
-          {configuredFields.length === 0 ? (
-            <div className="text-gray-500 text-center py-4">
-              No quote fields have been configured. Please contact your administrator to set up quote fields.
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {configuredFields.map((field) => renderField(field))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+              {configuredFields.length === 0 ? (
+                <div className="text-gray-500 text-center py-4">
+                  No quote fields have been configured. Please contact your administrator to set up quote fields.
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {configuredFields.map((field) => renderField(field))}
+                </div>
+              )}
+            </CardContent>
+          </CollapsibleContent>
+        </Card>
+      </Collapsible>
 
       <Dialog open={Boolean(activeModalContext)} onOpenChange={(open) => !open && setActiveModal(null)}>
         <DialogContent className="bg-white border-gray-200 max-w-2xl">
