@@ -1,27 +1,23 @@
 import React, { useState, useRef, useCallback } from 'react';
-import * as XLSX from 'xlsx';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Progress } from "@/components/ui/progress";
-import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { 
   Download, 
-  Upload, 
   FileSpreadsheet, 
   AlertCircle, 
   CheckCircle2, 
-  RefreshCw,
-  Eye,
   Loader2,
   ArrowRight,
-  X
+  X,
+  Eye
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import {
   Table,
   TableBody,
@@ -80,8 +76,13 @@ interface BulkProductExcelManagerProps {
   onRefresh: () => void;
 }
 
+// Dynamic import for xlsx to avoid bundling issues
+const loadXLSX = async () => {
+  const XLSX = await import('xlsx');
+  return XLSX;
+};
+
 export const BulkProductExcelManager: React.FC<BulkProductExcelManagerProps> = ({ onRefresh }) => {
-  const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   const [isDownloading, setIsDownloading] = useState(false);
@@ -97,6 +98,8 @@ export const BulkProductExcelManager: React.FC<BulkProductExcelManagerProps> = (
   const handleDownload = useCallback(async () => {
     setIsDownloading(true);
     try {
+      const XLSX = await loadXLSX();
+      
       // Fetch all products (levels 1-3)
       const { data: products, error: productsError } = await supabase
         .from('products')
@@ -170,25 +173,20 @@ export const BulkProductExcelManager: React.FC<BulkProductExcelManagerProps> = (
       // Download
       XLSX.writeFile(wb, filename);
 
-      toast({
-        title: "Download Complete",
-        description: `Exported ${productsData.length} products to ${filename}`,
-      });
+      toast.success(`Exported ${productsData.length} products to ${filename}`);
 
     } catch (error: any) {
       console.error('Download error:', error);
-      toast({
-        title: "Download Failed",
-        description: error.message,
-        variant: "destructive",
-      });
+      toast.error(`Download Failed: ${error.message}`);
     } finally {
       setIsDownloading(false);
     }
-  }, [toast]);
+  }, []);
 
   // Parse and validate uploaded Excel
   const parseExcel = useCallback(async (file: File): Promise<ValidationResult> => {
+    const XLSX = await loadXLSX();
+    
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       
@@ -422,25 +420,14 @@ export const BulkProductExcelManager: React.FC<BulkProductExcelManagerProps> = (
       setUploadProgress(100);
 
       if (result.errors.length > 0) {
-        toast({
-          title: "Validation Warnings",
-          description: `Found ${result.errors.length} issue(s). Review before applying.`,
-          variant: "destructive",
-        });
+        toast.error(`Found ${result.errors.length} validation issue(s). Review before applying.`);
       } else {
-        toast({
-          title: "File Validated",
-          description: `Ready to apply ${result.validRows} product updates.`,
-        });
+        toast.success(`Ready to apply ${result.validRows} product updates.`);
       }
 
     } catch (error: any) {
       console.error('Upload error:', error);
-      toast({
-        title: "Upload Failed",
-        description: error.message,
-        variant: "destructive",
-      });
+      toast.error(`Upload Failed: ${error.message}`);
       setValidationResult(null);
     } finally {
       setIsUploading(false);
@@ -449,7 +436,7 @@ export const BulkProductExcelManager: React.FC<BulkProductExcelManagerProps> = (
         fileInputRef.current.value = '';
       }
     }
-  }, [parseExcel, generateDiffPreview, toast]);
+  }, [parseExcel, generateDiffPreview]);
 
   // Apply updates via edge function
   const handleApplyUpdates = useCallback(async () => {
@@ -476,10 +463,7 @@ export const BulkProductExcelManager: React.FC<BulkProductExcelManagerProps> = (
         errors: string[];
       };
 
-      toast({
-        title: "Bulk Update Complete",
-        description: `Updated: ${result.updated}, Inserted: ${result.inserted}, Disabled: ${result.disabled}, Relationships: ${result.relationship_updates}${result.skipped > 0 ? `, Skipped: ${result.skipped}` : ''}`,
-      });
+      toast.success(`Bulk Update Complete - Updated: ${result.updated}, Inserted: ${result.inserted}, Disabled: ${result.disabled}`);
 
       // Reset state
       setValidationResult(null);
@@ -491,15 +475,11 @@ export const BulkProductExcelManager: React.FC<BulkProductExcelManagerProps> = (
 
     } catch (error: any) {
       console.error('Apply updates error:', error);
-      toast({
-        title: "Update Failed",
-        description: error.message,
-        variant: "destructive",
-      });
+      toast.error(`Update Failed: ${error.message}`);
     } finally {
       setIsApplying(false);
     }
-  }, [validationResult, toast, onRefresh]);
+  }, [validationResult, onRefresh]);
 
   // Reset/clear state
   const handleReset = useCallback(() => {
@@ -680,7 +660,7 @@ export const BulkProductExcelManager: React.FC<BulkProductExcelManagerProps> = (
                   {diffPreview.map((diff, i) => (
                     <TableRow key={`${diff.id}-${diff.field}-${i}`}>
                       <TableCell className="font-mono text-xs">
-                        {diff.id.substring(0, 20)}...
+                        {diff.id.length > 20 ? `${diff.id.substring(0, 20)}...` : diff.id}
                       </TableCell>
                       <TableCell className="font-medium">
                         {diff.name}
