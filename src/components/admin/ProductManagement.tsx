@@ -14,6 +14,7 @@ import { ChassisTypeManager } from "./ChassisTypeManager";
 import { Level1ProductList } from "./product-lists/Level1ProductList";
 import { Level2ProductList } from "./product-lists/Level2ProductList";
 import { Level3ProductList } from "./product-lists/Level3ProductList";
+import { BulkProductExcelManager } from "./BulkProductExcelManager";
 import { Level1Product, Level2Product, Level3Product } from "@/types/product";
 import { productDataService } from "@/services/productDataService";
 import { useToast } from "@/hooks/use-toast";
@@ -255,13 +256,14 @@ export const ProductManagement = () => {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="grid w-full grid-cols-6">
-          <TabsTrigger value="level1">Level 1 Products</TabsTrigger>
-          <TabsTrigger value="level2">Level 2 Products</TabsTrigger>
-          <TabsTrigger value="level3">Level 3 Products</TabsTrigger>
-          <TabsTrigger value="level4">Level 4 Configuration</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-7">
+          <TabsTrigger value="level1">Level 1</TabsTrigger>
+          <TabsTrigger value="level2">Level 2</TabsTrigger>
+          <TabsTrigger value="level3">Level 3</TabsTrigger>
+          <TabsTrigger value="level4">Level 4</TabsTrigger>
           <TabsTrigger value="partnumbers">Part Numbers</TabsTrigger>
           <TabsTrigger value="chassis-types">Chassis Types</TabsTrigger>
+          <TabsTrigger value="bulk-update">Bulk Update</TabsTrigger>
         </TabsList>
 
         <TabsContent value="level1" className="space-y-4">
@@ -404,6 +406,10 @@ export const ProductManagement = () => {
 
         <TabsContent value="chassis-types" className="space-y-4">
           <ChassisTypeManager />
+        </TabsContent>
+
+        <TabsContent value="bulk-update" className="space-y-4">
+          <BulkProductExcelManager onRefresh={refreshProductData} />
         </TabsContent>
       </Tabs>
     </div>
