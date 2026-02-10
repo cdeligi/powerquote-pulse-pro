@@ -78,8 +78,9 @@ interface BulkProductExcelManagerProps {
 
 // Dynamic import for exceljs to keep initial bundle smaller
 const loadExcelJS = async () => {
-  const ExcelJS = await import('exceljs');
-  return ExcelJS;
+  // exceljs ships as a CJS/dual package; in Vite the module often comes through as { default: ExcelJS }
+  const mod: any = await import('exceljs');
+  return mod?.default ?? mod;
 };
 
 export const BulkProductExcelManager: React.FC<BulkProductExcelManagerProps> = ({ onRefresh }) => {
