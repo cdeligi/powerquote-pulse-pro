@@ -76,10 +76,10 @@ interface BulkProductExcelManagerProps {
   onRefresh: () => void;
 }
 
-// Dynamic import for xlsx to avoid bundling issues
-const loadXLSX = async () => {
-  const XLSX = await import('xlsx');
-  return XLSX;
+// Dynamic import for exceljs to keep initial bundle smaller
+const loadExcelJS = async () => {
+  const ExcelJS = await import('exceljs');
+  return ExcelJS;
 };
 
 export const BulkProductExcelManager: React.FC<BulkProductExcelManagerProps> = ({ onRefresh }) => {
@@ -98,7 +98,7 @@ export const BulkProductExcelManager: React.FC<BulkProductExcelManagerProps> = (
   const handleDownload = useCallback(async () => {
     setIsDownloading(true);
     try {
-      const XLSX = await loadXLSX();
+      const ExcelJS = await loadExcelJS();
       
       // Fetch all products (levels 1-3)
       const { data: products, error: productsError } = await supabase
@@ -156,22 +156,37 @@ export const BulkProductExcelManager: React.FC<BulkProductExcelManagerProps> = (
       }));
 
       // Create workbook
-      const wb = XLSX.utils.book_new();
-      
+      const wb = new ExcelJS.Workbook();
+
       // Products sheet
-      const productsWs = XLSX.utils.json_to_sheet(productsData);
-      XLSX.utils.book_append_sheet(wb, productsWs, 'products');
-      
+      const productsWs = wb.addWorksheet('products');
+      if (productsData.length > 0) {
+        productsWs.columns = Object.keys(productsData[0]).map((key) => ({ header: key, key }));
+        productsWs.addRows(productsData);
+      }
+
       // Relationships sheet
-      const relWs = XLSX.utils.json_to_sheet(relationshipsData);
-      XLSX.utils.book_append_sheet(wb, relWs, 'level2_level3_relationships');
+      const relWs = wb.addWorksheet('level2_level3_relationships');
+      if (relationshipsData.length > 0) {
+        relWs.columns = Object.keys(relationshipsData[0]).map((key) => ({ header: key, key }));
+        relWs.addRows(relationshipsData);
+      }
 
       // Generate filename with date
       const date = new Date().toISOString().split('T')[0];
       const filename = `product-master-${date}.xlsx`;
 
       // Download
-      XLSX.writeFile(wb, filename);
+      const buffer = await wb.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
 
       toast.success(`Exported ${productsData.length} products to ${filename}`);
 
@@ -185,74 +200,89 @@ export const BulkProductExcelManager: React.FC<BulkProductExcelManagerProps> = (
 
   // Parse and validate uploaded Excel
   const parseExcel = useCallback(async (file: File): Promise<ValidationResult> => {
-    const XLSX = await loadXLSX();
-    
+    const ExcelJS = await loadExcelJS();
+
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
-      
+
       reader.onload = async (e) => {
         try {
-          const data = new Uint8Array(e.target?.result as ArrayBuffer);
-          const workbook = XLSX.read(data, { type: 'array' });
-          
+          const data = e.target?.result as ArrayBuffer;
+          const workbook = new ExcelJS.Workbook();
+          await workbook.xlsx.load(data);
+
           const errors: string[] = [];
           const products: ProductRow[] = [];
           const relationships: RelationshipRow[] = [];
 
+          // Helper: convert worksheet to array of objects using first row as headers
+          const sheetToJson = (ws: any): any[] => {
+            if (!ws) return [];
+            const headerRow = ws.getRow(1);
+            const headers: string[] = [];
+            headerRow.eachCell({ includeEmpty: true }, (cell: any, colNumber: number) => {
+              const v = String(cell?.value ?? '').trim();
+              headers[colNumber] = v;
+            });
+
+            const rows: any[] = [];
+            ws.eachRow((row: any, rowNumber: number) => {
+              if (rowNumber === 1) return;
+              const obj: any = {};
+              row.eachCell({ includeEmpty: true }, (cell: any, colNumber: number) => {
+                const key = headers[colNumber];
+                if (!key) return;
+                // exceljs can return objects for rich text; coerce to primitive string/number when possible
+                const val = (cell && cell.value && typeof cell.value === 'object' && 'text' in cell.value)
+                  ? (cell.value as any).text
+                  : cell?.value;
+                obj[key] = val;
+              });
+              // skip completely empty rows
+              if (Object.keys(obj).length > 0) rows.push(obj);
+            });
+            return rows;
+          };
+
+          const parseBoolean = (val: any): boolean => {
+            if (typeof val === 'boolean') return val;
+            if (typeof val === 'number') return val !== 0;
+            if (typeof val === 'string') return val.toUpperCase() === 'TRUE';
+            return Boolean(val);
+          };
+
           // Parse products sheet
-          const productsSheet = workbook.Sheets['products'];
+          const productsSheet = workbook.getWorksheet('products');
           if (!productsSheet) {
             errors.push('Missing "products" sheet');
           } else {
-            const rows = XLSX.utils.sheet_to_json(productsSheet) as any[];
-            
-            // Validate required columns
+            const rows = sheetToJson(productsSheet);
+
             const requiredColumns = ['id', 'product_level', 'name', 'cost', 'price'];
             if (rows.length > 0) {
               const firstRow = rows[0];
               for (const col of requiredColumns) {
-                if (!(col in firstRow)) {
-                  errors.push(`Missing required column: ${col}`);
-                }
+                if (!(col in firstRow)) errors.push(`Missing required column: ${col}`);
               }
             }
 
             for (let i = 0; i < rows.length; i++) {
               const row = rows[i];
-              const rowNum = i + 2; // Excel rows start at 1, plus header
-              
-              // Parse booleans
-              const parseBoolean = (val: any): boolean => {
-                if (typeof val === 'boolean') return val;
-                if (typeof val === 'string') return val.toUpperCase() === 'TRUE';
-                return Boolean(val);
-              };
+              const rowNum = i + 2;
 
-              // Parse numbers
               const cost = Number(row.cost);
               const price = Number(row.price);
               const level = Number(row.product_level);
 
-              if (isNaN(cost)) {
-                errors.push(`Row ${rowNum}: Invalid cost value "${row.cost}"`);
-                continue;
-              }
-              if (isNaN(price)) {
-                errors.push(`Row ${rowNum}: Invalid price value "${row.price}"`);
-                continue;
-              }
-              if (![1, 2, 3].includes(level)) {
-                errors.push(`Row ${rowNum}: Invalid product_level "${row.product_level}" (must be 1, 2, or 3)`);
-                continue;
-              }
+              if (isNaN(cost)) { errors.push(`Row ${rowNum}: Invalid cost value "${row.cost}"`); continue; }
+              if (isNaN(price)) { errors.push(`Row ${rowNum}: Invalid price value "${row.price}"`); continue; }
+              if (![1, 2, 3].includes(level)) { errors.push(`Row ${rowNum}: Invalid product_level "${row.product_level}" (must be 1, 2, or 3)`); continue; }
 
-              // Validate action
-              const action = (row.action || 'UPDATE').toUpperCase();
+              const action = String(row.action || 'UPDATE').toUpperCase();
               if (!['UPDATE', 'INSERT', 'DELETE'].includes(action)) {
                 errors.push(`Row ${rowNum}: Invalid action "${row.action}" (must be UPDATE, INSERT, or DELETE)`);
                 continue;
               }
-
               if (action !== 'INSERT' && !row.id) {
                 errors.push(`Row ${rowNum}: Missing ID for ${action} action`);
                 continue;
@@ -284,17 +314,15 @@ export const BulkProductExcelManager: React.FC<BulkProductExcelManagerProps> = (
           }
 
           // Parse relationships sheet
-          const relSheet = workbook.Sheets['level2_level3_relationships'];
+          const relSheet = workbook.getWorksheet('level2_level3_relationships');
           if (relSheet) {
-            const rows = XLSX.utils.sheet_to_json(relSheet) as any[];
-            
+            const rows = sheetToJson(relSheet);
             for (const row of rows) {
               if (row.level3_product_id && row.level2_product_ids) {
                 const l2Ids = String(row.level2_product_ids)
                   .split(',')
-                  .map(s => s.trim())
+                  .map((s) => s.trim())
                   .filter(Boolean);
-                
                 relationships.push({
                   level3_product_id: row.level3_product_id,
                   level2_product_ids: l2Ids
@@ -311,7 +339,6 @@ export const BulkProductExcelManager: React.FC<BulkProductExcelManagerProps> = (
             products,
             relationships
           });
-
         } catch (err: any) {
           reject(new Error(`Failed to parse Excel file: ${err.message}`));
         }
