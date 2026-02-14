@@ -3255,9 +3255,9 @@ export const generateQuotePDF = async (
           background: #f1f5f9;
           color: #0f172a;
           margin: 0;
-          padding: 20px 12px;
-          font-size: 11px;
-          line-height: 1.55;
+          padding: 12px 8px;
+          font-size: 10px;
+          line-height: 1.4;
         }
         .page {
           background: #ffffff;
@@ -3270,10 +3270,10 @@ export const generateQuotePDF = async (
         }
         .page:last-of-type { page-break-after: auto; }
         .page-inner { 
-          padding: 20px 18px; 
+          padding: 14px 12px; 
           display: flex;
           flex-direction: column;
-          min-height: calc(100vh - 40px);
+          min-height: auto;
         }
         .header {
           border-bottom: 1px solid #e2e8f0;
@@ -3289,23 +3289,23 @@ export const generateQuotePDF = async (
         .header-right { text-align: right; }
         .quote-id { font-size: 16px; font-weight: 600; color: #0f172a; margin: 0; }
         .header-meta { font-size: 11px; color: #64748b; margin-top: 6px; }
-        .draft-warning { background: #fef3c7; border: 1px solid #f59e0b; padding: 16px 20px; border-radius: 12px; margin-bottom: 28px; color: #92400e; font-size: 11px; }
-        .draft-warning strong { display: block; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 6px; }
-        .draft-warning p { margin: 4px 0 0; }
+        .draft-warning { background: #fef3c7; border: 1px solid #f59e0b; padding: 10px 12px; border-radius: 10px; margin-bottom: 12px; color: #92400e; font-size: 10px; }
+        .draft-warning strong { display: block; font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 4px; }
+        .draft-warning p { margin: 2px 0 0; }
         .date-info { display: inline-flex; flex-wrap: wrap; gap: 14px; align-items: center; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 14px 18px; margin-bottom: 32px; color: #475569; font-size: 11px; }
         .date-info strong { color: #0f172a; font-weight: 600; }
         .date-info .note { color: #64748b; font-style: italic; }
-        .quote-header-fields { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 16px; padding: 24px 28px; margin-bottom: 36px; }
-        .quote-header-fields h3 { color: #0f172a; margin: 0 0 18px; font-size: 15px; font-weight: 600; }
-        .field-row { display: grid; grid-template-columns: minmax(180px, 220px) 1fr; gap: 14px; padding: 10px 0; border-bottom: 1px solid #e2e8f0; }
+        .quote-header-fields { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 14px 16px; margin-bottom: 16px; }
+        .quote-header-fields h3 { color: #0f172a; margin: 0 0 10px; font-size: 13px; font-weight: 600; }
+        .field-row { display: grid; grid-template-columns: minmax(140px, 170px) 1fr; gap: 8px; padding: 5px 0; border-bottom: 1px solid #e2e8f0; }
         .field-row:last-of-type { border-bottom: none; }
-        .field-label { font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: #64748b; font-weight: 600; }
-        .field-value { font-size: 12px; color: #0f172a; font-weight: 500; word-break: break-word; }
-        .section-title { color: #0f172a; font-size: 16px; font-weight: 600; margin: 0 0 18px; }
-        .bom-table { width: 100%; border-collapse: collapse; margin-bottom: 12px; }
+        .field-label { font-size: 9px; letter-spacing: 0.06em; text-transform: uppercase; color: #64748b; font-weight: 600; }
+        .field-value { font-size: 10px; color: #0f172a; font-weight: 500; word-break: break-word; }
+        .section-title { color: #0f172a; font-size: 14px; font-weight: 600; margin: 0 0 12px; }
+        .bom-table { width: 100%; border-collapse: collapse; margin-bottom: 8px; }
         .bom-table thead { display: table-header-group; }
-        .bom-table th { background: #f1f5f9; color: #0f172a; padding: 12px 14px; font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; border-bottom: 1px solid #e2e8f0; }
-        .bom-table td { padding: 14px; border-bottom: 1px solid #e2e8f0; color: #0f172a; font-size: 11px; vertical-align: top; }
+        .bom-table th { background: #f1f5f9; color: #0f172a; padding: 8px 10px; font-size: 9px; letter-spacing: 0.06em; text-transform: uppercase; border-bottom: 1px solid #e2e8f0; }
+        .bom-table td { padding: 8px 10px; border-bottom: 1px solid #e2e8f0; color: #0f172a; font-size: 10px; vertical-align: top; }
         .bom-table tbody tr { page-break-inside: avoid; }
         .bom-table tbody tr:nth-child(even) { background: #f8fafc; }
         .bom-item-cell { display: flex; flex-direction: column; align-items: flex-start; }
@@ -3313,6 +3313,7 @@ export const generateQuotePDF = async (
         .product-info-link { margin-top: 8px; font-size: 10px; }
         .product-info-link a { color: #2563eb; text-decoration: none; word-break: break-all; }
         .product-info-link a:hover { text-decoration: underline; }
+        .product-info-link-print-note { margin-top: 6px; font-size: 9px; color: #64748b; }
         .total-section { margin-top: 20px; border-top: 1px solid #e2e8f0; padding-top: 16px; display: flex; flex-direction: column; gap: 8px; align-items: flex-end; }
         .total-line { display: flex; gap: 16px; font-size: 12px; font-weight: 600; color: #0f172a; }
         .total-line .label { font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: #64748b; font-weight: 500; }
@@ -3355,22 +3356,22 @@ export const generateQuotePDF = async (
         .terms-content {
           max-width: 800px;
           font-size: 10px;
-          line-height: 1.6;
+          line-height: 1.45;
           color: #475569;
         }
         .terms-heading {
           font-size: 13px;
           font-weight: 600;
           color: #1e293b;
-          margin: 18px 0 10px 0;
-          line-height: 1.4;
+          margin: 12px 0 6px 0;
+          line-height: 1.35;
         }
         .terms-heading:first-child {
           margin-top: 0;
         }
         .terms-content p {
-          margin: 0 0 12px 0;
-          line-height: 1.6;
+          margin: 0 0 8px 0;
+          line-height: 1.45;
           color: #334155;
         }
         .terms-content ul,
@@ -3418,21 +3419,61 @@ export const generateQuotePDF = async (
         }
         .footer { margin-top: 48px; border-top: 1px solid #e2e8f0; padding-top: 18px; font-size: 10px; color: #64748b; }
         @media print {
-          body { background: #ffffff; padding: 0; }
+          @page {
+            size: A4;
+            margin: 6mm 5mm;
+          }
+          body { background: #ffffff; padding: 0; font-size: 10px; line-height: 1.35; }
           .page { box-shadow: none; border-radius: 0; margin: 0 auto; max-width: none; width: auto; }
-          .page-inner { padding: 8mm 6mm; }
-          .draft-warning, .date-info, .quote-header-fields, .rack-card, .level4-section { page-break-inside: avoid; }
+          .page-intro, .page-bom, .page-rack, .page-level4, .page-config-footer-only { page-break-after: always; break-after: page; }
+          .page-terms { page-break-before: always; break-before: page; page-break-after: auto; break-after: auto; }
+          .page-inner { padding: 6mm 5mm; min-height: auto; }
+          .header { padding-bottom: 12px; margin-bottom: 14px; }
+          .quote-header-fields { padding: 14px 16px; margin-bottom: 14px; }
+          .field-row { padding: 4px 0; grid-template-columns: minmax(130px, 170px) 1fr; }
+          .bom-table th { padding: 7px 8px; font-size: 9px; }
+          .bom-table td { padding: 7px 8px; font-size: 10px; }
+          .additional-info { margin-top: 10px; padding: 10px 12px; }
+          .rack-config { gap: 12px; }
+          .rack-card { padding: 12px; page-break-inside: avoid; break-inside: avoid; }
+          .rack-table tbody tr { page-break-inside: avoid; break-inside: avoid; }
+          .rack-table th, .rack-table td, .level4-table th, .level4-table td { padding: 7px 8px; }
+          .level4-collection { gap: 12px; }
+          .level4-section { padding: 12px; page-break-inside: avoid; break-inside: avoid-page; }
+          .level4-heading, .level4-subheading, .level4-meta { page-break-after: avoid; break-after: avoid; }
+          .level4-table thead { display: table-header-group; }
+          .level4-table tbody tr { page-break-inside: avoid; break-inside: avoid; }
+          .product-info-link { display: block; font-size: 8px; margin-top: 2px; }
+          .draft-warning, .date-info, .quote-header-fields { page-break-inside: avoid; }
           .terms-page-wrapper {
+            page-break-inside: auto;
+            break-inside: auto;
+          }
+          .terms-content h1,
+          .terms-content h2,
+          .terms-content h3,
+          .terms-content h4,
+          .terms-content h5,
+          .terms-content h6 {
+            page-break-after: avoid;
+            break-after: avoid;
             page-break-inside: avoid;
             break-inside: avoid;
           }
-          .terms-page-columns {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 18px;
+          .terms-content p,
+          .terms-content li,
+          .terms-content blockquote {
+            page-break-inside: auto;
+            break-inside: auto;
+            orphans: 3;
+            widows: 3;
           }
-          .terms-column-left,
-          .terms-column-right {
+          .terms-content table {
+            page-break-inside: avoid;
+            break-inside: avoid;
+          }
+          .terms-content ul,
+          .terms-content ol {
             page-break-inside: auto;
             break-inside: auto;
           }
@@ -3580,8 +3621,7 @@ export const generateQuotePDF = async (
                         sanitizeHttpUrl((parentLevel2Item?.product as any)?.product_info_url)
                       : undefined);
 
-                  const shouldRenderLink =
-                    !!infoUrl && normalizedLevel !== 1 && normalizedLevel !== 4;
+                  const shouldRenderLink = !!infoUrl;
 
                   const infoLinkHtml = shouldRenderLink && infoUrl
                     ? `<div class="product-info-link"><a href="${escapeHtml(infoUrl)}" target="_blank" rel="noopener noreferrer">Product Info</a></div>`
@@ -3647,13 +3687,24 @@ export const generateQuotePDF = async (
       </div>
 
       ${hasRackOrLevel4Content ? `
-        <div class="page page-config">
-          <div class="page-inner">
-            ${rackConfigurationHTML ? `<h2 class="section-title">Rack Configuration</h2>${rackConfigurationHTML}` : ''}
-            ${level4SectionHTML ? `<h2 class="section-title" style="margin-top: 48px;">Level 4 Configuration Details</h2>${level4SectionHTML}` : ''}
-            ${!hasTermsContent ? footerHTML : ''}
+        ${rackConfigurationHTML ? `
+          <div class="page page-rack">
+            <div class="page-inner">
+              <h2 class="section-title">Rack Configuration</h2>
+              ${rackConfigurationHTML}
+            </div>
           </div>
-        </div>
+        ` : ''}
+
+        ${level4SectionHTML ? `
+          <div class="page page-level4">
+            <div class="page-inner">
+              <h2 class="section-title">Level 4 Configuration Details</h2>
+              ${level4SectionHTML}
+              ${!hasTermsContent ? footerHTML : ''}
+            </div>
+          </div>
+        ` : `${!hasTermsContent ? `<div class="page page-config-footer-only"><div class="page-inner">${footerHTML}</div></div>` : ''}`}
       ` : ''}
 
       ${hasTermsContent ? `
