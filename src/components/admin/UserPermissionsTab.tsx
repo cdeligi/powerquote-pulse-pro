@@ -72,8 +72,8 @@ const UserPermissionsTab = ({ userProfile }: UserPermissionsTabProps) => {
       const userOverridesMap = new Map(userOverrides?.map(uo => [uo.feature_key, uo.allowed]) || []);
 
       const permissions: FeaturePermission[] = filteredFeatures.map(feature => {
-        const roleDefault = roleDefaultsMap.get(feature.key) || false;
-        const userOverride = userOverridesMap.get(feature.key) || null;
+        const roleDefault = roleDefaultsMap.has(feature.key) ? Boolean(roleDefaultsMap.get(feature.key)) : false;
+        const userOverride = userOverridesMap.has(feature.key) ? (userOverridesMap.get(feature.key) as boolean | null) : null;
         const effectivePermission = userOverride !== null ? userOverride : roleDefault;
 
         return {
@@ -122,7 +122,7 @@ const UserPermissionsTab = ({ userProfile }: UserPermissionsTabProps) => {
             user_id: userProfile.id,
             feature_key: featureKey,
             allowed
-          });
+          }, { onConflict: 'user_id,feature_key' });
 
         if (error) throw error;
       }

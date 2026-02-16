@@ -36,7 +36,7 @@ interface UserEditDialogProps {
 export default function UserEditDialog({ user, isOpen, onClose, onSave, departments, currentUserEmail }: UserEditDialogProps) {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
-  const [role, setRole] = useState('SALES');
+  const [role, setRole] = useState('LEVEL_1');
   const [userStatus, setUserStatus] = useState('active');
   const [department, setDepartment] = useState('');
   const [jobTitle, setJobTitle] = useState('');
@@ -52,7 +52,7 @@ export default function UserEditDialog({ user, isOpen, onClose, onSave, departme
       const nameParts = user.fullName.split(' ');
       setFirstName(nameParts[0] || '');
       setLastName(nameParts.slice(1).join(' ') || '');
-      setRole(user.role);
+      setRole(user.role === 'ADMIN' ? 'LEVEL_3' : user.role === 'MASTER' ? 'MASTER' : user.role === 'FINANCE' ? 'FINANCE' : 'LEVEL_1');
       setUserStatus(user.userStatus);
       setDepartment(user.department || '');
       setJobTitle(user.jobTitle || '');
@@ -72,7 +72,7 @@ export default function UserEditDialog({ user, isOpen, onClose, onSave, departme
         id: user.id,
         firstName,
         lastName,
-        role,
+        role: role === 'LEVEL_1' || role === 'LEVEL_2' ? 'SALES' : role === 'LEVEL_3' ? 'ADMIN' : role,
         userStatus,
         department,
         jobTitle,
@@ -151,8 +151,9 @@ export default function UserEditDialog({ user, isOpen, onClose, onSave, departme
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent className="bg-gray-800 border-gray-700">
-                  <SelectItem value="SALES">Sales</SelectItem>
-                  <SelectItem value="ADMIN">Admin</SelectItem>
+                  <SelectItem value="LEVEL_1">Level 1</SelectItem>
+                  <SelectItem value="LEVEL_2">Level 2</SelectItem>
+                  <SelectItem value="LEVEL_3">Level 3</SelectItem>
                   <SelectItem value="FINANCE">Finance</SelectItem>
                 </SelectContent>
               </Select>

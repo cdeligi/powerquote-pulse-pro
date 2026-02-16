@@ -51,14 +51,14 @@ export function usePermissions(): PermissionData & { has: (featureKey: string) =
         const effectivePermissions: Record<string, boolean> = {};
 
         // Start with role defaults
-        roleDefaults?.forEach(({ feature_key, allowed }) => {
-          effectivePermissions[feature_key] = allowed;
+        roleDefaults?.forEach(({ feature_key, allowed }: any) => {
+          effectivePermissions[feature_key] = Boolean(allowed);
         });
 
         // Apply user overrides (null means no override, use default)
-        userOverrides?.forEach(({ feature_key, allowed }) => {
+        userOverrides?.forEach(({ feature_key, allowed }: any) => {
           if (allowed !== null) {
-            effectivePermissions[feature_key] = allowed;
+            effectivePermissions[feature_key] = Boolean(allowed);
           }
         });
 
