@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { getSupabaseClient } from "@/integrations/supabase/client";
+import { Role } from '@/types/auth';
 
 const supabase = getSupabaseClient();
 import { Loader2 } from 'lucide-react';
@@ -22,7 +23,7 @@ interface RoleDefault {
   allowed: boolean;
 }
 
-const ROLES = ['ADMIN', 'FINANCE', 'LEVEL_3', 'LEVEL_2', 'LEVEL_1'] as const;
+const ROLES: Role[] = ['SALES', 'ADMIN', 'FINANCE', 'MASTER'];
 
 const DEFAULT_FEATURES: Feature[] = [
   {
@@ -134,15 +135,28 @@ export default function PermissionsOverview() {
         return [...prev, { role, feature_key: featureKey, allowed }];
       });
 
-      // Update in database
-      const { error } = await supabase
+      // Update in database (safe path without assuming composite unique constraint)
+      const { data: existing, error: existingError } = await supabase
         .from('role_feature_defaults')
-        .upsert(
-          { role, feature_key: featureKey, allowed },
-          { onConflict: 'role,feature_key' }
-        );
+        .select('id')
+        .eq('role', role)
+        .eq('feature_key', featureKey)
+        .maybeSingle();
 
-      if (error) throw error;
+      if (existingError) throw existingError;
+
+      if (existing?.id) {
+        const { error: updateError } = await supabase
+          .from('role_feature_defaults')
+          .update({ allowed })
+          .eq('id', existing.id);
+        if (updateError) throw updateError;
+      } else {
+        const { error: insertError } = await supabase
+          .from('role_feature_defaults')
+          .insert({ role, feature_key: featureKey, allowed });
+        if (insertError) throw insertError;
+      }
       
       toast({
         title: "Success",
@@ -152,7 +166,7 @@ export default function PermissionsOverview() {
       console.error('Error updating permission:', error);
       toast({
         title: "Error",
-        description: "Failed to update permission. Please try again.",
+        description: error instanceof Error ? error.message : "Failed to update permission. Please try again.",
         variant: "destructive",
       });
       // Revert local state on error

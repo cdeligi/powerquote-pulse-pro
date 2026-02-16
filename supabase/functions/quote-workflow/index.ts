@@ -552,7 +552,7 @@ async function handleEmailTemplateGet(
   supabase: SupabaseServerClient,
   context: RequestContext,
 ) {
-  assertRole(context, ["ADMIN", "MASTER"]);
+  assertRole(context, ["ADMIN", "FINANCE", "MASTER"]);
   const templateType = url.searchParams.get("type");
   if (!templateType) {
     throw new HttpError(400, "type query parameter is required");
@@ -600,7 +600,7 @@ async function handleEmailTemplateUpdate(
   supabase: SupabaseServerClient,
   context: RequestContext,
 ) {
-  assertRole(context, ["ADMIN", "MASTER"]);
+  assertRole(context, ["ADMIN", "FINANCE", "MASTER"]);
   const { templateType, subjectTemplate, bodyTemplate, enabled } = await req.json();
   if (!templateType || !subjectTemplate || !bodyTemplate) {
     throw new HttpError(400, "templateType, subjectTemplate and bodyTemplate are required");
