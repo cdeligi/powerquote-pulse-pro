@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -71,6 +71,21 @@ const AdminSettings = () => {
 
       // Parse values - they're stored as JSONB now (directly, not double-stringified)
       setQuotePrefix(prefixSetting?.value || 'QLT');
+
+      try {
+        const limit = await quoteWorkflowService.getFinanceMarginLimit();
+        setFinanceLimit(limit);
+      } catch (limitError) {
+        console.warn('Unable to load finance limit', limitError);
+      }
+
+      try {
+        const template = await quoteWorkflowService.getEmailTemplate('quote_admin_decision');
+        setWorkflowTemplate(template);
+      } catch (templateError) {
+        console.warn('Unable to load workflow template', templateError);
+      }
+
       setQuoteCounter(typeof counterSetting?.value === 'number' ? counterSetting.value : parseInt(counterSetting?.value || '1'));
       setQuoteExpiresDays(typeof expiresSetting?.value === 'number' ? expiresSetting.value : parseInt(expiresSetting?.value || '30'));
       setCompanyName(nameSetting?.value || 'QUALITROL');
@@ -123,6 +138,54 @@ const AdminSettings = () => {
       });
     } finally {
       setSaving(false);
+    }
+  };
+
+  const saveFinanceGuardrail = async () => {
+    if (!financeLimit) return;
+    try {
+      setFinanceLimitSaving(true);
+      const updated = await quoteWorkflowService.updateFinanceMarginLimit(financeLimit.percent, financeLimit.currency);
+      setFinanceLimit(updated);
+      toast({
+        title: 'Finance Guardrail Updated',
+        description: `Minimum margin set to ${updated.percent}%`,
+      });
+    } catch (error) {
+      console.error('Error updating finance guardrail:', error);
+      toast({
+        title: 'Error',
+        description: 'Unable to update finance guardrail.',
+        variant: 'destructive',
+      });
+    } finally {
+      setFinanceLimitSaving(false);
+    }
+  };
+
+  const saveWorkflowTemplate = async () => {
+    if (!workflowTemplate) return;
+    try {
+      setWorkflowTemplateSaving(true);
+      await quoteWorkflowService.updateEmailTemplate({
+        templateType: workflowTemplate.template_type ?? 'quote_admin_decision',
+        subjectTemplate: workflowTemplate.subject_template,
+        bodyTemplate: workflowTemplate.body_template,
+        enabled: workflowTemplate.enabled ?? true,
+      });
+      toast({
+        title: 'Template Saved',
+        description: 'Workflow email template updated successfully.',
+      });
+    } catch (error) {
+      console.error('Error updating workflow template:', error);
+      toast({
+        title: 'Error',
+        description: 'Unable to update workflow template.',
+        variant: 'destructive',
+      });
+    } finally {
+      setWorkflowTemplateSaving(false);
     }
   };
 
@@ -310,6 +373,73 @@ const AdminSettings = () => {
               </div>
             </CardContent>
           </Card>
+
+          <Card className="bg-gray-900 border-gray-800 mt-6">
+            <CardHeader>
+              <CardTitle className="text-white">Finance Guardrail & Workflow Email</CardTitle>
+              <CardDescription className="text-gray-400">Update the minimum margin threshold and the admin decision email template.</CardDescription>
+            </CardHeader>
+            <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-3">
+                <Label className="text-white">Minimum Margin Percentage</Label>
+                <div className="flex gap-2">
+                  <Input
+                    type="number"
+                    value={financeLimit?.percent ?? ''}
+                    onChange={(e) => setFinanceLimit(prev => ({
+                      percent: Number(e.target.value) || 0,
+                      currency: prev?.currency ?? 'USD',
+                      updatedAt: prev?.updatedAt,
+                      updatedBy: prev?.updatedBy,
+                    }))}
+                    className="bg-gray-800 border-gray-600 text-white"
+                    placeholder="22"
+                  />
+                  <Button
+                    onClick={saveFinanceGuardrail}
+                    disabled={financeLimitSaving || !financeLimit}
+                    className="bg-red-600 hover:bg-red-700"
+                  >
+                    {financeLimitSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Update'}
+                  </Button>
+                </div>
+                <p className="text-sm text-gray-400">Quotes below this blended margin automatically route to finance.</p>
+                {financeLimit?.updatedAt && (
+                  <p className="text-xs text-gray-500">Last updated {new Date(financeLimit.updatedAt).toLocaleString()}</p>
+                )}
+              </div>
+
+              <div className="space-y-3">
+                <Label className="text-white">Admin Decision Email</Label>
+                <Input
+                  value={workflowTemplate?.subject_template ?? ''}
+                  onChange={(e) => setWorkflowTemplate(prev => ({
+                    ...(prev ?? { template_type: 'quote_admin_decision', enabled: true }),
+                    subject_template: e.target.value,
+                  }))}
+                  placeholder="Quote {{quote_id}} decision"
+                  className="bg-gray-800 border-gray-600 text-white"
+                />
+                <Textarea
+                  value={workflowTemplate?.body_template ?? ''}
+                  onChange={(e) => setWorkflowTemplate(prev => ({
+                    ...(prev ?? { template_type: 'quote_admin_decision', enabled: true }),
+                    body_template: e.target.value,
+                  }))}
+                  className="bg-gray-800 border-gray-600 text-white min-h-[120px]"
+                  placeholder="Compose the workflow email body..."
+                />
+                <Button
+                  onClick={saveWorkflowTemplate}
+                  disabled={workflowTemplateSaving || !workflowTemplate}
+                  className="bg-red-600 hover:bg-red-700"
+                >
+                  {workflowTemplateSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Save Template'}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
         </TabsContent>
 
         <TabsContent value="pdf-template">
