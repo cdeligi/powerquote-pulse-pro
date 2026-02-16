@@ -29,13 +29,15 @@ export function usePermissions(): PermissionData & { has: (featureKey: string) =
       try {
         setPermissionData(prev => ({ ...prev, loading: true, error: null }));
 
-        // Fetch role defaults
-        const { data: roleDefaults, error: roleError } = await supabase
+        // Fetch role defaults (load all + filter client-side to avoid enum literal mismatches)
+        const { data: allRoleDefaults, error: roleError } = await supabase
           .from('role_feature_defaults')
-          .select('feature_key, allowed')
-          .eq('role', user.role);
+          .select('role, feature_key, allowed');
 
         if (roleError) throw roleError;
+
+        const normalizedUserRole = String(user.role || '').toUpperCase();
+        const roleDefaults = (allRoleDefaults || []).filter((row: any) => String(row.role || '').toUpperCase() === normalizedUserRole);
 
         // Fetch user overrides
         const { data: userOverrides, error: overrideError } = await supabase
@@ -101,9 +103,8 @@ export const FEATURES = {
 
 // Role labels for UI display
 export const ROLE_LABELS: Record<Role, string> = {
-  LEVEL_1: 'Channel Partners',
-  LEVEL_2: 'Qualitrol Sales', 
-  LEVEL_3: 'Directors',
-  ADMIN: 'Administrators',
-  FINANCE: 'Finance'
+  SALES: 'Sales',
+  ADMIN: 'Admin Reviewer',
+  FINANCE: 'Finance',
+  MASTER: 'Master Operator'
 };

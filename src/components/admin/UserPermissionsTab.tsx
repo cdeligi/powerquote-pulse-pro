@@ -48,13 +48,15 @@ const UserPermissionsTab = ({ userProfile }: UserPermissionsTabProps) => {
 
       if (featuresError) throw featuresError;
 
-      // Fetch role defaults for this user's role
-      const { data: roleDefaults, error: roleError } = await supabase
+      // Fetch role defaults (load all + filter client-side to avoid enum literal mismatches)
+      const { data: allRoleDefaults, error: roleError } = await supabase
         .from('role_feature_defaults')
-        .select('feature_key, allowed')
-        .eq('role', userProfile.role);
+        .select('role, feature_key, allowed');
 
       if (roleError) throw roleError;
+
+      const normalizedUserRole = String(userProfile.role || '').toUpperCase();
+      const roleDefaults = (allRoleDefaults || []).filter((row: any) => String(row.role || '').toUpperCase() === normalizedUserRole);
 
       // Fetch user overrides
       const { data: userOverrides, error: overrideError } = await supabase
