@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Checkbox } from "@/components/ui/checkbox";
+// checkbox removed: master now represented directly in role select
 import { toast } from "@/hooks/use-toast";
 import { Department } from "@/services/departmentService";
 
@@ -37,6 +37,16 @@ export default function UserEditDialog({ user, isOpen, onClose, onSave, departme
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [role, setRole] = useState('level1');
+
+  const normalizeRoleForEditor = (rawRole: string | null | undefined): string => {
+    const value = String(rawRole || '').toLowerCase();
+    if (['level1', 'level2', 'level3', 'admin', 'finance', 'master'].includes(value)) {
+      return value;
+    }
+    if (value === 'sales') return 'level1';
+    if (value === 'administrator') return 'admin';
+    return 'level1';
+  };
   const [userStatus, setUserStatus] = useState('active');
   const [department, setDepartment] = useState('');
   const [jobTitle, setJobTitle] = useState('');
@@ -52,7 +62,7 @@ export default function UserEditDialog({ user, isOpen, onClose, onSave, departme
       const nameParts = user.fullName.split(' ');
       setFirstName(nameParts[0] || '');
       setLastName(nameParts.slice(1).join(' ') || '');
-      setRole(user.role || 'level1');
+      setRole(normalizeRoleForEditor(user.role));
       setUserStatus(user.userStatus);
       setDepartment(user.department || '');
       setJobTitle(user.jobTitle || '');
@@ -146,7 +156,7 @@ export default function UserEditDialog({ user, isOpen, onClose, onSave, departme
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label htmlFor="role" className="text-gray-400">Role</Label>
-              <Select value={role === 'master' ? 'finance' : role} onValueChange={setRole}>
+              <Select value={role} onValueChange={setRole}>
                 <SelectTrigger className="bg-gray-800 border-gray-700 text-white">
                   <SelectValue />
                 </SelectTrigger>
@@ -154,20 +164,13 @@ export default function UserEditDialog({ user, isOpen, onClose, onSave, departme
                   <SelectItem value="level1">Level 1</SelectItem>
                   <SelectItem value="level2">Level 2</SelectItem>
                   <SelectItem value="level3">Level 3</SelectItem>
+                  <SelectItem value="admin">Admin</SelectItem>
                   <SelectItem value="finance">Finance</SelectItem>
+                  <SelectItem value="master" disabled={currentUserEmail !== 'cdeligi@qualitrolcorp.com' || user.email !== 'cdeligi@qualitrolcorp.com'}>Master</SelectItem>
                 </SelectContent>
               </Select>
-              <div className="mt-3 flex items-center space-x-2">
-                <Checkbox
-                  id="master-id"
-                  checked={role === 'master'}
-                  disabled={currentUserEmail !== 'cdeligi@qualitrolcorp.com'}
-                  onCheckedChange={(checked) => setRole(checked ? 'master' : 'finance')}
-                />
-                <Label htmlFor="master-id" className="text-gray-300">Master ID (highest level)</Label>
-              </div>
-              {currentUserEmail !== 'cdeligi@qualitrolcorp.com' && (
-                <p className="text-xs text-amber-400 mt-1">Only cdeligi@qualitrolcorp.com can assign Master ID.</p>
+              {(currentUserEmail !== 'cdeligi@qualitrolcorp.com' || user.email !== 'cdeligi@qualitrolcorp.com') && (
+                <p className="text-xs text-amber-400 mt-1">Master role is restricted to cdeligi@qualitrolcorp.com only.</p>
               )}
             </div>
             <div>

@@ -170,7 +170,20 @@ async function getRequestContext(req: Request, supabase: SupabaseServerClient): 
     throw new HttpError(403, "Profile not found");
   }
 
-  const normalizedRole = (profile.role || "SALES").toUpperCase() as Role;
+  const rawRole = String(profile.role || "SALES").toUpperCase();
+  const normalizedRole = (
+    rawRole === "LEVEL1" || rawRole === "LEVEL_1" || rawRole === "SALES"
+      ? "SALES"
+      : rawRole === "LEVEL2" || rawRole === "LEVEL_2"
+        ? "SALES"
+        : rawRole === "LEVEL3" || rawRole === "LEVEL_3" || rawRole === "ADMIN"
+          ? "ADMIN"
+          : rawRole === "FINANCE"
+            ? "FINANCE"
+            : rawRole === "MASTER"
+              ? "MASTER"
+              : "SALES"
+  ) as Role;
   const fullName = `${profile.first_name ?? ""} ${profile.last_name ?? ""}`.trim();
 
   return {

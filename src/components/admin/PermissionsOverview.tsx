@@ -25,6 +25,20 @@ interface RoleDefault {
 
 const ROLES = ['level1', 'level2', 'level3', 'admin', 'finance', 'master'] as const;
 
+const ROLE_ALIASES: Record<(typeof ROLES)[number], string[]> = {
+  level1: ['level1', 'level_1', 'sales'],
+  level2: ['level2', 'level_2'],
+  level3: ['level3', 'level_3'],
+  admin: ['admin'],
+  finance: ['finance'],
+  master: ['master'],
+};
+
+const roleMatches = (displayRole: (typeof ROLES)[number], dbRole: string): boolean => {
+  const val = String(dbRole || '').toLowerCase();
+  return ROLE_ALIASES[displayRole].includes(val);
+};
+
 const DEFAULT_FEATURES: Feature[] = [
   {
     key: 'FEATURE_BOM_SHOW_PRODUCT_COST',
@@ -111,14 +125,14 @@ export default function PermissionsOverview() {
     fetchData();
   }, []);
 
-  const getPermissionForRole = (featureKey: string, role: string): boolean => {
+  const getPermissionForRole = (featureKey: string, role: (typeof ROLES)[number]): boolean => {
     const roleDefault = roleDefaults.find(
-      rd => rd.feature_key === featureKey && rd.role === role
+      rd => rd.feature_key === featureKey && roleMatches(role, rd.role)
     );
     return roleDefault?.allowed || false;
   };
 
-  const updateRolePermission = async (featureKey: string, role: string, allowed: boolean) => {
+  const updateRolePermission = async (featureKey: string, role: (typeof ROLES)[number], allowed: boolean) => {
     try {
       setSaving(true);
       
@@ -136,15 +150,16 @@ export default function PermissionsOverview() {
       });
 
       // Update in database (safe path without assuming composite unique constraint)
-      const { data: existing, error: existingError } = await supabase
+      const aliasValues = ROLE_ALIASES[role];
+      const { data: existingRows, error: existingError } = await supabase
         .from('role_feature_defaults')
-        .select('id')
-        .eq('role', role)
+        .select('id, role')
         .eq('feature_key', featureKey)
-        .maybeSingle();
+        .in('role', aliasValues as any);
 
       if (existingError) throw existingError;
 
+      const existing = existingRows?.[0];
       if (existing?.id) {
         const { error: updateError } = await supabase
           .from('role_feature_defaults')
@@ -152,9 +167,10 @@ export default function PermissionsOverview() {
           .eq('id', existing.id);
         if (updateError) throw updateError;
       } else {
+        const preferredRoleValue = aliasValues[0];
         const { error: insertError } = await supabase
           .from('role_feature_defaults')
-          .insert({ role, feature_key: featureKey, allowed });
+          .insert({ role: preferredRoleValue as any, feature_key: featureKey, allowed });
         if (insertError) throw insertError;
       }
       
