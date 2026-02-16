@@ -34,6 +34,15 @@ const ROLE_ALIASES: Record<(typeof ROLES)[number], string[]> = {
   master: ['master'],
 };
 
+const ROLE_DB_CANONICAL: Record<(typeof ROLES)[number], string> = {
+  level1: 'LEVEL_1',
+  level2: 'LEVEL_2',
+  level3: 'LEVEL_3',
+  admin: 'ADMIN',
+  finance: 'FINANCE',
+  master: 'MASTER',
+};
+
 const roleMatches = (displayRole: (typeof ROLES)[number], dbRole: string): boolean => {
   const val = String(dbRole || '').toLowerCase();
   return ROLE_ALIASES[displayRole].includes(val);
@@ -167,7 +176,7 @@ export default function PermissionsOverview() {
           .eq('id', existing.id);
         if (updateError) throw updateError;
       } else {
-        const preferredRoleValue = aliasValues[0];
+        const preferredRoleValue = ROLE_DB_CANONICAL[role];
         const { error: insertError } = await supabase
           .from('role_feature_defaults')
           .insert({ role: preferredRoleValue as any, feature_key: featureKey, allowed });
