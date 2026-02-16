@@ -13,6 +13,7 @@ import { toast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { UserSharingManager } from './UserSharingManager';
 import { EmailSettings } from './EmailSettings';
+import { quoteWorkflowService, type FinanceMarginLimit } from '@/services/quoteWorkflowService';
 
 const AdminSettings = () => {
   const { user } = useAuth();
@@ -31,6 +32,16 @@ const AdminSettings = () => {
   const [sessionDurationHours, setSessionDurationHours] = useState(8);
   const [inactivityTimeoutMinutes, setInactivityTimeoutMinutes] = useState(30);
   const [sessionRefreshIntervalMinutes, setSessionRefreshIntervalMinutes] = useState(30);
+
+  const [financeLimit, setFinanceLimit] = useState<FinanceMarginLimit | null>(null);
+  const [financeLimitSaving, setFinanceLimitSaving] = useState(false);
+  const [workflowTemplate, setWorkflowTemplate] = useState<{
+    template_type?: string;
+    subject_template: string;
+    body_template: string;
+    enabled?: boolean;
+  } | null>(null);
+  const [workflowTemplateSaving, setWorkflowTemplateSaving] = useState(false);
 
   const fetchLegalContent = async () => {
     try {
