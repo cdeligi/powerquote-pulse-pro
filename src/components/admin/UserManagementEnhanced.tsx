@@ -70,7 +70,7 @@ const UserManagementEnhanced = ({ user }: UserManagementEnhancedProps) => {
   const [newPassword, setNewPassword] = useState('');
   const [newFirstName, setNewFirstName] = useState('');
   const [newLastName, setNewLastName] = useState('');
-  const [newRole, setNewRole] = useState<Role>('LEVEL_1'); // Default role
+  const [newRole, setNewRole] = useState<Role>('SALES'); // Default role
   const [newDepartment, setNewDepartment] = useState('');
   const [newJobTitle, setNewJobTitle] = useState('');
   const [newPhoneNumber, setNewPhoneNumber] = useState('');
@@ -268,7 +268,7 @@ const UserManagementEnhanced = ({ user }: UserManagementEnhancedProps) => {
       setNewPassword('');
       setNewFirstName('');
       setNewLastName('');
-      setNewRole('LEVEL_1');
+      setNewRole('SALES');
       setNewDepartment('');
       setNewJobTitle('');
       setNewPhoneNumber('');
@@ -581,11 +581,10 @@ const UserManagementEnhanced = ({ user }: UserManagementEnhancedProps) => {
                       <SelectValue placeholder="Select a role" />
                     </SelectTrigger>
                     <SelectContent className="bg-gray-800 border-gray-700 text-white">
-                      <SelectItem value="LEVEL_1">Level 1</SelectItem>
-                      <SelectItem value="LEVEL_2">Level 2</SelectItem>
-                      <SelectItem value="LEVEL_3">Level 3</SelectItem>
-                      <SelectItem value="ADMIN">Admin</SelectItem>
-                      <SelectItem value="FINANCE">Finance</SelectItem>
+                      <SelectItem value="SALES">Sales</SelectItem>
+                      <SelectItem value="ADMIN">Admin Reviewer</SelectItem>
+                      <SelectItem value="FINANCE">Finance Reviewer</SelectItem>
+                      <SelectItem value="MASTER">Master Operator</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -1059,7 +1058,8 @@ const UserManagementEnhanced = ({ user }: UserManagementEnhancedProps) => {
         isOpen={!!selectedUserForEdit}
         onClose={() => setSelectedUserForEdit(null)}
         onSave={handleUpdateUser}
-        departments={departments} // Add this line
+        departments={departments}
+        currentUserEmail={user?.email ?? null}
       />
 
       {/* New Department Dialog */}

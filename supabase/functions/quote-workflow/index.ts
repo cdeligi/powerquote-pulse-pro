@@ -562,13 +562,37 @@ async function handleEmailTemplateGet(
     .from("email_templates")
     .select("*")
     .eq("template_type", templateType)
-    .single();
+    .maybeSingle();
 
-  if (error || !data) {
-    throw new HttpError(404, "Template not found");
+  if (error) {
+    throw new HttpError(500, "Unable to load template");
   }
 
-  return jsonResponse({ success: true, template: data });
+  if (data) {
+    return jsonResponse({ success: true, template: data });
+  }
+
+  const fallback = {
+    template_type: templateType,
+    subject_template: "Quote {{quote_id}} decision",
+    body_template: "Quote {{quote_id}} status updated.",
+    enabled: true,
+    variables: ["quote_id", "customer_name", "approved_by", "approved_date"],
+    updated_by: context.userId,
+    updated_at: new Date().toISOString(),
+  };
+
+  const { data: inserted, error: insertError } = await supabase
+    .from("email_templates")
+    .upsert(fallback, { onConflict: "template_type" })
+    .select("*")
+    .single();
+
+  if (insertError || !inserted) {
+    throw new HttpError(500, "Unable to initialize template");
+  }
+
+  return jsonResponse({ success: true, template: inserted });
 }
 
 async function handleEmailTemplateUpdate(
@@ -584,14 +608,16 @@ async function handleEmailTemplateUpdate(
 
   const { data, error } = await supabase
     .from("email_templates")
-    .update({
+    .upsert({
+      template_type: templateType,
       subject_template: subjectTemplate,
       body_template: bodyTemplate,
       enabled: typeof enabled === "boolean" ? enabled : true,
       updated_by: context.userId,
       updated_at: new Date().toISOString(),
+    }, {
+      onConflict: "template_type",
     })
-    .eq("template_type", templateType)
     .select("*")
     .single();
 

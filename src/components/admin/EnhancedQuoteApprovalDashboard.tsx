@@ -863,6 +863,7 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
                 const workflowState = getDerivedWorkflowState(quote);
                 const statusBadge = getStatusBadge(quote);
                 const workflowBadge = getWorkflowBadge(workflowState);
+                const showStatusBadge = String(quote.status ?? '').toLowerCase() !== String(workflowState ?? '').toLowerCase();
                 const workflowLane = getWorkflowLaneForState(workflowState);
                 const claimKey = workflowLane ? `${quote.id}-${workflowLane}` : '';
                 const claimBusy = workflowLane ? Boolean(claimLoading[claimKey]) : false;
@@ -907,7 +908,7 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
                           </div>
                           
                           <div className="flex items-center space-x-2">
-                            {statusBadge}
+                            {showStatusBadge && statusBadge}
                             <Badge className={`${workflowBadge.color} text-white`} variant="secondary">
                               {workflowBadge.text}
                             </Badge>
@@ -972,6 +973,7 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
                 const workflowState = getDerivedWorkflowState(quote);
                 const statusBadge = getStatusBadge(quote);
                 const workflowBadge = getWorkflowBadge(workflowState);
+                const showStatusBadge = String(quote.status ?? '').toLowerCase() !== String(workflowState ?? '').toLowerCase();
                 const workflowLane = getWorkflowLaneForState(workflowState);
                 const claimKey = workflowLane ? `${quote.id}-${workflowLane}` : '';
                 const claimBusy = workflowLane ? Boolean(claimLoading[claimKey]) : false;
@@ -1010,7 +1012,7 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
                           </div>
                           
                           <div className="flex items-center space-x-2">
-                            {statusBadge}
+                            {showStatusBadge && statusBadge}
                             <Badge className={`${workflowBadge.color} text-white`} variant="secondary">
                               {workflowBadge.text}
                             </Badge>

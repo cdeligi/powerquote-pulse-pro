@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "@/hooks/use-toast";
 import { Department } from "@/services/departmentService";
 
@@ -28,13 +29,14 @@ interface UserEditDialogProps {
   isOpen: boolean;
   onClose: () => void;
   onSave: (userData: any) => Promise<void>;
-  departments: Department[]; // Add this prop
+  departments: Department[];
+  currentUserEmail?: string | null;
 }
 
-export default function UserEditDialog({ user, isOpen, onClose, onSave, departments }: UserEditDialogProps) {
+export default function UserEditDialog({ user, isOpen, onClose, onSave, departments, currentUserEmail }: UserEditDialogProps) {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
-  const [role, setRole] = useState('level1');
+  const [role, setRole] = useState('SALES');
   const [userStatus, setUserStatus] = useState('active');
   const [department, setDepartment] = useState('');
   const [jobTitle, setJobTitle] = useState('');
@@ -144,17 +146,28 @@ export default function UserEditDialog({ user, isOpen, onClose, onSave, departme
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label htmlFor="role" className="text-gray-400">Role</Label>
-              <Select value={role} onValueChange={setRole}>
+              <Select value={role === 'MASTER' ? 'FINANCE' : role} onValueChange={setRole}>
                 <SelectTrigger className="bg-gray-800 border-gray-700 text-white">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent className="bg-gray-800 border-gray-700">
-                  <SelectItem value="level1">Level 1</SelectItem>
-                  <SelectItem value="level2">Level 2</SelectItem>
-                  <SelectItem value="admin">Admin</SelectItem>
-                  <SelectItem value="finance">Finance</SelectItem>
+                  <SelectItem value="SALES">Sales</SelectItem>
+                  <SelectItem value="ADMIN">Admin</SelectItem>
+                  <SelectItem value="FINANCE">Finance</SelectItem>
                 </SelectContent>
               </Select>
+              <div className="mt-3 flex items-center space-x-2">
+                <Checkbox
+                  id="master-id"
+                  checked={role === 'MASTER'}
+                  disabled={currentUserEmail !== 'cdeligi@qualitrolcorp.com'}
+                  onCheckedChange={(checked) => setRole(checked ? 'MASTER' : 'FINANCE')}
+                />
+                <Label htmlFor="master-id" className="text-gray-300">Master ID (highest level)</Label>
+              </div>
+              {currentUserEmail !== 'cdeligi@qualitrolcorp.com' && (
+                <p className="text-xs text-amber-400 mt-1">Only cdeligi@qualitrolcorp.com can assign Master ID.</p>
+              )}
             </div>
             <div>
               <Label htmlFor="status" className="text-gray-400">Status</Label>
