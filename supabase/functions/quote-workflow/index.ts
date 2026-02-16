@@ -606,23 +606,48 @@ async function handleEmailTemplateUpdate(
     throw new HttpError(400, "templateType, subjectTemplate and bodyTemplate are required");
   }
 
-  const { data, error } = await supabase
-    .from("email_templates")
-    .upsert({
-      template_type: templateType,
-      subject_template: subjectTemplate,
-      body_template: bodyTemplate,
-      enabled: typeof enabled === "boolean" ? enabled : true,
-      updated_by: context.userId,
-      updated_at: new Date().toISOString(),
-    }, {
-      onConflict: "template_type",
-    })
-    .select("*")
-    .single();
+  const now = new Date().toISOString();
+  const payload = {
+    template_type: templateType,
+    subject_template: subjectTemplate,
+    body_template: bodyTemplate,
+    enabled: typeof enabled === "boolean" ? enabled : true,
+    updated_by: context.userId,
+    updated_at: now,
+  };
 
-  if (error || !data) {
-    throw new HttpError(500, "Unable to update template");
+  const { data: existing, error: existingError } = await supabase
+    .from("email_templates")
+    .select("id")
+    .eq("template_type", templateType)
+    .maybeSingle();
+
+  if (existingError) {
+    throw new HttpError(500, "Unable to lookup template");
+  }
+
+  let data: any = null;
+  if (existing?.id) {
+    const updated = await supabase
+      .from("email_templates")
+      .update(payload)
+      .eq("id", existing.id)
+      .select("*")
+      .single();
+    if (updated.error || !updated.data) {
+      throw new HttpError(500, "Unable to update template");
+    }
+    data = updated.data;
+  } else {
+    const inserted = await supabase
+      .from("email_templates")
+      .insert({ ...payload, created_at: now })
+      .select("*")
+      .single();
+    if (inserted.error || !inserted.data) {
+      throw new HttpError(500, "Unable to create template");
+    }
+    data = inserted.data;
   }
 
   return jsonResponse({ success: true, template: data });

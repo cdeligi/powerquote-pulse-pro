@@ -36,7 +36,7 @@ interface UserEditDialogProps {
 export default function UserEditDialog({ user, isOpen, onClose, onSave, departments, currentUserEmail }: UserEditDialogProps) {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
-  const [role, setRole] = useState('LEVEL_1');
+  const [role, setRole] = useState('level1');
   const [userStatus, setUserStatus] = useState('active');
   const [department, setDepartment] = useState('');
   const [jobTitle, setJobTitle] = useState('');
@@ -52,7 +52,7 @@ export default function UserEditDialog({ user, isOpen, onClose, onSave, departme
       const nameParts = user.fullName.split(' ');
       setFirstName(nameParts[0] || '');
       setLastName(nameParts.slice(1).join(' ') || '');
-      setRole(user.role === 'ADMIN' ? 'LEVEL_3' : user.role === 'MASTER' ? 'MASTER' : user.role === 'FINANCE' ? 'FINANCE' : 'LEVEL_1');
+      setRole(user.role || 'level1');
       setUserStatus(user.userStatus);
       setDepartment(user.department || '');
       setJobTitle(user.jobTitle || '');
@@ -72,7 +72,7 @@ export default function UserEditDialog({ user, isOpen, onClose, onSave, departme
         id: user.id,
         firstName,
         lastName,
-        role: role === 'LEVEL_1' || role === 'LEVEL_2' ? 'SALES' : role === 'LEVEL_3' ? 'ADMIN' : role,
+        role,
         userStatus,
         department,
         jobTitle,
@@ -146,23 +146,23 @@ export default function UserEditDialog({ user, isOpen, onClose, onSave, departme
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label htmlFor="role" className="text-gray-400">Role</Label>
-              <Select value={role === 'MASTER' ? 'FINANCE' : role} onValueChange={setRole}>
+              <Select value={role === 'master' ? 'finance' : role} onValueChange={setRole}>
                 <SelectTrigger className="bg-gray-800 border-gray-700 text-white">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent className="bg-gray-800 border-gray-700">
-                  <SelectItem value="LEVEL_1">Level 1</SelectItem>
-                  <SelectItem value="LEVEL_2">Level 2</SelectItem>
-                  <SelectItem value="LEVEL_3">Level 3</SelectItem>
-                  <SelectItem value="FINANCE">Finance</SelectItem>
+                  <SelectItem value="level1">Level 1</SelectItem>
+                  <SelectItem value="level2">Level 2</SelectItem>
+                  <SelectItem value="level3">Level 3</SelectItem>
+                  <SelectItem value="finance">Finance</SelectItem>
                 </SelectContent>
               </Select>
               <div className="mt-3 flex items-center space-x-2">
                 <Checkbox
                   id="master-id"
-                  checked={role === 'MASTER'}
+                  checked={role === 'master'}
                   disabled={currentUserEmail !== 'cdeligi@qualitrolcorp.com'}
-                  onCheckedChange={(checked) => setRole(checked ? 'MASTER' : 'FINANCE')}
+                  onCheckedChange={(checked) => setRole(checked ? 'master' : 'finance')}
                 />
                 <Label htmlFor="master-id" className="text-gray-300">Master ID (highest level)</Label>
               </div>

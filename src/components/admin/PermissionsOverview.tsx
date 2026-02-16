@@ -23,7 +23,7 @@ interface RoleDefault {
   allowed: boolean;
 }
 
-const ROLES: Role[] = ['SALES', 'ADMIN', 'FINANCE', 'MASTER'];
+const ROLES = ['level1', 'level2', 'level3', 'admin', 'finance', 'master'] as const;
 
 const DEFAULT_FEATURES: Feature[] = [
   {
@@ -235,7 +235,7 @@ export default function PermissionsOverview() {
                 <TableHead className="w-1/3">Feature</TableHead>
                 {ROLES.map(role => (
                   <TableHead key={role} className="text-center">
-                    {role.replace('_', ' ')}
+                    {({level1:'Level 1',level2:'Level 2',level3:'Level 3',admin:'Admin',finance:'Finance',master:'Master'} as any)[role] || role}
                   </TableHead>
                 ))}
               </TableRow>
