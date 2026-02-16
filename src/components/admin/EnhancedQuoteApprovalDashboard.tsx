@@ -11,7 +11,7 @@ import {
   updateQuoteWithAdditionalInfo,
 } from '@/utils/additionalQuoteInformation';
 import type { Database } from '@/integrations/supabase/types';
-import { Quote, BOMItemWithDetails } from '@/types/quote';
+import { Quote, BOMItemWithDetails, QuoteWorkflowState } from '@/types/quote';
 import { User } from '@/types/auth';
 import { toast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -20,7 +20,9 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import QuoteDetails from './quote-approval/QuoteDetails';
-import { RefreshCw, ChevronDown, ChevronRight, Clock, User as UserIcon, Calendar, AlertCircle } from 'lucide-react';
+import { RefreshCw, ChevronDown, ChevronRight, Clock, User as UserIcon, Calendar } from 'lucide-react';
+import { quoteWorkflowService, type FinanceMarginLimit } from '@/services/quoteWorkflowService';
+import { deriveWorkflowState, getWorkflowLaneForState, WORKFLOW_QUEUE_STATES } from '@/lib/workflow/utils';
 
 const supabase = getSupabaseClient();
 const supabaseAdmin = getSupabaseAdminClient();
@@ -126,6 +128,53 @@ const formatQuoteCurrency = (amount: number, quote: Quote): string => {
   }
 };
 
+const workflowStateBadges: Record<QuoteWorkflowState, { text: string; color: string }> = {
+  draft: { text: 'Draft', color: 'bg-slate-600' },
+  submitted: { text: 'Submitted', color: 'bg-blue-600' },
+  admin_review: { text: 'Admin Review', color: 'bg-purple-600' },
+  finance_review: { text: 'Finance Review', color: 'bg-amber-600' },
+  approved: { text: 'Approved', color: 'bg-green-600' },
+  rejected: { text: 'Rejected', color: 'bg-red-600' },
+  needs_revision: { text: 'Needs Revision', color: 'bg-yellow-600' },
+  closed: { text: 'Closed', color: 'bg-gray-500' },
+};
+
+const getWorkflowBadge = (state?: QuoteWorkflowState) => {
+  if (!state) {
+    return workflowStateBadges.draft;
+  }
+  return workflowStateBadges[state] ?? workflowStateBadges.draft;
+};
+
+const getDerivedWorkflowState = (quote: Quote): QuoteWorkflowState => {
+  return deriveWorkflowState(quote);
+};
+
+const isQuoteInQueue = (quote: Quote): boolean => {
+  const state = getDerivedWorkflowState(quote);
+  return WORKFLOW_QUEUE_STATES.has(state);
+};
+
+const getStatusBadge = (quote: Quote) => {
+  const state = getDerivedWorkflowState(quote);
+  switch (state) {
+    case 'approved':
+      return <Badge className="bg-green-600 text-white">Approved</Badge>;
+    case 'rejected':
+      return <Badge className="bg-red-600 text-white">Rejected</Badge>;
+    case 'finance_review':
+      return <Badge className="bg-amber-600 text-white">Finance Review</Badge>;
+    case 'admin_review':
+      return <Badge className="bg-purple-600 text-white">Admin Review</Badge>;
+    case 'submitted':
+      return <Badge className="bg-blue-600 text-white">Submitted</Badge>;
+    case 'needs_revision':
+      return <Badge className="bg-yellow-600 text-white">Needs Revision</Badge>;
+    default:
+      return <Badge className="bg-gray-600 text-white">{state}</Badge>;
+  }
+};
+
 const isMissingBomUpdatedAtColumnError = (error: PostgrestError | null | undefined) => {
   if (!error) {
     return false;
@@ -205,8 +254,10 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
   const [actionLoading, setActionLoading] = useState<{ [quoteId: string]: boolean }>({});
   const [activeTab, setActiveTab] = useState("pending_approval");
   const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"all" | Quote['status']>("all");
+  const [statusFilter, setStatusFilter] = useState<"all" | "finance_required" | Quote['status'] | QuoteWorkflowState>("all");
   const [expandedQuotes, setExpandedQuotes] = useState<ExpandedQuoteState>({});
+  const [financeGuardrail, setFinanceGuardrail] = useState<FinanceMarginLimit | null>(null);
+  const [claimLoading, setClaimLoading] = useState<Record<string, boolean>>({});
 
   const fetchData = async (): Promise<Quote[]> => {
     console.log('Fetching quotes for approval dashboard...');
@@ -232,6 +283,7 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
       // Fetch BOM items for each quote
       const quotesWithBOM = await Promise.all(
         (quotesData || []).map(async (quote) => {
+        const workflowBadge = getWorkflowBadge(quote.workflow_state as QuoteWorkflowState | undefined);
           noteAdditionalQuoteInfoColumnFromRow(quote as Record<string, any>);
           const normalizedFields = parseQuoteFieldsValue(quote.quote_fields) ?? undefined;
           const additionalInfo = extractAdditionalQuoteInformation(quote, normalizedFields);
@@ -297,14 +349,44 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
     fetchData();
   }, []);
 
+  useEffect(() => {
+    let isMounted = true;
+    quoteWorkflowService
+      .getFinanceMarginLimit()
+      .then((limit) => {
+        if (isMounted) {
+          setFinanceGuardrail(limit);
+        }
+      })
+      .catch((error) => {
+        console.warn('Unable to load finance guardrail', error);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   const filteredQuotes = quotes.filter(quote => {
+    const workflowState = getDerivedWorkflowState(quote);
+    const inQueue = isQuoteInQueue(quote);
     const inTab =
       activeTab === "pending_approval"
-        ? quote.status === "pending_approval"
-        : quote.status !== "pending_approval";
+        ? inQueue
+        : !inQueue;
 
-    const matchesStatus =
-      statusFilter === "all" ? true : quote.status === statusFilter;
+    const matchesStatus = (() => {
+      if (statusFilter === "all") {
+        return true;
+      }
+      if (statusFilter === "pending_approval") {
+        return workflowState === "submitted" || quote.status === "pending_approval";
+      }
+      if (statusFilter === "finance_required") {
+        return Boolean(quote.requires_finance_approval) || workflowState === "finance_review";
+      }
+      return workflowState === statusFilter || quote.status === statusFilter;
+    })();
 
     const monthString = new Date(quote.created_at)
       .toLocaleString("default", { month: "long", year: "numeric" })
@@ -332,6 +414,34 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
     }
   };
 
+  const handleClaimAction = async (quoteId: string, lane: 'admin' | 'finance') => {
+    const claimKey = `${quoteId}-${lane}`;
+    setClaimLoading(prev => ({ ...prev, [claimKey]: true }));
+    try {
+      await quoteWorkflowService.claimQuote(quoteId, lane);
+      toast({
+        title: lane === 'admin' ? 'Quote claimed for admin review' : 'Quote claimed for finance review',
+        description: lane === 'admin'
+          ? 'You are now the assigned admin reviewer for this quote.'
+          : 'You are now the assigned finance reviewer for this quote.',
+      });
+      await fetchData();
+    } catch (error) {
+      console.error('Error claiming quote:', error);
+      toast({
+        title: 'Unable to claim quote',
+        description: error instanceof Error ? error.message : 'Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setClaimLoading(prev => {
+        const updated = { ...prev };
+        delete updated[claimKey];
+        return updated;
+      });
+    }
+  };
+
   const handleQuoteAction = async (
     quoteId: string,
     action: 'approve' | 'reject',
@@ -352,7 +462,29 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
       const client = supabaseAdmin ?? supabase;
       const quote = quotes.find(q => q.id === quoteId);
 
-      if (action === 'approve' && quote) {
+      if (!quote) {
+        throw new Error('Quote not found. Please refresh and try again.');
+      }
+
+      const workflowState = getDerivedWorkflowState(quote);
+      const lane = getWorkflowLaneForState(workflowState);
+
+      if (!lane) {
+        throw new Error('Quote is no longer in an actionable workflow state.');
+      }
+
+      const userRole = user?.role ?? 'SALES';
+      const isAdminLane = lane === 'admin';
+      const isFinanceLane = lane === 'finance';
+      const hasPermission = isAdminLane
+        ? userRole === 'ADMIN' || userRole === 'MASTER'
+        : userRole === 'FINANCE' || userRole === 'MASTER';
+
+      if (!hasPermission) {
+        throw new Error('You do not have permission to perform this action.');
+      }
+
+      if (action === 'approve') {
         const normalizedQuoteId = normalizeQuoteId(quote.id);
 
         if (normalizedQuoteId && normalizedQuoteId !== quote.id) {
@@ -382,17 +514,36 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
         }
       }
 
+      const ensureClaimed = async () => {
+        if (isAdminLane) {
+          if (quote.admin_reviewer_id && quote.admin_reviewer_id !== user?.id) {
+            throw new Error('Quote is already claimed by another admin reviewer.');
+          }
+          if (!quote.admin_reviewer_id) {
+            await quoteWorkflowService.claimQuote(targetQuoteId, 'admin');
+          }
+        } else if (isFinanceLane) {
+          if (quote.finance_reviewer_id && quote.finance_reviewer_id !== user?.id) {
+            throw new Error('Quote is already claimed by another finance reviewer.');
+          }
+          if (!quote.finance_reviewer_id) {
+            await quoteWorkflowService.claimQuote(targetQuoteId, 'finance');
+          }
+        }
+      };
+
+      await ensureClaimed();
+
       const appliedDiscount =
         typeof approvedDiscount === 'number'
           ? approvedDiscount
-          : quote?.approved_discount ?? quote?.requested_discount ?? 0;
+          : quote.approved_discount ?? quote.requested_discount ?? 0;
 
       const isoNow = new Date().toISOString();
 
       const updates: Record<string, any> = {
-        status: action === 'approve' ? 'approved' : 'rejected',
         reviewed_at: isoNow,
-        updated_at: isoNow
+        updated_at: isoNow,
       };
 
       if (user?.id) {
@@ -405,7 +556,7 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
         updates.additional_quote_information = additionalQuoteInformation?.trim()
           ? additionalQuoteInformation.trim()
           : null;
-      } else if (action === 'reject') {
+      } else {
         updates.rejection_reason = notes?.trim() ? notes.trim() : null;
         updates.approval_notes = null;
         updates.additional_quote_information = null;
@@ -419,7 +570,9 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
 
       const bomItemsForTotals = (updatedBOMItems && updatedBOMItems.length > 0)
         ? updatedBOMItems
-        : ((quote?.bom_items as BOMItemWithDetails[] | undefined) ?? []);
+        : ((quote.bom_items as BOMItemWithDetails[] | undefined) ?? []);
+
+      let discountedMargin: number | null = null;
 
       if (bomItemsForTotals.length > 0) {
         const totalRevenue = bomItemsForTotals.reduce((sum, item) => sum + (item.unit_price * item.quantity), 0);
@@ -431,7 +584,7 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
         const discountFraction = normalizedDiscount / 100;
         const discountedValue = totalRevenue - (totalRevenue * discountFraction);
         const discountedGrossProfit = discountedValue - totalCost;
-        const discountedMargin = discountedValue > 0 ? (discountedGrossProfit / discountedValue) * 100 : 0;
+        discountedMargin = discountedValue > 0 ? (discountedGrossProfit / discountedValue) * 100 : 0;
 
         preparedUpdates.total_cost = totalCost;
         preparedUpdates.gross_profit = grossProfit;
@@ -443,7 +596,7 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
 
       const { error: quoteError } = await updateQuoteWithAdditionalInfo({
         client,
-        quote: quote ?? {},
+        quote,
         quoteId: targetQuoteId,
         updates: preparedUpdates,
         additionalInfo: action === 'approve' ? additionalQuoteInformation : null,
@@ -502,36 +655,93 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
         }
       }
 
+      let workflowDecision: 'approved' | 'rejected' | 'requires_finance' = action === 'approve' ? 'approved' : 'rejected';
+      const financeLimitPercent = financeGuardrail?.percent;
+      const marginPercent = typeof discountedMargin === 'number' ? discountedMargin : undefined;
+
+      if (isFinanceLane) {
+        workflowDecision = action === 'approve' ? 'approved' : 'rejected';
+        await quoteWorkflowService.recordFinanceDecision({
+          quoteId: targetQuoteId,
+          decision: workflowDecision as 'approved' | 'rejected',
+          notes,
+          marginPercent,
+          financeLimitPercent,
+        });
+      } else {
+        if (action === 'approve' && typeof marginPercent === 'number' && typeof financeLimitPercent === 'number' && marginPercent < financeLimitPercent) {
+          workflowDecision = 'requires_finance';
+        } else {
+          workflowDecision = action === 'approve' ? 'approved' : 'rejected';
+        }
+
+        await quoteWorkflowService.recordAdminDecision({
+          quoteId: targetQuoteId,
+          decision: workflowDecision,
+          notes,
+          marginPercent,
+          financeLimitPercent,
+        });
+      }
+
+      const toastTitle = (() => {
+        if (workflowDecision === 'requires_finance') {
+          return 'Quote routed to Finance';
+        }
+        if (bomUpdateError) {
+          return 'Quote processed with warnings';
+        }
+        return 'Success';
+      })();
+
+      const toastDescription = (() => {
+        if (workflowDecision === 'requires_finance') {
+          const guardrailText = financeLimitPercent ? `${financeLimitPercent}%` : 'the finance guardrail';
+          const marginText = typeof marginPercent === 'number' ? `${marginPercent.toFixed(1)}%` : 'The current margin';
+          const warningSuffix = bomUpdateError
+            ? ' Some BOM price updates may not have been saved. Please verify the bill of materials.'
+            : '';
+          return `${marginText} is below ${guardrailText}. The quote has been sent to Finance.${warningSuffix}`;
+        }
+
+        if (bomUpdateError) {
+          return 'Quote updated, but some BOM price updates may not have been saved. Please verify the bill of materials.';
+        }
+
+        return `Quote ${workflowDecision} successfully`;
+      })();
+
       toast({
-        title: bomUpdateError ? "Quote approved with warnings" : "Success",
-        description: bomUpdateError
-          ? "Quote approved, but some BOM price updates may not have been saved. Please verify the bill of materials."
-          : `Quote ${action === 'approve' ? 'approved' : 'rejected'} successfully`,
+        title: toastTitle,
+        description: toastDescription,
       });
 
-      // Send email notification
-      try {
-        console.log(`Triggering email notification for ${action} of quote ${targetQuoteId}`);
-        
-        const { error: emailError } = await supabase.functions.invoke('send-quote-status-email', {
-          body: {
-            quoteId: targetQuoteId,
-            action: action === 'approve' ? 'approved' : 'rejected',
-          },
-        });
+      const shouldSendEmail = workflowDecision === 'approved' || workflowDecision === 'rejected';
 
-        if (emailError) {
-          console.error('Failed to send email notification:', emailError);
-          toast({
-            title: 'Email Warning',
-            description: 'Quote status updated, but email notification failed to send.',
-            variant: 'default',
+      if (shouldSendEmail) {
+        try {
+          console.log(`Triggering email notification for ${workflowDecision} of quote ${targetQuoteId}`);
+
+          const { error: emailError } = await supabase.functions.invoke('send-quote-status-email', {
+            body: {
+              quoteId: targetQuoteId,
+              action: workflowDecision,
+            },
           });
-        } else {
-          console.log('Email notification sent successfully');
+
+          if (emailError) {
+            console.error('Failed to send email notification:', emailError);
+            toast({
+              title: 'Email Warning',
+              description: 'Quote status updated, but email notification failed to send.',
+              variant: 'default',
+            });
+          } else {
+            console.log('Email notification sent successfully');
+          }
+        } catch (emailError) {
+          console.error('Exception sending email notification:', emailError);
         }
-      } catch (emailError) {
-        console.error('Exception sending email notification:', emailError);
       }
 
       const refreshedQuotes = await fetchData();
@@ -543,9 +753,9 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
     } catch (error) {
       console.error(`Error ${action}ing quote:`, error);
       toast({
-        title: "Error",
-        description: `Failed to ${action} quote. Please try again.`,
-        variant: "destructive",
+        title: 'Error',
+        description: error instanceof Error ? error.message : `Failed to ${action} quote. Please try again.`,
+        variant: 'destructive',
       });
     } finally {
       setActionLoading(prev => {
@@ -558,25 +768,13 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
     }
   };
 
+
   const getAgingDays = (createdAt: string) => {
     const created = new Date(createdAt);
     const now = new Date();
     const diffTime = Math.abs(now.getTime() - created.getTime());
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     return diffDays;
-  };
-
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'approved':
-        return <Badge className="bg-green-600 text-white">Approved</Badge>;
-      case 'rejected':
-        return <Badge className="bg-red-600 text-white">Rejected</Badge>;
-      case 'pending_approval':
-        return <Badge className="bg-yellow-600 text-white">Pending Approval</Badge>;
-      default:
-        return <Badge className="bg-gray-600 text-white">Unknown</Badge>;
-    }
   };
 
   const getPriorityColor = (priority: string) => {
@@ -596,7 +794,7 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
   console.log('Filtered quotes for tab:', activeTab, filteredQuotes);
 
   return (
-    <div className="w-full max-w-none p-6 space-y-6">
+                  <div className="w-full max-w-none p-6 space-y-6">
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-semibold text-white mb-2">Quote Approval Dashboard</h1>
@@ -611,10 +809,10 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="w-full justify-start bg-gray-800">
           <TabsTrigger value="pending_approval" className="text-white data-[state=active]:bg-red-600">
-            Pending Queue ({quotes.filter(q => q.status === 'pending_approval').length})
+            Pending Queue ({quotes.filter(isQuoteInQueue).length})
           </TabsTrigger>
           <TabsTrigger value="reviewed" className="text-white data-[state=active]:bg-red-600">
-            History ({quotes.filter(q => q.status !== 'pending_approval').length})
+            History ({quotes.filter(q => !isQuoteInQueue(q)).length})
           </TabsTrigger>
         </TabsList>
 
@@ -630,10 +828,21 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
             onChange={(e) => setStatusFilter(e.target.value as any)}
             className="bg-gray-800 border border-gray-700 text-white rounded-md px-3 py-2"
           >
-            <option value="all">All Statuses</option>
-            <option value="pending_approval">Pending Approval</option>
-            <option value="approved">Approved</option>
-            <option value="rejected">Rejected</option>
+            {[
+              { value: 'all', label: 'All Statuses' },
+              { value: 'submitted', label: 'Submitted' },
+              { value: 'admin_review', label: 'Admin Review' },
+              { value: 'finance_review', label: 'Finance Review' },
+              { value: 'finance_required', label: 'Finance Approval Required' },
+              { value: 'approved', label: 'Approved' },
+              { value: 'rejected', label: 'Rejected' },
+              { value: 'needs_revision', label: 'Needs Revision' },
+              { value: 'pending_approval', label: 'Legacy Pending Approval' },
+            ].map(option => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
           </select>
         </div>
 
@@ -650,8 +859,15 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
             </Card>
           ) : (
             <div className="space-y-3">
-              {filteredQuotes.map((quote) => (
-                <div key={quote.id} className="space-y-0">
+              {filteredQuotes.map((quote) => {
+                const workflowState = getDerivedWorkflowState(quote);
+                const statusBadge = getStatusBadge(quote);
+                const workflowBadge = getWorkflowBadge(workflowState);
+                const workflowLane = getWorkflowLaneForState(workflowState);
+                const claimKey = workflowLane ? `${quote.id}-${workflowLane}` : '';
+                const claimBusy = workflowLane ? Boolean(claimLoading[claimKey]) : false;
+                return (
+                  <div key={quote.id} className="space-y-0">
                   {/* Quote Header Row */}
                   <Card className="bg-gray-900 border-gray-800 hover:border-gray-700 transition-colors">
                     <CardContent className="p-4">
@@ -691,7 +907,15 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
                           </div>
                           
                           <div className="flex items-center space-x-2">
-                            {getStatusBadge(quote.status)}
+                            {statusBadge}
+                            <Badge className={`${workflowBadge.color} text-white`} variant="secondary">
+                              {workflowBadge.text}
+                            </Badge>
+                            {(quote.requires_finance_approval || workflowState === 'finance_review') && (
+                              <Badge className="bg-orange-600 text-white" variant="secondary">
+                                Finance Approval Required
+                              </Badge>
+                            )}
                             <Badge className={`${getPriorityColor(quote.priority)} border-current`} variant="outline">
                               {quote.priority}
                             </Badge>
@@ -718,12 +942,15 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
                           onReject={notes => handleQuoteAction(quote.id, 'reject', { notes })}
                           isLoading={actionLoading[quote.id] || false}
                           user={user}
+                          onClaim={workflowLane ? (lane) => handleClaimAction(quote.id, lane) : undefined}
+                          isClaiming={claimBusy}
                         />
                       </CardContent>
                     </Card>
                   )}
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </TabsContent>
@@ -741,8 +968,15 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
             </Card>
           ) : (
             <div className="space-y-3">
-              {filteredQuotes.map((quote) => (
-                <div key={quote.id} className="space-y-0">
+              {filteredQuotes.map((quote) => {
+                const workflowState = getDerivedWorkflowState(quote);
+                const statusBadge = getStatusBadge(quote);
+                const workflowBadge = getWorkflowBadge(workflowState);
+                const workflowLane = getWorkflowLaneForState(workflowState);
+                const claimKey = workflowLane ? `${quote.id}-${workflowLane}` : '';
+                const claimBusy = workflowLane ? Boolean(claimLoading[claimKey]) : false;
+                return (
+                  <div key={quote.id} className="space-y-0">
                   <Card className="bg-gray-900 border-gray-800 hover:border-gray-700 transition-colors">
                     <CardContent className="p-4">
                       <div 
@@ -776,7 +1010,15 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
                           </div>
                           
                           <div className="flex items-center space-x-2">
-                            {getStatusBadge(quote.status)}
+                            {statusBadge}
+                            <Badge className={`${workflowBadge.color} text-white`} variant="secondary">
+                              {workflowBadge.text}
+                            </Badge>
+                            {(quote.requires_finance_approval || workflowState === 'finance_review') && (
+                              <Badge className="bg-orange-600 text-white" variant="secondary">
+                                Finance Approval Required
+                              </Badge>
+                            )}
                             <Badge variant="secondary" className="font-mono">
                               {getQuoteCurrency(quote)}
                             </Badge>
@@ -799,12 +1041,15 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
                           onReject={notes => handleQuoteAction(quote.id, 'reject', { notes })}
                           isLoading={actionLoading[quote.id] || false}
                           user={user}
+                          onClaim={workflowLane ? (lane) => handleClaimAction(quote.id, lane) : undefined}
+                          isClaiming={claimBusy}
                         />
                       </CardContent>
                     </Card>
                   )}
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </TabsContent>
