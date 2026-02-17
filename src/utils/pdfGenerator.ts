@@ -2225,8 +2225,10 @@ export const generateQuotePDF = async (
 
           if (optionInfoUrl) {
             detailParts.push(
-              `<a href="${escapeHtml(optionInfoUrl)}" target="_blank" rel="noopener noreferrer">Product Info</a>`
+              `Product Info: <a href="${escapeHtml(optionInfoUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(optionInfoUrl)}</a>`
             );
+          } else {
+            detailParts.push('Product Info: Not available');
           }
           if (!option) {
             detailParts.push(`Option ID: ${escapeHtml(selection.value)}`);
@@ -3624,8 +3626,8 @@ export const generateQuotePDF = async (
                   const shouldRenderLink = !!infoUrl;
 
                   const infoLinkHtml = shouldRenderLink && infoUrl
-                    ? `<div class="product-info-link"><a href="${escapeHtml(infoUrl)}" target="_blank" rel="noopener noreferrer">Product Info</a></div>`
-                    : '';
+                    ? `<div class="product-info-link">Product Info: <a href="${escapeHtml(infoUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(infoUrl)}</a></div>`
+                    : '<div class="product-info-link">Product Info: Not available</div>';
 
                   return `
                   <tr>
