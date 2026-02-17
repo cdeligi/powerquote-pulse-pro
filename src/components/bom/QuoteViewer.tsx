@@ -265,7 +265,35 @@ const QuoteViewer: React.FC = () => {
           };
         });
 
-        setBomItems(loadedItems);
+        
+          const productIds = Array.from(new Set(loadedItems
+            .map((it: any) => it?.product?.id)
+            .filter((id: unknown): id is string => typeof id === 'string' && id.length > 0)));
+
+          if (productIds.length > 0) {
+            const { data: productRows } = await supabase
+              .from('products')
+              .select('id, product_info_url')
+              .in('id', productIds);
+
+            const urlById = new Map<string, string>();
+            (productRows || []).forEach((row: any) => {
+              if (row?.id && typeof row.product_info_url === 'string' && row.product_info_url.trim().length > 0) {
+                urlById.set(row.id, row.product_info_url.trim());
+              }
+            });
+
+            loadedItems.forEach((it: any) => {
+              const pid = it?.product?.id;
+              const infoUrl = pid ? urlById.get(pid) : null;
+              if (infoUrl && it?.product) {
+                it.product.productInfoUrl = infoUrl;
+                it.product.product_info_url = infoUrl;
+              }
+            });
+          }
+
+setBomItems(loadedItems);
       } else {
         // Load BOM items from persistent storage
         const { data: bomData, error: bomError } = await supabase
