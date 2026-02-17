@@ -126,6 +126,22 @@ interface QuoteFieldConfigurationProps {
   user: User;
 }
 
+type SalesforceConnectionConfig = {
+  instanceUrl: string;
+  authUrl: string;
+  tokenUrl: string;
+  clientId: string;
+  clientSecret: string;
+};
+
+const DEFAULT_SALESFORCE_CONFIG: SalesforceConnectionConfig = {
+  instanceUrl: '',
+  authUrl: '',
+  tokenUrl: '',
+  clientId: '',
+  clientSecret: '',
+};
+
 const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
   const [quoteFields, setQuoteFields] = useState<QuoteField[]>([]);
   const [loading, setLoading] = useState(true);
@@ -135,8 +151,11 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
   const [isAdmin, setIsAdmin] = useState(false);
   const [authLoading, setAuthLoading] = useState(true);
   const [draggedFieldId, setDraggedFieldId] = useState<string | null>(null);
-  const [quoteFieldsView, setQuoteFieldsView] = useState<'data-fields' | 'field-mapping-table'>('data-fields');
+  const [quoteFieldsView, setQuoteFieldsView] = useState<'data-fields' | 'field-mapping-table' | 'salesforce-connection'>('data-fields');
   const [mappingDrafts, setMappingDrafts] = useState<Record<string, QuoteField>>({});
+  const [salesforceConfig, setSalesforceConfig] = useState<SalesforceConnectionConfig>(DEFAULT_SALESFORCE_CONFIG);
+  const [showClientSecret, setShowClientSecret] = useState(false);
+  const [savingSalesforceConfig, setSavingSalesforceConfig] = useState(false);
   const { toast } = useToast();
 
   const handleDragStart = (e: React.DragEvent, field: QuoteField) => {
@@ -211,6 +230,7 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
   useEffect(() => {
     checkAuthAndRole();
     fetchQuoteFields();
+    fetchSalesforceConnectionConfig();
   }, []);
 
   const checkAuthAndRole = async () => {
@@ -511,6 +531,67 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
   const openCreateDialog = () => {
     setEditingField(null);
     setDialogOpen(true);
+  };
+
+  const fetchSalesforceConnectionConfig = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('app_settings')
+        .select('value')
+        .eq('key', 'salesforce_connection_config')
+        .maybeSingle();
+
+      if (error) throw error;
+
+      const value = (data?.value as Partial<SalesforceConnectionConfig> | null) ?? null;
+      if (value) {
+        setSalesforceConfig({
+          ...DEFAULT_SALESFORCE_CONFIG,
+          ...value,
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching Salesforce connection config:', error);
+    }
+  };
+
+  const saveSalesforceConnectionConfig = async () => {
+    try {
+      setSavingSalesforceConfig(true);
+
+      const payload = {
+        key: 'salesforce_connection_config',
+        value: {
+          instanceUrl: salesforceConfig.instanceUrl.trim(),
+          authUrl: salesforceConfig.authUrl.trim(),
+          tokenUrl: salesforceConfig.tokenUrl.trim(),
+          clientId: salesforceConfig.clientId.trim(),
+          clientSecret: salesforceConfig.clientSecret.trim(),
+        },
+        description: 'Salesforce OAuth connection settings for PowerQuote integration',
+        updated_by: user?.id ?? null,
+      };
+
+      const { error } = await supabase
+        .from('app_settings')
+        .upsert(payload, { onConflict: 'key' });
+
+      if (error) throw error;
+
+      toast({
+        title: 'Saved',
+        description: 'Salesforce connection settings saved successfully.',
+      });
+    } catch (error) {
+      console.error('Error saving Salesforce connection config:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to save Salesforce connection settings.',
+        variant: 'destructive',
+      });
+    } finally {
+      setSavingSalesforceConfig(false);
+    }
   };
 
   const updateMappingDraft = (fieldId: string, patch: Partial<QuoteField>) => {
@@ -817,20 +898,23 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
               </Button>
             </>
           )}
-          <Button
-            className="bg-red-600 hover:bg-red-700"
-            onClick={openCreateDialog}
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Add Field
-          </Button>
+          {quoteFieldsView !== 'salesforce-connection' && (
+            <Button
+              className="bg-red-600 hover:bg-red-700"
+              onClick={openCreateDialog}
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Add Field
+            </Button>
+          )}
         </div>
       </div>
 
-      <Tabs value={quoteFieldsView} onValueChange={(v) => setQuoteFieldsView(v as 'data-fields' | 'field-mapping-table')}>
+      <Tabs value={quoteFieldsView} onValueChange={(v) => setQuoteFieldsView(v as 'data-fields' | 'field-mapping-table' | 'salesforce-connection')}>
         <TabsList className="bg-gray-800">
           <TabsTrigger value="data-fields" className="text-white data-[state=active]:bg-red-600 data-[state=active]:text-white">Data Fields</TabsTrigger>
           <TabsTrigger value="field-mapping-table" className="text-white data-[state=active]:bg-red-600 data-[state=active]:text-white">Field Mapping Table</TabsTrigger>
+          <TabsTrigger value="salesforce-connection" className="text-white data-[state=active]:bg-red-600 data-[state=active]:text-white">Salesforce Connection</TabsTrigger>
         </TabsList>
 
         <TabsContent value="data-fields" className="mt-4">
@@ -1137,6 +1221,90 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
                 })}              </tbody>
             </table>
           </div>
+        </TabsContent>
+
+        <TabsContent value="salesforce-connection" className="mt-4">
+          <Card className="bg-gray-900 border-gray-800">
+            <CardHeader>
+              <CardTitle className="text-white">Salesforce Connection Settings</CardTitle>
+              <CardDescription className="text-gray-400">
+                Add Salesforce OAuth details provided by IT. These settings are used for bridge authentication.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <Alert className="border-amber-500/40 bg-amber-500/10 text-amber-100">
+                <AlertDescription>
+                  Use a dedicated integration user and connected app credentials. Keep values restricted to admins only.
+                </AlertDescription>
+              </Alert>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-white">Salesforce Instance URL</Label>
+                  <Input
+                    value={salesforceConfig.instanceUrl}
+                    onChange={(e) => setSalesforceConfig((prev) => ({ ...prev, instanceUrl: e.target.value }))}
+                    placeholder="https://your-org.my.salesforce.com"
+                    className="bg-gray-800 border-gray-700 text-white"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-white">Auth URL</Label>
+                  <Input
+                    value={salesforceConfig.authUrl}
+                    onChange={(e) => setSalesforceConfig((prev) => ({ ...prev, authUrl: e.target.value }))}
+                    placeholder="https://login.salesforce.com/services/oauth2/authorize"
+                    className="bg-gray-800 border-gray-700 text-white"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-white">Token URL</Label>
+                  <Input
+                    value={salesforceConfig.tokenUrl}
+                    onChange={(e) => setSalesforceConfig((prev) => ({ ...prev, tokenUrl: e.target.value }))}
+                    placeholder="https://login.salesforce.com/services/oauth2/token"
+                    className="bg-gray-800 border-gray-700 text-white"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-white">Client ID</Label>
+                  <Input
+                    value={salesforceConfig.clientId}
+                    onChange={(e) => setSalesforceConfig((prev) => ({ ...prev, clientId: e.target.value }))}
+                    placeholder="Consumer Key"
+                    className="bg-gray-800 border-gray-700 text-white"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-white">Client Secret</Label>
+                <div className="flex items-center gap-2">
+                  <Input
+                    type={showClientSecret ? 'text' : 'password'}
+                    value={salesforceConfig.clientSecret}
+                    onChange={(e) => setSalesforceConfig((prev) => ({ ...prev, clientSecret: e.target.value }))}
+                    placeholder="Consumer Secret"
+                    className="bg-gray-800 border-gray-700 text-white"
+                  />
+                  <Button type="button" variant="outline" className="border-gray-700 text-gray-200" onClick={() => setShowClientSecret((v) => !v)}>
+                    {showClientSecret ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </Button>
+                </div>
+              </div>
+
+              <div className="flex justify-end">
+                <Button
+                  type="button"
+                  onClick={saveSalesforceConnectionConfig}
+                  className="bg-emerald-600 hover:bg-emerald-700"
+                  disabled={savingSalesforceConfig}
+                >
+                  {savingSalesforceConfig ? 'Saving...' : 'Save Salesforce Settings'}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
 
