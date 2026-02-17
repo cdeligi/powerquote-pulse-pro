@@ -756,21 +756,21 @@ setBomItems(loadedItems);
                       <div className="flex-1">
                         <h4 className="font-medium text-foreground">{item.product.name}</h4>
                         <p className="text-sm text-muted-foreground">{item.product.description}</p>
-                        <p className="text-sm mt-1 text-muted-foreground">
-                          Product Info:{' '}
+                        <div className="mt-1 rounded border border-dashed border-slate-300 px-2 py-1 text-xs">
+                          <span className="font-semibold text-slate-700">Product Info Link:</span>{' '}
                           {infoUrl ? (
                             <a
                               href={infoUrl}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="text-blue-600 hover:text-blue-500 underline"
+                              className="text-blue-600 hover:text-blue-500 underline break-all"
                             >
-                              Open link
+                              {infoUrl}
                             </a>
                           ) : (
-                            <span>Not available</span>
+                            <span className="text-muted-foreground">Not available</span>
                           )}
-                        </p>
+                        </div>
                         <p className="text-sm text-muted-foreground">Part Number: {item.partNumber}</p>
                       </div>
                       <div className="text-right">
