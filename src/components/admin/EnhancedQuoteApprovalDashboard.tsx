@@ -461,7 +461,9 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
           ? 'You are now the assigned admin reviewer for this quote.'
           : 'You are now the assigned finance reviewer for this quote.',
       });
-      await fetchData();
+      const refreshed = await fetchData();
+      const refreshedQuote = refreshed.find(q => q.id === quoteId);
+      if (refreshedQuote) setSelectedQuote(refreshedQuote);
     } catch (error) {
       console.error('Error claiming quote:', error);
       toast({
@@ -933,7 +935,7 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
 
                           <div className="flex flex-col text-sm">
                             <span><span className="text-gray-500">Quote Review Claimed by:</span> <span className="text-cyan-300">{(quote as any).admin_reviewer_name || getClaimOwnerLabel(quote)}</span></span>
-                            {quote.requires_finance_approval && <span><span className="text-gray-500">Finance Claimed by:</span> <span className="text-amber-300">{(quote as any).finance_reviewer_name || 'Unclaimed'}</span></span>}
+                            {(quote.requires_finance_approval || quote.finance_reviewer_id || (quote as any).finance_reviewer_name || quote.finance_decision_at || (quote as any).finance_notes) && <span><span className="text-gray-500">Finance Claimed by:</span> <span className="text-amber-300">{(quote as any).finance_reviewer_name || quote.finance_reviewer_id || 'Unclaimed'}</span></span>}
                           </div>
                           
                           <div className="flex items-center space-x-2">
@@ -1038,7 +1040,7 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
 
                           <div className="flex flex-col text-sm">
                             <span><span className="text-gray-500">Quote Review Claimed by:</span> <span className="text-cyan-300">{(quote as any).admin_reviewer_name || getClaimOwnerLabel(quote)}</span></span>
-                            {quote.requires_finance_approval && <span><span className="text-gray-500">Finance Claimed by:</span> <span className="text-amber-300">{(quote as any).finance_reviewer_name || 'Unclaimed'}</span></span>}
+                            {(quote.requires_finance_approval || quote.finance_reviewer_id || (quote as any).finance_reviewer_name || quote.finance_decision_at || (quote as any).finance_notes) && <span><span className="text-gray-500">Finance Claimed by:</span> <span className="text-amber-300">{(quote as any).finance_reviewer_name || quote.finance_reviewer_id || 'Unclaimed'}</span></span>}
                           </div>
                           
                           <div className="flex items-center space-x-2">
