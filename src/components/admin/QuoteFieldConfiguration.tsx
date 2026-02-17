@@ -40,6 +40,17 @@ import {
 const supabase = getSupabaseClient();
 const POSTGREST_SCHEMA_RELOAD_ERROR_CODE = "PGRST204";
 
+
+const getConditionalSubfieldLabels = (field: QuoteField): string[] => {
+  const labels = new Set<string>();
+  (field.conditional_logic || []).forEach((rule) => {
+    (rule.fields || []).forEach((sub) => {
+      if (sub?.label?.trim()) labels.add(sub.label.trim());
+    });
+  });
+  return Array.from(labels);
+};
+
 const getMutationErrorMessage = (error: { code?: string; message?: string }) => {
   if (error?.code === POSTGREST_SCHEMA_RELOAD_ERROR_CODE) {
     return "Supabase is still refreshing its schema. Please wait a moment and try saving again.";
@@ -773,7 +784,7 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
                             </Badge>
                             {field.conditional_logic && field.conditional_logic.length > 0 && (
                               <Badge variant="outline" className="text-xs border-red-600 text-red-300 bg-red-900/20">
-                                Conditional
+                                Conditional ({getConditionalSubfieldLabels(field).length})
                               </Badge>
                             )}
                             {field.include_in_pdf && (
@@ -782,6 +793,12 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
                               </Badge>
                             )}
                           </div>
+                          {field.conditional_logic && field.conditional_logic.length > 0 && (
+                            <div className="mt-2 text-xs text-gray-300">
+                              <p className="text-gray-400">Sub-items:</p>
+                              <p className="truncate">{getConditionalSubfieldLabels(field).join(', ') || 'None'}</p>
+                            </div>
+                          )}
                           <div className="flex items-center gap-2 mt-2">
                             <Label htmlFor={`include-quote-${field.id}`} className="text-xs text-gray-400 cursor-pointer">
                               Include in the Quote
