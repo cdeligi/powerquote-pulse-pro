@@ -1170,7 +1170,7 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
               return (
                 <div
                   key={quote.id}
-                  className="flex items-center justify-between p-4 bg-gray-800 rounded-lg hover:bg-gray-750 transition-colors"
+                  className="flex items-start justify-between gap-4 p-4 bg-gray-800 rounded-lg hover:bg-gray-750 transition-colors"
                 >
                   <div className="flex-1 grid grid-cols-1 md:grid-cols-4 gap-4 items-start">
                     <div>
@@ -1239,7 +1239,7 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
                     </div>
                   </div>
                   
-                  <div className="flex flex-wrap items-center gap-2 ml-4">
+                  <div className="flex shrink-0 w-[430px] items-center justify-end gap-2 ml-2">
                     <Button
                       variant="ghost"
                       size="sm"
