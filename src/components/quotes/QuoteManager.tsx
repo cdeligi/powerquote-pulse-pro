@@ -140,16 +140,34 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
         return;
       }
 
-      const { data, error } = await supabase
+      const mapped: Record<string, string> = {};
+
+      const { data: profileData } = await supabase
         .from('profiles')
         .select('id, full_name, email')
         .in('id', ids);
 
-      if (error) return;
-      const mapped: Record<string, string> = {};
-      (data || []).forEach((r: any) => {
-        mapped[r.id] = r.full_name || r.email || r.id;
+      (profileData || []).forEach((r: any) => {
+        const candidate = (typeof r.full_name === 'string' && r.full_name.trim().length > 0)
+          ? r.full_name.trim()
+          : ((typeof r.email === 'string' && r.email.trim().length > 0) ? r.email.trim() : null);
+        if (candidate) mapped[r.id] = candidate;
       });
+
+      const missingIds = ids.filter((id) => !mapped[id]);
+      if (missingIds.length > 0) {
+        const { data: userData } = await supabase
+          .from('users')
+          .select('id, first_name, last_name, email')
+          .in('id', missingIds);
+
+        (userData || []).forEach((u: any) => {
+          const fullName = [u.first_name, u.last_name].filter((v: unknown) => typeof v === 'string' && v.trim().length > 0).join(' ').trim();
+          const candidate = fullName || (typeof u.email === 'string' ? u.email : '');
+          if (candidate) mapped[u.id] = candidate;
+        });
+      }
+
       setReviewerNameById(mapped);
     };
 
@@ -1197,9 +1215,9 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
                     <div>
                       <p className="text-white">Created: {quote.createdAt}</p>
                       <p className="text-gray-400 text-sm">Updated: {quote.updatedAt}</p>
-                      <p className="text-gray-400 text-xs mt-1">Quote Review Claimed by: <span className="text-cyan-300">{quote.adminReviewerId ? (reviewerNameById[quote.adminReviewerId] || quote.adminReviewerId) : 'Unclaimed'}</span></p>
+                      <p className="text-gray-400 text-xs mt-1">Quote Review Claimed by: <span className="text-cyan-300">{quote.adminReviewerId ? (reviewerNameById[quote.adminReviewerId] || 'Assigned reviewer') : 'Unclaimed'}</span></p>
                       {(quote.financeReviewerId || quote.financeDecisionAt || quote.financeNotes) && (
-                        <p className="text-gray-400 text-xs">Finance Claimed by: <span className="text-amber-300">{quote.financeReviewerId ? (reviewerNameById[quote.financeReviewerId] || quote.financeReviewerId) : 'Unclaimed'}</span></p>
+                        <p className="text-gray-400 text-xs">Finance Claimed by: <span className="text-amber-300">{quote.financeReviewerId ? (reviewerNameById[quote.financeReviewerId] || 'Assigned reviewer') : 'Unclaimed'}</span></p>
                       )}
                       <p className="text-gray-500 text-xs mt-1">Age — Admin: {ageDaysBetween(quote.adminClaimedAt || quote.submittedAt, quote.adminDecisionAt)} · Finance: {ageDaysBetween(quote.financeClaimedAt, quote.financeDecisionAt)} · Total: {ageDaysBetween(quote.submittedAt, quote.financeDecisionAt || quote.adminDecisionAt || quote.updatedAt)}</p>
                     </div>
