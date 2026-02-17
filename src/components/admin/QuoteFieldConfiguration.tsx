@@ -610,6 +610,7 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
       'Required',
       'Enabled',
       'Include In Quote',
+      'SF Sync Enabled',
       'SF Object',
       'SF Field API Name',
       'Direction',
@@ -627,6 +628,7 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
           String(row.required),
           String(row.enabled),
           String(Boolean(row.include_in_pdf)),
+          String(m?.enabled !== false),
           m?.objectName ?? '',
           m?.fieldApiName ?? '',
           m?.direction ?? '',
@@ -924,6 +926,7 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
                   <th className="text-left p-2">Required</th>
                   <th className="text-left p-2">Enabled</th>
                   <th className="text-left p-2">Include in Quote</th>
+                  <th className="text-left p-2">SF Sync</th>
                   <th className="text-left p-2">SF Object</th>
                   <th className="text-left p-2">SF Field API Name</th>
                   <th className="text-left p-2">Direction</th>
@@ -988,6 +991,17 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
                             onCheckedChange={(v) => updateMappingDraft(field.id, { include_in_pdf: v })}
                           />
                         </td>
+                        <td className="p-2">
+                          <Switch
+                            className="data-[state=checked]:bg-emerald-500"
+                            checked={mapping.enabled !== false}
+                            onCheckedChange={(v) =>
+                              updateMappingDraft(field.id, {
+                                salesforce_mapping: { ...mapping, enabled: v },
+                              })
+                            }
+                          />
+                        </td>
                         <td className="p-2 min-w-[140px]">
                           <Select
                             value={mapping.objectName}
@@ -996,6 +1010,7 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
                                 salesforce_mapping: { ...mapping, objectName: value },
                               })
                             }
+                            disabled={mapping.enabled === false}
                           >
                             <SelectTrigger className="bg-gray-800 border-gray-700 text-white h-8">
                               <SelectValue />
@@ -1018,7 +1033,8 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
                                 salesforce_mapping: { ...mapping, fieldApiName: e.target.value },
                               })
                             }
-                            className="bg-gray-800 border-gray-700 text-white h-8"
+                            disabled={mapping.enabled === false}
+                            className="bg-gray-800 border-gray-700 text-white h-8 disabled:opacity-50"
                           />
                         </td>
                         <td className="p-2 min-w-[190px]">
@@ -1029,6 +1045,7 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
                                 salesforce_mapping: { ...mapping, direction: value },
                               })
                             }
+                            disabled={mapping.enabled === false}
                           >
                             <SelectTrigger className="bg-gray-800 border-gray-700 text-white h-8">
                               <SelectValue />
@@ -1072,10 +1089,18 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
                             <td className="p-2"><span className="text-xs text-gray-400">{sub.required ? 'Yes' : 'No'}</span></td>
                             <td className="p-2"><span className="text-xs text-gray-400">{sub.enabled === false ? 'No' : 'Yes'}</span></td>
                             <td className="p-2"><span className="text-xs text-gray-400">{sub.include_in_pdf ? 'Yes' : 'No'}</span></td>
+                            <td className="p-2">
+                              <Switch
+                                className="data-[state=checked]:bg-emerald-500"
+                                checked={subMapping.enabled !== false}
+                                onCheckedChange={(v) => updateConditionalSubfieldMapping(field.id, String(sub.label || sub.id), { enabled: v })}
+                              />
+                            </td>
                             <td className="p-2 min-w-[140px]">
                               <Select
                                 value={subMapping.objectName}
                                 onValueChange={(value) => updateConditionalSubfieldMapping(field.id, String(sub.label || sub.id), { objectName: value })}
+                                disabled={subMapping.enabled === false}
                               >
                                 <SelectTrigger className="bg-gray-800 border-gray-700 text-white h-8"><SelectValue /></SelectTrigger>
                                 <SelectContent className="bg-gray-800 border-gray-700">
@@ -1088,11 +1113,12 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
                                 </SelectContent>
                               </Select>
                             </td>
-                            <td className="p-2 min-w-[220px]"><Input value={subMapping.fieldApiName} onChange={(e)=>updateConditionalSubfieldMapping(field.id, String(sub.label || sub.id), { fieldApiName: e.target.value })} className="bg-gray-800 border-gray-700 text-white h-8" /></td>
+                            <td className="p-2 min-w-[220px]"><Input value={subMapping.fieldApiName} onChange={(e)=>updateConditionalSubfieldMapping(field.id, String(sub.label || sub.id), { fieldApiName: e.target.value })} disabled={subMapping.enabled === false} className="bg-gray-800 border-gray-700 text-white h-8 disabled:opacity-50" /></td>
                             <td className="p-2 min-w-[190px]">
                               <Select
                                 value={subMapping.direction}
                                 onValueChange={(value: 'to_salesforce' | 'from_salesforce' | 'bidirectional') => updateConditionalSubfieldMapping(field.id, String(sub.label || sub.id), { direction: value })}
+                                disabled={subMapping.enabled === false}
                               >
                                 <SelectTrigger className="bg-gray-800 border-gray-700 text-white h-8"><SelectValue /></SelectTrigger>
                                 <SelectContent className="bg-gray-800 border-gray-700">
