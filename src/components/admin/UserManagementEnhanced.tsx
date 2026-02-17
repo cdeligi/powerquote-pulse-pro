@@ -55,6 +55,8 @@ interface UserProfile {
   business_justification?: string | null;
   created_at: string;
   updated_at: string;
+  last_sign_in_at?: string | null;
+  lastSignInAt?: string | null;
 }
 
 interface UserManagementEnhancedProps {
@@ -123,7 +125,25 @@ const UserManagementEnhanced = ({ user }: UserManagementEnhancedProps) => {
       // Prefer edge function list (admin scope), fallback to direct query.
       const fnResult = await supabase.functions.invoke('admin-users', { method: 'GET' });
       if (!fnResult.error && (fnResult.data as any)?.users) {
-        setUserProfiles((fnResult.data as any).users || []);
+        const normalized = ((fnResult.data as any).users || []).map((u: any) => ({
+          id: u.id,
+          email: u.email,
+          first_name: u.first_name ?? (u.fullName ? String(u.fullName).split(' ')[0] : ''),
+          last_name: u.last_name ?? (u.fullName ? String(u.fullName).split(' ').slice(1).join(' ') : ''),
+          role: u.role,
+          department: u.department ?? '',
+          user_status: u.userStatus ?? u.user_status ?? 'active',
+          job_title: u.jobTitle ?? u.job_title ?? null,
+          phone_number: u.phoneNumber ?? u.phone_number ?? null,
+          manager_email: u.managerEmail ?? u.manager_email ?? null,
+          company_name: u.companyName ?? u.company_name ?? null,
+          business_justification: u.businessJustification ?? u.business_justification ?? null,
+          created_at: u.createdAt ?? u.created_at ?? new Date().toISOString(),
+          updated_at: u.updatedAt ?? u.updated_at ?? new Date().toISOString(),
+          last_sign_in_at: u.lastSignInAt ?? u.last_sign_in_at ?? null,
+          lastSignInAt: u.lastSignInAt ?? u.last_sign_in_at ?? null,
+        }));
+        setUserProfiles(normalized);
         return;
       }
 
@@ -1122,7 +1142,8 @@ const UserManagementEnhanced = ({ user }: UserManagementEnhancedProps) => {
           phoneNumber: selectedUserForEdit.phone_number ?? null,
           managerEmail: selectedUserForEdit.manager_email ?? null,
           companyName: selectedUserForEdit.company_name ?? null,
-          businessJustification: selectedUserForEdit.business_justification ?? null
+          businessJustification: selectedUserForEdit.business_justification ?? null,
+          lastLoginAt: selectedUserForEdit.last_sign_in_at ?? selectedUserForEdit.lastSignInAt ?? null
         } : null}
         isOpen={!!selectedUserForEdit}
         onClose={() => setSelectedUserForEdit(null)}

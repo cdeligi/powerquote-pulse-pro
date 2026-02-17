@@ -22,6 +22,7 @@ interface User {
   managerEmail?: string | null;
   companyName?: string | null;
   businessJustification?: string | null;
+  lastLoginAt?: string | null;
 }
 
 interface UserEditDialogProps {
@@ -130,6 +131,25 @@ export default function UserEditDialog({ user, isOpen, onClose, onSave, departme
               disabled
               className="bg-gray-800 border-gray-700 text-gray-500"
             />
+          </div>
+          
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label className="text-gray-400">Last Login</Label>
+              <Input
+                value={user.lastLoginAt ? new Date(user.lastLoginAt).toLocaleString() : 'Never'}
+                disabled
+                className="bg-gray-800 border-gray-700 text-gray-400"
+              />
+            </div>
+            <div>
+              <Label className="text-gray-400">User ID</Label>
+              <Input
+                value={user.id}
+                disabled
+                className="bg-gray-800 border-gray-700 text-gray-500"
+              />
+            </div>
           </div>
           
           <div className="grid grid-cols-2 gap-4">
