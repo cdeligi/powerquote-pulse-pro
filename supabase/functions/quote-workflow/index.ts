@@ -264,7 +264,7 @@ async function handleClaim(
 
   const { data: before, error: beforeError } = await supabase
     .from("quotes")
-    .select("workflow_state")
+    .select("id, status")
     .eq("id", quoteId)
     .single();
 
@@ -273,6 +273,9 @@ async function handleClaim(
   }
 
   let data: any = null;
+  // Legacy quotes.status check constraint allows: draft/submitted/pending_approval/approved/rejected/in_process/under-review
+  const nextState = "under-review";
+
   const rpcResult = await supabase.rpc("claim_quote_for_review", {
     p_actor_id: context.userId,
     p_lane: lane,
@@ -282,34 +285,15 @@ async function handleClaim(
   if (!rpcResult.error) {
     data = rpcResult.data;
   } else {
-    // Fallback path when RPC is unavailable/misconfigured.
-    const column = lane === "admin" ? "admin_reviewer_id" : "finance_reviewer_id";
-    const nextState = lane === "admin" ? "admin_review" : "finance_review";
-
-    const current = await supabase
-      .from("quotes")
-      .select(`id, workflow_state, ${column}`)
-      .eq("id", quoteId)
-      .single();
-
-    if (current.error || !current.data) {
-      throw new HttpError(404, "Quote not found");
-    }
-
-    if (current.data[column] && current.data[column] !== context.userId) {
-      throw new HttpError(409, "Quote already claimed");
-    }
-
-    const updatePayload: Record<string, any> = {
-      [column]: context.userId,
-      workflow_state: nextState,
-      status: nextState,
-      updated_at: new Date().toISOString(),
-    };
-
+    // Legacy-schema fallback: many environments do not have claim RPC/reviewer columns.
     const updated = await supabase
       .from("quotes")
-      .update(updatePayload)
+      .update({
+        status: nextState,
+        reviewed_by: context.userId,
+        reviewed_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
       .eq("id", quoteId)
       .select("*")
       .single();
@@ -325,8 +309,8 @@ async function handleClaim(
     quoteId,
     lane === "admin" ? "quote_claimed_admin" : "quote_claimed_finance",
     context,
-    before.workflow_state ?? null,
-    data?.workflow_state ?? before.workflow_state ?? null,
+    (before as any).workflow_state ?? (before as any).status ?? null,
+    (data as any)?.workflow_state ?? (data as any)?.status ?? (before as any).status ?? null,
     { lane },
   );
 
@@ -601,10 +585,12 @@ async function handleEmailTemplateGet(
   context: RequestContext,
 ) {
   assertRole(context, ["ADMIN", "FINANCE", "MASTER"]);
-  const templateType = url.searchParams.get("type");
-  if (!templateType) {
+  const requestedType = url.searchParams.get("type");
+  if (!requestedType) {
     throw new HttpError(400, "type query parameter is required");
   }
+  // Backward compatibility with DB constraint that only supports quote_approved/quote_rejected.
+  const templateType = requestedType === "quote_admin_decision" ? "quote_approved" : requestedType;
 
   const { data, error } = await supabase
     .from("email_templates")
@@ -654,9 +640,10 @@ async function handleEmailTemplateUpdate(
     throw new HttpError(400, "templateType, subjectTemplate and bodyTemplate are required");
   }
 
+  const normalizedTemplateType = templateType === "quote_admin_decision" ? "quote_approved" : templateType;
   const now = new Date().toISOString();
   const payload = {
-    template_type: templateType,
+    template_type: normalizedTemplateType,
     subject_template: subjectTemplate,
     body_template: bodyTemplate,
     enabled: typeof enabled === "boolean" ? enabled : true,
@@ -667,7 +654,7 @@ async function handleEmailTemplateUpdate(
   const { data: existing, error: existingError } = await supabase
     .from("email_templates")
     .select("id")
-    .eq("template_type", templateType)
+    .eq("template_type", normalizedTemplateType)
     .maybeSingle();
 
   if (existingError) {
@@ -807,7 +794,7 @@ async function logEvent(
   newState: string | null,
   payload?: Record<string, any>,
 ) {
-  await supabase.from("quote_events").insert({
+  const result = await supabase.from("quote_events").insert({
     quote_id: quoteId,
     event_type: eventType,
     actor_id: context.userId,
@@ -816,6 +803,11 @@ async function logEvent(
     new_state: newState,
     payload: payload ?? null,
   });
+
+  if (result.error) {
+    // Backward-compatible mode: some projects do not have quote_events table yet.
+    console.warn("quote_events logging skipped", result.error.message);
+  }
 }
 
 function assertRole(context: RequestContext, allowed: Role[]) {

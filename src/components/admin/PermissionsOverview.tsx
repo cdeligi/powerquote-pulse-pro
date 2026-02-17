@@ -159,16 +159,15 @@ export default function PermissionsOverview() {
       });
 
       // Update in database (safe path without assuming composite unique constraint)
-      const aliasValues = ROLE_ALIASES[role];
+      const aliasValues = ROLE_ALIASES[role].map(v => v.toUpperCase());
       const { data: existingRows, error: existingError } = await supabase
         .from('role_feature_defaults')
         .select('id, role')
-        .eq('feature_key', featureKey)
-        .in('role', aliasValues as any);
+        .eq('feature_key', featureKey);
 
       if (existingError) throw existingError;
 
-      const existing = existingRows?.[0];
+      const existing = (existingRows || []).find((row: any) => aliasValues.includes(String(row.role || '').toUpperCase()));
       if (existing?.id) {
         const { error: updateError } = await supabase
           .from('role_feature_defaults')
