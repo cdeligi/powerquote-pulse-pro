@@ -121,10 +121,40 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
   
   // Fetch BOM item count for each quote
   const [bomCounts, setBomCounts] = useState<Record<string, number>>({});
+  const [reviewerNameById, setReviewerNameById] = useState<Record<string, string>>({});
 
   useEffect(() => {
     fetchQuotes();
   }, []);
+
+  useEffect(() => {
+    const loadReviewerNames = async () => {
+      const ids = Array.from(new Set(
+        quotes
+          .flatMap((q: any) => [q.admin_reviewer_id, q.finance_reviewer_id])
+          .filter((v): v is string => typeof v === 'string' && v.length > 0)
+      ));
+
+      if (ids.length === 0) {
+        setReviewerNameById({});
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, full_name, email')
+        .in('id', ids);
+
+      if (error) return;
+      const mapped: Record<string, string> = {};
+      (data || []).forEach((r: any) => {
+        mapped[r.id] = r.full_name || r.email || r.id;
+      });
+      setReviewerNameById(mapped);
+    };
+
+    loadReviewerNames();
+  }, [quotes]);
 
   const normalizePercentage = (value?: number | null) => {
     if (value === null || value === undefined) {
@@ -137,6 +167,20 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
     }
 
     return value;
+  };
+
+  const toDate = (value?: string | null): Date | null => {
+    if (!value) return null;
+    const d = new Date(value);
+    return Number.isNaN(d.getTime()) ? null : d;
+  };
+
+  const ageDaysBetween = (start?: string | null, end?: string | null): string => {
+    const s = toDate(start);
+    const e = toDate(end);
+    if (!s || !e) return '-';
+    const days = Math.max(0, Math.ceil((e.getTime() - s.getTime()) / (1000 * 60 * 60 * 24)));
+    return `${days}d`;
   };
 
   // Filter and process quotes with real BOM item counts
@@ -329,7 +373,15 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
       updatedAt: new Date(quote.updated_at).toLocaleDateString(),
       items: bomCounts[quote.id] || 0,
       hasDiscount,
-      pdfUrl: quote.status === 'draft' ? null : `/quotes/${quote.id}.pdf`
+      pdfUrl: quote.status === 'draft' ? null : `/quotes/${quote.id}.pdf`,
+      adminReviewerId: (quote as any).admin_reviewer_id || null,
+      financeReviewerId: (quote as any).finance_reviewer_id || null,
+      adminClaimedAt: (quote as any).admin_claimed_at || null,
+      financeClaimedAt: (quote as any).finance_claimed_at || null,
+      adminDecisionAt: (quote as any).admin_decision_at || (quote as any).reviewed_at || null,
+      financeDecisionAt: (quote as any).finance_decision_at || null,
+      submittedAt: (quote as any).submitted_at || quote.created_at,
+      financeNotes: (quote as any).finance_notes || null,
     };
   });
 
@@ -516,7 +568,7 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
     }
   };
 
-  const canSeePrices = user.role !== 'LEVEL_1';
+  const canSeePrices = user.role !== 'SALES';
 
   const updatePdfLoading = (quoteId: string, isLoading: boolean) => {
     setPdfLoadingStates(prev => {
@@ -1145,6 +1197,11 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
                     <div>
                       <p className="text-white">Created: {quote.createdAt}</p>
                       <p className="text-gray-400 text-sm">Updated: {quote.updatedAt}</p>
+                      <p className="text-gray-400 text-xs mt-1">Quote Review Claimed by: <span className="text-cyan-300">{quote.adminReviewerId ? (reviewerNameById[quote.adminReviewerId] || quote.adminReviewerId) : 'Unclaimed'}</span></p>
+                      {(quote.financeReviewerId || quote.financeDecisionAt || quote.financeNotes) && (
+                        <p className="text-gray-400 text-xs">Finance Claimed by: <span className="text-amber-300">{quote.financeReviewerId ? (reviewerNameById[quote.financeReviewerId] || quote.financeReviewerId) : 'Unclaimed'}</span></p>
+                      )}
+                      <p className="text-gray-500 text-xs mt-1">Age — Admin: {ageDaysBetween(quote.adminClaimedAt || quote.submittedAt, quote.adminDecisionAt)} · Finance: {ageDaysBetween(quote.financeClaimedAt, quote.financeDecisionAt)} · Total: {ageDaysBetween(quote.submittedAt, quote.financeDecisionAt || quote.adminDecisionAt || quote.updatedAt)}</p>
                     </div>
                   </div>
                   
