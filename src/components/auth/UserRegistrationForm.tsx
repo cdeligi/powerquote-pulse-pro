@@ -68,6 +68,7 @@ const UserRegistrationForm = ({ onSubmit, onBack }: UserRegistrationFormProps) =
   }, []);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitNotice, setSubmitNotice] = useState<string | null>(null);
   const [showTerms, setShowTerms] = useState(false);
   const [showPrivacy, setShowPrivacy] = useState(false);
 
@@ -84,6 +85,7 @@ const UserRegistrationForm = ({ onSubmit, onBack }: UserRegistrationFormProps) =
     }
 
     setIsSubmitting(true);
+    setSubmitNotice(null);
     
     try {
       // Insert into real database
@@ -193,11 +195,11 @@ const UserRegistrationForm = ({ onSubmit, onBack }: UserRegistrationFormProps) =
         const applicantJson = await applicantRes.json().catch(() => ({}));
         if (!applicantRes.ok) {
           console.warn('Applicant notification failed:', applicantJson);
-          alert(`Email notification failed: ${JSON.stringify(applicantJson)}`);
+          setSubmitNotice(`Email notification failed: ${JSON.stringify(applicantJson)}`);
         } else {
           console.log('Applicant notification sent:', applicantJson);
           const emailId = applicantJson?.result?.data?.id || applicantJson?.result?.data?.[0]?.id;
-          alert(`Request submitted. Confirmation email sent (id: ${emailId || 'unknown'}). Check Inbox/Spam/Promotions.`);
+          setSubmitNotice(`Confirmation email sent (id: ${emailId || 'unknown'}). Check Inbox/Spam/Promotions.`);
         }
 
         await supabase.from('admin_notifications').insert({
@@ -215,7 +217,8 @@ const UserRegistrationForm = ({ onSubmit, onBack }: UserRegistrationFormProps) =
         console.warn('Failed to notify admins of registration request:', notifyError);
       }
       
-      alert('Request submitted successfully. You will receive an email confirmation and a follow-up email within 2 business days (48 hours) once approved or denied.');
+      // Final UX note (some mobile webviews suppress window.alert)
+      setSubmitNotice((prev) => prev || 'Request submitted successfully. If you do not see the email, check Spam/Promotions.');
       
       // Reset form
       setFormData({
@@ -520,6 +523,12 @@ const UserRegistrationForm = ({ onSubmit, onBack }: UserRegistrationFormProps) =
                 {isSubmitting ? 'Submitting Request...' : 'Request Access'}
               </Button>
               
+              {submitNotice && (
+                <div className="mt-4 rounded-md border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 p-3 text-sm text-gray-800 dark:text-gray-200">
+                  {submitNotice}
+                </div>
+              )}
+
               <p className="text-gray-500 dark:text-gray-400 text-sm text-center mt-3">
                 Your request will be reviewed by an administrator. You will receive an email notification once your request has been processed.
               </p>
