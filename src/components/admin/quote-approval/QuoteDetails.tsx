@@ -69,6 +69,7 @@ const QuoteDetails = ({
   const [qtmsConfig, setQtmsConfig] = useState<ConsolidatedQTMS | null>(null);
   const [editingQTMS, setEditingQTMS] = useState(false);
   const [approvedDiscountInput, setApprovedDiscountInput] = useState('0');
+  const [financeApprovedMargin, setFinanceApprovedMargin] = useState('');
   const { formattedFields: formattedConfiguredFields } =
     useConfiguredQuoteFields(quote.quote_fields);
   const { has } = usePermissions();
@@ -90,9 +91,11 @@ const QuoteDetails = ({
   const claimedByAnother = currentLane === 'admin'
     ? Boolean((quote.admin_reviewer_id && quote.admin_reviewer_id !== user?.id) || (!quote.admin_reviewer_id && reviewedBy && reviewedBy !== user?.id))
     : currentLane === 'finance'
-      ? Boolean(quote.finance_reviewer_id && quote.finance_reviewer_id !== user?.id)
+      ? false
       : false;
-  const requiresClaim = currentLane !== null && !claimedByAnother && !claimedByCurrentUser;
+  const requiresClaim = currentLane === 'finance'
+    ? !claimedByCurrentUser
+    : currentLane !== null && !claimedByAnother && !claimedByCurrentUser;
   const showWorkflowActions = Boolean(isWorkflowPending && canCurrentUserAct && claimedByCurrentUser);
 
   useEffect(() => {
@@ -120,6 +123,7 @@ const QuoteDetails = ({
     setApprovalNotes(quote.approval_notes || '');
     setRejectionReason(quote.rejection_reason || '');
     setQuoteAdditionalInfo(quote.additional_quote_information || '');
+    setFinanceApprovedMargin('');
   }, [
     quote.id,
     quote.approved_discount,
@@ -153,8 +157,12 @@ const QuoteDetails = ({
       ? Math.min(Math.max(parsedDiscount, 0), 100)
       : 0;
     const trimmedAdditionalInfo = quoteAdditionalInfo.trim();
+    const financeNote = currentLane === 'finance' && financeApprovedMargin
+      ? `\nFinance Approved Margin: ${financeApprovedMargin}%`
+      : '';
+
     onApprove({
-      notes: approvalNotes,
+      notes: `${approvalNotes || ''}${financeNote}`.trim(),
       updatedBOMItems: bomItems,
       approvedDiscount: sanitizedDiscount / 100,
       additionalQuoteInformation: trimmedAdditionalInfo || undefined
@@ -712,9 +720,23 @@ const QuoteDetails = ({
                       id="approval-notes"
                       value={approvalNotes}
                       onChange={(e) => setApprovalNotes(e.target.value)}
-                      placeholder={currentLane === 'finance' ? 'Add context about the finance decision...' : 'Add any notes about the approval...'}
+                      placeholder={currentLane === 'finance' ? 'Required: explain finance justification and conditions...' : 'Add any notes about the approval...'}
                       className="bg-gray-800 border-gray-700 text-white min-h-[80px]"
                     />
+                    {currentLane === 'finance' && (
+                      <div className="space-y-2">
+                        <Label className="text-gray-400">Finance Approved Margin (%)</Label>
+                        <Input
+                          type="number"
+                          value={financeApprovedMargin}
+                          onChange={(e) => setFinanceApprovedMargin(e.target.value)}
+                          className="bg-gray-800 border-gray-700 text-white"
+                          placeholder="e.g. 45"
+                        />
+                        <p className="text-xs text-gray-500">Optional custom margin approved by finance for this quote.</p>
+                      </div>
+                    )}
+
                     <div className="space-y-2">
                       <Label htmlFor="additional-quote-info" className="text-white">
                         Additional Quote Information (Visible on PDF)
@@ -743,6 +765,7 @@ const QuoteDetails = ({
                           setSelectedAction(null);
                           setApprovalNotes(quote.approval_notes || '');
                           setQuoteAdditionalInfo(quote.additional_quote_information || '');
+    setFinanceApprovedMargin('');
                         }}
                         variant="outline"
                         className="border-gray-600 text-gray-300 hover:bg-gray-800"
