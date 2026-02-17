@@ -40,6 +40,14 @@ const supabase = getSupabaseClient();
 const POSTGREST_SCHEMA_RELOAD_ERROR_CODE = "PGRST204";
 
 
+const normalizeSalesforceApiName = (value: string): string => {
+  const trimmed = (value || '').trim();
+  if (!trimmed) return '';
+  let cleaned = trimmed.replace(/[^A-Za-z0-9_]/g, '_').replace(/_+/g, '_').replace(/^_+|_+$/g, '');
+  if (!/^[A-Za-z]/.test(cleaned)) cleaned = `F_${cleaned}`;
+  return cleaned;
+};
+
 const getConditionalSubfieldLabels = (field: QuoteField): string[] => {
   const labels = new Set<string>();
   (field.conditional_logic || []).forEach((rule) => {
@@ -570,8 +578,6 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
     const apiName = mapping.fieldApiName?.trim();
     if (!apiName) {
       issues.push('Missing SF field API name.');
-    } else if (!/^[A-Za-z][A-Za-z0-9_]*$/.test(apiName)) {
-      issues.push('API name format looks invalid.');
     }
 
     const duplicateCount = allRows.filter((candidate) => {
@@ -639,7 +645,33 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
 
   const saveMappingTable = async () => {
     try {
-      const rows = Object.values(mappingDrafts);
+      const rows = Object.values(mappingDrafts).map((row) => {
+        const mapping = row.salesforce_mapping
+          ? { ...row.salesforce_mapping, fieldApiName: normalizeSalesforceApiName(row.salesforce_mapping.fieldApiName || row.label) }
+          : row.salesforce_mapping;
+
+        const conditional_logic = (row.conditional_logic || []).map((rule) => ({
+          ...rule,
+          fields: (rule.fields || []).map((sub: any) => {
+            const sf = (sub as any).salesforce_mapping;
+            if (!sf) return sub;
+            return {
+              ...sub,
+              salesforce_mapping: {
+                ...sf,
+                fieldApiName: normalizeSalesforceApiName(sf.fieldApiName || sub.label || sub.id),
+              },
+            };
+          }),
+        }));
+
+        return {
+          ...row,
+          salesforce_mapping: mapping,
+          conditional_logic,
+        };
+      });
+
       const rowsWithIssues = rows
         .map((row) => ({ row, issues: getMappingIssues(row, rows) }))
         .filter((entry) => entry.issues.length > 0);
