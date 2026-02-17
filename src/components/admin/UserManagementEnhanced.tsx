@@ -245,8 +245,38 @@ const UserManagementEnhanced = ({ user }: UserManagementEnhancedProps) => {
     loadDepartments();
   }, []);
 
+  const normalizeRole = (value?: string | null) => String(value || '').trim().toLowerCase();
+
+  const getRoleRank = (value?: string | null) => {
+    const role = normalizeRole(value);
+    if (role === 'master') return 60;
+    if (role === 'admin' || role === 'finance') return 50;
+    if (role === 'level3' || role === 'level_3') return 40;
+    if (role === 'level2' || role === 'sales') return 30;
+    if (role === 'level1') return 20;
+    return 10;
+  };
+
+  const canCurrentUserDelete = (target: UserProfile) => {
+    if (target.user_status !== 'active') return false;
+
+    const currentEmail = String(user?.email || '').toLowerCase();
+    const targetEmail = String(target.email || '').toLowerCase();
+    if (!currentEmail || currentEmail === targetEmail) return false;
+
+    const currentRank = getRoleRank((user as any)?.role);
+    const targetRank = getRoleRank(target.role);
+
+    // Highest role can delete any downstream account.
+    return currentRank > targetRank;
+  };
+
   const handleRemoveUser = async (userProfile: UserProfile) => {
     try {
+      if (!canCurrentUserDelete(userProfile)) {
+        throw new Error('You can only remove downstream users.');
+      }
+
       // Call the deactivate_user function
       const { error } = await supabase.rpc('deactivate_user', {
         target_user_id: userProfile.id
@@ -847,9 +877,7 @@ const UserManagementEnhanced = ({ user }: UserManagementEnhancedProps) => {
                               <Edit className="h-4 w-4 text-black" />
                             </Button>
                             
-                            {profile.user_status === 'active' &&
-                              profile.email?.toLowerCase() !== 'cdeligi@qualitrolcorp.com' &&
-                              !['admin', 'master'].includes(String(profile.role || '').toLowerCase()) && (
+                            {canCurrentUserDelete(profile) && (
                               <Button
                                 onClick={() => {
                                   setSelectedUserToRemove(profile);
