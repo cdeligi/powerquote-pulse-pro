@@ -531,7 +531,7 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
     const base = mappingDrafts[parentFieldId] ?? quoteFields.find((f) => f.id === parentFieldId);
     if (!base) return;
 
-    const normalizeKey = (value: string) => value.trim().toLowerCase();
+    const normalizeKey = (value: string) => value.trim().toLowerCase().replace(/\s*\([^)]*\)\s*$/,'').trim();
     const targetKey = normalizeKey(subfieldKey);
 
     const nextConditional = (base.conditional_logic || []).map((rule) => ({
@@ -945,7 +945,7 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
                     const byKey = new Map<string, any>();
                     (row.conditional_logic || []).forEach((rule) => {
                       (rule.fields || []).forEach((sub: any) => {
-                        const key = String(sub.label || sub.id || '').trim().toLowerCase();
+                        const key = String(sub.label || sub.id || '').trim().toLowerCase().replace(/\s*\([^)]*\)\s*$/,'').trim();
                         if (!key) return;
                         if (!byKey.has(key)) {
                           byKey.set(key, sub);
@@ -1066,8 +1066,8 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
                         };
 
                         return (
-                          <tr key={`${field.id}-${String(sub.label || sub.id).toLowerCase()}`} className="border-t border-gray-800 bg-gray-900/70 text-white">
-                            <td className="p-2 pl-6 text-cyan-300">↳ {sub.label || sub.id}</td>
+                          <tr key={`${field.id}-${String(sub.label || sub.id).toLowerCase().replace(/\s*\([^)]*\)\s*$/, '').trim()}`} className="border-t border-gray-800 bg-gray-900/70 text-white">
+                            <td className="p-2 pl-6 text-cyan-300">↳ {String(sub.label || sub.id).replace(/\s*\([^)]*\)\s*$/, '').trim()}</td>
                             <td className="p-2 text-gray-300">{String(sub.type || 'text').toUpperCase()}</td>
                             <td className="p-2"><span className="text-xs text-gray-400">{sub.required ? 'Yes' : 'No'}</span></td>
                             <td className="p-2"><span className="text-xs text-gray-400">{sub.enabled === false ? 'No' : 'Yes'}</span></td>
