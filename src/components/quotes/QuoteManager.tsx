@@ -1228,10 +1228,14 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
                     <div>
                       <p className="text-white">Created: {quote.createdAt}</p>
                       <p className="text-gray-400 text-sm">Updated: {quote.updatedAt}</p>
-                      <p className="text-gray-400 text-xs mt-1">Quote Review Claimed by: <span className="text-cyan-300">{(quote as any).admin_reviewer_name || (quote.adminReviewerId ? (reviewerNameById[quote.adminReviewerId] || 'Assigned reviewer') : 'Unclaimed')}</span></p>
-                      {(quote.financeReviewerId || quote.financeDecisionAt || quote.financeNotes) && (
-                        <p className="text-gray-400 text-xs">Finance Claimed by: <span className="text-amber-300">{(quote as any).finance_reviewer_name || (quote.financeReviewerId ? (reviewerNameById[quote.financeReviewerId] || 'Assigned reviewer') : 'Unclaimed')}</span></p>
-                      )}
+                      <div className="mt-1 min-h-[40px] space-y-0.5">
+                        <p className="text-gray-400 text-xs whitespace-nowrap overflow-hidden text-ellipsis">
+                          Quote Review Claimed by: <span className="text-cyan-300">{(quote as any).admin_reviewer_name || (quote.adminReviewerId ? (reviewerNameById[quote.adminReviewerId] || 'Assigned reviewer') : 'Unclaimed')}</span>
+                        </p>
+                        <p className="text-gray-400 text-xs whitespace-nowrap overflow-hidden text-ellipsis">
+                          Finance Claimed by: <span className="text-amber-300">{(quote as any).finance_reviewer_name || (quote.financeReviewerId ? (reviewerNameById[quote.financeReviewerId] || 'Assigned reviewer') : 'Unclaimed')}</span>
+                        </p>
+                      </div>
                     </div>
                   </div>
                   
