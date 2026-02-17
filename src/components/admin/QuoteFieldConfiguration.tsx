@@ -513,6 +513,42 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
     }));
   };
 
+  const updateConditionalSubfieldMapping = (
+    parentFieldId: string,
+    ruleId: string,
+    subfieldId: string,
+    patch: Partial<SalesforceFieldMapping>
+  ) => {
+    const base = mappingDrafts[parentFieldId] ?? quoteFields.find((f) => f.id === parentFieldId);
+    if (!base) return;
+
+    const nextConditional = (base.conditional_logic || []).map((rule) => {
+      if (rule.id !== ruleId) return rule;
+      return {
+        ...rule,
+        fields: (rule.fields || []).map((sub: any) => {
+          if (sub.id !== subfieldId) return sub;
+          const currentMapping = (sub as any).salesforce_mapping ?? {
+            enabled: true,
+            objectName: 'Opportunity',
+            fieldApiName: sub.label?.replace(/\s+/g, '_') || sub.id,
+            direction: 'to_salesforce' as const,
+            transformRule: '',
+          };
+          return {
+            ...sub,
+            salesforce_mapping: {
+              ...currentMapping,
+              ...patch,
+            },
+          };
+        }),
+      };
+    });
+
+    updateMappingDraft(parentFieldId, { conditional_logic: nextConditional });
+  };
+
   const getMappingIssues = (row: QuoteField, allRows: QuoteField[]) => {
     const issues: string[] = [];
     const mapping = row.salesforce_mapping;
@@ -626,6 +662,7 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
               enabled: row.enabled,
               include_in_pdf: row.include_in_pdf || false,
               salesforce_mapping: row.salesforce_mapping ?? null,
+              conditional_logic: row.conditional_logic ?? [],
             })
             .eq('id', row.id)
         )
@@ -870,109 +907,164 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
                     transformRule: '',
                   };
                   const issues = getMappingIssues({ ...row, salesforce_mapping: mapping }, quoteFields.map((f) => mappingDrafts[f.id] ?? f));
+                  const subRows = (row.conditional_logic || []).flatMap((rule) =>
+                    (rule.fields || []).map((sub: any) => ({ ruleId: rule.id, sub }))
+                  );
 
                   return (
-                    <tr key={field.id} className="border-t border-gray-800 bg-gray-950 text-white">
-                      <td className="p-2">
-                        <div>{row.label}</div>
-                        {getConditionalSubfieldLabels(row).length > 0 && (
-                          <div className="text-xs text-gray-400 mt-1">
-                            Follow-up fields: {getConditionalSubfieldLabels(row).join(', ')}
-                          </div>
-                        )}
-                      </td>
-                      <td className="p-2 text-gray-300">{row.type.toUpperCase()}</td>
-                      <td className="p-2">
-                        <Switch
-                          className="data-[state=checked]:bg-emerald-500"
-                          checked={row.required}
-                          onCheckedChange={(v) => updateMappingDraft(field.id, { required: v })}
-                        />
-                      </td>
-                      <td className="p-2">
-                        <Switch
-                          className="data-[state=checked]:bg-emerald-500"
-                          checked={row.enabled}
-                          onCheckedChange={(v) => updateMappingDraft(field.id, { enabled: v })}
-                        />
-                      </td>
-                      <td className="p-2">
-                        <Switch
-                          className="data-[state=checked]:bg-emerald-500"
-                          checked={row.include_in_pdf || false}
-                          onCheckedChange={(v) => updateMappingDraft(field.id, { include_in_pdf: v })}
-                        />
-                      </td>
-                      <td className="p-2 min-w-[140px]">
-                        <Select
-                          value={mapping.objectName}
-                          onValueChange={(value) =>
-                            updateMappingDraft(field.id, {
-                              salesforce_mapping: { ...mapping, objectName: value },
-                            })
-                          }
-                        >
-                          <SelectTrigger className="bg-gray-800 border-gray-700 text-white h-8">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent className="bg-gray-800 border-gray-700">
-                            <SelectItem value="Opportunity" className="text-white">Opportunity</SelectItem>
-                            <SelectItem value="Case" className="text-white">Case</SelectItem>
-                            <SelectItem value="Quote" className="text-white">Quote</SelectItem>
-                            <SelectItem value="Account" className="text-white">Account</SelectItem>
-                            <SelectItem value="Contact" className="text-white">Contact</SelectItem>
-                            <SelectItem value="Custom" className="text-white">Custom</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </td>
-                      <td className="p-2 min-w-[220px]">
-                        <Input
-                          value={mapping.fieldApiName}
-                          onChange={(e) =>
-                            updateMappingDraft(field.id, {
-                              salesforce_mapping: { ...mapping, fieldApiName: e.target.value },
-                            })
-                          }
-                          className="bg-gray-800 border-gray-700 text-white h-8"
-                        />
-                      </td>
-                      <td className="p-2 min-w-[190px]">
-                        <Select
-                          value={mapping.direction}
-                          onValueChange={(value: 'to_salesforce' | 'from_salesforce' | 'bidirectional') =>
-                            updateMappingDraft(field.id, {
-                              salesforce_mapping: { ...mapping, direction: value },
-                            })
-                          }
-                        >
-                          <SelectTrigger className="bg-gray-800 border-gray-700 text-white h-8">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent className="bg-gray-800 border-gray-700">
-                            <SelectItem value="to_salesforce" className="text-white">PowerQuote → Salesforce</SelectItem>
-                            <SelectItem value="from_salesforce" className="text-white">Salesforce → PowerQuote</SelectItem>
-                            <SelectItem value="bidirectional" className="text-white">Bidirectional</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </td>
-                      <td className="p-2 min-w-[220px]">
-                        {issues.length === 0 ? (
-                          <span className="text-emerald-400 text-xs">OK</span>
-                        ) : (
-                          <div className="text-xs text-amber-300 space-y-1">
-                            {issues.map((issue) => (
-                              <div key={issue} className="flex items-center gap-1">
-                                <AlertCircle className="h-3 w-3" />
-                                <span>{issue}</span>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </td>
-                    </tr>
+                    <>
+                      <tr key={field.id} className="border-t border-gray-800 bg-gray-950 text-white">
+                        <td className="p-2">
+                          <div>{row.label}</div>
+                          {getConditionalSubfieldLabels(row).length > 0 && (
+                            <div className="text-xs text-gray-400 mt-1">
+                              Follow-up fields below
+                            </div>
+                          )}
+                        </td>
+                        <td className="p-2 text-gray-300">{row.type.toUpperCase()}</td>
+                        <td className="p-2">
+                          <Switch
+                            className="data-[state=checked]:bg-emerald-500"
+                            checked={row.required}
+                            onCheckedChange={(v) => updateMappingDraft(field.id, { required: v })}
+                          />
+                        </td>
+                        <td className="p-2">
+                          <Switch
+                            className="data-[state=checked]:bg-emerald-500"
+                            checked={row.enabled}
+                            onCheckedChange={(v) => updateMappingDraft(field.id, { enabled: v })}
+                          />
+                        </td>
+                        <td className="p-2">
+                          <Switch
+                            className="data-[state=checked]:bg-emerald-500"
+                            checked={row.include_in_pdf || false}
+                            onCheckedChange={(v) => updateMappingDraft(field.id, { include_in_pdf: v })}
+                          />
+                        </td>
+                        <td className="p-2 min-w-[140px]">
+                          <Select
+                            value={mapping.objectName}
+                            onValueChange={(value) =>
+                              updateMappingDraft(field.id, {
+                                salesforce_mapping: { ...mapping, objectName: value },
+                              })
+                            }
+                          >
+                            <SelectTrigger className="bg-gray-800 border-gray-700 text-white h-8">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent className="bg-gray-800 border-gray-700">
+                              <SelectItem value="Opportunity" className="text-white">Opportunity</SelectItem>
+                              <SelectItem value="Case" className="text-white">Case</SelectItem>
+                              <SelectItem value="Quote" className="text-white">Quote</SelectItem>
+                              <SelectItem value="Account" className="text-white">Account</SelectItem>
+                              <SelectItem value="Contact" className="text-white">Contact</SelectItem>
+                              <SelectItem value="Custom" className="text-white">Custom</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </td>
+                        <td className="p-2 min-w-[220px]">
+                          <Input
+                            value={mapping.fieldApiName}
+                            onChange={(e) =>
+                              updateMappingDraft(field.id, {
+                                salesforce_mapping: { ...mapping, fieldApiName: e.target.value },
+                              })
+                            }
+                            className="bg-gray-800 border-gray-700 text-white h-8"
+                          />
+                        </td>
+                        <td className="p-2 min-w-[190px]">
+                          <Select
+                            value={mapping.direction}
+                            onValueChange={(value: 'to_salesforce' | 'from_salesforce' | 'bidirectional') =>
+                              updateMappingDraft(field.id, {
+                                salesforce_mapping: { ...mapping, direction: value },
+                              })
+                            }
+                          >
+                            <SelectTrigger className="bg-gray-800 border-gray-700 text-white h-8">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent className="bg-gray-800 border-gray-700">
+                              <SelectItem value="to_salesforce" className="text-white">PowerQuote → Salesforce</SelectItem>
+                              <SelectItem value="from_salesforce" className="text-white">Salesforce → PowerQuote</SelectItem>
+                              <SelectItem value="bidirectional" className="text-white">Bidirectional</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </td>
+                        <td className="p-2 min-w-[220px]">
+                          {issues.length === 0 ? (
+                            <span className="text-emerald-400 text-xs">OK</span>
+                          ) : (
+                            <div className="text-xs text-amber-300 space-y-1">
+                              {issues.map((issue) => (
+                                <div key={issue} className="flex items-center gap-1">
+                                  <AlertCircle className="h-3 w-3" />
+                                  <span>{issue}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+
+                      {subRows.map(({ ruleId, sub }) => {
+                        const subMapping = (sub as any).salesforce_mapping ?? {
+                          enabled: true,
+                          objectName: mapping.objectName,
+                          fieldApiName: (sub.label || sub.id || '').replace(/\s+/g, '_'),
+                          direction: mapping.direction,
+                          transformRule: '',
+                        };
+
+                        return (
+                          <tr key={`${field.id}-${ruleId}-${sub.id}`} className="border-t border-gray-800 bg-gray-900/70 text-white">
+                            <td className="p-2 pl-6 text-cyan-300">↳ {sub.label || sub.id}</td>
+                            <td className="p-2 text-gray-300">{String(sub.type || 'text').toUpperCase()}</td>
+                            <td className="p-2"><span className="text-xs text-gray-400">{sub.required ? 'Yes' : 'No'}</span></td>
+                            <td className="p-2"><span className="text-xs text-gray-400">{sub.enabled === false ? 'No' : 'Yes'}</span></td>
+                            <td className="p-2"><span className="text-xs text-gray-400">{sub.include_in_pdf ? 'Yes' : 'No'}</span></td>
+                            <td className="p-2 min-w-[140px]">
+                              <Select
+                                value={subMapping.objectName}
+                                onValueChange={(value) => updateConditionalSubfieldMapping(field.id, ruleId, sub.id, { objectName: value })}
+                              >
+                                <SelectTrigger className="bg-gray-800 border-gray-700 text-white h-8"><SelectValue /></SelectTrigger>
+                                <SelectContent className="bg-gray-800 border-gray-700">
+                                  <SelectItem value="Opportunity" className="text-white">Opportunity</SelectItem>
+                                  <SelectItem value="Case" className="text-white">Case</SelectItem>
+                                  <SelectItem value="Quote" className="text-white">Quote</SelectItem>
+                                  <SelectItem value="Account" className="text-white">Account</SelectItem>
+                                  <SelectItem value="Contact" className="text-white">Contact</SelectItem>
+                                  <SelectItem value="Custom" className="text-white">Custom</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </td>
+                            <td className="p-2 min-w-[220px]"><Input value={subMapping.fieldApiName} onChange={(e)=>updateConditionalSubfieldMapping(field.id, ruleId, sub.id, { fieldApiName: e.target.value })} className="bg-gray-800 border-gray-700 text-white h-8" /></td>
+                            <td className="p-2 min-w-[190px]">
+                              <Select
+                                value={subMapping.direction}
+                                onValueChange={(value: 'to_salesforce' | 'from_salesforce' | 'bidirectional') => updateConditionalSubfieldMapping(field.id, ruleId, sub.id, { direction: value })}
+                              >
+                                <SelectTrigger className="bg-gray-800 border-gray-700 text-white h-8"><SelectValue /></SelectTrigger>
+                                <SelectContent className="bg-gray-800 border-gray-700">
+                                  <SelectItem value="to_salesforce" className="text-white">PowerQuote → Salesforce</SelectItem>
+                                  <SelectItem value="from_salesforce" className="text-white">Salesforce → PowerQuote</SelectItem>
+                                  <SelectItem value="bidirectional" className="text-white">Bidirectional</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </td>
+                            <td className="p-2 min-w-[220px]"><span className="text-emerald-400 text-xs">OK</span></td>
+                          </tr>
+                        );
+                      })}
+                    </>
                   );
-                })}
-              </tbody>
+                })}              </tbody>
             </table>
           </div>
         </TabsContent>
