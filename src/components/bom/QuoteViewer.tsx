@@ -61,6 +61,11 @@ interface Quote {
   submitted_at?: string;
   created_at: string;
   updated_at: string;
+  admin_reviewer_id?: string | null;
+  finance_reviewer_id?: string | null;
+  admin_claimed_at?: string | null;
+  finance_claimed_at?: string | null;
+  finance_notes?: string | null;
 }
 
 const QuoteViewer: React.FC = () => {
@@ -75,6 +80,7 @@ const QuoteViewer: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [quoteEvents, setQuoteEvents] = useState<QuoteEvent[]>([]);
+  const [reviewerNames, setReviewerNames] = useState<Record<string, string>>({});
 
   const isDraft = quote?.status === 'draft';
   const isExplicitView = mode === 'view';
@@ -189,6 +195,19 @@ const QuoteViewer: React.FC = () => {
         additional_quote_information: additionalQuoteInfo ?? null,
         customer_name: resolvedCustomerName,
       });
+
+      const reviewerIds = [quoteData.admin_reviewer_id, quoteData.finance_reviewer_id].filter(Boolean);
+      if (reviewerIds.length > 0) {
+        const { data: reviewers } = await supabase
+          .from('profiles')
+          .select('id, full_name, email')
+          .in('id', reviewerIds as string[]);
+        const mapped: Record<string, string> = {};
+        (reviewers || []).forEach((r: any) => {
+          mapped[r.id] = r.full_name || r.email || r.id;
+        });
+        setReviewerNames(mapped);
+      }
 
       const { data: eventsData } = await supabase
         .from('quote_events')
@@ -451,6 +470,27 @@ const QuoteViewer: React.FC = () => {
             To make changes, use the Clone button to create a new editable draft.
           </AlertDescription>
         </Alert>
+      )}
+
+      {!isEditable && quote.status !== 'draft' && (
+        <div className="container mx-auto px-6 pt-0 pb-2">
+          <Card>
+            <CardContent className="py-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                <div>
+                  <p className="text-muted-foreground">Quote Review Claimed by</p>
+                  <p className="font-semibold text-cyan-700 dark:text-cyan-300">{reviewerNames[quote.admin_reviewer_id || ''] || quote.admin_reviewer_id || 'Unclaimed'}</p>
+                  <p className="text-xs text-muted-foreground">{quote.admin_claimed_at ? new Date(quote.admin_claimed_at).toLocaleString() : ''}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Finance Claimed by</p>
+                  <p className="font-semibold text-amber-700 dark:text-amber-300">{reviewerNames[quote.finance_reviewer_id || ''] || quote.finance_reviewer_id || 'Unclaimed'}</p>
+                  <p className="text-xs text-muted-foreground">{quote.finance_claimed_at ? new Date(quote.finance_claimed_at).toLocaleString() : ''}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       )}
 
       {/* Content */}

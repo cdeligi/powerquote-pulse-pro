@@ -850,13 +850,15 @@ const QuoteDetails = ({
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div>
-                  <Label className="text-gray-400">Admin Reviewer</Label>
-                  <p className="text-gray-200 mt-1">{(quote as any).admin_reviewer_name || quote.admin_reviewer_id || 'N/A'}</p>
+                <div className="bg-gray-800 p-3 rounded">
+                  <p className="text-xs text-gray-400">Quote Review Claimed by</p>
+                  <p className="text-cyan-300 font-semibold mt-1">{(quote as any).admin_reviewer_name || quote.admin_reviewer_id || 'Unclaimed'}</p>
+                  <p className="text-xs text-gray-500 mt-1">{(quote as any).admin_claimed_at ? new Date((quote as any).admin_claimed_at).toLocaleString() : ''}</p>
                 </div>
-                <div>
-                  <Label className="text-gray-400">Finance Reviewer</Label>
-                  <p className="text-gray-200 mt-1">{(quote as any).finance_reviewer_name || quote.finance_reviewer_id || 'N/A'}</p>
+                <div className="bg-gray-800 p-3 rounded">
+                  <p className="text-xs text-gray-400">Finance Claimed by</p>
+                  <p className="text-amber-300 font-semibold mt-1">{(quote as any).finance_reviewer_name || quote.finance_reviewer_id || 'Unclaimed'}</p>
+                  <p className="text-xs text-gray-500 mt-1">{(quote as any).finance_claimed_at ? new Date((quote as any).finance_claimed_at).toLocaleString() : ''}</p>
                 </div>
               </div>
 
