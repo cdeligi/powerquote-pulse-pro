@@ -855,16 +855,34 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
                       <td className="p-2">{row.label}</td>
                       <td className="p-2 text-gray-300">{row.type.toUpperCase()}</td>
                       <td className="p-2">
-                        <Switch checked={row.required} onCheckedChange={(v) => updateMappingDraft(field.id, { required: v })} />
+                        <div className="flex items-center gap-2">
+                          {row.required && <span className="h-2 w-2 rounded-full bg-emerald-400" />}
+                          <Switch
+                            className="data-[state=checked]:bg-emerald-500"
+                            checked={row.required}
+                            onCheckedChange={(v) => updateMappingDraft(field.id, { required: v })}
+                          />
+                        </div>
                       </td>
                       <td className="p-2">
                         <div className="flex items-center gap-2">
                           {row.enabled && <CheckCircle2 className="h-4 w-4 text-emerald-400" />}
-                          <Switch checked={row.enabled} onCheckedChange={(v) => updateMappingDraft(field.id, { enabled: v })} />
+                          <Switch
+                            className="data-[state=checked]:bg-emerald-500"
+                            checked={row.enabled}
+                            onCheckedChange={(v) => updateMappingDraft(field.id, { enabled: v })}
+                          />
                         </div>
                       </td>
                       <td className="p-2">
-                        <Switch checked={row.include_in_pdf || false} onCheckedChange={(v) => updateMappingDraft(field.id, { include_in_pdf: v })} />
+                        <div className="flex items-center gap-2">
+                          {row.include_in_pdf && <span className="h-2 w-2 rounded-full bg-emerald-400" />}
+                          <Switch
+                            className="data-[state=checked]:bg-emerald-500"
+                            checked={row.include_in_pdf || false}
+                            onCheckedChange={(v) => updateMappingDraft(field.id, { include_in_pdf: v })}
+                          />
+                        </div>
                       </td>
                       <td className="p-2 min-w-[140px]">
                         <Select
