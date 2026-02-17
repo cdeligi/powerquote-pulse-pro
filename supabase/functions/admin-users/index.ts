@@ -98,7 +98,9 @@ serve(async (req) => {
       .eq('id', user.id)
       .single();
 
-    if (profileError || !profile || (profile as any)?.role !== 'admin') {
+    const rawRole = String((profile as any)?.role || '').toLowerCase();
+    const isAdminLike = ['admin','master','level3','level_3'].includes(rawRole);
+    if (profileError || !profile || !isAdminLike) {
       throw new Error('Admin access required');
     }
 

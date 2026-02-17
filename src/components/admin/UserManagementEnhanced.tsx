@@ -126,13 +126,19 @@ const UserManagementEnhanced = ({ user }: UserManagementEnhancedProps) => {
   const fetchUserProfiles = async () => {
     setLoading(true);
     try {
+      // Prefer edge function list (admin scope), fallback to direct query.
+      const fnResult = await supabase.functions.invoke('admin-users', { method: 'GET' });
+      if (!fnResult.error && (fnResult.data as any)?.users) {
+        setUserProfiles((fnResult.data as any).users || []);
+        return;
+      }
+
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-
       setUserProfiles(data || []);
     } catch (error) {
       console.error('Error fetching user profiles:', error);
@@ -1058,7 +1064,7 @@ const UserManagementEnhanced = ({ user }: UserManagementEnhancedProps) => {
         isOpen={!!selectedUserForEdit}
         onClose={() => setSelectedUserForEdit(null)}
         onSave={handleUpdateUser}
-        departments={departments}
+        departments={departments.length ? departments : [{id:'application-engineer',name:'Application engineer'},{id:'quote-enginner',name:'Quote Enginner'},{id:'ae-management',name:'AE Management'},{id:'sales-engineer',name:'Sales Engineer'},{id:'sales-director',name:'Sales Director'},{id:'technical-application-engineer',name:'Technical Application Engineer'},{id:'field-service-engineer',name:'Field Service Engineer'},{id:'fse-management',name:'FSE Management'},{id:'finance',name:'Finance'},{id:'partner',name:'Partner'}]}
         currentUserEmail={user?.email ?? null}
       />
 

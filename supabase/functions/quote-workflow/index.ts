@@ -272,17 +272,52 @@ async function handleClaim(
     throw new HttpError(404, "Quote not found");
   }
 
-  const { data, error } = await supabase.rpc("claim_quote_for_review", {
+  let data: any = null;
+  const rpcResult = await supabase.rpc("claim_quote_for_review", {
     p_actor_id: context.userId,
     p_lane: lane,
     p_quote_id: quoteId,
   });
 
-  if (error) {
-    if (error.message?.includes("QUOTE_ALREADY_CLAIMED")) {
+  if (!rpcResult.error) {
+    data = rpcResult.data;
+  } else {
+    // Fallback path when RPC is unavailable/misconfigured.
+    const column = lane === "admin" ? "admin_reviewer_id" : "finance_reviewer_id";
+    const nextState = lane === "admin" ? "admin_review" : "finance_review";
+
+    const current = await supabase
+      .from("quotes")
+      .select(`id, workflow_state, ${column}`)
+      .eq("id", quoteId)
+      .single();
+
+    if (current.error || !current.data) {
+      throw new HttpError(404, "Quote not found");
+    }
+
+    if (current.data[column] && current.data[column] !== context.userId) {
       throw new HttpError(409, "Quote already claimed");
     }
-    throw new HttpError(400, error.message ?? "Unable to claim quote");
+
+    const updatePayload: Record<string, any> = {
+      [column]: context.userId,
+      workflow_state: current.data.workflow_state ?? nextState,
+      status: current.data.workflow_state ?? nextState,
+      updated_at: new Date().toISOString(),
+    };
+
+    const updated = await supabase
+      .from("quotes")
+      .update(updatePayload)
+      .eq("id", quoteId)
+      .select("*")
+      .single();
+
+    if (updated.error || !updated.data) {
+      throw new HttpError(400, rpcResult.error?.message ?? "Unable to claim quote");
+    }
+    data = updated.data;
   }
 
   await logEvent(
