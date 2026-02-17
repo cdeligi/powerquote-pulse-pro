@@ -198,7 +198,9 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
   };
 
   const DragHandle = ({ field }: { field: QuoteField }) => (
-    <div 
+    <div
+      draggable
+      onDragStart={(e) => handleDragStart(e, field)}
       className="flex items-center cursor-move hover:bg-gray-700 rounded-sm p-1 transition-colors"
     >
       <GripVertical className="h-4 w-4 mr-1" />
@@ -834,8 +836,6 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
             {quoteFields.map((field) => (
               <Card
                 key={field.id}
-                draggable={true}
-                onDragStart={(e) => handleDragStart(e, field)}
                 onDragOver={(e) => handleDragOver(e, field)}
                 onDrop={(e) => handleDrop(e, field)}
                 className={`bg-gray-900 border-gray-800 hover:bg-gray-800 transition-colors ${
