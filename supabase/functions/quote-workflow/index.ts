@@ -302,8 +302,8 @@ async function handleClaim(
 
     const updatePayload: Record<string, any> = {
       [column]: context.userId,
-      workflow_state: current.data.workflow_state ?? nextState,
-      status: current.data.workflow_state ?? nextState,
+      workflow_state: nextState,
+      status: nextState,
       updated_at: new Date().toISOString(),
     };
 

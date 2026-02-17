@@ -5,10 +5,9 @@ import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, RotateCcw } from 'lucide-react';
-import { getSupabaseClient, getSupabaseAdminClient, isAdminAvailable } from "@/integrations/supabase/client";
+import { getSupabaseClient } from "@/integrations/supabase/client";
 
 const supabase = getSupabaseClient();
-const supabaseAdmin = getSupabaseAdminClient();;
 import { toast } from '@/hooks/use-toast';
 import { Role, Feature, UserFeatureOverride } from '@/types/auth';
 
@@ -55,8 +54,17 @@ const UserPermissionsTab = ({ userProfile }: UserPermissionsTabProps) => {
 
       if (roleError) throw roleError;
 
-      const normalizedUserRole = String(userProfile.role || '').toUpperCase();
-      const roleDefaults = (allRoleDefaults || []).filter((row: any) => String(row.role || '').toUpperCase() === normalizedUserRole);
+      const normalizedUserRole = String(userProfile.role || '').toLowerCase();
+      const userRoleAliases: Record<string, string[]> = {
+        level1: ['level1','level_1','sales'],
+        level2: ['level2','level_2'],
+        level3: ['level3','level_3'],
+        admin: ['admin'],
+        finance: ['finance'],
+        master: ['master'],
+      };
+      const aliases = userRoleAliases[normalizedUserRole] || [normalizedUserRole];
+      const roleDefaults = (allRoleDefaults || []).filter((row: any) => aliases.includes(String(row.role || '').toLowerCase()));
 
       // Fetch user overrides
       const { data: userOverrides, error: overrideError } = await supabase

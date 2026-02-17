@@ -56,6 +56,19 @@ interface UserManagementEnhancedProps {
   user: User;
 }
 
+const DEPARTMENT_FALLBACK: Department[] = [
+  { id: 'application-engineer', name: 'Application engineer', created_at: '' },
+  { id: 'quote-enginner', name: 'Quote Enginner', created_at: '' },
+  { id: 'ae-management', name: 'AE Management', created_at: '' },
+  { id: 'sales-engineer', name: 'Sales Engineer', created_at: '' },
+  { id: 'sales-director', name: 'Sales Director', created_at: '' },
+  { id: 'technical-application-engineer', name: 'Technical Application Engineer', created_at: '' },
+  { id: 'field-service-engineer', name: 'Field Service Engineer', created_at: '' },
+  { id: 'fse-management', name: 'FSE Management', created_at: '' },
+  { id: 'finance', name: 'Finance', created_at: '' },
+  { id: 'partner', name: 'Partner', created_at: '' },
+];
+
 const UserManagementEnhanced = ({ user }: UserManagementEnhancedProps) => {
   const [selectedRequest, setSelectedRequest] = useState<UserRegistrationRequest | null>(null);
   const [rejectionReason, setRejectionReason] = useState('');
@@ -156,7 +169,7 @@ const UserManagementEnhanced = ({ user }: UserManagementEnhancedProps) => {
     fetchUserProfiles();
     const loadDepartments = async () => {
       const fetchedDepartments = await departmentService.fetchDepartments();
-      setDepartments(fetchedDepartments);
+      setDepartments((fetchedDepartments && fetchedDepartments.length > 0) ? fetchedDepartments : DEPARTMENT_FALLBACK);
     };
     loadDepartments();
   }, []);
@@ -602,7 +615,7 @@ const UserManagementEnhanced = ({ user }: UserManagementEnhancedProps) => {
                         <SelectValue placeholder="Select a department" />
                       </SelectTrigger>
                        <SelectContent className="bg-gray-800 border-gray-700 text-white">
-                         {departments.map((dept) => (
+                         {(departments.length ? departments : DEPARTMENT_FALLBACK).map((dept) => (
                           <SelectItem key={dept.id} value={dept.name}>
                             {dept.name}
                           </SelectItem>
