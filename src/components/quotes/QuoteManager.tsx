@@ -642,10 +642,14 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
 
           return {
             id: item.id || crypto.randomUUID(),
+            product_id: item.productId || item.product_id || item.product?.id,
             product: {
+              id: item.productId || item.product_id || item.product?.id,
               name: item.name || item.product?.name || 'Unknown Product',
               description: item.description || item.product?.description || '',
               price: productPrice,
+              productInfoUrl: item.product?.productInfoUrl || item.product?.product_info_url,
+              product_info_url: item.product?.product_info_url || item.product?.productInfoUrl,
             },
             quantity: item.quantity || 1,
             enabled: item.enabled !== false,
@@ -688,10 +692,14 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
 
           return {
             id: item.id || crypto.randomUUID(),
+            product_id: item.product_id,
             product: {
+              id: item.product_id,
               name: item.name || product?.name || 'Unknown Product',
               description: item.description || product?.description || '',
               price: item.unit_price || product?.price || 0,
+              productInfoUrl: product?.product_info_url || null,
+              product_info_url: product?.product_info_url || null,
             },
             quantity: item.quantity || 1,
             enabled: true,
