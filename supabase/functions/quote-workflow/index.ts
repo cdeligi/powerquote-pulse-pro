@@ -264,12 +264,16 @@ async function handleClaim(
 
   const { data: before, error: beforeError } = await supabase
     .from("quotes")
-    .select("id, status")
+    .select("id, status, requires_finance_approval")
     .eq("id", quoteId)
     .single();
 
   if (beforeError || !before) {
     throw new HttpError(404, "Quote not found");
+  }
+
+  if (lane === 'finance' && !(before as any).requires_finance_approval) {
+    throw new HttpError(400, "Quote is not waiting for finance claim");
   }
 
   let data: any = null;
@@ -357,7 +361,7 @@ async function handleAdminDecision(
 
   const now = new Date().toISOString();
   const updates: Record<string, any> = {
-    finance_notes: notes ?? null,
+    approval_notes: notes ?? null,
     reviewed_by: context.userId,
     reviewed_at: now,
     updated_at: now,
