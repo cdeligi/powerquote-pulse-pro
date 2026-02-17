@@ -264,10 +264,15 @@ const UserManagementEnhanced = ({ user }: UserManagementEnhancedProps) => {
     const targetEmail = String(target.email || '').toLowerCase();
     if (!currentEmail || currentEmail === targetEmail) return false;
 
-    const currentRank = getRoleRank((user as any)?.role);
+    // Explicit owner override requested.
+    if (currentEmail === 'cdeligi@qualitrolcorp.com') return true;
+
+    // Resolve current role from loaded profile list (more reliable than auth payload prop).
+    const currentProfile = userProfiles.find((p) => String(p.email || '').toLowerCase() === currentEmail);
+    const currentRank = getRoleRank(currentProfile?.role ?? (user as any)?.role);
     const targetRank = getRoleRank(target.role);
 
-    // Highest role can delete any downstream account.
+    // Higher role can delete downstream users only.
     return currentRank > targetRank;
   };
 
