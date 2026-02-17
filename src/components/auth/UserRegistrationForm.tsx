@@ -12,7 +12,7 @@ import { Shield, User, Mail, Phone, Building, FileText, ArrowLeft } from "lucide
 import { supabase } from "@/integrations/supabase/client";
 import LegalDocumentModal from "@/components/admin/LegalDocumentModal";
 import { departmentService, Department } from "@/services/departmentService";
-import { roleService, RoleMetadata } from "@/services/roleService";
+// role options are defined locally for stable onboarding UX
 
 interface UserRegistrationFormProps {
   onSubmit?: (data: Partial<UserRegistrationRequest>) => void;
@@ -28,7 +28,7 @@ const UserRegistrationForm = ({ onSubmit, onBack }: UserRegistrationFormProps) =
     jobTitle: '',
     phoneNumber: '',
     businessJustification: '',
-    requestedRole: 'LEVEL_1' as 'LEVEL_1' | 'LEVEL_2' | 'LEVEL_3' | 'ADMIN' | 'FINANCE',
+    requestedRole: 'level1',
     managerEmail: '',
     companyName: '',
     agreedToTerms: false,
@@ -36,19 +36,29 @@ const UserRegistrationForm = ({ onSubmit, onBack }: UserRegistrationFormProps) =
   });
 
   const [departments, setDepartments] = useState<Department[]>([]);
-  const [rolesMetadata, setRolesMetadata] = useState<RoleMetadata[]>([]);
+
+  const FALLBACK_DEPARTMENTS = [
+    { id: 'sales', name: 'Sales' },
+    { id: 'engineering', name: 'Engineering' },
+    { id: 'finance', name: 'Finance' },
+    { id: 'operations', name: 'Operations' },
+  ];
+
+  const FALLBACK_ACCESS_LEVELS = [
+    { value: 'level1', label: 'Level 1 - Partner Access' },
+    { value: 'level2', label: 'Level 2 - Sales Engineer Access' },
+    { value: 'level3', label: 'Level 3 - Directors Access' },
+    { value: 'admin', label: 'Admin - Quotes Engineering Team' },
+    { value: 'finance', label: 'Finance - Finance Approval' },
+    { value: 'master', label: 'Master - Full Control' },
+  ];
 
   useEffect(() => {
     const loadDepartments = async () => {
       const fetchedDepartments = await departmentService.fetchDepartments();
       setDepartments(fetchedDepartments);
     };
-    const loadRoles = async () => {
-      const fetchedRoles = await roleService.fetchRoles();
-      setRolesMetadata(fetchedRoles);
-    };
     loadDepartments();
-    loadRoles();
   }, []);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -107,7 +117,7 @@ const UserRegistrationForm = ({ onSubmit, onBack }: UserRegistrationFormProps) =
         jobTitle: '',
         phoneNumber: '',
         businessJustification: '',
-        requestedRole: 'LEVEL_1',
+        requestedRole: 'level1',
         managerEmail: '',
         companyName: '',
         agreedToTerms: false,
@@ -271,7 +281,7 @@ const UserRegistrationForm = ({ onSubmit, onBack }: UserRegistrationFormProps) =
                       <SelectValue placeholder="Select a department" />
                     </SelectTrigger>
                     <SelectContent className="bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 z-50">
-                      {departments.map((dept) => (
+                      {(departments.length > 0 ? departments : FALLBACK_DEPARTMENTS).map((dept) => (
                         <SelectItem key={dept.id} value={dept.name} className="text-gray-900 dark:text-white">
                           {dept.name}
                         </SelectItem>
@@ -324,14 +334,14 @@ const UserRegistrationForm = ({ onSubmit, onBack }: UserRegistrationFormProps) =
                 <Label htmlFor="requestedRole" className="text-gray-700 dark:text-white font-medium mb-2 block">
                   Requested Access Level *
                 </Label>
-                <Select value={formData.requestedRole} onValueChange={(value: 'LEVEL_1' | 'LEVEL_2' | 'LEVEL_3' | 'ADMIN' | 'FINANCE') => handleInputChange('requestedRole', value)}>
+                <Select value={formData.requestedRole} onValueChange={(value: string) => handleInputChange('requestedRole', value)}>
                   <SelectTrigger className="bg-gray-50 dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white focus:border-red-500 focus:ring-red-500">
                     <SelectValue placeholder="Select access level" />
                   </SelectTrigger>
                   <SelectContent className="bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 z-50">
-                    {rolesMetadata.map((role) => (
-                      <SelectItem key={role.role_name} value={role.role_name} className="text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700 focus:bg-gray-100 dark:focus:bg-gray-700">
-                        {role.display_name}
+                    {FALLBACK_ACCESS_LEVELS.map((role) => (
+                      <SelectItem key={role.value} value={role.value} className="text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700 focus:bg-gray-100 dark:focus:bg-gray-700">
+                        {role.label}
                       </SelectItem>
                     ))}
                   </SelectContent>
