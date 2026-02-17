@@ -38,10 +38,16 @@ const UserRegistrationForm = ({ onSubmit, onBack }: UserRegistrationFormProps) =
   const [departments, setDepartments] = useState<Department[]>([]);
 
   const FALLBACK_DEPARTMENTS = [
-    { id: 'sales', name: 'Sales' },
-    { id: 'engineering', name: 'Engineering' },
+    { id: 'application-engineer', name: 'Application engineer' },
+    { id: 'quote-enginner', name: 'Quote Enginner' },
+    { id: 'ae-management', name: 'AE Management' },
+    { id: 'sales-engineer', name: 'Sales Engineer' },
+    { id: 'sales-director', name: 'Sales Director' },
+    { id: 'technical-application-engineer', name: 'Technical Application Engineer' },
+    { id: 'field-service-engineer', name: 'Field Service Engineer' },
+    { id: 'fse-management', name: 'FSE Management' },
     { id: 'finance', name: 'Finance' },
-    { id: 'operations', name: 'Operations' },
+    { id: 'partner', name: 'Partner' },
   ];
 
   const FALLBACK_ACCESS_LEVELS = [
