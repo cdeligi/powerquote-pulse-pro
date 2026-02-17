@@ -137,6 +137,7 @@ const UserRegistrationForm = ({ onSubmit, onBack }: UserRegistrationFormProps) =
 
         const regId = `REG-${Date.now()}`;
 
+        // Notify admins/masters
         if (recipients.length > 0) {
           await Promise.allSettled(
             recipients.map((recipientEmail: string) =>
@@ -148,12 +149,25 @@ const UserRegistrationForm = ({ onSubmit, onBack }: UserRegistrationFormProps) =
                   quoteId: regId,
                   quoteName: 'New User Registration Request',
                   permissionLevel: 'view',
-                  message: `New user request: ${formData.email} (${formData.requestedRole}) — needs review and approval.`,
+                  message: `New user request: ${formData.email} (${formData.requestedRole}). Please review within 2 business days (48 hours) and approve or deny.`,
                 },
               })
             )
           );
         }
+
+        // Notify applicant
+        await supabase.functions.invoke('send-quote-notifications', {
+          body: {
+            recipientEmail: formData.email,
+            recipientName: `${formData.firstName} ${formData.lastName}`.trim(),
+            senderName: 'PowerQuotePro',
+            quoteId: regId,
+            quoteName: 'Access Request Received',
+            permissionLevel: 'view',
+            message: 'We received your access request. It is now under analysis and may take up to 2 business days (48 hours) to approve or deny. You will receive an email when a decision is made.',
+          },
+        });
 
         await supabase.from('admin_notifications').insert({
           quote_id: regId,
@@ -170,7 +184,7 @@ const UserRegistrationForm = ({ onSubmit, onBack }: UserRegistrationFormProps) =
         console.warn('Failed to notify admins of registration request:', notifyError);
       }
       
-      alert('Registration request submitted successfully! Admins were notified for review.');
+      alert('Request submitted successfully. You will receive an email confirmation and a follow-up email within 2 business days (48 hours) once approved or denied.');
       
       // Reset form
       setFormData({

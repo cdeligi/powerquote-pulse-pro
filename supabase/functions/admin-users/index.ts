@@ -1,6 +1,7 @@
 
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { Resend } from "https://esm.sh/resend@3.2.0";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -207,6 +208,42 @@ async function logAuditEvent(supabase: any, payload: { user_id?: string | null; 
     });
   } catch (error) {
     console.warn('Failed to write audit log event:', error);
+  }
+}
+
+async function sendEmailNotification(supabase: any, payload: { to: string[]; subject: string; html: string }) {
+  try {
+    const resendApiKey = Deno.env.get('RESEND_API_KEY');
+    if (!resendApiKey) {
+      console.warn('RESEND_API_KEY not configured; skipping email notification');
+      return;
+    }
+
+    const { data: settingsRows } = await supabase
+      .from('email_settings')
+      .select('setting_key, setting_value');
+
+    const settings: Record<string, any> = {};
+    for (const row of settingsRows ?? []) settings[row.setting_key] = row.setting_value;
+
+    if (settings.enable_notifications === false) return;
+
+    const fromEmail = settings.smtp_from_email as string | undefined;
+    const fromName = (settings.smtp_from_name as string | undefined) ?? 'PowerQuotePro';
+    if (!fromEmail) {
+      console.warn('smtp_from_email not configured; skipping email notification');
+      return;
+    }
+
+    const resend = new Resend(resendApiKey);
+    await resend.emails.send({
+      from: `${fromName} <${fromEmail}>`,
+      to: payload.to,
+      subject: payload.subject,
+      html: payload.html,
+    });
+  } catch (error) {
+    console.warn('Failed to send email notification:', error);
   }
 }
 
@@ -419,6 +456,21 @@ async function handleApproveRequest(req: Request, supabase: any, adminId: string
     event: `ADMIN_APPROVE_REQUEST:${request.email}`,
   });
 
+  // Notify applicant (approval). The invite email handles password creation.
+  await sendEmailNotification(supabase, {
+    to: [String(request.email).trim()],
+    subject: 'PowerQuotePro access approved',
+    html: `
+      <div style="font-family:Arial,sans-serif;line-height:1.5">
+        <p>Hello ${request.first_name ?? ''} ${request.last_name ?? ''},</p>
+        <p>Your access request has been <strong>approved</strong>.</p>
+        <p>You will also receive (or may have already received) an invitation email to set your password and activate your account.</p>
+        <p>If you do not receive it within a few minutes, please check spam/junk or contact the admin team.</p>
+        <p>Regards,<br/>PowerQuotePro</p>
+      </div>
+    `,
+  });
+
   return new Response(JSON.stringify({ 
     success: true,
     invited: true,
@@ -431,6 +483,13 @@ async function handleApproveRequest(req: Request, supabase: any, adminId: string
 
 async function handleRejectRequest(req: Request, supabase: any, adminId: string) {
   const { requestId, reason } = await req.json();
+
+  // Fetch request email before updating (for notification)
+  const { data: requestRow } = await supabase
+    .from('user_requests')
+    .select('email, first_name, last_name')
+    .eq('id', requestId)
+    .maybeSingle();
 
   const { error } = await supabase
     .from('user_requests')
@@ -449,7 +508,24 @@ async function handleRejectRequest(req: Request, supabase: any, adminId: string)
     event: `ADMIN_REJECT_REQUEST:${requestId}`,
   });
 
-  return new Response(JSON.stringify({ success: true }), {
+  // Notify applicant (rejection)
+  if (requestRow?.email) {
+    await sendEmailNotification(supabase, {
+      to: [String(requestRow.email).trim()],
+      subject: 'PowerQuotePro access request update',
+      html: `
+        <div style="font-family:Arial,sans-serif;line-height:1.5">
+          <p>Hello ${requestRow.first_name ?? ''} ${requestRow.last_name ?? ''},</p>
+          <p>Your access request has been <strong>denied</strong>.</p>
+          ${reason ? `<p><strong>Reason:</strong> ${String(reason).replaceAll('<','&lt;').replaceAll('>','&gt;')}</p>` : ''}
+          <p>If you believe this is a mistake, please contact the admin team.</p>
+          <p>Regards,<br/>PowerQuotePro</p>
+        </div>
+      `,
+    });
+  }
+
+  return new Response(JSON.stringify({ success: true }), { 
     headers: { ...corsHeaders, 'Content-Type': 'application/json' }
   });
 }
