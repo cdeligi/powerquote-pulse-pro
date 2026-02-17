@@ -763,7 +763,7 @@ const QuoteViewer: React.FC = () => {
                         )}
                         <div className="rounded border p-3 text-sm bg-card">
                           <div className="font-medium">{ev.event_type.replaceAll('_', ' ')}</div>
-                          <div className="text-muted-foreground text-xs">{new Date(ev.created_at).toLocaleString()} · {ev.actor_role || 'system'} · {ev.actor_id || '-'}</div>
+                          <div className="text-muted-foreground text-xs">{new Date(ev.created_at).toLocaleString()} · {ev.actor_role || 'system'} · {ev.actor_id ? (reviewerNames[ev.actor_id] || (ev.actor_role === 'FINANCE' ? (quote.finance_reviewer_name || ev.actor_id) : (quote.admin_reviewer_name || ev.actor_id))) : '-'}</div>
                           {(ev.previous_state || ev.new_state) && (
                             <div className="text-xs text-muted-foreground mt-1">{ev.previous_state || '-'} → {ev.new_state || '-'}</div>
                           )}
