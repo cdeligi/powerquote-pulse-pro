@@ -69,7 +69,7 @@ const QuoteDetails = ({
   const [qtmsConfig, setQtmsConfig] = useState<ConsolidatedQTMS | null>(null);
   const [editingQTMS, setEditingQTMS] = useState(false);
   const [approvedDiscountInput, setApprovedDiscountInput] = useState('0');
-  const [financeApprovedMargin, setFinanceApprovedMargin] = useState('');
+  const [financeNotes, setFinanceNotes] = useState('');
   const { formattedFields: formattedConfiguredFields } =
     useConfiguredQuoteFields(quote.quote_fields);
   const { has } = usePermissions();
@@ -123,7 +123,7 @@ const QuoteDetails = ({
     setApprovalNotes(quote.approval_notes || '');
     setRejectionReason(quote.rejection_reason || '');
     setQuoteAdditionalInfo(quote.additional_quote_information || '');
-    setFinanceApprovedMargin('');
+    setFinanceNotes((quote as any).finance_notes || '');
   }, [
     quote.id,
     quote.approved_discount,
@@ -157,12 +157,10 @@ const QuoteDetails = ({
       ? Math.min(Math.max(parsedDiscount, 0), 100)
       : 0;
     const trimmedAdditionalInfo = quoteAdditionalInfo.trim();
-    const financeNote = currentLane === 'finance' && financeApprovedMargin
-      ? `\nFinance Approved Margin: ${financeApprovedMargin}%`
-      : '';
+    const decisionNotes = currentLane === 'finance' ? financeNotes : approvalNotes;
 
     onApprove({
-      notes: `${approvalNotes || ''}${financeNote}`.trim(),
+      notes: (decisionNotes || '').trim(),
       updatedBOMItems: bomItems,
       approvedDiscount: sanitizedDiscount / 100,
       additionalQuoteInformation: trimmedAdditionalInfo || undefined
@@ -714,28 +712,15 @@ const QuoteDetails = ({
                 {selectedAction === 'approve' && (
                   <div className="space-y-3 p-4 bg-green-900/20 border border-green-600 rounded-lg">
                     <Label htmlFor="approval-notes" className="text-white">
-                      {currentLane === 'finance' ? 'Finance Notes (Optional)' : 'Approval Notes (Optional)'}
+                      {currentLane === 'finance' ? 'Finance Notes' : 'Approval Notes (Optional)'}
                     </Label>
                     <Textarea
                       id="approval-notes"
-                      value={approvalNotes}
-                      onChange={(e) => setApprovalNotes(e.target.value)}
-                      placeholder={currentLane === 'finance' ? 'Required: explain finance justification and conditions...' : 'Add any notes about the approval...'}
+                      value={currentLane === 'finance' ? financeNotes : approvalNotes}
+                      onChange={(e) => currentLane === 'finance' ? setFinanceNotes(e.target.value) : setApprovalNotes(e.target.value)}
+                      placeholder={currentLane === 'finance' ? 'Required: explain finance decision and justification...' : 'Add any notes about the approval...'}
                       className="bg-gray-800 border-gray-700 text-white min-h-[80px]"
                     />
-                    {currentLane === 'finance' && (
-                      <div className="space-y-2">
-                        <Label className="text-gray-400">Finance Approved Margin (%)</Label>
-                        <Input
-                          type="number"
-                          value={financeApprovedMargin}
-                          onChange={(e) => setFinanceApprovedMargin(e.target.value)}
-                          className="bg-gray-800 border-gray-700 text-white"
-                          placeholder="e.g. 45"
-                        />
-                        <p className="text-xs text-gray-500">Optional custom margin approved by finance for this quote.</p>
-                      </div>
-                    )}
 
                     <div className="space-y-2">
                       <Label htmlFor="additional-quote-info" className="text-white">
@@ -756,7 +741,7 @@ const QuoteDetails = ({
                       <Button
                         onClick={handleApprove}
                         className="bg-green-600 hover:bg-green-700 text-white"
-                        disabled={isLoading}
+                        disabled={isLoading || (currentLane === 'finance' && !financeNotes.trim())}
                       >
                         {isLoading ? 'Processing...' : 'Confirm Approval'}
                       </Button>
@@ -765,7 +750,7 @@ const QuoteDetails = ({
                           setSelectedAction(null);
                           setApprovalNotes(quote.approval_notes || '');
                           setQuoteAdditionalInfo(quote.additional_quote_information || '');
-    setFinanceApprovedMargin('');
+    setFinanceNotes((quote as any).finance_notes || '');
                         }}
                         variant="outline"
                         className="border-gray-600 text-gray-300 hover:bg-gray-800"
