@@ -846,6 +846,7 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
                 <tr>
                   <th className="text-left p-2">Field Label</th>
                   <th className="text-left p-2">Type</th>
+                  <th className="text-left p-2">Sub-items</th>
                   <th className="text-left p-2">Required</th>
                   <th className="text-left p-2">Enabled</th>
                   <th className="text-left p-2">Include in Quote</th>
@@ -871,6 +872,11 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
                     <tr key={field.id} className="border-t border-gray-800 bg-gray-950 text-white">
                       <td className="p-2">{row.label}</td>
                       <td className="p-2 text-gray-300">{row.type.toUpperCase()}</td>
+                      <td className="p-2 min-w-[220px] text-xs text-gray-300">
+                        {getConditionalSubfieldLabels(row).length > 0
+                          ? getConditionalSubfieldLabels(row).join(', ')
+                          : '-'}
+                      </td>
                       <td className="p-2">
                         <div className="flex items-center gap-2">
                           {row.required && <span className="h-2 w-2 rounded-full bg-emerald-400" />}
