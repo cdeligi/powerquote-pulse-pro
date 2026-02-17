@@ -1232,7 +1232,6 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
                       {(quote.financeReviewerId || quote.financeDecisionAt || quote.financeNotes) && (
                         <p className="text-gray-400 text-xs">Finance Claimed by: <span className="text-amber-300">{(quote as any).finance_reviewer_name || (quote.financeReviewerId ? (reviewerNameById[quote.financeReviewerId] || 'Assigned reviewer') : 'Unclaimed')}</span></p>
                       )}
-                      <p className="text-gray-500 text-xs mt-1">Age — Admin: {ageDaysBetween(quote.adminClaimedAt || quote.submittedAt, quote.adminDecisionAt)} · Finance: {ageDaysBetween(quote.financeClaimedAt, quote.financeDecisionAt)} · Total: {ageDaysBetween(quote.submittedAt, quote.financeDecisionAt || quote.adminDecisionAt || quote.updatedAt)}</p>
                     </div>
                   </div>
                   
