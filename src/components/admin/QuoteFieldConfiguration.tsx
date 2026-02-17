@@ -518,6 +518,11 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
     const issues: string[] = [];
     const mapping = row.salesforce_mapping;
 
+    // Only enforce mapping validation when both the field and mapping are enabled.
+    if (!row.enabled || mapping?.enabled === false) {
+      return issues;
+    }
+
     if (!mapping) {
       issues.push('Missing Salesforce mapping.');
       return issues;
