@@ -291,8 +291,12 @@ async function handleClaim(
       updated_at: new Date().toISOString(),
     };
     if (lane === 'admin') {
+      claimPayload.admin_reviewer_id = context.userId;
       claimPayload.reviewed_by = context.userId;
       claimPayload.reviewed_at = new Date().toISOString();
+    }
+    if (lane === 'finance') {
+      claimPayload.finance_reviewer_id = context.userId;
     }
 
     const updated = await supabase
@@ -375,10 +379,12 @@ async function handleAdminDecision(
     Object.assign(updates, {
       status: "under-review",
       requires_finance_approval: true,
+      finance_reviewer_id: null,
     });
     nextState = "finance_review";
   } else if (decision === "approved") {
     Object.assign(updates, {
+      admin_reviewer_id: context.userId,
       status: "approved",
       requires_finance_approval: false,
       rejection_reason: null,
@@ -386,6 +392,7 @@ async function handleAdminDecision(
     nextState = "approved";
   } else if (decision === "rejected") {
     Object.assign(updates, {
+      admin_reviewer_id: context.userId,
       status: "rejected",
       requires_finance_approval: false,
       rejection_reason: notes ?? 'Rejected by admin',
@@ -468,6 +475,7 @@ async function handleFinanceDecision(
   const updates: Record<string, any> = {
     approval_notes: notes ?? null,
     updated_at: now,
+    finance_reviewer_id: context.userId,
     requires_finance_approval: false,
     status: decision === "approved" ? "approved" : "rejected",
   };

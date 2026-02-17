@@ -281,7 +281,7 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
 
       console.log(`Fetched ${quotesData?.length || 0} quotes from database`);
 
-      const reviewerIds = [...new Set((quotesData || []).map((q: any) => q.reviewed_by).filter(Boolean))];
+      const reviewerIds = [...new Set((quotesData || []).flatMap((q: any) => [q.reviewed_by, q.admin_reviewer_id, q.finance_reviewer_id]).filter(Boolean))];
       const reviewerNameById = new Map<string, string>();
       if (reviewerIds.length > 0) {
         const { data: reviewerProfiles } = await supabase
@@ -335,7 +335,9 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
             quote_fields: normalizedFields ?? undefined,
             additional_quote_information: additionalInfo ?? null,
             bom_items: enrichedItems,
-            reviewed_by_name: quote.reviewed_by ? reviewerNameById.get(quote.reviewed_by) || quote.reviewed_by : null,
+            reviewed_by_name: (quote.requires_finance_approval ? (quote.admin_reviewer_id || quote.reviewed_by) : (quote.reviewed_by || quote.admin_reviewer_id))
+              ? reviewerNameById.get((quote.requires_finance_approval ? (quote.admin_reviewer_id || quote.reviewed_by) : (quote.reviewed_by || quote.admin_reviewer_id))) || (quote.requires_finance_approval ? (quote.admin_reviewer_id || quote.reviewed_by) : (quote.reviewed_by || quote.admin_reviewer_id))
+              : null,
           } as Quote;
         })
       );
@@ -770,9 +772,12 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
   };
 
   const getClaimOwnerLabel = (quote: Quote & { reviewed_by_name?: string | null }): string => {
-    if (quote.reviewed_by) {
-      if (user?.id && quote.reviewed_by === user.id) return user.name || user.email || String(user.id).slice(0, 8);
-      return quote.reviewed_by_name || String(quote.reviewed_by).slice(0, 8);
+    const ownerId = quote.requires_finance_approval
+      ? (quote.admin_reviewer_id || quote.reviewed_by)
+      : (quote.reviewed_by || quote.admin_reviewer_id);
+    if (ownerId) {
+      if (user?.id && ownerId === user.id) return user.name || user.email || String(user.id).slice(0, 8);
+      return quote.reviewed_by_name || String(ownerId).slice(0, 8);
     }
     return 'Unclaimed';
   };

@@ -85,12 +85,12 @@ const QuoteDetails = ({
   const claimedByCurrentUser = currentLane === 'admin'
     ? (quote.admin_reviewer_id ? quote.admin_reviewer_id === user?.id : reviewedBy === user?.id)
     : currentLane === 'finance'
-      ? (quote.finance_reviewer_id ? quote.finance_reviewer_id === user?.id : reviewedBy === user?.id)
+      ? Boolean(quote.finance_reviewer_id && quote.finance_reviewer_id === user?.id)
       : false;
   const claimedByAnother = currentLane === 'admin'
     ? Boolean((quote.admin_reviewer_id && quote.admin_reviewer_id !== user?.id) || (!quote.admin_reviewer_id && reviewedBy && reviewedBy !== user?.id))
     : currentLane === 'finance'
-      ? Boolean((quote.finance_reviewer_id && quote.finance_reviewer_id !== user?.id) || (!quote.finance_reviewer_id && reviewedBy && reviewedBy !== user?.id))
+      ? Boolean(quote.finance_reviewer_id && quote.finance_reviewer_id !== user?.id)
       : false;
   const requiresClaim = currentLane !== null && !claimedByAnother && !claimedByCurrentUser;
   const showWorkflowActions = Boolean(isWorkflowPending && canCurrentUserAct && claimedByCurrentUser);
