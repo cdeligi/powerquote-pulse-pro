@@ -590,7 +590,8 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
     }
   };
 
-  const canSeePrices = user.role !== 'SALES';
+  // Prices/discounts must remain visible in generated quote pages for requester workflows.
+  const canSeePrices = true;
 
   const updatePdfLoading = (quoteId: string, isLoading: boolean) => {
     setPdfLoadingStates(prev => {
