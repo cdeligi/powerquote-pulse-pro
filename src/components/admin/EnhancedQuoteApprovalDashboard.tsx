@@ -370,7 +370,10 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
 
   const filteredQuotes = quotes.filter(quote => {
     const workflowState = getDerivedWorkflowState(quote);
-    const inQueue = isQuoteInQueue(quote);
+    const isFinanceUser = (user?.role ?? 'SALES') === 'FINANCE';
+    const inQueue = isFinanceUser
+      ? Boolean(quote.requires_finance_approval)
+      : isQuoteInQueue(quote);
     const inTab =
       activeTab === "pending_approval"
         ? inQueue
