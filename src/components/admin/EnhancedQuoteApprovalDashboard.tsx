@@ -785,7 +785,7 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
 
   const getClaimOwnerLabel = (quote: Quote): string => {
     if (quote.reviewed_by) {
-      if (user?.id && quote.reviewed_by === user.id) return 'You';
+      if (user?.id && quote.reviewed_by === user.id) return user.name || user.email || String(user.id).slice(0, 8);
       return String(quote.reviewed_by).slice(0, 8);
     }
     return 'Unclaimed';
