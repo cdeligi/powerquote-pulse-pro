@@ -523,36 +523,38 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
 
   const updateConditionalSubfieldMapping = (
     parentFieldId: string,
-    ruleId: string,
-    subfieldId: string,
+    subfieldKey: string,
     patch: Partial<SalesforceFieldMapping>
   ) => {
     const base = mappingDrafts[parentFieldId] ?? quoteFields.find((f) => f.id === parentFieldId);
     if (!base) return;
 
-    const nextConditional = (base.conditional_logic || []).map((rule) => {
-      if (rule.id !== ruleId) return rule;
-      return {
-        ...rule,
-        fields: (rule.fields || []).map((sub: any) => {
-          if (sub.id !== subfieldId) return sub;
-          const currentMapping = (sub as any).salesforce_mapping ?? {
-            enabled: true,
-            objectName: 'Opportunity',
-            fieldApiName: sub.label?.replace(/\s+/g, '_') || sub.id,
-            direction: 'to_salesforce' as const,
-            transformRule: '',
-          };
-          return {
-            ...sub,
-            salesforce_mapping: {
-              ...currentMapping,
-              ...patch,
-            },
-          };
-        }),
-      };
-    });
+    const normalizeKey = (value: string) => value.trim().toLowerCase();
+    const targetKey = normalizeKey(subfieldKey);
+
+    const nextConditional = (base.conditional_logic || []).map((rule) => ({
+      ...rule,
+      fields: (rule.fields || []).map((sub: any) => {
+        const key = normalizeKey(String(sub.label || sub.id || ''));
+        if (key !== targetKey) return sub;
+
+        const currentMapping = (sub as any).salesforce_mapping ?? {
+          enabled: true,
+          objectName: 'Opportunity',
+          fieldApiName: sub.label?.replace(/\s+/g, '_') || sub.id,
+          direction: 'to_salesforce' as const,
+          transformRule: '',
+        };
+
+        return {
+          ...sub,
+          salesforce_mapping: {
+            ...currentMapping,
+            ...patch,
+          },
+        };
+      }),
+    }));
 
     updateMappingDraft(parentFieldId, { conditional_logic: nextConditional });
   };
@@ -939,9 +941,19 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
                     transformRule: '',
                   };
                   const issues = getMappingIssues({ ...row, salesforce_mapping: mapping }, quoteFields.map((f) => mappingDrafts[f.id] ?? f));
-                  const subRows = (row.conditional_logic || []).flatMap((rule) =>
-                    (rule.fields || []).map((sub: any) => ({ ruleId: rule.id, sub }))
-                  );
+                  const subRows = (() => {
+                    const byKey = new Map<string, any>();
+                    (row.conditional_logic || []).forEach((rule) => {
+                      (rule.fields || []).forEach((sub: any) => {
+                        const key = String(sub.label || sub.id || '').trim().toLowerCase();
+                        if (!key) return;
+                        if (!byKey.has(key)) {
+                          byKey.set(key, sub);
+                        }
+                      });
+                    });
+                    return Array.from(byKey.values());
+                  })();
 
                   return (
                     <>
@@ -1044,7 +1056,7 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
                         </td>
                       </tr>
 
-                      {subRows.map(({ ruleId, sub }) => {
+                      {subRows.map((sub) => {
                         const subMapping = (sub as any).salesforce_mapping ?? {
                           enabled: true,
                           objectName: mapping.objectName,
@@ -1054,7 +1066,7 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
                         };
 
                         return (
-                          <tr key={`${field.id}-${ruleId}-${sub.id}`} className="border-t border-gray-800 bg-gray-900/70 text-white">
+                          <tr key={`${field.id}-${String(sub.label || sub.id).toLowerCase()}`} className="border-t border-gray-800 bg-gray-900/70 text-white">
                             <td className="p-2 pl-6 text-cyan-300">↳ {sub.label || sub.id}</td>
                             <td className="p-2 text-gray-300">{String(sub.type || 'text').toUpperCase()}</td>
                             <td className="p-2"><span className="text-xs text-gray-400">{sub.required ? 'Yes' : 'No'}</span></td>
@@ -1063,7 +1075,7 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
                             <td className="p-2 min-w-[140px]">
                               <Select
                                 value={subMapping.objectName}
-                                onValueChange={(value) => updateConditionalSubfieldMapping(field.id, ruleId, sub.id, { objectName: value })}
+                                onValueChange={(value) => updateConditionalSubfieldMapping(field.id, String(sub.label || sub.id), { objectName: value })}
                               >
                                 <SelectTrigger className="bg-gray-800 border-gray-700 text-white h-8"><SelectValue /></SelectTrigger>
                                 <SelectContent className="bg-gray-800 border-gray-700">
@@ -1076,11 +1088,11 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
                                 </SelectContent>
                               </Select>
                             </td>
-                            <td className="p-2 min-w-[220px]"><Input value={subMapping.fieldApiName} onChange={(e)=>updateConditionalSubfieldMapping(field.id, ruleId, sub.id, { fieldApiName: e.target.value })} className="bg-gray-800 border-gray-700 text-white h-8" /></td>
+                            <td className="p-2 min-w-[220px]"><Input value={subMapping.fieldApiName} onChange={(e)=>updateConditionalSubfieldMapping(field.id, String(sub.label || sub.id), { fieldApiName: e.target.value })} className="bg-gray-800 border-gray-700 text-white h-8" /></td>
                             <td className="p-2 min-w-[190px]">
                               <Select
                                 value={subMapping.direction}
-                                onValueChange={(value: 'to_salesforce' | 'from_salesforce' | 'bidirectional') => updateConditionalSubfieldMapping(field.id, ruleId, sub.id, { direction: value })}
+                                onValueChange={(value: 'to_salesforce' | 'from_salesforce' | 'bidirectional') => updateConditionalSubfieldMapping(field.id, String(sub.label || sub.id), { direction: value })}
                               >
                                 <SelectTrigger className="bg-gray-800 border-gray-700 text-white h-8"><SelectValue /></SelectTrigger>
                                 <SelectContent className="bg-gray-800 border-gray-700">
