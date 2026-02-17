@@ -1172,7 +1172,7 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
                   key={quote.id}
                   className="flex items-center justify-between p-4 bg-gray-800 rounded-lg hover:bg-gray-750 transition-colors"
                 >
-                  <div className="flex-1 grid grid-cols-1 md:grid-cols-5 gap-4">
+                  <div className="flex-1 grid grid-cols-1 md:grid-cols-4 gap-4 items-start">
                     <div>
                       <div className="flex items-center space-x-3">
                         <span className="text-white font-bold">
@@ -1225,7 +1225,7 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
                       )}
                     </div>
                     
-                    <div>
+                    <div className="min-w-[280px]">
                       <p className="text-white">Created: {quote.createdAt}</p>
                       <p className="text-gray-400 text-sm">Updated: {quote.updatedAt}</p>
                       <div className="mt-1 min-h-[40px] space-y-0.5">
