@@ -156,6 +156,13 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
   const [salesforceConfig, setSalesforceConfig] = useState<SalesforceConnectionConfig>(DEFAULT_SALESFORCE_CONFIG);
   const [showClientSecret, setShowClientSecret] = useState(false);
   const [savingSalesforceConfig, setSavingSalesforceConfig] = useState(false);
+  const [testingSalesforceConfig, setTestingSalesforceConfig] = useState(false);
+  const [salesforceConfigUnlocked, setSalesforceConfigUnlocked] = useState(false);
+  const [salesforceUnlockPassword, setSalesforceUnlockPassword] = useState('');
+  const [salesforceConnectionState, setSalesforceConnectionState] = useState<'not_tested' | 'passed' | 'failed'>('not_tested');
+  const [salesforceLastTestAt, setSalesforceLastTestAt] = useState<string | null>(null);
+  const [salesforceTestMessage, setSalesforceTestMessage] = useState<string>('');
+  const [salesforceRecentChecks, setSalesforceRecentChecks] = useState<Array<{ at: string; status: 'passed' | 'failed'; message: string }>>([]);
   const { toast } = useToast();
 
   const handleDragStart = (e: React.DragEvent, field: QuoteField) => {
@@ -543,12 +550,21 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
 
       if (error) throw error;
 
-      const value = (data?.value as Partial<SalesforceConnectionConfig> | null) ?? null;
+      const value = (data?.value as (Partial<SalesforceConnectionConfig> & {
+        last_tested_at?: string;
+        test_status?: 'passed' | 'failed' | 'not_tested';
+        test_message?: string;
+        recent_checks?: Array<{ at: string; status: 'passed' | 'failed'; message: string }>;
+      }) | null) ?? null;
       if (value) {
         setSalesforceConfig({
           ...DEFAULT_SALESFORCE_CONFIG,
           ...value,
         });
+        setSalesforceLastTestAt(value.last_tested_at ?? null);
+        setSalesforceConnectionState(value.test_status ?? 'not_tested');
+        setSalesforceTestMessage(value.test_message ?? '');
+        setSalesforceRecentChecks(Array.isArray(value.recent_checks) ? value.recent_checks : []);
       }
     } catch (error) {
       console.error('Error fetching Salesforce connection config:', error);
@@ -563,6 +579,39 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
       salesforceConfig.clientSecret.trim()
   );
 
+  const pushSalesforceCheckEvent = (status: 'passed' | 'failed', message: string) => {
+    const next = [
+      { at: new Date().toISOString(), status, message },
+      ...salesforceRecentChecks,
+    ].slice(0, 10);
+    setSalesforceRecentChecks(next);
+    return next;
+  };
+
+  const validateSalesforceConfig = () => {
+    const checks = [salesforceConfig.instanceUrl, salesforceConfig.authUrl, salesforceConfig.tokenUrl];
+    const invalid = checks.find((url) => !/^https:\/\//i.test(url.trim()));
+    if (invalid) {
+      return { ok: false as const, message: 'URLs must start with https:// (Instance/Auth/Token).' };
+    }
+
+    if (!/salesforce\.com/i.test(salesforceConfig.instanceUrl)) {
+      return { ok: false as const, message: 'Instance URL should be your Salesforce domain.' };
+    }
+
+    return { ok: true as const, message: 'Configuration format looks valid. Ready for IT credential handshake.' };
+  };
+
+  const runSalesforceConnectionCheck = () => {
+    const result = validateSalesforceConfig();
+    const status = result.ok ? 'passed' : 'failed';
+    const nextEvents = pushSalesforceCheckEvent(status, result.message);
+    setSalesforceConnectionState(result.ok ? 'passed' : 'failed');
+    setSalesforceTestMessage(result.message);
+    setSalesforceLastTestAt(new Date().toISOString());
+    return { result, nextEvents };
+  };
+
   const saveSalesforceConnectionConfig = async () => {
     try {
       setSavingSalesforceConfig(true);
@@ -575,6 +624,10 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
           tokenUrl: salesforceConfig.tokenUrl.trim(),
           clientId: salesforceConfig.clientId.trim(),
           clientSecret: salesforceConfig.clientSecret.trim(),
+          last_tested_at: salesforceLastTestAt,
+          test_status: salesforceConnectionState,
+          test_message: salesforceTestMessage,
+          recent_checks: salesforceRecentChecks,
         },
         description: 'Salesforce OAuth connection settings for PowerQuote integration',
         updated_by: user?.id ?? null,
@@ -599,6 +652,63 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
       });
     } finally {
       setSavingSalesforceConfig(false);
+    }
+  };
+
+  const unlockSalesforceConfig = () => {
+    if (salesforceUnlockPassword === 'admin') {
+      setSalesforceConfigUnlocked(true);
+      setSalesforceUnlockPassword('');
+      toast({ title: 'Unlocked', description: 'Salesforce settings are now editable.' });
+      return;
+    }
+
+    toast({ title: 'Invalid password', description: 'Password is incorrect.', variant: 'destructive' });
+  };
+
+  const handleSalesforceConnectionTest = async () => {
+    setTestingSalesforceConfig(true);
+    try {
+      const { result, nextEvents } = runSalesforceConnectionCheck();
+
+      const { error } = await supabase
+        .from('app_settings')
+        .upsert(
+          {
+            key: 'salesforce_connection_config',
+            value: {
+              instanceUrl: salesforceConfig.instanceUrl.trim(),
+              authUrl: salesforceConfig.authUrl.trim(),
+              tokenUrl: salesforceConfig.tokenUrl.trim(),
+              clientId: salesforceConfig.clientId.trim(),
+              clientSecret: salesforceConfig.clientSecret.trim(),
+              last_tested_at: new Date().toISOString(),
+              test_status: result.ok ? 'passed' : 'failed',
+              test_message: result.message,
+              recent_checks: nextEvents,
+            },
+            description: 'Salesforce OAuth connection settings for PowerQuote integration',
+            updated_by: user?.id ?? null,
+          },
+          { onConflict: 'key' }
+        );
+
+      if (error) throw error;
+
+      toast({
+        title: result.ok ? 'Connection check passed' : 'Connection check failed',
+        description: result.message,
+        variant: result.ok ? 'default' : 'destructive',
+      });
+    } catch (error) {
+      console.error('Error running Salesforce connection check:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to run connection check.',
+        variant: 'destructive',
+      });
+    } finally {
+      setTestingSalesforceConfig(false);
     }
   };
 
@@ -1251,6 +1361,23 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
                 </AlertDescription>
               </Alert>
 
+              {!salesforceConfigUnlocked ? (
+                <div className="rounded-md border border-gray-700 bg-gray-800/60 p-3 space-y-2">
+                  <Label className="text-white">Unlock to view/edit credentials</Label>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="password"
+                      value={salesforceUnlockPassword}
+                      onChange={(e) => setSalesforceUnlockPassword(e.target.value)}
+                      placeholder="Enter admin password"
+                      className="bg-gray-800 border-gray-700 text-white"
+                    />
+                    <Button type="button" onClick={unlockSalesforceConfig} className="bg-red-600 hover:bg-red-700">Unlock</Button>
+                  </div>
+                  <p className="text-xs text-gray-400">Temporary UI gate requested by admin. Recommend replacing this with server-side secret vault policy.</p>
+                </div>
+              ) : null}
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label className="text-white">Salesforce Instance URL</Label>
@@ -1258,7 +1385,8 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
                     value={salesforceConfig.instanceUrl}
                     onChange={(e) => setSalesforceConfig((prev) => ({ ...prev, instanceUrl: e.target.value }))}
                     placeholder="https://your-org.my.salesforce.com"
-                    className="bg-gray-800 border-gray-700 text-white"
+                    disabled={!salesforceConfigUnlocked}
+                    className="bg-gray-800 border-gray-700 text-white disabled:opacity-60"
                   />
                 </div>
                 <div className="space-y-2">
@@ -1267,7 +1395,8 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
                     value={salesforceConfig.authUrl}
                     onChange={(e) => setSalesforceConfig((prev) => ({ ...prev, authUrl: e.target.value }))}
                     placeholder="https://login.salesforce.com/services/oauth2/authorize"
-                    className="bg-gray-800 border-gray-700 text-white"
+                    disabled={!salesforceConfigUnlocked}
+                    className="bg-gray-800 border-gray-700 text-white disabled:opacity-60"
                   />
                 </div>
                 <div className="space-y-2">
@@ -1276,7 +1405,8 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
                     value={salesforceConfig.tokenUrl}
                     onChange={(e) => setSalesforceConfig((prev) => ({ ...prev, tokenUrl: e.target.value }))}
                     placeholder="https://login.salesforce.com/services/oauth2/token"
-                    className="bg-gray-800 border-gray-700 text-white"
+                    disabled={!salesforceConfigUnlocked}
+                    className="bg-gray-800 border-gray-700 text-white disabled:opacity-60"
                   />
                 </div>
                 <div className="space-y-2">
@@ -1285,7 +1415,8 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
                     value={salesforceConfig.clientId}
                     onChange={(e) => setSalesforceConfig((prev) => ({ ...prev, clientId: e.target.value }))}
                     placeholder="Consumer Key"
-                    className="bg-gray-800 border-gray-700 text-white"
+                    disabled={!salesforceConfigUnlocked}
+                    className="bg-gray-800 border-gray-700 text-white disabled:opacity-60"
                   />
                 </div>
               </div>
@@ -1298,30 +1429,64 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
                     value={salesforceConfig.clientSecret}
                     onChange={(e) => setSalesforceConfig((prev) => ({ ...prev, clientSecret: e.target.value }))}
                     placeholder="Consumer Secret"
-                    className="bg-gray-800 border-gray-700 text-white"
+                    disabled={!salesforceConfigUnlocked}
+                    className="bg-gray-800 border-gray-700 text-white disabled:opacity-60"
                   />
-                  <Button type="button" variant="outline" className="border-gray-700 text-gray-200" onClick={() => setShowClientSecret((v) => !v)}>
+                  <Button type="button" variant="outline" className="border-gray-700 text-gray-200" onClick={() => setShowClientSecret((v) => !v)} disabled={!salesforceConfigUnlocked}>
                     {showClientSecret ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </Button>
                 </div>
               </div>
 
+              <div className="rounded-md border border-gray-700 bg-gray-800/40 p-3 space-y-1 text-xs">
+                <p className="text-gray-300">
+                  Connection Check Status:{' '}
+                  <span className={salesforceConnectionState === 'passed' ? 'text-emerald-400' : salesforceConnectionState === 'failed' ? 'text-red-400' : 'text-amber-300'}>
+                    {salesforceConnectionState === 'passed' ? 'Passed' : salesforceConnectionState === 'failed' ? 'Failed' : 'Not tested'}
+                  </span>
+                </p>
+                <p className="text-gray-400">Last Check: {salesforceLastTestAt ? new Date(salesforceLastTestAt).toLocaleString() : 'Never'}</p>
+                {salesforceTestMessage ? <p className="text-gray-300">Message: {salesforceTestMessage}</p> : null}
+              </div>
+
               {!isSalesforceConfigComplete && (
                 <p className="text-xs text-amber-300">
-                  Fill all five fields to enable Save.
+                  Fill all five fields to enable Save and Test.
                 </p>
               )}
 
-              <div className="flex justify-end">
+              <div className="flex flex-wrap justify-end gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="border-cyan-700 text-cyan-300"
+                  onClick={handleSalesforceConnectionTest}
+                  disabled={testingSalesforceConfig || !isSalesforceConfigComplete || !salesforceConfigUnlocked}
+                >
+                  {testingSalesforceConfig ? 'Testing...' : 'Test Connection'}
+                </Button>
                 <Button
                   type="button"
                   onClick={saveSalesforceConnectionConfig}
                   className="bg-emerald-600 hover:bg-emerald-700"
-                  disabled={savingSalesforceConfig || !isSalesforceConfigComplete}
+                  disabled={savingSalesforceConfig || !isSalesforceConfigComplete || !salesforceConfigUnlocked}
                 >
                   {savingSalesforceConfig ? 'Saving...' : 'Save Salesforce Settings'}
                 </Button>
               </div>
+
+              {salesforceRecentChecks.length > 0 && (
+                <div className="rounded-md border border-gray-700 bg-gray-800/30 p-3">
+                  <p className="text-xs text-gray-300 mb-2">Recent Checks</p>
+                  <div className="space-y-1 max-h-36 overflow-y-auto">
+                    {salesforceRecentChecks.map((entry, idx) => (
+                      <p key={`${entry.at}-${idx}`} className="text-xs text-gray-400">
+                        {new Date(entry.at).toLocaleString()} — <span className={entry.status === 'passed' ? 'text-emerald-400' : 'text-red-400'}>{entry.status.toUpperCase()}</span> — {entry.message}
+                      </p>
+                    ))}
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
