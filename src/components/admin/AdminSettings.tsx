@@ -15,6 +15,9 @@ import { UserSharingManager } from './UserSharingManager';
 import { EmailSettings } from './EmailSettings';
 import { quoteWorkflowService, type FinanceMarginLimit } from '@/services/quoteWorkflowService';
 
+const stripHtmlTags = (value: string | undefined | null) =>
+  String(value || '').replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim();
+
 const AdminSettings = () => {
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
@@ -92,7 +95,7 @@ const AdminSettings = () => {
 
       try {
         const template = await quoteWorkflowService.getEmailTemplate('quote_admin_decision');
-        setWorkflowTemplate(template);
+        setWorkflowTemplate(template ? { ...template, body_template: stripHtmlTags(template.body_template) } : template);
       } catch (templateError) {
         console.warn('Unable to load workflow template', templateError);
       }
@@ -181,7 +184,7 @@ const AdminSettings = () => {
       await quoteWorkflowService.updateEmailTemplate({
         templateType: workflowTemplate.template_type ?? 'quote_admin_decision',
         subjectTemplate: workflowTemplate.subject_template,
-        bodyTemplate: workflowTemplate.body_template,
+        bodyTemplate: stripHtmlTags(workflowTemplate.body_template),
         enabled: workflowTemplate.enabled ?? true,
       });
       toast({

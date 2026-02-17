@@ -10,6 +10,7 @@ import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   Plus, 
   Edit2, 
@@ -28,6 +29,7 @@ import ConditionalLogicEditor from "@/components/admin/ConditionalLogicEditor";
 import {
   QuoteFieldConfiguration as QuoteFieldConfig,
   QuoteFieldType,
+  SalesforceFieldMapping,
 } from "@/types/quote-field";
 import {
   normalizeQuoteFieldConditionalRules,
@@ -114,6 +116,8 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
   const [isAdmin, setIsAdmin] = useState(false);
   const [authLoading, setAuthLoading] = useState(true);
   const [draggedFieldId, setDraggedFieldId] = useState<string | null>(null);
+  const [quoteFieldsView, setQuoteFieldsView] = useState<'data-fields' | 'field-mapping-table'>('data-fields');
+  const [mappingDrafts, setMappingDrafts] = useState<Record<string, QuoteField>>({});
   const { toast } = useToast();
 
   const handleDragStart = (e: React.DragEvent, field: QuoteField) => {
@@ -203,7 +207,8 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
           .eq('id', session.user.id)
           .single();
         
-        setIsAdmin(profile?.role === 'admin');
+        const r = String(profile?.role || '').toLowerCase();
+        setIsAdmin(['admin','master','level3','level_3'].includes(r));
       }
     } catch (error) {
       console.error('Error checking auth:', error);
@@ -232,6 +237,7 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
         display_order: field.display_order ?? 0,
         include_in_pdf: Boolean(field.include_in_pdf),
         conditional_logic: normalizeQuoteFieldConditionalRules(field.conditional_logic),
+        salesforce_mapping: (field.salesforce_mapping as SalesforceFieldMapping | null) ?? null,
       })) as QuoteField[];
 
       // Sort fields by display_order and then by label
@@ -279,6 +285,21 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
       uniqueFields.sort((a, b) => a.display_order - b.display_order);
 
       setQuoteFields(uniqueFields);
+      setMappingDrafts(
+        uniqueFields.reduce((acc, field) => {
+          acc[field.id] = {
+            ...field,
+            salesforce_mapping: field.salesforce_mapping ?? {
+              enabled: true,
+              objectName: 'Opportunity',
+              fieldApiName: field.label,
+              direction: 'to_salesforce',
+              transformRule: '',
+            },
+          };
+          return acc;
+        }, {} as Record<string, QuoteField>)
+      );
     } catch (error) {
       console.error('Error fetching quote fields:', error);
       toast({
@@ -308,6 +329,7 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
               display_order: fieldData.display_order,
               include_in_pdf: fieldData.include_in_pdf || false,
               conditional_logic: fieldData.conditional_logic ?? [],
+              salesforce_mapping: fieldData.salesforce_mapping ?? null,
             }),
         { reloadClient: mutationClient }
       );
@@ -345,6 +367,7 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
               display_order: fieldData.display_order,
               include_in_pdf: fieldData.include_in_pdf || false,
               conditional_logic: fieldData.conditional_logic ?? [],
+              salesforce_mapping: fieldData.salesforce_mapping ?? null,
             })
             .eq('id', fieldId),
         { reloadClient: mutationClient }
@@ -469,6 +492,144 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
     setDialogOpen(true);
   };
 
+  const updateMappingDraft = (fieldId: string, patch: Partial<QuoteField>) => {
+    setMappingDrafts((prev) => ({
+      ...prev,
+      [fieldId]: {
+        ...(prev[fieldId] ?? quoteFields.find((f) => f.id === fieldId)!),
+        ...patch,
+      },
+    }));
+  };
+
+  const getMappingIssues = (row: QuoteField, allRows: QuoteField[]) => {
+    const issues: string[] = [];
+    const mapping = row.salesforce_mapping;
+
+    if (!mapping) {
+      issues.push('Missing Salesforce mapping.');
+      return issues;
+    }
+
+    if (!mapping.objectName?.trim()) {
+      issues.push('Missing SF object.');
+    }
+
+    const apiName = mapping.fieldApiName?.trim();
+    if (!apiName) {
+      issues.push('Missing SF field API name.');
+    } else if (!/^[A-Za-z][A-Za-z0-9_]*$/.test(apiName)) {
+      issues.push('API name format looks invalid.');
+    }
+
+    const duplicateCount = allRows.filter((candidate) => {
+      const c = candidate.salesforce_mapping;
+      return (
+        c?.enabled !== false &&
+        mapping.enabled !== false &&
+        c?.objectName?.trim().toLowerCase() === mapping.objectName?.trim().toLowerCase() &&
+        c?.fieldApiName?.trim().toLowerCase() === apiName?.toLowerCase()
+      );
+    }).length;
+
+    if (apiName && duplicateCount > 1) {
+      issues.push('Duplicate mapping target.');
+    }
+
+    return issues;
+  };
+
+  const exportMappingTableCsv = () => {
+    const rows = quoteFields.map((field) => mappingDrafts[field.id] ?? field);
+    const header = [
+      'Field Label',
+      'Field ID',
+      'Type',
+      'Required',
+      'Enabled',
+      'Include In Quote',
+      'SF Object',
+      'SF Field API Name',
+      'Direction',
+      'Transform Rule',
+    ];
+
+    const csvLines = [
+      header.join(','),
+      ...rows.map((row) => {
+        const m = row.salesforce_mapping;
+        const cols = [
+          row.label,
+          row.id,
+          row.type,
+          String(row.required),
+          String(row.enabled),
+          String(Boolean(row.include_in_pdf)),
+          m?.objectName ?? '',
+          m?.fieldApiName ?? '',
+          m?.direction ?? '',
+          m?.transformRule ?? '',
+        ];
+        return cols.map((c) => `"${String(c).replaceAll('"', '""')}"`).join(',');
+      }),
+    ];
+
+    const blob = new Blob([csvLines.join('\n')], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `field-mapping-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const saveMappingTable = async () => {
+    try {
+      const rows = Object.values(mappingDrafts);
+      const rowsWithIssues = rows
+        .map((row) => ({ row, issues: getMappingIssues(row, rows) }))
+        .filter((entry) => entry.issues.length > 0);
+
+      if (rowsWithIssues.length > 0) {
+        toast({
+          title: 'Validation required',
+          description: `Please fix ${rowsWithIssues.length} row(s) with mapping issues before saving.`,
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      await Promise.all(
+        rows.map((row) =>
+          supabase
+            .from('quote_fields')
+            .update({
+              required: row.required,
+              enabled: row.enabled,
+              include_in_pdf: row.include_in_pdf || false,
+              salesforce_mapping: row.salesforce_mapping ?? null,
+            })
+            .eq('id', row.id)
+        )
+      );
+
+      toast({
+        title: 'Success',
+        description: 'Field Mapping Table saved successfully',
+      });
+      await fetchQuoteFields();
+    } catch (error) {
+      console.error('Error saving mapping table:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to save field mapping table',
+        variant: 'destructive',
+      });
+    }
+  };
+
   if (authLoading || loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -551,118 +712,230 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
     <div className="space-y-4">
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-xl font-medium text-white">Quote Field Configuration</h2>
-          <p className="text-gray-400 text-sm">Configure and manage quote request form fields</p>
+          <h2 className="text-xl font-medium text-white">Data Fields</h2>
+          <p className="text-gray-400 text-sm">Manage quote fields and edit Salesforce mappings in one place.</p>
         </div>
-        <Button 
-          className="bg-red-600 hover:bg-red-700"
-          onClick={openCreateDialog}
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          Add Field
-        </Button>
+        <div className="flex items-center gap-2">
+          {quoteFieldsView === 'field-mapping-table' && (
+            <>
+              <Button variant="outline" className="border-gray-700 text-gray-200" onClick={exportMappingTableCsv}>
+                Export CSV
+              </Button>
+              <Button className="bg-emerald-600 hover:bg-emerald-700" onClick={saveMappingTable}>
+                Save All
+              </Button>
+            </>
+          )}
+          <Button
+            className="bg-red-600 hover:bg-red-700"
+            onClick={openCreateDialog}
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Add Field
+          </Button>
+        </div>
       </div>
 
-      {/* Fields Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-        {quoteFields.map((field, index) => (
-          <Card 
-            key={field.id} 
-            draggable={true}
-            onDragStart={(e) => handleDragStart(e, field)}
-            onDragOver={(e) => handleDragOver(e, field)}
-            onDrop={(e) => handleDrop(e, field)}
-            className={`bg-gray-900 border-gray-800 hover:bg-gray-800 transition-colors ${
-              field.id === draggedFieldId ? 'opacity-50' : ''
-            }`}
-          >
-            <CardHeader className="p-3">
-              <div className="flex justify-between items-start">
-                <div className="flex-1">
-                  <div className="flex items-center space-x-2">
+      <Tabs value={quoteFieldsView} onValueChange={(v) => setQuoteFieldsView(v as 'data-fields' | 'field-mapping-table')}>
+        <TabsList className="bg-gray-800">
+          <TabsTrigger value="data-fields" className="text-white data-[state=active]:bg-red-600 data-[state=active]:text-white">Data Fields</TabsTrigger>
+          <TabsTrigger value="field-mapping-table" className="text-white data-[state=active]:bg-red-600 data-[state=active]:text-white">Field Mapping Table</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="data-fields" className="mt-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {quoteFields.map((field) => (
+              <Card
+                key={field.id}
+                draggable={true}
+                onDragStart={(e) => handleDragStart(e, field)}
+                onDragOver={(e) => handleDragOver(e, field)}
+                onDrop={(e) => handleDrop(e, field)}
+                className={`bg-gray-900 border-gray-800 hover:bg-gray-800 transition-colors ${
+                  field.id === draggedFieldId ? 'opacity-50' : ''
+                }`}
+              >
+                <CardHeader className="p-3">
+                  <div className="flex justify-between items-start">
                     <div className="flex-1">
                       <div className="flex items-center space-x-2">
-                        <DragHandle field={field} />
-                        <CardTitle className={`${field.required ? 'text-red-400' : 'text-white'} text-sm font-medium truncate`}>
-                          {field.label}
-                        </CardTitle>
+                        <div className="flex-1">
+                          <div className="flex items-center space-x-2">
+                            <DragHandle field={field} />
+                            <CardTitle className={`${field.required ? 'text-red-400' : 'text-white'} text-sm font-medium truncate`}>
+                              {field.label}
+                            </CardTitle>
+                          </div>
+                          <div className="flex gap-1 mt-1">
+                            <Badge variant="outline" className="text-xs capitalize border-gray-600 text-gray-400">
+                              {field.type.toUpperCase()}
+                            </Badge>
+                            {field.conditional_logic && field.conditional_logic.length > 0 && (
+                              <Badge variant="outline" className="text-xs border-red-600 text-red-300 bg-red-900/20">
+                                Conditional
+                              </Badge>
+                            )}
+                            {field.include_in_pdf && (
+                              <Badge variant="outline" className="text-xs bg-blue-900/30 text-blue-400 border-blue-600">
+                                QUOTE
+                              </Badge>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2 mt-2">
+                            <Label htmlFor={`include-quote-${field.id}`} className="text-xs text-gray-400 cursor-pointer">
+                              Include in the Quote
+                            </Label>
+                            <Switch
+                              id={`include-quote-${field.id}`}
+                              checked={field.include_in_pdf || false}
+                              onCheckedChange={() => toggleIncludeInQuote(field.id)}
+                              className="data-[state=checked]:bg-blue-500"
+                            />
+                          </div>
+                        </div>
+                        <div className="flex-shrink-0">
+                          <Switch
+                            id={`enabled-${field.id}`}
+                            checked={field.enabled}
+                            onCheckedChange={() => toggleFieldEnabled(field.id)}
+                            className="data-[state=checked]:bg-green-500 data-[state=unchecked]:bg-red-500 hover:bg-gray-700"
+                          />
+                        </div>
                       </div>
-                       <div className="flex gap-1 mt-1">
-                        <Badge
-                          variant="outline"
-                          className="text-xs capitalize border-gray-600 text-gray-400"
+                      <div className="flex items-center space-x-2 mt-1 text-xs text-gray-400">
+                        <code className="bg-gray-800 px-1 rounded">{field.id}</code>
+                      </div>
+                    </div>
+                    <div className="flex space-x-2">
+                      <Button variant="ghost" size="sm" onClick={() => openEditDialog(field)} className="text-blue-400 hover:text-blue-300">
+                        <Edit2 className="h-4 w-4" />
+                      </Button>
+                      <Button variant="ghost" size="sm" onClick={() => handleDeleteField(field.id)} className="text-red-400 hover:text-red-300">
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                </CardHeader>
+              </Card>
+            ))}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="field-mapping-table" className="mt-4">
+          <div className="overflow-x-auto rounded-md border border-gray-800">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-900 text-gray-300">
+                <tr>
+                  <th className="text-left p-2">Field Label</th>
+                  <th className="text-left p-2">Type</th>
+                  <th className="text-left p-2">Required</th>
+                  <th className="text-left p-2">Enabled</th>
+                  <th className="text-left p-2">Include in Quote</th>
+                  <th className="text-left p-2">SF Object</th>
+                  <th className="text-left p-2">SF Field API Name</th>
+                  <th className="text-left p-2">Direction</th>
+                  <th className="text-left p-2">Validation</th>
+                </tr>
+              </thead>
+              <tbody>
+                {quoteFields.map((field) => {
+                  const row = mappingDrafts[field.id] ?? field;
+                  const mapping = row.salesforce_mapping ?? {
+                    enabled: true,
+                    objectName: 'Opportunity',
+                    fieldApiName: row.label,
+                    direction: 'to_salesforce' as const,
+                    transformRule: '',
+                  };
+                  const issues = getMappingIssues({ ...row, salesforce_mapping: mapping }, quoteFields.map((f) => mappingDrafts[f.id] ?? f));
+
+                  return (
+                    <tr key={field.id} className="border-t border-gray-800 bg-gray-950 text-white">
+                      <td className="p-2">{row.label}</td>
+                      <td className="p-2 text-gray-300">{row.type.toUpperCase()}</td>
+                      <td className="p-2">
+                        <Switch checked={row.required} onCheckedChange={(v) => updateMappingDraft(field.id, { required: v })} />
+                      </td>
+                      <td className="p-2">
+                        <Switch checked={row.enabled} onCheckedChange={(v) => updateMappingDraft(field.id, { enabled: v })} />
+                      </td>
+                      <td className="p-2">
+                        <Switch checked={row.include_in_pdf || false} onCheckedChange={(v) => updateMappingDraft(field.id, { include_in_pdf: v })} />
+                      </td>
+                      <td className="p-2 min-w-[140px]">
+                        <Select
+                          value={mapping.objectName}
+                          onValueChange={(value) =>
+                            updateMappingDraft(field.id, {
+                              salesforce_mapping: { ...mapping, objectName: value },
+                            })
+                          }
                         >
-                          {field.type.toUpperCase()}
-                        </Badge>
-                        {field.conditional_logic && field.conditional_logic.length > 0 && (
-                          <Badge
-                            variant="outline"
-                            className="text-xs border-red-600 text-red-300 bg-red-900/20"
-                          >
-                            Conditional
-                          </Badge>
-                        )}
-                        {field.include_in_pdf && (
-                          <Badge 
-                            variant="outline" 
-                            className="text-xs bg-blue-900/30 text-blue-400 border-blue-600"
-                          >
-                            QUOTE
-                          </Badge>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2 mt-2">
-                        <Label htmlFor={`include-quote-${field.id}`} className="text-xs text-gray-400 cursor-pointer">
-                          Include in the Quote
-                        </Label>
-                        <Switch
-                          id={`include-quote-${field.id}`}
-                          checked={field.include_in_pdf || false}
-                          onCheckedChange={() => toggleIncludeInQuote(field.id)}
-                          className="data-[state=checked]:bg-blue-500"
+                          <SelectTrigger className="bg-gray-800 border-gray-700 text-white h-8">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent className="bg-gray-800 border-gray-700">
+                            <SelectItem value="Opportunity" className="text-white">Opportunity</SelectItem>
+                            <SelectItem value="Case" className="text-white">Case</SelectItem>
+                            <SelectItem value="Quote" className="text-white">Quote</SelectItem>
+                            <SelectItem value="Account" className="text-white">Account</SelectItem>
+                            <SelectItem value="Contact" className="text-white">Contact</SelectItem>
+                            <SelectItem value="Custom" className="text-white">Custom</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </td>
+                      <td className="p-2 min-w-[220px]">
+                        <Input
+                          value={mapping.fieldApiName}
+                          onChange={(e) =>
+                            updateMappingDraft(field.id, {
+                              salesforce_mapping: { ...mapping, fieldApiName: e.target.value },
+                            })
+                          }
+                          className="bg-gray-800 border-gray-700 text-white h-8"
                         />
-                      </div>
-                    </div>
-                    <div className="flex-shrink-0">
-                      <Switch
-                        id={`enabled-${field.id}`}
-                        checked={field.enabled}
-                        onCheckedChange={() => toggleFieldEnabled(field.id)}
-                        className={`
-                          data-[state=checked]:bg-green-500
-                          data-[state=unchecked]:bg-red-500
-                          hover:bg-gray-700
-                        `}
-                      />
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-2 mt-1 text-xs text-gray-400">
-                    <code className="bg-gray-800 px-1 rounded">{field.id}</code>
-                  </div>
-                </div>
-                <div className="flex space-x-2">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => openEditDialog(field)}
-                    className="text-blue-400 hover:text-blue-300"
-                  >
-                    <Edit2 className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleDeleteField(field.id)}
-                    className="text-red-400 hover:text-red-300"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            </CardHeader>
-          </Card>
-        ))}
-      </div>
+                      </td>
+                      <td className="p-2 min-w-[190px]">
+                        <Select
+                          value={mapping.direction}
+                          onValueChange={(value: 'to_salesforce' | 'from_salesforce' | 'bidirectional') =>
+                            updateMappingDraft(field.id, {
+                              salesforce_mapping: { ...mapping, direction: value },
+                            })
+                          }
+                        >
+                          <SelectTrigger className="bg-gray-800 border-gray-700 text-white h-8">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent className="bg-gray-800 border-gray-700">
+                            <SelectItem value="to_salesforce" className="text-white">PowerQuote → Salesforce</SelectItem>
+                            <SelectItem value="from_salesforce" className="text-white">Salesforce → PowerQuote</SelectItem>
+                            <SelectItem value="bidirectional" className="text-white">Bidirectional</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </td>
+                      <td className="p-2 min-w-[220px]">
+                        {issues.length === 0 ? (
+                          <span className="text-emerald-400 text-xs">OK</span>
+                        ) : (
+                          <div className="text-xs text-amber-300 space-y-1">
+                            {issues.map((issue) => (
+                              <div key={issue} className="flex items-center gap-1">
+                                <AlertCircle className="h-3 w-3" />
+                                <span>{issue}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </TabsContent>
+      </Tabs>
 
       {/* Create/Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
@@ -700,6 +973,13 @@ const QuoteFieldForm = ({ onSubmit, initialData, onCancel }: QuoteFieldFormProps
     display_order: initialData?.display_order || 1,
     include_in_pdf: initialData?.include_in_pdf ?? false,
     conditional_logic: initialData?.conditional_logic ?? [],
+    salesforce_mapping: initialData?.salesforce_mapping ?? {
+      enabled: true,
+      objectName: 'Opportunity',
+      fieldApiName: initialData?.label || '',
+      direction: 'to_salesforce',
+      transformRule: '',
+    },
   });
 
   const [optionsText, setOptionsText] = useState(
@@ -831,6 +1111,93 @@ const QuoteFieldForm = ({ onSubmit, initialData, onCancel }: QuoteFieldFormProps
           onChange={(rules) => setFormData({ ...formData, conditional_logic: rules })}
           parentFieldLabel={formData.label || 'Quote Field'}
         />
+      </div>
+
+      <div className="space-y-3 border border-gray-800 rounded-md p-3">
+        <div>
+          <Label className="text-white">Salesforce Mapping</Label>
+          <p className="text-xs text-gray-400">Define which Salesforce field this quote field maps to.</p>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div>
+            <Label htmlFor="sf-object" className="text-white">Object</Label>
+            <Select
+              value={formData.salesforce_mapping?.objectName || 'Opportunity'}
+              onValueChange={(value) =>
+                setFormData({
+                  ...formData,
+                  salesforce_mapping: {
+                    enabled: formData.salesforce_mapping?.enabled ?? true,
+                    objectName: value,
+                    fieldApiName: formData.salesforce_mapping?.fieldApiName || formData.label,
+                    direction: formData.salesforce_mapping?.direction ?? 'to_salesforce',
+                    transformRule: formData.salesforce_mapping?.transformRule || '',
+                  },
+                })
+              }
+            >
+              <SelectTrigger id="sf-object" className="bg-gray-800 border-gray-700 text-white">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className="bg-gray-800 border-gray-700">
+                <SelectItem value="Opportunity" className="text-white">Opportunity</SelectItem>
+                <SelectItem value="Case" className="text-white">Case</SelectItem>
+                <SelectItem value="Quote" className="text-white">Quote</SelectItem>
+                <SelectItem value="Account" className="text-white">Account</SelectItem>
+                <SelectItem value="Contact" className="text-white">Contact</SelectItem>
+                <SelectItem value="Custom" className="text-white">Custom</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label htmlFor="sf-api-name" className="text-white">Salesforce Field API Name</Label>
+            <Input
+              id="sf-api-name"
+              value={formData.salesforce_mapping?.fieldApiName || ''}
+              onChange={(e) =>
+                setFormData({
+                  ...formData,
+                  salesforce_mapping: {
+                    enabled: formData.salesforce_mapping?.enabled ?? true,
+                    objectName: formData.salesforce_mapping?.objectName || 'Opportunity',
+                    fieldApiName: e.target.value,
+                    direction: formData.salesforce_mapping?.direction ?? 'to_salesforce',
+                    transformRule: formData.salesforce_mapping?.transformRule || '',
+                  },
+                })
+              }
+              className="bg-gray-800 border-gray-700 text-white"
+              placeholder="e.g. Opportunity_Name__c"
+            />
+          </div>
+          <div>
+            <Label htmlFor="sf-direction" className="text-white">Sync Direction</Label>
+            <Select
+              value={formData.salesforce_mapping?.direction || 'to_salesforce'}
+              onValueChange={(value: 'to_salesforce' | 'from_salesforce' | 'bidirectional') =>
+                setFormData({
+                  ...formData,
+                  salesforce_mapping: {
+                    enabled: formData.salesforce_mapping?.enabled ?? true,
+                    objectName: formData.salesforce_mapping?.objectName || 'Opportunity',
+                    fieldApiName: formData.salesforce_mapping?.fieldApiName || formData.label,
+                    direction: value,
+                    transformRule: formData.salesforce_mapping?.transformRule || '',
+                  },
+                })
+              }
+            >
+              <SelectTrigger id="sf-direction" className="bg-gray-800 border-gray-700 text-white">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className="bg-gray-800 border-gray-700">
+                <SelectItem value="to_salesforce" className="text-white">PowerQuote → Salesforce</SelectItem>
+                <SelectItem value="from_salesforce" className="text-white">Salesforce → PowerQuote</SelectItem>
+                <SelectItem value="bidirectional" className="text-white">Bidirectional</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
       </div>
 
       <div className="grid grid-cols-3 gap-4">

@@ -777,6 +777,14 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
     return diffDays;
   };
 
+  const getClaimOwnerLabel = (quote: Quote): string => {
+    if (quote.reviewed_by) {
+      if (user?.id && quote.reviewed_by === user.id) return 'You';
+      return String(quote.reviewed_by).slice(0, 8);
+    }
+    return 'Unclaimed';
+  };
+
   const getPriorityColor = (priority: string) => {
     switch (priority.toLowerCase()) {
       case 'urgent':
@@ -868,8 +876,13 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
                 return (
                   <div key={quote.id} className="space-y-0">
                   {/* Quote Header Row */}
-                  <Card className="bg-gray-900 border-gray-800 hover:border-gray-700 transition-colors">
+                  <Card className={`bg-gray-900 border ${quote.requires_finance_approval ? 'border-red-600' : 'border-gray-800'} hover:border-gray-700 transition-colors`}>
                     <CardContent className="p-4">
+                      {quote.requires_finance_approval && (
+                        <div className="mb-3 rounded-md border border-red-500 bg-red-900/30 px-3 py-2 text-red-200 text-sm">
+                          Low Margin Alert: quote is below finance threshold and requires immediate finance attention.
+                        </div>
+                      )}
                       <div 
                         className="flex items-center justify-between cursor-pointer"
                         onClick={() => handleQuoteToggle(quote.id)}
@@ -903,6 +916,11 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
                           <div className="flex items-center space-x-2 text-sm text-gray-400">
                             <Clock className="h-4 w-4" />
                             <span>{getAgingDays(quote.created_at)} days</span>
+                          </div>
+
+                          <div className="flex items-center space-x-2 text-sm">
+                            <span className="text-gray-500">Claimed by:</span>
+                            <span className="text-cyan-300">{getClaimOwnerLabel(quote)}</span>
                           </div>
                           
                           <div className="flex items-center space-x-2">
@@ -1004,6 +1022,11 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
                           <div className="flex items-center space-x-2 text-sm text-gray-400">
                             <Calendar className="h-4 w-4" />
                             <span>{new Date(quote.reviewed_at || quote.updated_at).toLocaleDateString()}</span>
+                          </div>
+
+                          <div className="flex items-center space-x-2 text-sm">
+                            <span className="text-gray-500">Claimed by:</span>
+                            <span className="text-cyan-300">{getClaimOwnerLabel(quote)}</span>
                           </div>
                           
                           <div className="flex items-center space-x-2">
