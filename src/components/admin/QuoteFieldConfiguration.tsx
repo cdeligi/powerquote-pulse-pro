@@ -555,6 +555,14 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
     }
   };
 
+  const isSalesforceConfigComplete = Boolean(
+    salesforceConfig.instanceUrl.trim() &&
+      salesforceConfig.authUrl.trim() &&
+      salesforceConfig.tokenUrl.trim() &&
+      salesforceConfig.clientId.trim() &&
+      salesforceConfig.clientSecret.trim()
+  );
+
   const saveSalesforceConnectionConfig = async () => {
     try {
       setSavingSalesforceConfig(true);
@@ -1226,7 +1234,12 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
         <TabsContent value="salesforce-connection" className="mt-4">
           <Card className="bg-gray-900 border-gray-800">
             <CardHeader>
-              <CardTitle className="text-white">Salesforce Connection Settings</CardTitle>
+              <div className="flex items-center justify-between gap-3">
+                <CardTitle className="text-white">Salesforce Connection Settings</CardTitle>
+                <Badge className={isSalesforceConfigComplete ? 'bg-emerald-600 text-white' : 'bg-amber-600 text-white'}>
+                  {isSalesforceConfigComplete ? 'Configured' : 'Incomplete'}
+                </Badge>
+              </div>
               <CardDescription className="text-gray-400">
                 Add Salesforce OAuth details provided by IT. These settings are used for bridge authentication.
               </CardDescription>
@@ -1293,12 +1306,18 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
                 </div>
               </div>
 
+              {!isSalesforceConfigComplete && (
+                <p className="text-xs text-amber-300">
+                  Fill all five fields to enable Save.
+                </p>
+              )}
+
               <div className="flex justify-end">
                 <Button
                   type="button"
                   onClick={saveSalesforceConnectionConfig}
                   className="bg-emerald-600 hover:bg-emerald-700"
-                  disabled={savingSalesforceConfig}
+                  disabled={savingSalesforceConfig || !isSalesforceConfigComplete}
                 >
                   {savingSalesforceConfig ? 'Saving...' : 'Save Salesforce Settings'}
                 </Button>
