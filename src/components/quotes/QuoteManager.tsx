@@ -1170,7 +1170,7 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
               return (
                 <div
                   key={quote.id}
-                  className="flex items-start justify-between gap-4 p-4 bg-gray-800 rounded-lg hover:bg-gray-750 transition-colors"
+                  className="flex flex-col lg:flex-row lg:items-start justify-between gap-4 p-4 bg-gray-800 rounded-lg hover:bg-gray-750 transition-colors"
                 >
                   <div className="flex-1 grid grid-cols-1 md:grid-cols-4 gap-4 items-start">
                     <div>
@@ -1192,9 +1192,9 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
                       </p>
                     </div>
                     
-                    <div className="text-right">
+                    <div className="text-left md:text-right">
                       {canSeePrices ? (
-                        <div className="flex flex-col items-end">
+                        <div className="flex flex-col items-start md:items-end">
                           {quote.hasDiscount && (
                             <span className="text-sm text-gray-400 line-through">
                               {formatCurrency(quote.value, quote.currency)}
@@ -1225,7 +1225,7 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
                       )}
                     </div>
                     
-                    <div className="min-w-[280px]">
+                    <div className="min-w-0 md:min-w-[260px] lg:min-w-[280px]">
                       <p className="text-white">Created: {quote.createdAt}</p>
                       <p className="text-gray-400 text-sm">Updated: {quote.updatedAt}</p>
                       <div className="mt-1 min-h-[40px] space-y-0.5">
@@ -1239,7 +1239,7 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
                     </div>
                   </div>
                   
-                  <div className="flex shrink-0 w-[430px] items-center justify-end gap-2 ml-2">
+                  <div className="flex w-full lg:shrink-0 lg:w-[430px] items-center justify-start lg:justify-end gap-2 ml-0 lg:ml-2 flex-wrap">
                     <Button
                       variant="ghost"
                       size="sm"
