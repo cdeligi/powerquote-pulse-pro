@@ -5,24 +5,21 @@ const supabase = getSupabaseClient();
 import { User, AuthError, Role } from "@/types/auth";
 
 // Helper function to map database role to app role
-const mapDatabaseRoleToAppRole = (dbRole: string): Role => {
-  switch (dbRole) {
-    case "level1":
-    case "LEVEL_1":
-      return "LEVEL_1";
-    case "level2":
-    case "LEVEL_2":
-      return "LEVEL_2";
-    case "admin":
-    case "ADMIN":
-      return "ADMIN";
-    case "LEVEL_3":
-      return "LEVEL_3";
-    case "FINANCE":
-      return "FINANCE";
-    default:
-      return "LEVEL_1";
+const mapDatabaseRoleToAppRole = (dbRole: string | null | undefined): Role => {
+  const normalized = (dbRole || '').toString().toUpperCase();
+  if (normalized === 'LEVEL_1' || normalized === 'LEVEL_2' || normalized === 'SALES') {
+    return 'SALES';
   }
+  if (normalized === 'LEVEL_3' || normalized === 'ADMIN' || normalized === 'APPROVER') {
+    return 'ADMIN';
+  }
+  if (normalized === 'FINANCE') {
+    return 'FINANCE';
+  }
+  if (normalized === 'MASTER') {
+    return 'MASTER';
+  }
+  return 'SALES';
 };
 
 interface AuthContextType {
@@ -221,7 +218,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
 
       console.log("[AuthProvider] Sign in request successful, awaiting auth state change...");
-      // Loading will be handled by handleAuthStateChange
+
+      // Fallback: some clients intermittently miss immediate SIGNED_IN propagation
+      // until tab visibility changes. If session is already returned, hydrate now.
+      if (session?.user) {
+        handleAuthStateChange('SIGNED_IN', session);
+      }
+
       return { error: null };
     } catch (err) {
       console.error("[AuthProvider] Unexpected sign in error:", err);
@@ -367,7 +370,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             email: userEmail,
             first_name: "",
             last_name: "",
-            role: "level1",
+            role: "SALES",
             department: null,
           })
           .select()
