@@ -195,6 +195,21 @@ async function handleListUsers(supabase: any) {
   });
 }
 
+async function logAuditEvent(supabase: any, payload: { user_id?: string | null; event: string; ip_address?: string | null; user_agent?: string | null; device_info?: any; location?: any; }) {
+  try {
+    await supabase.from('user_sessions').insert({
+      user_id: payload.user_id ?? null,
+      event: payload.event,
+      ip_address: payload.ip_address ?? null,
+      user_agent: payload.user_agent ?? null,
+      device_info: payload.device_info ?? {},
+      location: payload.location ?? {},
+    });
+  } catch (error) {
+    console.warn('Failed to write audit log event:', error);
+  }
+}
+
 async function handleCreateUser(req: Request, supabase: any, adminId: string) {
   const { 
     email, 
@@ -246,6 +261,11 @@ async function handleCreateUser(req: Request, supabase: any, adminId: string) {
     });
 
   if (profileError) throw profileError;
+
+  await logAuditEvent(supabase, {
+    user_id: adminId,
+    event: `ADMIN_CREATE_USER:${email}`,
+  });
 
   return new Response(JSON.stringify({ 
     success: true, 
@@ -304,6 +324,11 @@ async function handleUpdateUser(req: Request, supabase: any, adminId: string) {
 
   if (profileError) throw profileError;
 
+  await logAuditEvent(supabase, {
+    user_id: adminId,
+    event: `ADMIN_UPDATE_USER:${userId}`,
+  });
+
   return new Response(JSON.stringify({ success: true }), {
     headers: { ...corsHeaders, 'Content-Type': 'application/json' }
   });
@@ -337,28 +362,31 @@ async function handleApproveRequest(req: Request, supabase: any, adminId: string
 
   if (requestError) throw requestError;
 
-  const tempPassword = Math.random().toString(36).slice(-8) + 'A1!';
-
-  // Create auth user
-  const { data: authUser, error: authError } = await supabase.auth.admin.createUser({
-    email: request.email,
-    password: tempPassword,
-    email_confirm: true,
-    user_metadata: {
-      first_name: request.first_name,
-      last_name: request.last_name,
-      role: request.requested_role,
-      department: request.department
+  // Send invite so the user sets their own password via email link
+  const { data: invited, error: inviteError } = await supabase.auth.admin.inviteUserByEmail(
+    request.email,
+    {
+      data: {
+        first_name: request.first_name,
+        last_name: request.last_name,
+        role: request.requested_role,
+        department: request.department,
+      },
     }
-  });
+  );
 
-  if (authError) throw authError;
+  if (inviteError) throw inviteError;
 
-  // Create profile with all fields from request
+  const invitedUserId = invited?.user?.id;
+  if (!invitedUserId) {
+    throw new Error('Invite sent but user ID was not returned by Supabase.');
+  }
+
+  // Upsert profile with all fields from request
   const { error: profileError } = await supabase
     .from('profiles')
-    .insert({
-      id: authUser.user.id,
+    .upsert({
+      id: invitedUserId,
       email: request.email,
       first_name: request.first_name,
       last_name: request.last_name,
@@ -386,10 +414,16 @@ async function handleApproveRequest(req: Request, supabase: any, adminId: string
 
   if (updateError) throw updateError;
 
+  await logAuditEvent(supabase, {
+    user_id: adminId,
+    event: `ADMIN_APPROVE_REQUEST:${request.email}`,
+  });
+
   return new Response(JSON.stringify({ 
-    success: true, 
-    tempPassword,
-    userId: authUser.user.id 
+    success: true,
+    invited: true,
+    message: 'User approved. Invite email sent so user can create their own password.',
+    userId: invitedUserId 
   }), {
     headers: { ...corsHeaders, 'Content-Type': 'application/json' }
   });
@@ -409,6 +443,11 @@ async function handleRejectRequest(req: Request, supabase: any, adminId: string)
     .eq('id', requestId);
 
   if (error) throw error;
+
+  await logAuditEvent(supabase, {
+    user_id: adminId,
+    event: `ADMIN_REJECT_REQUEST:${requestId}`,
+  });
 
   return new Response(JSON.stringify({ success: true }), {
     headers: { ...corsHeaders, 'Content-Type': 'application/json' }

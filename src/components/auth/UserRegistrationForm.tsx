@@ -111,8 +111,53 @@ const UserRegistrationForm = ({ onSubmit, onBack }: UserRegistrationFormProps) =
       }
 
       console.log('Registration request submitted to database');
+
+      // Notify admins for review workflow
+      try {
+        const { data: emailSettings } = await supabase
+          .from('email_settings')
+          .select('notification_recipients')
+          .limit(1)
+          .maybeSingle();
+
+        const recipients = Array.isArray((emailSettings as any)?.notification_recipients)
+          ? (emailSettings as any).notification_recipients
+          : [];
+
+        if (recipients.length > 0) {
+          await Promise.allSettled(
+            recipients.map((recipientEmail: string) =>
+              supabase.functions.invoke('send-quote-notifications', {
+                body: {
+                  recipientEmail,
+                  recipientName: 'Admin',
+                  senderName: `${formData.firstName} ${formData.lastName}`,
+                  quoteId: `REG-${Date.now()}`,
+                  quoteName: 'New User Registration Request',
+                  permissionLevel: 'view',
+                  message: `New user request: ${formData.email} (${formData.requestedRole}) — needs review and approval.`,
+                },
+              })
+            )
+          );
+        }
+
+        await supabase.from('admin_notifications').insert({
+          quote_id: `REG-${Date.now()}`,
+          notification_type: 'user_registration_pending_review',
+          message_content: {
+            email: formData.email,
+            requested_role: formData.requestedRole,
+            department: formData.department,
+            details: 'New user registration request pending admin approval',
+          },
+          sent_to: recipients,
+        });
+      } catch (notifyError) {
+        console.warn('Failed to notify admins of registration request:', notifyError);
+      }
       
-      alert('Registration request submitted successfully! You will receive an email once your request has been reviewed.');
+      alert('Registration request submitted successfully! Admins were notified for review.');
       
       // Reset form
       setFormData({

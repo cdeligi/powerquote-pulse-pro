@@ -104,19 +104,7 @@ const UserManagementEnhanced = ({ user }: UserManagementEnhancedProps) => {
   const [isDepartmentDialogOpen, setIsDepartmentDialogOpen] = useState(false); // For the new department dialog
 
   const [pendingRequests, setPendingRequests] = useState<UserRegistrationRequest[]>([]);
-
-  const auditLogs: SecurityAuditLog[] = [
-    {
-      id: 'AUDIT-001',
-      userId: 'REG-2024-001',
-      action: 'Registration Request Submitted',
-      details: 'New user registration request for Level 2 access',
-      ipAddress: '192.168.1.100',
-      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
-      timestamp: '2024-01-16T10:30:00Z',
-      severity: 'low'
-    }
-  ];
+  const [auditLogs, setAuditLogs] = useState<SecurityAuditLog[]>([]);
 
   // Fetch user profiles
   const fetchUserProfiles = async () => {
@@ -216,10 +204,40 @@ const UserManagementEnhanced = ({ user }: UserManagementEnhancedProps) => {
     }
   };
 
+  const fetchAuditLogs = async () => {
+    try {
+      const fnResult = await supabase.functions.invoke('admin-users/audit-logs', { method: 'GET' });
+      if (fnResult.error) throw fnResult.error;
+
+      const sessions = ((fnResult.data as any)?.sessions || []) as any[];
+      const mapped: SecurityAuditLog[] = sessions.map((s) => ({
+        id: s.id,
+        userId: s.user_id || 'unknown',
+        action: s.event || 'Unknown Event',
+        details: s.user_agent || 'No details provided',
+        ipAddress: s.ip_address || 'Unknown',
+        userAgent: s.user_agent || '',
+        timestamp: s.created_at,
+        severity: /fail|reject|error|denied|blocked/i.test(String(s.event || '')) ? 'high' : 'low',
+      }));
+
+      setAuditLogs(mapped);
+    } catch (error) {
+      console.error('Error fetching audit logs:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to fetch security audit logs.',
+        variant: 'destructive',
+      });
+      setAuditLogs([]);
+    }
+  };
+
 
   useEffect(() => {
     fetchUserProfiles();
     fetchPendingRequests();
+    fetchAuditLogs();
     const loadDepartments = async () => {
       const fetchedDepartments = await departmentService.fetchDepartments();
       setDepartments((fetchedDepartments && fetchedDepartments.length > 0) ? fetchedDepartments : DEPARTMENT_FALLBACK);
@@ -415,7 +433,7 @@ const UserManagementEnhanced = ({ user }: UserManagementEnhancedProps) => {
 
       toast({
         title: 'Success',
-        description: 'Request approved and user created successfully.',
+        description: 'Request approved. Invite email sent so user can create their password.',
       });
 
       await fetchPendingRequests();
@@ -516,7 +534,11 @@ const UserManagementEnhanced = ({ user }: UserManagementEnhancedProps) => {
         </div>
         <div className="flex items-center space-x-4">
           <Button
-            onClick={fetchUserProfiles}
+            onClick={() => {
+              fetchUserProfiles();
+              fetchPendingRequests();
+              fetchAuditLogs();
+            }}
             variant="outline"
             size="sm"
             disabled={loading}
@@ -778,6 +800,7 @@ const UserManagementEnhanced = ({ user }: UserManagementEnhancedProps) => {
                       <TableHead className="text-gray-300">Role</TableHead>
                       <TableHead className="text-gray-300">Department</TableHead>
                       <TableHead className="text-gray-300">Status</TableHead>
+                      <TableHead className="text-gray-300">Last Login</TableHead>
                       <TableHead className="text-gray-300">Created</TableHead>
                       <TableHead className="text-gray-300">Actions</TableHead>
                     </TableRow>
@@ -804,6 +827,11 @@ const UserManagementEnhanced = ({ user }: UserManagementEnhancedProps) => {
                         <TableCell>
                           {getUserStatusBadge(profile.user_status)}
                         </TableCell>
+                        <TableCell className="text-gray-300 text-xs">
+                          {profile.last_sign_in_at || profile.lastSignInAt
+                            ? new Date((profile.last_sign_in_at || profile.lastSignInAt) as string).toLocaleString()
+                            : 'Never'}
+                        </TableCell>
                         <TableCell className="text-gray-300">
                           {new Date(profile.created_at).toLocaleDateString()}
                         </TableCell>
@@ -819,7 +847,9 @@ const UserManagementEnhanced = ({ user }: UserManagementEnhancedProps) => {
                               <Edit className="h-4 w-4 text-black" />
                             </Button>
                             
-                            {profile.role !== 'ADMIN' && profile.user_status === 'active' && (
+                            {profile.user_status === 'active' &&
+                              profile.email?.toLowerCase() !== 'cdeligi@qualitrolcorp.com' &&
+                              !['admin', 'master'].includes(String(profile.role || '').toLowerCase()) && (
                               <Button
                                 onClick={() => {
                                   setSelectedUserToRemove(profile);
