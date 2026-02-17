@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import type { SupabaseClient, PostgrestError } from '@supabase/supabase-js';
 import { getSupabaseClient, getSupabaseAdminClient } from "@/integrations/supabase/client";
-import { normalizeQuoteId, persistNormalizedQuoteId } from '@/utils/quoteIdGenerator';
+// quote id normalization disabled for legacy workflow compatibility
 import { deriveCustomerNameFromFields } from "@/utils/customerName";
 import {
   extractAdditionalQuoteInformation,
@@ -485,35 +485,9 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
         throw new Error('You do not have permission to perform this action.');
       }
 
-      if (action === 'approve') {
-        const normalizedQuoteId = normalizeQuoteId(quote.id);
-
-        if (normalizedQuoteId && normalizedQuoteId !== quote.id) {
-          try {
-            await persistNormalizedQuoteId(quote.id, normalizedQuoteId, client);
-            targetQuoteId = normalizedQuoteId;
-
-            setQuotes(prevQuotes => prevQuotes.map(current => (
-              current.id === quoteId
-                ? { ...current, id: normalizedQuoteId }
-                : current
-            )));
-
-            setActionLoading(prev => {
-              const updated = { ...prev };
-              delete updated[quoteId];
-              updated[normalizedQuoteId] = true;
-              return updated;
-            });
-          } catch (normalizationError) {
-            console.warn('Failed to normalize quote id during approval:', normalizationError);
-            toast({
-              title: 'Quote ID normalization skipped',
-              description: 'The quote kept its original identifier because it is still referenced elsewhere.',
-            });
-          }
-        }
-      }
+      // Keep the original quote id during approval workflow.
+      // Legacy environments can fail admin-decision lookup when ids are normalized mid-flow.
+      targetQuoteId = quote.id;
 
       const ensureClaimed = async () => {
         if (isAdminLane) {
