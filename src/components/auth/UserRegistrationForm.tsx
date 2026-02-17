@@ -120,9 +120,22 @@ const UserRegistrationForm = ({ onSubmit, onBack }: UserRegistrationFormProps) =
           .limit(1)
           .maybeSingle();
 
-        const recipients = Array.isArray((emailSettings as any)?.notification_recipients)
+        const baseRecipients = Array.isArray((emailSettings as any)?.notification_recipients)
           ? (emailSettings as any).notification_recipients
           : [];
+
+        const { data: adminProfiles } = await supabase
+          .from('profiles')
+          .select('email, role');
+
+        const roleRecipients = (adminProfiles || [])
+          .filter((p: any) => ['admin', 'master'].includes(String(p.role || '').toLowerCase()))
+          .map((p: any) => String(p.email || '').trim())
+          .filter((e: string) => e.length > 0);
+
+        const recipients = Array.from(new Set([...(baseRecipients || []), ...roleRecipients]));
+
+        const regId = `REG-${Date.now()}`;
 
         if (recipients.length > 0) {
           await Promise.allSettled(
@@ -132,7 +145,7 @@ const UserRegistrationForm = ({ onSubmit, onBack }: UserRegistrationFormProps) =
                   recipientEmail,
                   recipientName: 'Admin',
                   senderName: `${formData.firstName} ${formData.lastName}`,
-                  quoteId: `REG-${Date.now()}`,
+                  quoteId: regId,
                   quoteName: 'New User Registration Request',
                   permissionLevel: 'view',
                   message: `New user request: ${formData.email} (${formData.requestedRole}) — needs review and approval.`,
@@ -143,7 +156,7 @@ const UserRegistrationForm = ({ onSubmit, onBack }: UserRegistrationFormProps) =
         }
 
         await supabase.from('admin_notifications').insert({
-          quote_id: `REG-${Date.now()}`,
+          quote_id: regId,
           notification_type: 'user_registration_pending_review',
           message_content: {
             email: formData.email,
