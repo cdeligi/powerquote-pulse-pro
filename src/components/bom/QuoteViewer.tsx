@@ -22,6 +22,17 @@ import {
   parseQuoteFieldsValue,
 } from '@/utils/additionalQuoteInformation';
 
+interface QuoteEvent {
+  id: string;
+  event_type: string;
+  actor_id?: string | null;
+  actor_role?: string | null;
+  previous_state?: string | null;
+  new_state?: string | null;
+  payload?: Record<string, any> | null;
+  created_at: string;
+}
+
 interface Quote {
   id: string;
   status: string;
@@ -63,6 +74,7 @@ const QuoteViewer: React.FC = () => {
   const [bomItems, setBomItems] = useState<BOMItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [quoteEvents, setQuoteEvents] = useState<QuoteEvent[]>([]);
 
   const isDraft = quote?.status === 'draft';
   const isExplicitView = mode === 'view';
@@ -177,6 +189,14 @@ const QuoteViewer: React.FC = () => {
         additional_quote_information: additionalQuoteInfo ?? null,
         customer_name: resolvedCustomerName,
       });
+
+      const { data: eventsData } = await supabase
+        .from('quote_events')
+        .select('*')
+        .eq('quote_id', quoteId)
+        .order('created_at', { ascending: false })
+        .limit(30);
+      setQuoteEvents((eventsData || []) as QuoteEvent[]);
 
       if (quoteData.status === 'draft' && quoteData.draft_bom?.items && Array.isArray(quoteData.draft_bom.items)) {
         const loadedItems: BOMItem[] = quoteData.draft_bom.items.map((item: any) => {
@@ -652,7 +672,32 @@ const QuoteViewer: React.FC = () => {
           </CardContent>
         </Card>
       </div>
-    </div>
+    
+          <Card className="mt-6">
+            <CardHeader>
+              <CardTitle>Approval Timeline & Audit Log</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {quoteEvents.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No workflow events recorded yet.</p>
+              ) : (
+                <div className="space-y-2">
+                  {quoteEvents.map((ev) => (
+                    <div key={ev.id} className="rounded border p-2 text-sm">
+                      <div className="font-medium">{ev.event_type}</div>
+                      <div className="text-muted-foreground">{new Date(ev.created_at).toLocaleString()} · {ev.actor_role || 'system'} · {ev.actor_id || '-'}</div>
+                      {(ev.previous_state || ev.new_state) && (
+                        <div className="text-xs text-muted-foreground">{ev.previous_state || '-'} → {ev.new_state || '-'}</div>
+                      )}
+                      {ev.payload && <pre className="mt-1 text-xs overflow-auto">{JSON.stringify(ev.payload, null, 2)}</pre>}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+</div>
   );
 };
 

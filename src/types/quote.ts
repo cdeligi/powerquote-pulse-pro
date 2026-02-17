@@ -3,7 +3,9 @@ import { BOMItem } from "./product";
 
 export type QuotePriority = 'High' | 'Medium' | 'Low' | 'Urgent';
 export type Currency = 'USD' | 'EURO' | 'GBP' | 'CAD' | 'BRL';
-export type QuoteStatus = 'draft' | 'pending_approval' | 'approved' | 'rejected' | 'under-review';
+export type QuoteWorkflowState = 'draft' | 'submitted' | 'admin_review' | 'finance_review' | 'approved' | 'rejected' | 'needs_revision' | 'closed';
+export type QuoteStatus = 'draft' | 'pending_approval' | 'approved' | 'rejected' | 'under-review' | 'submitted' | 'admin_review' | 'finance_review' | 'needs_revision';
+export type QuoteDecisionStatus = 'pending' | 'approved' | 'rejected' | 'requires_finance' | 'needs_revision';
 
 export interface Quote {
   id: string;
@@ -53,6 +55,31 @@ export interface Quote {
   partner_commission_rate?: number;
   partner_commission_type?: 'discount' | 'commission' | null;
   partner_commission_value?: number;
+  owner_id?: string | null;
+  workflow_state?: QuoteWorkflowState;
+  workflow_locked?: boolean;
+  admin_reviewer_id?: string | null;
+  finance_reviewer_id?: string | null;
+  admin_claimed_at?: string | null;
+  finance_claimed_at?: string | null;
+  admin_decision_status?: QuoteDecisionStatus;
+  admin_decision_notes?: string | null;
+  admin_decision_at?: string | null;
+  admin_decision_by?: string | null;
+  finance_decision_status?: 'pending' | 'approved' | 'rejected' | 'escalated';
+  finance_decision_notes?: string | null;
+  finance_notes?: string | null;
+  finance_decision_at?: string | null;
+  finance_decision_by?: string | null;
+  requires_finance_approval?: boolean;
+  finance_threshold_snapshot?: Record<string, any> | null;
+  finance_margin_breached?: boolean;
+  sfdc_case_id?: string | null;
+  sfdc_quote_id?: string | null;
+  sfdc_sync_status?: string | null;
+  sfdc_sync_error?: string | null;
+  sfdc_last_synced_at?: string | null;
+  sfdc_payload?: Record<string, any> | null;
 }
 
 export interface QuoteItem {

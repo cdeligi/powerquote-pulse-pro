@@ -288,6 +288,28 @@ const QuoteDetails = ({
   const storedAdditionalQuoteInfo = quote.additional_quote_information?.trim() ?? '';
   const hasStoredAdditionalQuoteInfo = storedAdditionalQuoteInfo.length > 0;
 
+
+  const toDate = (value?: string | null): Date | null => {
+    if (!value) return null;
+    const d = new Date(value);
+    return Number.isNaN(d.getTime()) ? null : d;
+  };
+
+  const ageDaysBetween = (start?: string | null, end?: string | null): string => {
+    const s = toDate(start);
+    const e = toDate(end);
+    if (!s || !e) return '-';
+    const days = Math.max(0, Math.ceil((e.getTime() - s.getTime()) / (1000 * 60 * 60 * 24)));
+    return `${days} day${days === 1 ? '' : 's'}`;
+  };
+
+  const submittedAt = quote.submitted_at || quote.created_at;
+  const adminClaimedAt = (quote as any).admin_claimed_at || quote.submitted_at || quote.created_at;
+  const adminDecidedAt = (quote as any).admin_decision_at || quote.reviewed_at;
+  const financeClaimedAt = (quote as any).finance_claimed_at;
+  const financeDecidedAt = (quote as any).finance_decision_at;
+  const finalDecisionAt = financeDecidedAt || adminDecidedAt || quote.reviewed_at || quote.updated_at;
+
   const formatCurrency = (value: number) => {
     return `${quote.currency} ${value.toLocaleString(undefined, {
       minimumFractionDigits: 2,
@@ -803,33 +825,62 @@ const QuoteDetails = ({
       {!isWorkflowPending && (
         <Card className="bg-gray-900 border-gray-800">
           <CardHeader>
-            <CardTitle className="text-white">Quote Status</CardTitle>
+            <CardTitle className="text-white">Quote Status & Approval History</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-2">
+            <div className="space-y-3">
               <p className="text-gray-400">
                 This quote has been <span className="text-white font-medium">{workflowState.replace('_', ' ')}</span>
-                {quote.reviewed_at && (
-                  <span> on {new Date(quote.reviewed_at).toLocaleDateString()}</span>
-                )}
+                {quote.reviewed_at && <span> on {new Date(quote.reviewed_at).toLocaleDateString()}</span>}
               </p>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div className="bg-gray-800 p-3 rounded">
+                  <p className="text-xs text-gray-400">Admin Step Age</p>
+                  <p className="text-white font-semibold">{ageDaysBetween(adminClaimedAt, adminDecidedAt)}</p>
+                </div>
+                <div className="bg-gray-800 p-3 rounded">
+                  <p className="text-xs text-gray-400">Finance Step Age</p>
+                  <p className="text-white font-semibold">{ageDaysBetween(financeClaimedAt, financeDecidedAt)}</p>
+                </div>
+                <div className="bg-gray-800 p-3 rounded">
+                  <p className="text-xs text-gray-400">Total Case Age</p>
+                  <p className="text-white font-semibold">{ageDaysBetween(submittedAt, finalDecisionAt)}</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <Label className="text-gray-400">Admin Reviewer</Label>
+                  <p className="text-gray-200 mt-1">{(quote as any).admin_reviewer_name || quote.admin_reviewer_id || 'N/A'}</p>
+                </div>
+                <div>
+                  <Label className="text-gray-400">Finance Reviewer</Label>
+                  <p className="text-gray-200 mt-1">{(quote as any).finance_reviewer_name || quote.finance_reviewer_id || 'N/A'}</p>
+                </div>
+              </div>
+
               {quote.approval_notes && (
                 <div>
-                  <Label className="text-gray-400">Approval Notes:</Label>
-                  <p className="text-gray-300 bg-gray-800 p-2 rounded mt-1">{quote.approval_notes}</p>
+                  <Label className="text-gray-400">Admin Notes</Label>
+                  <p className="text-gray-300 bg-gray-800 p-2 rounded mt-1 whitespace-pre-wrap">{quote.approval_notes}</p>
+                </div>
+              )}
+              {((quote as any).finance_notes || quote.finance_decision_notes) && (
+                <div>
+                  <Label className="text-gray-400">Finance Notes</Label>
+                  <p className="text-gray-300 bg-gray-800 p-2 rounded mt-1 whitespace-pre-wrap">{(quote as any).finance_notes || quote.finance_decision_notes}</p>
                 </div>
               )}
               {hasStoredAdditionalQuoteInfo && (
                 <div>
-                  <Label className="text-gray-400">Additional Quote Information:</Label>
-                  <p className="text-gray-300 bg-gray-800 p-2 rounded mt-1 whitespace-pre-wrap">
-                    {storedAdditionalQuoteInfo}
-                  </p>
+                  <Label className="text-gray-400">Additional Quote Information</Label>
+                  <p className="text-gray-300 bg-gray-800 p-2 rounded mt-1 whitespace-pre-wrap">{storedAdditionalQuoteInfo}</p>
                 </div>
               )}
               {quote.rejection_reason && (
                 <div>
-                  <Label className="text-gray-400">Rejection Reason:</Label>
+                  <Label className="text-gray-400">Rejection Reason</Label>
                   <p className="text-gray-300 bg-gray-800 p-2 rounded mt-1">{quote.rejection_reason}</p>
                 </div>
               )}

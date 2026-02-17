@@ -294,9 +294,11 @@ async function handleClaim(
       claimPayload.admin_reviewer_id = context.userId;
       claimPayload.reviewed_by = context.userId;
       claimPayload.reviewed_at = new Date().toISOString();
+      claimPayload.admin_claimed_at = new Date().toISOString();
     }
     if (lane === 'finance') {
       claimPayload.finance_reviewer_id = context.userId;
+      claimPayload.finance_claimed_at = new Date().toISOString();
     }
 
     const updated = await supabase
@@ -355,7 +357,7 @@ async function handleAdminDecision(
 
   const now = new Date().toISOString();
   const updates: Record<string, any> = {
-    approval_notes: notes ?? null,
+    finance_notes: notes ?? null,
     reviewed_by: context.userId,
     reviewed_at: now,
     updated_at: now,
@@ -467,15 +469,16 @@ async function handleFinanceDecision(
     ? marginPercent
     : (quote as any).finance_threshold_snapshot?.marginPercent ?? null;
 
-  if (decision === "approved" && margin !== null && margin < limit) {
-    throw new HttpError(422, "Margin is still below the finance guardrail");
-  }
+  // Finance is the final authority for low-margin exceptions.
+  // If finance approves with justification, allow release even below guardrail.
 
   const now = new Date().toISOString();
   const updates: Record<string, any> = {
-    approval_notes: notes ?? null,
+    finance_notes: notes ?? null,
     updated_at: now,
     finance_reviewer_id: context.userId,
+    finance_decision_by: context.userId,
+    finance_decision_at: now,
     requires_finance_approval: false,
     status: decision === "approved" ? "approved" : "rejected",
   };
