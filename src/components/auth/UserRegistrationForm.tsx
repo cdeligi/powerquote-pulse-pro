@@ -196,6 +196,8 @@ const UserRegistrationForm = ({ onSubmit, onBack }: UserRegistrationFormProps) =
           alert(`Email notification failed: ${JSON.stringify(applicantJson)}`);
         } else {
           console.log('Applicant notification sent:', applicantJson);
+          const emailId = applicantJson?.result?.data?.id || applicantJson?.result?.data?.[0]?.id;
+          alert(`Request submitted. Confirmation email sent (id: ${emailId || 'unknown'}). Check Inbox/Spam/Promotions.`);
         }
 
         await supabase.from('admin_notifications').insert({
