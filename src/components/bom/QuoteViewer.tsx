@@ -756,18 +756,21 @@ setBomItems(loadedItems);
                       <div className="flex-1">
                         <h4 className="font-medium text-foreground">{item.product.name}</h4>
                         <p className="text-sm text-muted-foreground">{item.product.description}</p>
-                        {infoUrl && (
-                          <p className="text-sm mt-1">
+                        <p className="text-sm mt-1 text-muted-foreground">
+                          Product Info:{' '}
+                          {infoUrl ? (
                             <a
                               href={infoUrl}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="text-blue-600 hover:text-blue-500 underline"
                             >
-                              Product Info
+                              Open link
                             </a>
-                          </p>
-                        )}
+                          ) : (
+                            <span>Not available</span>
+                          )}
+                        </p>
                         <p className="text-sm text-muted-foreground">Part Number: {item.partNumber}</p>
                       </div>
                       <div className="text-right">
