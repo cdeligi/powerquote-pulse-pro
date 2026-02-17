@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { Resend } from "https://esm.sh/resend@3.2.0";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -77,7 +78,6 @@ const handler = async (req: Request): Promise<Response> => {
         <p><strong>${senderName}</strong> sent a notification from PowerQuotePro.</p>
         <p><strong>Context:</strong> ${quoteName}</p>
         <p><strong>ID:</strong> ${quoteId}</p>
-        <p><strong>Permission:</strong> ${permissionLevel}</p>
         ${message ? `<div style="margin-top:12px;padding:12px;border:1px solid #e5e7eb;border-radius:8px;background:#f9fafb"><strong>Message:</strong><br/>${String(message).replaceAll('<','&lt;').replaceAll('>','&gt;')}</div>` : ''}
         <p style="margin-top:16px">Regards,<br/>PowerQuotePro</p>
       </div>

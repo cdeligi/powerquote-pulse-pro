@@ -156,7 +156,7 @@ const UserRegistrationForm = ({ onSubmit, onBack }: UserRegistrationFormProps) =
                   quoteId: regId,
                   quoteName: 'New User Registration Request',
                   permissionLevel: 'view',
-                  message: `New user request: ${formData.email} (${formData.requestedRole}). Please review within 2 business days (48 hours) and approve or deny.`,
+                  message: `New user request: ${formData.email}. Requested access level: ${formData.requestedRole}. Please review within 2 business days (48 hours) and approve or deny.`, 
                 }),
               });
               const json = await res.json().catch(() => ({}));
@@ -188,7 +188,7 @@ const UserRegistrationForm = ({ onSubmit, onBack }: UserRegistrationFormProps) =
             quoteName: 'Access Request Received',
             permissionLevel: 'view',
             message:
-              'We received your access request. It is now under analysis and may take up to 2 business days (48 hours) to approve or deny. You will receive an email when a decision is made.',
+              `We received your access request for access level: ${formData.requestedRole}. It is now under analysis and may take up to 2 business days (48 hours) to approve or deny. You will receive an email when a decision is made.`, 
           }),
         });
 
