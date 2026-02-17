@@ -73,6 +73,11 @@ const DEFAULT_FEATURES: Feature[] = [
     key: 'FEATURE_BOM_SHOW_PARTNER_COMMISSION',
     label: 'View Partner Commission',
     description: 'Allows users to view partner commission costs in BOM',
+  },
+  {
+    key: 'FEATURE_ACCESS_ADMIN_PANEL',
+    label: 'Access to Admin Panel',
+    description: 'Allows user to open Admin Panel and manage administrative workflows.',
   }
 ];
 

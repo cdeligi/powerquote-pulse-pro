@@ -36,8 +36,17 @@ export function usePermissions(): PermissionData & { has: (featureKey: string) =
 
         if (roleError) throw roleError;
 
-        const normalizedUserRole = String(user.role || '').toUpperCase();
-        const roleDefaults = (allRoleDefaults || []).filter((row: any) => String(row.role || '').toUpperCase() === normalizedUserRole);
+        const normalizedUserRole = String(user.role || '').toLowerCase();
+        const roleAliases: Record<string, string[]> = {
+          level1: ['level1','level_1','sales'],
+          level2: ['level2','level_2'],
+          level3: ['level3','level_3'],
+          admin: ['admin'],
+          finance: ['finance'],
+          master: ['master'],
+        };
+        const aliases = roleAliases[normalizedUserRole] || [normalizedUserRole];
+        const roleDefaults = (allRoleDefaults || []).filter((row: any) => aliases.includes(String(row.role || '').toLowerCase()));
 
         // Fetch user overrides
         const { data: userOverrides, error: overrideError } = await supabase
@@ -98,7 +107,8 @@ export const FEATURES = {
   BOM_FORCE_PART_NUMBER: 'FEATURE_BOM_FORCE_PART_NUMBER',
   BOM_EDIT_PART_NUMBER: 'FEATURE_BOM_EDIT_PART_NUMBER',
   BOM_EDIT_PRICE: 'FEATURE_BOM_EDIT_PRICE',
-  BOM_SHOW_PARTNER_COMMISSION: 'FEATURE_BOM_SHOW_PARTNER_COMMISSION'
+  BOM_SHOW_PARTNER_COMMISSION: 'FEATURE_BOM_SHOW_PARTNER_COMMISSION',
+  ACCESS_ADMIN_PANEL: 'FEATURE_ACCESS_ADMIN_PANEL'
 } as const;
 
 // Role labels for UI display

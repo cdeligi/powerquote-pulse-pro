@@ -13,6 +13,7 @@ import {
   BarChart3,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { FEATURES, usePermissions } from '@/hooks/usePermissions';
 
 interface ModernSidebarProps {
   user: {
@@ -29,6 +30,7 @@ export function ModernSidebar({ user, onLogout }: ModernSidebarProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [currentHash, setCurrentHash] = useState(window.location.hash);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { has } = usePermissions();
 
   useEffect(() => {
     const handleHashChange = () => {
@@ -39,11 +41,13 @@ export function ModernSidebar({ user, onLogout }: ModernSidebarProps) {
     return () => window.removeEventListener('hashchange', handleHashChange);
   }, []);
 
+  const canAccessAdminPanel = has(FEATURES.ACCESS_ADMIN_PANEL) || user.role === 'ADMIN' || user.role === 'MASTER';
+
   const menuItems = [
     { title: 'BOM Builder', icon: Wrench, path: '/bom-new', viewId: 'bom', useHash: false },
     { title: 'Quotes', icon: FileText, path: '/', viewId: 'quotes', useHash: true },
     { title: 'Pricing Analysis', icon: BarChart3, path: '/', viewId: 'pricing-analysis', useHash: true },
-    ...(user.role === 'ADMIN'
+    ...(canAccessAdminPanel
       ? [{ title: 'Admin Panel', icon: Settings, path: '/', viewId: 'admin', useHash: true }]
       : []),
   ];
@@ -60,9 +64,10 @@ export function ModernSidebar({ user, onLogout }: ModernSidebarProps) {
   const getRoleBadge = (role?: string) => {
     if (!role) return null;
     const roleConfig = {
-      ADMIN: { label: 'Admin', className: 'bg-destructive text-destructive-foreground' },
       SALES: { label: 'Sales', className: 'bg-blue-500 text-white' },
-      ENGINEER: { label: 'Engineer', className: 'bg-green-500 text-white' },
+      ADMIN: { label: 'Admin', className: 'bg-destructive text-destructive-foreground' },
+      FINANCE: { label: 'Finance', className: 'bg-amber-500 text-white' },
+      MASTER: { label: 'Master', className: 'bg-slate-600 text-white' },
     };
     const config = roleConfig[role as keyof typeof roleConfig] || { label: role, className: 'bg-muted' };
     return <Badge className={cn('text-xs', config.className)}>{config.label}</Badge>;
