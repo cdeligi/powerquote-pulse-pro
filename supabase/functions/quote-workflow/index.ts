@@ -330,7 +330,7 @@ async function handleAdminDecision(
 
   const { data: quote, error } = await supabase
     .from("quotes")
-    .select("workflow_state, finance_threshold_snapshot")
+    .select("*")
     .eq("id", quoteId)
     .single();
 
@@ -338,7 +338,10 @@ async function handleAdminDecision(
     throw new HttpError(404, "Quote not found");
   }
 
-  if ((quote.workflow_state ?? "draft") !== "admin_review") {
+  const currentStatus = String((quote as any).status || 'draft');
+  const isFinancePending = Boolean((quote as any).requires_finance_approval);
+  const canAdminDecide = ['submitted','pending_approval','under-review'].includes(currentStatus) && !isFinancePending;
+  if (!canAdminDecide) {
     throw new HttpError(400, "Quote is not in admin review");
   }
 
@@ -350,8 +353,8 @@ async function handleAdminDecision(
     admin_decision_at: now,
   };
 
-  let nextState = quote.workflow_state ?? "admin_review";
-  let thresholdSnapshot = quote.finance_threshold_snapshot;
+  let nextState = (quote as any).workflow_state ?? 'admin_review';
+  let thresholdSnapshot = (quote as any).finance_threshold_snapshot;
 
   if (decision === "requires_finance") {
     const limit = financeLimitPercent ?? (await getFinanceLimitValue(supabase)).percent;
@@ -366,32 +369,25 @@ async function handleAdminDecision(
     };
 
     Object.assign(updates, {
-      workflow_state: "finance_review",
-      status: "finance_review",
+      status: "under-review",
       requires_finance_approval: true,
-      finance_margin_breached: breached,
-      finance_threshold_snapshot: thresholdSnapshot,
     });
     nextState = "finance_review";
   } else if (decision === "approved") {
     Object.assign(updates, {
-      workflow_state: "approved",
       status: "approved",
       requires_finance_approval: false,
-      finance_margin_breached: false,
     });
     nextState = "approved";
   } else if (decision === "rejected") {
     Object.assign(updates, {
-      workflow_state: "rejected",
       status: "rejected",
       requires_finance_approval: false,
     });
     nextState = "rejected";
   } else if (decision === "needs_revision") {
     Object.assign(updates, {
-      workflow_state: "needs_revision",
-      status: "needs_revision",
+      status: "submitted",
       requires_finance_approval: false,
     });
     nextState = "needs_revision";
@@ -440,7 +436,7 @@ async function handleFinanceDecision(
 
   const { data: quote, error } = await supabase
     .from("quotes")
-    .select("workflow_state, finance_threshold_snapshot")
+    .select("*")
     .eq("id", quoteId)
     .single();
 
@@ -448,15 +444,15 @@ async function handleFinanceDecision(
     throw new HttpError(404, "Quote not found");
   }
 
-  if ((quote.workflow_state ?? "draft") !== "finance_review") {
+  if (!(quote as any).requires_finance_approval) {
     throw new HttpError(400, "Quote is not waiting for finance");
   }
 
-  const snapshotLimit = quote.finance_threshold_snapshot?.limitPercent;
+  const snapshotLimit = (quote as any).finance_threshold_snapshot?.limitPercent;
   const limit = financeLimitPercent ?? snapshotLimit ?? (await getFinanceLimitValue(supabase)).percent;
   const margin = typeof marginPercent === "number"
     ? marginPercent
-    : quote.finance_threshold_snapshot?.marginPercent ?? null;
+    : (quote as any).finance_threshold_snapshot?.marginPercent ?? null;
 
   if (decision === "approved" && margin !== null && margin < limit) {
     throw new HttpError(422, "Margin is still below the finance guardrail");
@@ -468,9 +464,7 @@ async function handleFinanceDecision(
     finance_decision_notes: notes ?? null,
     finance_decision_by: context.userId,
     finance_decision_at: now,
-    finance_margin_breached: margin !== null ? margin < limit : false,
     requires_finance_approval: false,
-    workflow_state: decision === "approved" ? "approved" : "rejected",
     status: decision === "approved" ? "approved" : "rejected",
   };
 
@@ -485,7 +479,7 @@ async function handleFinanceDecision(
     throw new HttpError(500, "Unable to record finance decision");
   }
 
-  await logEvent(supabase, quoteId, "quote_finance_decision", context, quote.workflow_state, updates.workflow_state, {
+  await logEvent(supabase, quoteId, "quote_finance_decision", context, (quote as any).status ?? null, updates.status ?? null, {
     decision,
     notes,
     marginPercent: margin,
