@@ -139,9 +139,9 @@ const UserRegistrationForm = ({ onSubmit, onBack }: UserRegistrationFormProps) =
 
         // Notify admins/masters
         if (recipients.length > 0) {
-          await Promise.allSettled(
-            recipients.map((recipientEmail: string) =>
-              supabase.functions.invoke('send-quote-notifications', {
+          const results = await Promise.all(
+            recipients.map(async (recipientEmail: string) => {
+              const res = await supabase.functions.invoke('send-quote-notifications', {
                 body: {
                   recipientEmail,
                   recipientName: 'Admin',
@@ -151,13 +151,21 @@ const UserRegistrationForm = ({ onSubmit, onBack }: UserRegistrationFormProps) =
                   permissionLevel: 'view',
                   message: `New user request: ${formData.email} (${formData.requestedRole}). Please review within 2 business days (48 hours) and approve or deny.`,
                 },
-              })
-            )
+              });
+              return { recipientEmail, error: res.error, data: res.data };
+            })
           );
+
+          const failed = results.filter((r) => r.error);
+          if (failed.length > 0) {
+            console.warn('Admin notifications failed:', failed);
+          } else {
+            console.log('Admin notifications sent:', results);
+          }
         }
 
         // Notify applicant
-        await supabase.functions.invoke('send-quote-notifications', {
+        const applicantNotify = await supabase.functions.invoke('send-quote-notifications', {
           body: {
             recipientEmail: formData.email,
             recipientName: `${formData.firstName} ${formData.lastName}`.trim(),
@@ -168,6 +176,11 @@ const UserRegistrationForm = ({ onSubmit, onBack }: UserRegistrationFormProps) =
             message: 'We received your access request. It is now under analysis and may take up to 2 business days (48 hours) to approve or deny. You will receive an email when a decision is made.',
           },
         });
+        if (applicantNotify.error) {
+          console.warn('Applicant notification failed:', applicantNotify.error);
+        } else {
+          console.log('Applicant notification sent:', applicantNotify.data);
+        }
 
         await supabase.from('admin_notifications').insert({
           quote_id: regId,
