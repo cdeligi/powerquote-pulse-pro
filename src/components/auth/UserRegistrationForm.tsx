@@ -141,8 +141,13 @@ const UserRegistrationForm = ({ onSubmit, onBack }: UserRegistrationFormProps) =
         if (recipients.length > 0) {
           const results = await Promise.all(
             recipients.map(async (recipientEmail: string) => {
-              const res = await supabase.functions.invoke('send-quote-notifications', {
-                body: {
+              const res = await fetch(fnUrl, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
+                },
+                body: JSON.stringify({
                   recipientEmail,
                   recipientName: 'Admin',
                   senderName: `${formData.firstName} ${formData.lastName}`,
@@ -150,9 +155,10 @@ const UserRegistrationForm = ({ onSubmit, onBack }: UserRegistrationFormProps) =
                   quoteName: 'New User Registration Request',
                   permissionLevel: 'view',
                   message: `New user request: ${formData.email} (${formData.requestedRole}). Please review within 2 business days (48 hours) and approve or deny.`,
-                },
+                }),
               });
-              return { recipientEmail, error: res.error, data: res.data };
+              const json = await res.json().catch(() => ({}));
+              return { recipientEmail, error: res.ok ? null : json, data: json };
             })
           );
 
@@ -164,22 +170,32 @@ const UserRegistrationForm = ({ onSubmit, onBack }: UserRegistrationFormProps) =
           }
         }
 
-        // Notify applicant
-        const applicantNotify = await supabase.functions.invoke('send-quote-notifications', {
-          body: {
+        // Notify applicant (direct fetch to avoid auth/RLS issues on public registration page)
+        const fnUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-quote-notifications`;
+        const applicantRes = await fetch(fnUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
+          },
+          body: JSON.stringify({
             recipientEmail: formData.email,
             recipientName: `${formData.firstName} ${formData.lastName}`.trim(),
             senderName: 'PowerQuotePro',
             quoteId: regId,
             quoteName: 'Access Request Received',
             permissionLevel: 'view',
-            message: 'We received your access request. It is now under analysis and may take up to 2 business days (48 hours) to approve or deny. You will receive an email when a decision is made.',
-          },
+            message:
+              'We received your access request. It is now under analysis and may take up to 2 business days (48 hours) to approve or deny. You will receive an email when a decision is made.',
+          }),
         });
-        if (applicantNotify.error) {
-          console.warn('Applicant notification failed:', applicantNotify.error);
+
+        const applicantJson = await applicantRes.json().catch(() => ({}));
+        if (!applicantRes.ok) {
+          console.warn('Applicant notification failed:', applicantJson);
+          alert(`Email notification failed: ${JSON.stringify(applicantJson)}`);
         } else {
-          console.log('Applicant notification sent:', applicantNotify.data);
+          console.log('Applicant notification sent:', applicantJson);
         }
 
         await supabase.from('admin_notifications').insert({
