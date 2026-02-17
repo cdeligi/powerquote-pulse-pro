@@ -294,6 +294,19 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
         });
       }
 
+      const submitterEmails = [...new Set((quotesData || []).map((q: any) => q.submitted_by_email).filter(Boolean))];
+      const submitterNameByEmail = new Map<string, string>();
+      if (submitterEmails.length > 0) {
+        const { data: submitterProfiles } = await supabase
+          .from('profiles')
+          .select('email, first_name, last_name')
+          .in('email', submitterEmails as string[]);
+        (submitterProfiles || []).forEach((p: any) => {
+          const full = `${p.first_name || ''} ${p.last_name || ''}`.trim();
+          if (p.email) submitterNameByEmail.set(String(p.email), full || String(p.email));
+        });
+      }
+
       // Fetch BOM items for each quote
       const quotesWithBOM = await Promise.all(
         (quotesData || []).map(async (quote) => {
@@ -338,6 +351,9 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
             reviewed_by_name: (quote.requires_finance_approval ? (quote.admin_reviewer_id || quote.reviewed_by) : (quote.reviewed_by || quote.admin_reviewer_id))
               ? reviewerNameById.get((quote.requires_finance_approval ? (quote.admin_reviewer_id || quote.reviewed_by) : (quote.reviewed_by || quote.admin_reviewer_id))) || (quote.requires_finance_approval ? (quote.admin_reviewer_id || quote.reviewed_by) : (quote.reviewed_by || quote.admin_reviewer_id))
               : null,
+            admin_reviewer_name: quote.admin_reviewer_id ? reviewerNameById.get(quote.admin_reviewer_id) || quote.admin_reviewer_id : null,
+            finance_reviewer_name: quote.finance_reviewer_id ? reviewerNameById.get(quote.finance_reviewer_id) || quote.finance_reviewer_id : null,
+            submitted_by_display: quote.submitted_by_email ? (submitterNameByEmail.get(quote.submitted_by_email) || quote.submitted_by_name || quote.submitted_by_email) : (quote.submitted_by_name || ''),
           } as Quote;
         })
       );
@@ -907,7 +923,7 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
                           
                           <div className="flex items-center space-x-2 text-sm text-gray-400">
                             <UserIcon className="h-4 w-4" />
-                            <span>{quote.submitted_by_name}</span>
+                            <span>{(quote as any).submitted_by_display || quote.submitted_by_name || quote.submitted_by_email}</span>
                           </div>
                           
                           <div className="flex items-center space-x-2 text-sm text-gray-400">
@@ -915,15 +931,17 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
                             <span>{getAgingDays(quote.created_at)} days</span>
                           </div>
 
-                          <div className="flex items-center space-x-2 text-sm">
-                            <span className="text-gray-500">Claimed by:</span>
-                            <span className="text-cyan-300">{getClaimOwnerLabel(quote)}</span>
+                          <div className="flex flex-col text-sm">
+                            <span><span className="text-gray-500">Quote Review Claimed by:</span> <span className="text-cyan-300">{(quote as any).admin_reviewer_name || getClaimOwnerLabel(quote)}</span></span>
+                            {quote.requires_finance_approval && <span><span className="text-gray-500">Finance Claimed by:</span> <span className="text-amber-300">{(quote as any).finance_reviewer_name || 'Unclaimed'}</span></span>}
                           </div>
                           
                           <div className="flex items-center space-x-2">
-                            <Badge className={`${workflowBadge.color} text-white`} variant="secondary">
-                              {workflowBadge.text}
-                            </Badge>
+                            {!(quote.requires_finance_approval || workflowState === 'finance_review') && (
+                              <Badge className={`${workflowBadge.color} text-white`} variant="secondary">
+                                {workflowBadge.text}
+                              </Badge>
+                            )}
                             {(quote.requires_finance_approval || workflowState === 'finance_review') && (
                               <Badge className="bg-orange-600 text-white" variant="secondary">
                                 Finance Approval Required
@@ -1018,15 +1036,17 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
                             <span>{new Date(quote.reviewed_at || quote.updated_at).toLocaleDateString()}</span>
                           </div>
 
-                          <div className="flex items-center space-x-2 text-sm">
-                            <span className="text-gray-500">Claimed by:</span>
-                            <span className="text-cyan-300">{getClaimOwnerLabel(quote)}</span>
+                          <div className="flex flex-col text-sm">
+                            <span><span className="text-gray-500">Quote Review Claimed by:</span> <span className="text-cyan-300">{(quote as any).admin_reviewer_name || getClaimOwnerLabel(quote)}</span></span>
+                            {quote.requires_finance_approval && <span><span className="text-gray-500">Finance Claimed by:</span> <span className="text-amber-300">{(quote as any).finance_reviewer_name || 'Unclaimed'}</span></span>}
                           </div>
                           
                           <div className="flex items-center space-x-2">
-                            <Badge className={`${workflowBadge.color} text-white`} variant="secondary">
-                              {workflowBadge.text}
-                            </Badge>
+                            {!(quote.requires_finance_approval || workflowState === 'finance_review') && (
+                              <Badge className={`${workflowBadge.color} text-white`} variant="secondary">
+                                {workflowBadge.text}
+                              </Badge>
+                            )}
                             {(quote.requires_finance_approval || workflowState === 'finance_review') && (
                               <Badge className="bg-orange-600 text-white" variant="secondary">
                                 Finance Approval Required
