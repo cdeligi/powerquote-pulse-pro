@@ -714,12 +714,32 @@ const QuoteViewer: React.FC = () => {
                   No BOM items in this quote
                 </div>
               ) : (
-                bomItems.map((item, index) => (
+                bomItems.map((item, index) => {
+                  const rawInfoUrl =
+                    (item.product as any)?.productInfoUrl ||
+                    (item.product as any)?.product_info_url ||
+                    (item as any)?.productInfoUrl ||
+                    (item as any)?.product_info_url;
+                  const infoUrl = typeof rawInfoUrl === 'string' && /^https?:\/\//i.test(rawInfoUrl) ? rawInfoUrl : null;
+
+                  return (
                   <div key={item.id || index} className="border border-border rounded-lg p-4 bg-card">
                     <div className="flex justify-between items-start">
                       <div className="flex-1">
                         <h4 className="font-medium text-foreground">{item.product.name}</h4>
                         <p className="text-sm text-muted-foreground">{item.product.description}</p>
+                        {infoUrl && (
+                          <p className="text-sm mt-1">
+                            <a
+                              href={infoUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-blue-600 hover:text-blue-500 underline"
+                            >
+                              Product Info
+                            </a>
+                          </p>
+                        )}
                         <p className="text-sm text-muted-foreground">Part Number: {item.partNumber}</p>
                       </div>
                       <div className="text-right">
@@ -733,7 +753,8 @@ const QuoteViewer: React.FC = () => {
                       </div>
                     </div>
                   </div>
-                ))
+                  );
+                })
               )}
             </div>
           </CardContent>
