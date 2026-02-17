@@ -155,6 +155,12 @@ const isQuoteInQueue = (quote: Quote): boolean => {
   return WORKFLOW_QUEUE_STATES.has(state);
 };
 
+const getLaneBadgeText = (quote: Quote, defaultText: string): string => {
+  const claimed = quote.reviewed_by ? String(quote.reviewed_by) : '';
+  if (!claimed) return defaultText;
+  return `Claimed: ${claimed.slice(0, 8)}`;
+};
+
 const getStatusBadge = (quote: Quote) => {
   const state = getDerivedWorkflowState(quote);
   switch (state) {
@@ -925,7 +931,7 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
                           
                           <div className="flex items-center space-x-2">
                             <Badge className={`${workflowBadge.color} text-white`} variant="secondary">
-                              {workflowBadge.text}
+                              {getLaneBadgeText(quote, workflowBadge.text)}
                             </Badge>
                             {(quote.requires_finance_approval || workflowState === 'finance_review') && (
                               <Badge className="bg-orange-600 text-white" variant="secondary">
@@ -1031,7 +1037,7 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
                           
                           <div className="flex items-center space-x-2">
                             <Badge className={`${workflowBadge.color} text-white`} variant="secondary">
-                              {workflowBadge.text}
+                              {getLaneBadgeText(quote, workflowBadge.text)}
                             </Badge>
                             {(quote.requires_finance_approval || workflowState === 'finance_review') && (
                               <Badge className="bg-orange-600 text-white" variant="secondary">

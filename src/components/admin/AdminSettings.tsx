@@ -435,10 +435,10 @@ const AdminSettings = () => {
                   className="bg-gray-800 border-gray-600 text-white"
                 />
                 <Textarea
-                  value={workflowTemplate?.body_template ?? ''}
+                  value={stripHtmlTags(workflowTemplate?.body_template ?? '')}
                   onChange={(e) => setWorkflowTemplate(prev => ({
                     ...(prev ?? { template_type: 'quote_admin_decision', enabled: true }),
-                    body_template: e.target.value,
+                    body_template: stripHtmlTags(e.target.value),
                   }))}
                   className="bg-gray-800 border-gray-600 text-white min-h-[120px]"
                   placeholder="Compose the workflow email body..."

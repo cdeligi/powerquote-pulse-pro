@@ -147,15 +147,15 @@ export default function PermissionsOverview() {
       
       // Update local state first for immediate UI feedback
       setRoleDefaults(prev => {
-        const existing = prev.find(rd => rd.role === role && rd.feature_key === featureKey);
+        const existing = prev.find(rd => rd.feature_key === featureKey && roleMatches(role, String(rd.role || '')));
         if (existing) {
           return prev.map(rd => 
-            rd.role === role && rd.feature_key === featureKey 
-              ? { ...rd, allowed } 
+            rd.feature_key === featureKey && roleMatches(role, String(rd.role || ''))
+              ? { ...rd, allowed }
               : rd
           );
         }
-        return [...prev, { role, feature_key: featureKey, allowed }];
+        return [...prev, { role: ROLE_DB_CANONICAL[role], feature_key: featureKey, allowed } as any];
       });
 
       // Update in database (safe path without assuming composite unique constraint)
