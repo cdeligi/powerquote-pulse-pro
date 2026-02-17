@@ -843,10 +843,10 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
                 }`}
               >
                 <CardHeader className="p-3">
-                  <div className="flex justify-between items-start">
-                    <div className="flex-1">
-                      <div className="flex items-center space-x-2">
-                        <div className="flex-1">
+                  <div className="flex justify-between items-start gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start gap-2">
+                        <div className="flex-1 min-w-0">
                           <div className="flex items-center space-x-2">
                             <DragHandle field={field} />
                             <CardTitle className={`${field.required ? 'text-red-400' : 'text-white'} text-sm font-medium truncate`}>
@@ -871,7 +871,7 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
                           {field.conditional_logic && field.conditional_logic.length > 0 && (
                             <div className="mt-2 text-xs text-gray-300">
                               <p className="text-gray-400">Sub-items:</p>
-                              <p className="truncate">{getConditionalSubfieldLabels(field).join(', ') || 'None'}</p>
+                              <p className="truncate max-w-full">{getConditionalSubfieldLabels(field).join(', ') || 'None'}</p>
                             </div>
                           )}
                           <div className="flex items-center gap-2 mt-2">
@@ -886,7 +886,7 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
                             />
                           </div>
                         </div>
-                        <div className="flex-shrink-0">
+                        <div className="shrink-0 pt-0.5">
                           <Switch
                             id={`enabled-${field.id}`}
                             checked={field.enabled}
@@ -899,7 +899,7 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
                         <code className="bg-gray-800 px-1 rounded">{field.id}</code>
                       </div>
                     </div>
-                    <div className="flex space-x-2">
+                    <div className="flex shrink-0 items-center space-x-1">
                       <Button variant="ghost" size="sm" onClick={() => openEditDialog(field)} className="text-blue-400 hover:text-blue-300">
                         <Edit2 className="h-4 w-4" />
                       </Button>
