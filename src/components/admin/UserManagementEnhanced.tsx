@@ -818,7 +818,7 @@ const UserManagementEnhanced = ({ user }: UserManagementEnhancedProps) => {
             <CardHeader>
               <CardTitle className="text-white flex items-center">
                 <Users className="h-5 w-5 mr-2" />
-                User Profiles ({userProfiles.length})
+                User Profiles ({userProfiles.filter(u => u.user_status === 'active').length})
               </CardTitle>
               <CardDescription className="text-gray-400">
                 Manage existing user accounts and permissions
@@ -841,7 +841,7 @@ const UserManagementEnhanced = ({ user }: UserManagementEnhancedProps) => {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {userProfiles.map((profile) => (
+                    {userProfiles.filter((p) => p.user_status === 'active').map((profile) => (
                       <TableRow key={profile.id} className="border-gray-800">
                         <TableCell>
                           <div>
