@@ -281,6 +281,19 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
 
       console.log(`Fetched ${quotesData?.length || 0} quotes from database`);
 
+      const reviewerIds = [...new Set((quotesData || []).map((q: any) => q.reviewed_by).filter(Boolean))];
+      const reviewerNameById = new Map<string, string>();
+      if (reviewerIds.length > 0) {
+        const { data: reviewerProfiles } = await supabase
+          .from('profiles')
+          .select('id, first_name, last_name, email')
+          .in('id', reviewerIds as string[]);
+        (reviewerProfiles || []).forEach((p: any) => {
+          const full = `${p.first_name || ''} ${p.last_name || ''}`.trim();
+          reviewerNameById.set(p.id, full || p.email || p.id);
+        });
+      }
+
       // Fetch BOM items for each quote
       const quotesWithBOM = await Promise.all(
         (quotesData || []).map(async (quote) => {
@@ -322,6 +335,7 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
             quote_fields: normalizedFields ?? undefined,
             additional_quote_information: additionalInfo ?? null,
             bom_items: enrichedItems,
+            reviewed_by_name: quote.reviewed_by ? reviewerNameById.get(quote.reviewed_by) || quote.reviewed_by : null,
           } as Quote;
         })
       );
@@ -755,10 +769,10 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
     return diffDays;
   };
 
-  const getClaimOwnerLabel = (quote: Quote): string => {
+  const getClaimOwnerLabel = (quote: Quote & { reviewed_by_name?: string | null }): string => {
     if (quote.reviewed_by) {
       if (user?.id && quote.reviewed_by === user.id) return user.name || user.email || String(user.id).slice(0, 8);
-      return String(quote.reviewed_by).slice(0, 8);
+      return quote.reviewed_by_name || String(quote.reviewed_by).slice(0, 8);
     }
     return 'Unclaimed';
   };

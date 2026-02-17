@@ -286,14 +286,18 @@ async function handleClaim(
     data = rpcResult.data;
   } else {
     // Legacy-schema fallback: many environments do not have claim RPC/reviewer columns.
+    const claimPayload: Record<string, any> = {
+      status: nextState,
+      updated_at: new Date().toISOString(),
+    };
+    if (lane === 'admin') {
+      claimPayload.reviewed_by = context.userId;
+      claimPayload.reviewed_at = new Date().toISOString();
+    }
+
     const updated = await supabase
       .from("quotes")
-      .update({
-        status: nextState,
-        reviewed_by: context.userId,
-        reviewed_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
+      .update(claimPayload)
       .eq("id", quoteId)
       .select("*")
       .single();
@@ -347,10 +351,10 @@ async function handleAdminDecision(
 
   const now = new Date().toISOString();
   const updates: Record<string, any> = {
-    admin_decision_status: decision,
-    admin_decision_notes: notes ?? null,
-    admin_decision_by: context.userId,
-    admin_decision_at: now,
+    approval_notes: notes ?? null,
+    reviewed_by: context.userId,
+    reviewed_at: now,
+    updated_at: now,
   };
 
   let nextState = (quote as any).workflow_state ?? 'admin_review';
@@ -377,12 +381,14 @@ async function handleAdminDecision(
     Object.assign(updates, {
       status: "approved",
       requires_finance_approval: false,
+      rejection_reason: null,
     });
     nextState = "approved";
   } else if (decision === "rejected") {
     Object.assign(updates, {
       status: "rejected",
       requires_finance_approval: false,
+      rejection_reason: notes ?? 'Rejected by admin',
     });
     nextState = "rejected";
   } else if (decision === "needs_revision") {
@@ -460,10 +466,8 @@ async function handleFinanceDecision(
 
   const now = new Date().toISOString();
   const updates: Record<string, any> = {
-    finance_decision_status: decision,
-    finance_decision_notes: notes ?? null,
-    finance_decision_by: context.userId,
-    finance_decision_at: now,
+    approval_notes: notes ?? null,
+    updated_at: now,
     requires_finance_approval: false,
     status: decision === "approved" ? "approved" : "rejected",
   };
