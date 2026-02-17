@@ -48,6 +48,11 @@ interface UserProfile {
   role: string;
   department: string;
   user_status: string;
+  job_title?: string | null;
+  phone_number?: string | null;
+  manager_email?: string | null;
+  company_name?: string | null;
+  business_justification?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -96,31 +101,7 @@ const UserManagementEnhanced = ({ user }: UserManagementEnhancedProps) => {
   const [isCreatingDepartment, setIsCreatingDepartment] = useState(false);
   const [isDepartmentDialogOpen, setIsDepartmentDialogOpen] = useState(false); // For the new department dialog
 
-  // Mock data for registration requests - in real app this would come from API
-  const [pendingRequests, setPendingRequests] = useState<UserRegistrationRequest[]>([
-    {
-      id: 'REG-2024-001',
-      email: 'john.smith@acmepower.com',
-      firstName: 'John',
-      lastName: 'Smith',
-      department: 'sales',
-      jobTitle: 'Senior Sales Engineer',
-      phoneNumber: '+1 (555) 123-4567',
-      businessJustification: 'I need access to the PowerQuotePro system to generate quotes for our utility customers.',
-      requestedRole: 'level2',
-      managerEmail: 'manager@acmepower.com',
-      companyName: 'ACME Power Solutions',
-      status: 'pending',
-      createdAt: '2024-01-16T10:30:00Z',
-      ipAddress: '192.168.1.100',
-      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
-      loginAttempts: 0,
-      isLocked: false,
-      twoFactorEnabled: false,
-      agreedToTerms: true,
-      agreedToPrivacyPolicy: true
-    }
-  ]);
+  const [pendingRequests, setPendingRequests] = useState<UserRegistrationRequest[]>([]);
 
   const auditLogs: SecurityAuditLog[] = [
     {
@@ -165,8 +146,60 @@ const UserManagementEnhanced = ({ user }: UserManagementEnhancedProps) => {
     }
   };
 
+  const mapRequestRow = (row: any): UserRegistrationRequest => ({
+    id: row.id,
+    email: row.email ?? '',
+    firstName: row.first_name ?? '',
+    lastName: row.last_name ?? '',
+    department: row.department ?? '',
+    jobTitle: row.job_title ?? '',
+    phoneNumber: row.phone_number ?? '',
+    businessJustification: row.business_justification ?? '',
+    requestedRole: (row.requested_role ?? 'level1') as any,
+    managerEmail: row.manager_email ?? '',
+    companyName: row.company_name ?? '',
+    status: (row.status ?? 'pending') as any,
+    createdAt: row.requested_at ?? row.created_at ?? new Date().toISOString(),
+    reviewedAt: row.processed_at ?? undefined,
+    reviewedBy: row.processed_by ?? undefined,
+    rejectionReason: row.rejection_reason ?? undefined,
+    ipAddress: row.ip_address ?? '',
+    userAgent: row.user_agent ?? '',
+    loginAttempts: row.login_attempts ?? 0,
+    isLocked: row.is_locked ?? false,
+    twoFactorEnabled: row.two_factor_enabled ?? false,
+    agreedToTerms: row.agreed_to_terms ?? false,
+    agreedToPrivacyPolicy: row.agreed_to_privacy_policy ?? false,
+  });
+
+  const fetchPendingRequests = async () => {
+    try {
+      const fnResult = await supabase.functions.invoke('admin-users/user-requests', { method: 'GET' });
+      if (!fnResult.error && (fnResult.data as any)?.requests) {
+        setPendingRequests(((fnResult.data as any).requests || []).map(mapRequestRow));
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from('user_requests')
+        .select('*')
+        .order('requested_at', { ascending: false });
+      if (error) throw error;
+      setPendingRequests((data || []).map(mapRequestRow));
+    } catch (error) {
+      console.error('Error fetching registration requests:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to fetch registration requests.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+
   useEffect(() => {
     fetchUserProfiles();
+    fetchPendingRequests();
     const loadDepartments = async () => {
       const fetchedDepartments = await departmentService.fetchDepartments();
       setDepartments((fetchedDepartments && fetchedDepartments.length > 0) ? fetchedDepartments : DEPARTMENT_FALLBACK);
@@ -351,42 +384,59 @@ const UserManagementEnhanced = ({ user }: UserManagementEnhancedProps) => {
     }
   };
 
-  const handleApproveRequest = (requestId: string) => {
-    setPendingRequests(prev => 
-      prev.map(req => 
-        req.id === requestId 
-          ? { 
-              ...req, 
-              status: 'approved', 
-              reviewedAt: new Date().toISOString(),
-              reviewedBy: user.id 
-            }
-          : req
-      )
-    );
-    console.log(`Approved registration request: ${requestId}`);
+  const handleApproveRequest = async (requestId: string) => {
+    try {
+      const result = await supabase.functions.invoke('admin-users/approve-request', {
+        method: 'POST',
+        body: { requestId },
+      });
+
+      if (result.error) throw result.error;
+
+      toast({
+        title: 'Success',
+        description: 'Request approved and user created successfully.',
+      });
+
+      await fetchPendingRequests();
+      await fetchUserProfiles();
+    } catch (error: any) {
+      console.error('Error approving request:', error);
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to approve request.',
+        variant: 'destructive',
+      });
+    }
   };
 
-  const handleRejectRequest = () => {
+  const handleRejectRequest = async () => {
     if (!selectedRequest || !rejectionReason.trim()) return;
 
-    setPendingRequests(prev => 
-      prev.map(req => 
-        req.id === selectedRequest.id 
-          ? { 
-              ...req, 
-              status: 'rejected', 
-              reviewedAt: new Date().toISOString(),
-              reviewedBy: user.id,
-              rejectionReason: rejectionReason.trim()
-            }
-          : req
-      )
-    );
-    
-    setIsReviewDialogOpen(false);
-    setSelectedRequest(null);
-    setRejectionReason('');
+    try {
+      const result = await supabase.functions.invoke('admin-users/reject-request', {
+        method: 'PUT',
+        body: { requestId: selectedRequest.id, reason: rejectionReason.trim() },
+      });
+      if (result.error) throw result.error;
+
+      toast({
+        title: 'Success',
+        description: 'Request rejected successfully.',
+      });
+
+      setIsReviewDialogOpen(false);
+      setSelectedRequest(null);
+      setRejectionReason('');
+      await fetchPendingRequests();
+    } catch (error: any) {
+      console.error('Error rejecting request:', error);
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to reject request.',
+        variant: 'destructive',
+      });
+    }
   };
 
   const getStatusBadge = (status: UserRegistrationRequest['status']) => {
@@ -813,7 +863,7 @@ const UserManagementEnhanced = ({ user }: UserManagementEnhancedProps) => {
                       </TableCell>
                       <TableCell>
                         <Badge variant="outline" className="text-blue-400 border-blue-400">
-                          {request.requestedRole === 'level1' ? 'Level 1 Sales' : 'Level 2 Sales'}
+                          {request.requestedRole === 'level1' ? 'Level 1' : request.requestedRole === 'level2' ? 'Level 2' : request.requestedRole === 'level3' ? 'Level 3' : request.requestedRole === 'admin' ? 'Admin' : request.requestedRole === 'finance' ? 'Finance' : request.requestedRole === 'master' ? 'Master' : request.requestedRole}
                         </Badge>
                       </TableCell>
                       <TableCell>
@@ -861,7 +911,7 @@ const UserManagementEnhanced = ({ user }: UserManagementEnhancedProps) => {
                                   <div>
                                     <Label className="text-gray-400">Requested Role</Label>
                                     <p className="text-white">
-                                      {request.requestedRole === 'level1' ? 'Level 1 Sales' : 'Level 2 Sales'}
+                                      {request.requestedRole === 'level1' ? 'Level 1' : request.requestedRole === 'level2' ? 'Level 2' : request.requestedRole === 'level3' ? 'Level 3' : request.requestedRole === 'admin' ? 'Admin' : request.requestedRole === 'finance' ? 'Finance' : request.requestedRole === 'master' ? 'Master' : request.requestedRole}
                                     </p>
                                   </div>
                                 </div>
@@ -1068,11 +1118,11 @@ const UserManagementEnhanced = ({ user }: UserManagementEnhancedProps) => {
           role: selectedUserForEdit.role,
           department: selectedUserForEdit.department,
           userStatus: selectedUserForEdit.user_status,
-          jobTitle: null,
-          phoneNumber: null,
-          managerEmail: null,
-          companyName: null,
-          businessJustification: null
+          jobTitle: selectedUserForEdit.job_title ?? null,
+          phoneNumber: selectedUserForEdit.phone_number ?? null,
+          managerEmail: selectedUserForEdit.manager_email ?? null,
+          companyName: selectedUserForEdit.company_name ?? null,
+          businessJustification: selectedUserForEdit.business_justification ?? null
         } : null}
         isOpen={!!selectedUserForEdit}
         onClose={() => setSelectedUserForEdit(null)}

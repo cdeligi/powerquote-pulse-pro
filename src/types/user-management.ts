@@ -8,7 +8,7 @@ export interface UserRegistrationRequest {
   jobTitle: string;
   phoneNumber: string;
   businessJustification: string;
-  requestedRole: 'level1' | 'level2';
+  requestedRole: 'level1' | 'level2' | 'level3' | 'admin' | 'finance' | 'master';
   managerEmail: string;
   companyName: string;
   status: 'pending' | 'approved' | 'rejected' | 'under_review';
