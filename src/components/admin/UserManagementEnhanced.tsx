@@ -348,9 +348,17 @@ const UserManagementEnhanced = ({ user }: UserManagementEnhancedProps) => {
   const handleCreateUser = async () => {
     setIsCreatingUser(true);
     try {
-      const { data, error } = await supabase.functions.invoke('admin-users/users', {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('No session found');
+
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-users/users`, {
         method: 'POST',
-        body: {
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
           email: newEmail,
           password: newPassword,
           firstName: newFirstName,
@@ -361,17 +369,20 @@ const UserManagementEnhanced = ({ user }: UserManagementEnhancedProps) => {
           phoneNumber: newPhoneNumber,
           managerEmail: newManagerEmail,
           businessJustification: newBusinessJustification,
-        },
+        }),
       });
 
-      if (error) throw error;
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(data?.error || `Create user failed (${response.status})`);
+      }
       if (!(data as any)?.success) {
         throw new Error((data as any)?.error || 'Failed to create user.');
       }
 
       toast({
         title: 'User Created',
-        description: `New user ${newEmail} created successfully!`,
+        description: (data as any)?.message || `New user ${newEmail} created successfully!`,
       });
 
       // Clear form
