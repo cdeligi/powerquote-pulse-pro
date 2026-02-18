@@ -681,17 +681,17 @@ const UserManagementEnhanced = ({ user }: UserManagementEnhancedProps) => {
       </div>
 
       <Tabs defaultValue="users" className="w-full">
-        <TabsList className="grid w-full grid-cols-4 bg-gray-800">
-          <TabsTrigger value="users" className="text-white data-[state=active]:bg-red-600">
+        <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 bg-gray-800 h-auto gap-1">
+          <TabsTrigger value="users" className="text-white data-[state=active]:bg-red-600 text-xs md:text-sm">
             User Profiles
           </TabsTrigger>
-          <TabsTrigger value="requests" className="text-white data-[state=active]:bg-red-600">
+          <TabsTrigger value="requests" className="text-white data-[state=active]:bg-red-600 text-xs md:text-sm">
             Registration Requests
           </TabsTrigger>
-          <TabsTrigger value="permissions" className="text-white data-[state=active]:bg-red-600">
+          <TabsTrigger value="permissions" className="text-white data-[state=active]:bg-red-600 text-xs md:text-sm">
             Permissions
           </TabsTrigger>
-          <TabsTrigger value="audit" className="text-white data-[state=active]:bg-red-600">
+          <TabsTrigger value="audit" className="text-white data-[state=active]:bg-red-600 text-xs md:text-sm">
             Security Audit Log
           </TabsTrigger>
         </TabsList>
@@ -884,10 +884,10 @@ const UserManagementEnhanced = ({ user }: UserManagementEnhancedProps) => {
                     <TableRow className="border-gray-800">
                       <TableHead className="text-gray-300">User</TableHead>
                       <TableHead className="text-gray-300">Role</TableHead>
-                      <TableHead className="text-gray-300">Department</TableHead>
+                      <TableHead className="text-gray-300 hidden md:table-cell">Department</TableHead>
                       <TableHead className="text-gray-300">Status</TableHead>
-                      <TableHead className="text-gray-300">Last Login</TableHead>
-                      <TableHead className="text-gray-300">Created</TableHead>
+                      <TableHead className="text-gray-300 hidden lg:table-cell">Last Login</TableHead>
+                      <TableHead className="text-gray-300 hidden md:table-cell">Created</TableHead>
                       <TableHead className="text-gray-300">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -907,22 +907,22 @@ const UserManagementEnhanced = ({ user }: UserManagementEnhancedProps) => {
                             {profile.role}
                           </Badge>
                         </TableCell>
-                        <TableCell className="text-gray-300">
+                        <TableCell className="text-gray-300 hidden md:table-cell">
                           {profile.department || '-'}
                         </TableCell>
                         <TableCell>
                           {getUserStatusBadge(profile.user_status)}
                         </TableCell>
-                        <TableCell className="text-gray-300 text-xs">
+                        <TableCell className="text-gray-300 text-xs hidden lg:table-cell">
                           {profile.last_sign_in_at || profile.lastSignInAt
                             ? new Date((profile.last_sign_in_at || profile.lastSignInAt) as string).toLocaleString()
                             : 'Never'}
                         </TableCell>
-                        <TableCell className="text-gray-300">
+                        <TableCell className="text-gray-300 hidden md:table-cell">
                           {new Date(profile.created_at).toLocaleDateString()}
                         </TableCell>
                          <TableCell>
-            <div className="flex space-x-2">
+            <div className="flex flex-wrap gap-2">
                             <Button
                               onClick={() => setSelectedUserForEdit(profile)}
                               size="sm"
@@ -973,10 +973,10 @@ const UserManagementEnhanced = ({ user }: UserManagementEnhancedProps) => {
                 <TableHeader>
                   <TableRow className="border-gray-800">
                     <TableHead className="text-gray-300">User</TableHead>
-                    <TableHead className="text-gray-300">Company</TableHead>
+                    <TableHead className="text-gray-300 hidden md:table-cell">Company</TableHead>
                     <TableHead className="text-gray-300">Role</TableHead>
                     <TableHead className="text-gray-300">Status</TableHead>
-                    <TableHead className="text-gray-300">Submitted</TableHead>
+                    <TableHead className="text-gray-300 hidden md:table-cell">Submitted</TableHead>
                     <TableHead className="text-gray-300">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -992,7 +992,7 @@ const UserManagementEnhanced = ({ user }: UserManagementEnhancedProps) => {
                           <p className="text-xs text-gray-500">{request.jobTitle}</p>
                         </div>
                       </TableCell>
-                      <TableCell className="text-gray-300">
+                      <TableCell className="text-gray-300 hidden md:table-cell">
                         {request.companyName}
                       </TableCell>
                       <TableCell>
@@ -1003,11 +1003,11 @@ const UserManagementEnhanced = ({ user }: UserManagementEnhancedProps) => {
                       <TableCell>
                         {getStatusBadge(request.status)}
                       </TableCell>
-                      <TableCell className="text-gray-300">
+                      <TableCell className="text-gray-300 hidden md:table-cell">
                         {new Date(request.createdAt).toLocaleDateString()}
                       </TableCell>
                       <TableCell>
-                        <div className="flex space-x-2">
+                        <div className="flex flex-wrap gap-2">
                           <Dialog>
                             <DialogTrigger asChild>
                               <Button variant="outline" size="sm" className="text-white border-gray-600">
@@ -1021,7 +1021,7 @@ const UserManagementEnhanced = ({ user }: UserManagementEnhancedProps) => {
                                 </DialogTitle>
                               </DialogHeader>
                               <div className="space-y-4">
-                                <div className="grid grid-cols-2 gap-4">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                   <div>
                                     <Label className="text-gray-400">Name</Label>
                                     <p className="text-white">{request.firstName} {request.lastName}</p>
