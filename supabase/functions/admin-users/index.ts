@@ -399,31 +399,22 @@ async function handleApproveRequest(req: Request, supabase: any, adminId: string
 
   if (requestError) throw requestError;
 
-  // Send invite so the user sets their own password via email link
-  const { data: invited, error: inviteError } = await supabase.auth.admin.inviteUserByEmail(
-    request.email,
-    {
-      data: {
-        first_name: request.first_name,
-        last_name: request.last_name,
-        role: request.requested_role,
-        department: request.department,
-      },
-    }
-  );
+  // Find existing auth user by email (user already chose password during registration)
+  const { data: authUsers, error: listError } = await supabase.auth.admin.listUsers();
+  if (listError) throw listError;
 
-  if (inviteError) throw inviteError;
-
-  const invitedUserId = invited?.user?.id;
-  if (!invitedUserId) {
-    throw new Error('Invite sent but user ID was not returned by Supabase.');
+  const match = (authUsers?.users || []).find((u: any) => String(u.email || '').toLowerCase() === String(request.email || '').toLowerCase());
+  if (!match?.id) {
+    throw new Error('No auth user found for this email. User must complete registration first.');
   }
 
-  // Upsert profile with all fields from request
+  const userId = match.id;
+
+  // Upsert profile with all fields from request and activate
   const { error: profileError } = await supabase
     .from('profiles')
     .upsert({
-      id: invitedUserId,
+      id: userId,
       email: request.email,
       first_name: request.first_name,
       last_name: request.last_name,
@@ -464,8 +455,8 @@ async function handleApproveRequest(req: Request, supabase: any, adminId: string
       <div style="font-family:Arial,sans-serif;line-height:1.5">
         <p>Hello ${request.first_name ?? ''} ${request.last_name ?? ''},</p>
         <p>Your access request has been <strong>approved</strong>.</p>
-        <p>You will also receive (or may have already received) an invitation email to set your password and activate your account.</p>
-        <p>If you do not receive it within a few minutes, please check spam/junk or contact the admin team.</p>
+        <p>You can now log in using the password you created during registration.</p>
+        <p>If you forgot your password, use the “Forgot password” link on the login screen.</p>
         <p>Regards,<br/>PowerQuotePro</p>
       </div>
     `,

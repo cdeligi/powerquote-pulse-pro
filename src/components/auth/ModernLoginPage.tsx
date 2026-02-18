@@ -9,6 +9,7 @@ import UserRegistrationForm from "./UserRegistrationForm";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
 import qualitrolLogo from "@/assets/qualitrol-logo.png";
 
 interface ModernLoginPageProps {
@@ -197,7 +198,31 @@ export function ModernLoginPage({ onLogin }: ModernLoginPageProps) {
                   </div>
                   
                   <div className="space-y-2.5">
-                    <Label htmlFor="password" className="text-slate-700 font-medium text-sm">Password</Label>
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="password" className="text-slate-700 font-medium text-sm">Password</Label>
+                      <Button
+                        type="button"
+                        variant="link"
+                        className="text-slate-600 hover:text-slate-900 p-0 h-auto text-sm"
+                        onClick={async () => {
+                          if (!credentials.email) {
+                            setError('Enter your email first, then click Forgot password.');
+                            return;
+                          }
+                          setError(null);
+                          const { error } = await supabase.auth.resetPasswordForEmail(credentials.email, {
+                            redirectTo: `${window.location.origin}/#update-password`,
+                          });
+                          if (error) {
+                            setError(error.message);
+                            return;
+                          }
+                          setError('Password reset email sent. Check your inbox/spam.');
+                        }}
+                      >
+                        Forgot password?
+                      </Button>
+                    </div>
                     <Input
                       id="password"
                       type="password"

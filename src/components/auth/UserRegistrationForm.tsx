@@ -22,6 +22,8 @@ interface UserRegistrationFormProps {
 const UserRegistrationForm = ({ onSubmit, onBack }: UserRegistrationFormProps) => {
   const [formData, setFormData] = useState({
     email: '',
+    password: '',
+    confirmPassword: '',
     firstName: '',
     lastName: '',
     department: '',
@@ -88,7 +90,37 @@ const UserRegistrationForm = ({ onSubmit, onBack }: UserRegistrationFormProps) =
     setSubmitNotice(null);
     
     try {
-      // Insert into real database
+      // Validate password
+      if (formData.password.length < 12) {
+        alert('Password must be at least 12 characters.');
+        setIsSubmitting(false);
+        return;
+      }
+      if (formData.password !== formData.confirmPassword) {
+        alert('Passwords do not match.');
+        setIsSubmitting(false);
+        return;
+      }
+
+      // Create auth user (email confirmation required)
+      const { error: signUpError } = await supabase.auth.signUp({
+        email: formData.email,
+        password: formData.password,
+        options: {
+          data: {
+            first_name: formData.firstName,
+            last_name: formData.lastName,
+          },
+          emailRedirectTo: `${window.location.origin}/#login`,
+        },
+      });
+
+      if (signUpError) {
+        console.error('Auth signup error:', signUpError);
+        throw signUpError;
+      }
+
+      // Insert request into database
       const { error } = await supabase
         .from('user_requests')
         .insert({
@@ -223,6 +255,8 @@ const UserRegistrationForm = ({ onSubmit, onBack }: UserRegistrationFormProps) =
       // Reset form
       setFormData({
         email: '',
+        password: '',
+        confirmPassword: '',
         firstName: '',
         lastName: '',
         department: '',
@@ -338,6 +372,37 @@ const UserRegistrationForm = ({ onSubmit, onBack }: UserRegistrationFormProps) =
                   placeholder="Enter your email address"
                   required
                 />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="password" className="text-gray-700 dark:text-white font-medium mb-2 block">
+                    Password *
+                  </Label>
+                  <Input
+                    id="password"
+                    type="password"
+                    value={formData.password}
+                    onChange={(e) => handleInputChange('password', e.target.value)}
+                    className="bg-gray-50 dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white placeholder:text-gray-500 dark:placeholder:text-gray-400 focus:border-red-500 focus:ring-red-500"
+                    placeholder="Minimum 12 characters"
+                    required
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="confirmPassword" className="text-gray-700 dark:text-white font-medium mb-2 block">
+                    Confirm Password *
+                  </Label>
+                  <Input
+                    id="confirmPassword"
+                    type="password"
+                    value={formData.confirmPassword}
+                    onChange={(e) => handleInputChange('confirmPassword', e.target.value)}
+                    className="bg-gray-50 dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white placeholder:text-gray-500 dark:placeholder:text-gray-400 focus:border-red-500 focus:ring-red-500"
+                    placeholder="Repeat password"
+                    required
+                  />
+                </div>
               </div>
 
               <div>

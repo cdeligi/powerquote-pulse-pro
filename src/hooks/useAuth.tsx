@@ -354,14 +354,26 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       let profileData = profile;
 
       if (!profileData) {
-        console.log("[AuthProvider] No profile found, creating new profile for:", uid);
-        
+        console.log("[AuthProvider] No profile found, creating pending profile for:", uid);
+
         const { data: sessionData } = await supabase.auth.getSession();
         const userEmail = sessionData.session?.user?.email;
-        
+
         if (!userEmail) {
           throw new Error("No user email available for profile creation");
         }
+
+        // Try to infer requested role from latest user request
+        const { data: latestRequest } = await supabase
+          .from('user_requests')
+          .select('requested_role, department, job_title')
+          .eq('email', userEmail)
+          .order('requested_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        const inferredRole = (latestRequest as any)?.requested_role ?? 'level1';
+        const inferredDept = (latestRequest as any)?.department ?? null;
 
         const { data: createdProfile, error: createError } = await supabase
           .from("profiles")
@@ -370,8 +382,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             email: userEmail,
             first_name: "",
             last_name: "",
-            role: "SALES",
-            department: null,
+            role: inferredRole,
+            department: inferredDept,
+            user_status: 'pending',
           })
           .select()
           .single();
@@ -380,12 +393,27 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           console.error("[AuthProvider] Error creating profile:", createError);
           throw createError;
         }
-        
+
         profileData = createdProfile;
       }
 
       if (!profileData) {
         throw new Error("Failed to load user profile");
+      }
+
+      // Block login unless approved/active
+      const status = String((profileData as any).user_status || 'active').toLowerCase();
+      if (status !== 'active') {
+        console.warn('[AuthProvider] User is not active; blocking login:', { email: profileData.email, status });
+        await supabase.auth.signOut();
+        setUser(null);
+        setSession(null);
+        setError({
+          code: 'ACCESS_UNDER_REVIEW',
+          message: 'Access under review. Please wait up to 2 business days (48 hours) for approval.',
+          type: 'auth',
+        });
+        return null;
       }
 
       console.log("[AuthProvider] Profile loaded successfully:", profileData.email);
