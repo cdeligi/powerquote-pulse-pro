@@ -378,36 +378,75 @@ async function handleCreateUser(req: Request, supabase: any, adminId: string) {
   const tempPassword = password || Math.random().toString(36).slice(-8) + 'A1!';
   const dbRole = ensureRole(role);
 
-  // Try to find existing auth user first to avoid duplicate-user failures.
-  const { data: usersPage, error: listUsersError } = await supabase.auth.admin.listUsers();
-  if (listUsersError) throw listUsersError;
+  // Create Auth user first (avoid listUsers dependency which can fail on some projects).
+  const { data: authUser, error: authError } = await supabase.auth.admin.createUser({
+    email: safeEmail,
+    password: tempPassword,
+    email_confirm: true,
+    user_metadata: {
+      first_name: firstName,
+      last_name: lastName,
+      role: dbRole,
+      department,
+    },
+  });
 
-  const existingAuthUser = (usersPage?.users || []).find(
-    (u: any) => String(u.email || '').toLowerCase() === safeEmail,
-  );
+  // If user already exists in Auth, try to update existing profile by email.
+  if (authError) {
+    const msg = String((authError as any)?.message || authError);
+    if (/already|exists|registered/i.test(msg)) {
+      const { data: existingProfile, error: existingProfileError } = await supabase
+        .from('profiles')
+        .select('id')
+        .ilike('email', safeEmail)
+        .maybeSingle();
 
-  let userId = existingAuthUser?.id as string | undefined;
+      if (existingProfileError) throw existingProfileError;
+      if (!existingProfile?.id) {
+        throw new Error('User already exists in Auth, but no profile was found to update.');
+      }
 
-  if (!userId) {
-    const { data: authUser, error: authError } = await supabase.auth.admin.createUser({
-      email: safeEmail,
-      password: tempPassword,
-      email_confirm: true,
-      user_metadata: {
-        first_name: firstName,
-        last_name: lastName,
-        role: dbRole,
-        department,
-      },
-    });
+      const { error: updateExistingProfileError } = await supabase
+        .from('profiles')
+        .update({
+          first_name: firstName,
+          last_name: lastName,
+          role: dbRole,
+          department,
+          job_title: jobTitle,
+          phone_number: phoneNumber,
+          manager_email: managerEmail,
+          company_name: companyName || 'QUALITROL',
+          business_justification: businessJustification,
+          user_status: 'active',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', existingProfile.id);
 
-    if (authError) throw authError;
-    userId = authUser?.user?.id;
+      if (updateExistingProfileError) throw updateExistingProfileError;
+
+      await logAuditEvent(supabase, {
+        user_id: adminId,
+        event: `ADMIN_CREATE_USER_EXISTING_AUTH:${safeEmail}`,
+      });
+
+      return new Response(JSON.stringify({
+        success: true,
+        userId: existingProfile.id,
+        existed: true,
+        message: 'User already existed. Profile updated and activated.',
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    throw authError;
   }
 
+  const userId = authUser?.user?.id;
   if (!userId) throw new Error('Unable to resolve auth user id');
 
-  // Upsert profile (works for new and existing users)
+  // Insert/Upsert profile for newly created auth user.
   const { error: profileError } = await supabase
     .from('profiles')
     .upsert({
@@ -436,10 +475,8 @@ async function handleCreateUser(req: Request, supabase: any, adminId: string) {
   return new Response(JSON.stringify({
     success: true,
     userId,
-    existed: Boolean(existingAuthUser),
-    message: existingAuthUser
-      ? 'User already existed in Auth. Profile was updated and activated.'
-      : 'User created successfully.',
+    existed: false,
+    message: 'User created successfully.',
   }), {
     headers: { ...corsHeaders, 'Content-Type': 'application/json' }
   });
