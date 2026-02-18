@@ -15,6 +15,11 @@ type EmailTemplateRecord = {
   variables?: string[];
 };
 
+type ClaimLane = 'admin' | 'finance';
+
+type AdminDecision = 'approved' | 'rejected' | 'requires_finance' | 'needs_revision';
+type FinanceDecision = 'approved' | 'rejected';
+
 class QuoteWorkflowService {
   private supabase = getSupabaseClient();
 
@@ -94,6 +99,42 @@ class QuoteWorkflowService {
       },
     );
     return res.template;
+  }
+
+  async claimQuote(quoteId: string, lane: ClaimLane) {
+    return this.request<{ success: boolean; quote: any }>('/claim', {
+      method: 'POST',
+      body: { quoteId, lane },
+      searchParams: {},
+    });
+  }
+
+  async recordAdminDecision(payload: {
+    quoteId: string;
+    decision: AdminDecision;
+    notes?: string;
+    marginPercent?: number;
+    financeLimitPercent?: number;
+  }) {
+    return this.request<{ success: boolean; quote: any }>('/admin-decision', {
+      method: 'POST',
+      body: payload,
+      searchParams: {},
+    });
+  }
+
+  async recordFinanceDecision(payload: {
+    quoteId: string;
+    decision: FinanceDecision;
+    notes?: string;
+    marginPercent?: number;
+    financeLimitPercent?: number;
+  }) {
+    return this.request<{ success: boolean; quote: any }>('/finance-decision', {
+      method: 'POST',
+      body: payload,
+      searchParams: {},
+    });
   }
 }
 
