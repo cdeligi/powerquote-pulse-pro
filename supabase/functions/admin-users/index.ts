@@ -406,6 +406,19 @@ async function handleCreateUser(req: Request, supabase: any, adminId: string) {
         throw new Error('User already exists in Auth, but no profile was found to update.');
       }
 
+      // Force-reset password for existing Auth user using provided/new temp password.
+      const { error: resetExistingAuthError } = await supabase.auth.admin.updateUserById(existingProfile.id, {
+        password: tempPassword,
+        email_confirm: true,
+        user_metadata: {
+          first_name: firstName,
+          last_name: lastName,
+          role: dbRole,
+          department,
+        },
+      });
+      if (resetExistingAuthError) throw resetExistingAuthError;
+
       const { error: updateExistingProfileError } = await supabase
         .from('profiles')
         .update({
@@ -434,7 +447,7 @@ async function handleCreateUser(req: Request, supabase: any, adminId: string) {
         success: true,
         userId: existingProfile.id,
         existed: true,
-        message: 'User already existed. Profile updated and activated.',
+        message: 'User already existed. Password reset, profile updated and activated.',
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
