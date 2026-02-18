@@ -402,7 +402,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
 
       // Block login unless approved/active
-      const status = String((profileData as any).user_status || 'active').toLowerCase();
+      // Security: if user_status is missing/null, treat as pending (never grant access by default)
+      const status = String((profileData as any).user_status || 'pending').toLowerCase();
       if (status !== 'active') {
         console.warn('[AuthProvider] User is not active; blocking login:', { email: profileData.email, status });
         await supabase.auth.signOut();
