@@ -747,11 +747,11 @@ const UserManagementEnhanced = ({ user }: UserManagementEnhancedProps) => {
                       <SelectValue placeholder="Select a role" />
                     </SelectTrigger>
                     <SelectContent className="bg-gray-800 border-gray-700 text-white">
-                      <SelectItem value="level1">Level 1</SelectItem>
-                      <SelectItem value="level2">Level 2 (Sales)</SelectItem>
-                      <SelectItem value="level3">Level 3</SelectItem>
-                      <SelectItem value="admin">Admin Reviewer</SelectItem>
-                      <SelectItem value="finance">Finance Reviewer</SelectItem>
+                      <SelectItem value="level1">level1</SelectItem>
+                      <SelectItem value="level2">level2</SelectItem>
+                      <SelectItem value="level3">level3</SelectItem>
+                      <SelectItem value="admin">admin</SelectItem>
+                      <SelectItem value="finance">finance</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -986,7 +986,7 @@ const UserManagementEnhanced = ({ user }: UserManagementEnhancedProps) => {
                       </TableCell>
                       <TableCell>
                         <Badge variant="outline" className="text-blue-400 border-blue-400">
-                          {request.requestedRole === 'level1' ? 'Level 1' : request.requestedRole === 'level2' ? 'Level 2' : request.requestedRole === 'level3' ? 'Level 3' : request.requestedRole === 'admin' ? 'Admin' : request.requestedRole === 'finance' ? 'Finance' : request.requestedRole === 'master' ? 'Master' : request.requestedRole}
+                          {request.requestedRole}
                         </Badge>
                       </TableCell>
                       <TableCell>
@@ -1033,9 +1033,7 @@ const UserManagementEnhanced = ({ user }: UserManagementEnhancedProps) => {
                                   </div>
                                   <div>
                                     <Label className="text-gray-400">Requested Role</Label>
-                                    <p className="text-white">
-                                      {request.requestedRole === 'level1' ? 'Level 1' : request.requestedRole === 'level2' ? 'Level 2' : request.requestedRole === 'level3' ? 'Level 3' : request.requestedRole === 'admin' ? 'Admin' : request.requestedRole === 'finance' ? 'Finance' : request.requestedRole === 'master' ? 'Master' : request.requestedRole}
-                                    </p>
+                                    <p className="text-white">{request.requestedRole}</p>
                                   </div>
                                 </div>
                                 <div>

@@ -53,12 +53,12 @@ const UserRegistrationForm = ({ onSubmit, onBack }: UserRegistrationFormProps) =
   ];
 
   const FALLBACK_ACCESS_LEVELS = [
-    { value: 'level1', label: 'Level 1 - Partner Access' },
-    { value: 'level2', label: 'Level 2 - Sales Engineer Access' },
-    { value: 'level3', label: 'Level 3 - Directors Access' },
-    { value: 'admin', label: 'Admin - Quotes Engineering Team' },
-    { value: 'finance', label: 'Finance - Finance Approval' },
-    { value: 'master', label: 'Master - Full Control' },
+    { value: 'level1', label: 'level1' },
+    { value: 'level2', label: 'level2' },
+    { value: 'level3', label: 'level3' },
+    { value: 'admin', label: 'admin' },
+    { value: 'finance', label: 'finance' },
+    { value: 'master', label: 'master' },
   ];
 
   useEffect(() => {

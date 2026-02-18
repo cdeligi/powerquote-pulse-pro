@@ -181,12 +181,12 @@ export default function UserEditDialog({ user, isOpen, onClose, onSave, departme
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent className="bg-gray-800 border-gray-700">
-                  <SelectItem value="level1">Level 1</SelectItem>
-                  <SelectItem value="level2">Level 2</SelectItem>
-                  <SelectItem value="level3">Level 3</SelectItem>
-                  <SelectItem value="admin">Admin</SelectItem>
-                  <SelectItem value="finance">Finance</SelectItem>
-                  <SelectItem value="master" disabled={currentUserEmail !== 'cdeligi@qualitrolcorp.com' || user.email !== 'cdeligi@qualitrolcorp.com'}>Master</SelectItem>
+                  <SelectItem value="level1">level1</SelectItem>
+                  <SelectItem value="level2">level2</SelectItem>
+                  <SelectItem value="level3">level3</SelectItem>
+                  <SelectItem value="admin">admin</SelectItem>
+                  <SelectItem value="finance">finance</SelectItem>
+                  <SelectItem value="master" disabled={currentUserEmail !== 'cdeligi@qualitrolcorp.com' || user.email !== 'cdeligi@qualitrolcorp.com'}>master</SelectItem>
                 </SelectContent>
               </Select>
               {(currentUserEmail !== 'cdeligi@qualitrolcorp.com' || user.email !== 'cdeligi@qualitrolcorp.com') && (
