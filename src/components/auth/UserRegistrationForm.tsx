@@ -90,14 +90,38 @@ const UserRegistrationForm = ({ onSubmit, onBack }: UserRegistrationFormProps) =
     setSubmitNotice(null);
     
     try {
-      // Validate password
-      if (formData.password.length < 12) {
-        alert('Password must be at least 12 characters.');
+      // Validate password (current security standards: length + block common weak patterns)
+      const emailLower = String(formData.email || '').trim().toLowerCase();
+      const pass = String(formData.password || '');
+      const passLower = pass.toLowerCase();
+
+      const commonBad = new Set([
+        'password',
+        'password123',
+        '123456789012',
+        '1234567890123',
+        '12345678901234',
+        'qwertyuiopasdf',
+        'adminadminadmin',
+      ]);
+
+      if (pass.length < 12) {
+        setSubmitNotice('Registration failed: Password must be at least 12 characters.');
         setIsSubmitting(false);
         return;
       }
-      if (formData.password !== formData.confirmPassword) {
-        alert('Passwords do not match.');
+      if (pass !== formData.confirmPassword) {
+        setSubmitNotice('Registration failed: Passwords do not match.');
+        setIsSubmitting(false);
+        return;
+      }
+      if (commonBad.has(passLower)) {
+        setSubmitNotice('Registration failed: Password is too common. Choose a stronger password.');
+        setIsSubmitting(false);
+        return;
+      }
+      if (emailLower && (passLower.includes(emailLower) || passLower.includes(emailLower.split('@')[0] || ''))) {
+        setSubmitNotice('Registration failed: Password must not contain your email.');
         setIsSubmitting(false);
         return;
       }
