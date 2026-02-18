@@ -154,6 +154,9 @@ serve(async (req) => {
           return await handleCreateUser(req, supabaseAdmin, user.id);
         } else if (path === 'approve-request') {
           return await handleApproveRequest(req, supabaseAdmin, user.id);
+        } else if (path === 'delete-rejected-request') {
+          // Allow POST for compatibility (some clients may drop DELETE bodies)
+          return await handleDeleteRejectedRequest(req, supabaseAdmin, user.id);
         }
         break;
       

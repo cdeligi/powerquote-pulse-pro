@@ -505,7 +505,7 @@ const UserManagementEnhanced = ({ user }: UserManagementEnhancedProps) => {
 
     try {
       const result = await supabase.functions.invoke('admin-users/delete-rejected-request', {
-        method: 'DELETE',
+        method: 'POST',
         body: { requestId },
       });
       if (result.error) throw result.error;
