@@ -512,6 +512,36 @@ const UserManagementEnhanced = ({ user }: UserManagementEnhancedProps) => {
     }
   };
 
+  const handleHardDeleteRejectedRequest = async (requestId: string, email: string) => {
+    const confirmDelete = window.confirm(
+      `This will permanently delete auth user, profile, and request for ${email}.\n\nType-safe dialog will be added next, but do you want to proceed now?`,
+    );
+    if (!confirmDelete) return;
+
+    try {
+      const result = await supabase.functions.invoke('admin-users/delete-rejected-request', {
+        method: 'DELETE',
+        body: { requestId },
+      });
+      if (result.error) throw result.error;
+
+      toast({
+        title: 'Success',
+        description: 'Rejected user was permanently deleted.',
+      });
+
+      await fetchPendingRequests();
+      await fetchUserProfiles();
+    } catch (error: any) {
+      console.error('Error hard deleting rejected request:', error);
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to hard delete rejected user.',
+        variant: 'destructive',
+      });
+    }
+  };
+
   const getStatusBadge = (status: UserRegistrationRequest['status']) => {
     const badges = {
       pending: { color: 'bg-yellow-600', icon: Clock, text: 'Pending' },
@@ -1040,6 +1070,18 @@ const UserManagementEnhanced = ({ user }: UserManagementEnhancedProps) => {
                                 <XCircle className="h-4 w-4" />
                               </Button>
                             </>
+                          )}
+
+                          {request.status === 'rejected' && (
+                            <Button
+                              onClick={() => handleHardDeleteRejectedRequest(request.id, request.email)}
+                              size="sm"
+                              className="bg-red-600 hover:bg-red-700 text-white"
+                              title="Permanently delete rejected user"
+                            >
+                              <Trash2 className="h-4 w-4 mr-1" />
+                              Delete
+                            </Button>
                           )}
                         </div>
                       </TableCell>
