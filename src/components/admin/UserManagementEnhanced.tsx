@@ -3,7 +3,7 @@
  */
 
 import { useState, useEffect } from "react";
-import { User, Role } from "@/types/auth";
+import { User } from "@/types/auth";
 import { UserRegistrationRequest, SecurityAuditLog } from "@/types/user-management";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -90,7 +90,7 @@ const UserManagementEnhanced = ({ user }: UserManagementEnhancedProps) => {
   const [newPassword, setNewPassword] = useState('');
   const [newFirstName, setNewFirstName] = useState('');
   const [newLastName, setNewLastName] = useState('');
-  const [newRole, setNewRole] = useState<Role>('SALES'); // Default role
+  const [newRole, setNewRole] = useState<string>('level2'); // Default role
   const [newDepartment, setNewDepartment] = useState('');
   const [newJobTitle, setNewJobTitle] = useState('');
   const [newPhoneNumber, setNewPhoneNumber] = useState('');
@@ -348,39 +348,25 @@ const UserManagementEnhanced = ({ user }: UserManagementEnhancedProps) => {
   const handleCreateUser = async () => {
     setIsCreatingUser(true);
     try {
-      // 1. Sign up user with Supabase Auth
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: newEmail,
-        password: newPassword,
+      const { data, error } = await supabase.functions.invoke('admin-users/users', {
+        method: 'POST',
+        body: {
+          email: newEmail,
+          password: newPassword,
+          firstName: newFirstName,
+          lastName: newLastName,
+          role: newRole,
+          department: newDepartment,
+          jobTitle: newJobTitle,
+          phoneNumber: newPhoneNumber,
+          managerEmail: newManagerEmail,
+          businessJustification: newBusinessJustification,
+        },
       });
 
-      if (authError) {
-        throw new Error(authError.message);
-      }
-
-      if (!authData.user) {
-        throw new Error('User data not returned after signup.');
-      }
-
-      // 2. Insert profile data into public.profiles table
-      const { error: profileError } = await supabase.from('profiles').insert({
-        id: authData.user.id,
-        email: newEmail,
-        first_name: newFirstName,
-        last_name: newLastName,
-        role: newRole,
-        department: newDepartment,
-        job_title: newJobTitle,
-        phone_number: newPhoneNumber,
-        manager_email: newManagerEmail,
-        business_justification: newBusinessJustification,
-        user_status: 'active', // Default to active
-      });
-
-      if (profileError) {
-        // If profile creation fails, attempt to delete the auth user to prevent orphaned users
-        await supabase.auth.admin.deleteUser(authData.user.id);
-        throw new Error(profileError.message);
+      if (error) throw error;
+      if (!(data as any)?.success) {
+        throw new Error((data as any)?.error || 'Failed to create user.');
       }
 
       toast({
@@ -393,7 +379,7 @@ const UserManagementEnhanced = ({ user }: UserManagementEnhancedProps) => {
       setNewPassword('');
       setNewFirstName('');
       setNewLastName('');
-      setNewRole('SALES');
+      setNewRole('level2');
       setNewDepartment('');
       setNewJobTitle('');
       setNewPhoneNumber('');
@@ -401,8 +387,7 @@ const UserManagementEnhanced = ({ user }: UserManagementEnhancedProps) => {
       setNewBusinessJustification('');
 
       // Refresh user list
-      fetchUserProfiles();
-
+      await fetchUserProfiles();
     } catch (error: any) {
       console.error('Error creating user:', error);
       toast({
@@ -752,15 +737,17 @@ const UserManagementEnhanced = ({ user }: UserManagementEnhancedProps) => {
                 </div>
                 <div>
                   <Label htmlFor="new-role" className="text-white">Role</Label>
-                  <Select onValueChange={(value: Role) => setNewRole(value)} value={newRole}>
+                  <Select onValueChange={(value: string) => setNewRole(value)} value={newRole}>
                     <SelectTrigger className="bg-gray-800 border-gray-700 text-white">
                       <SelectValue placeholder="Select a role" />
                     </SelectTrigger>
                     <SelectContent className="bg-gray-800 border-gray-700 text-white">
-                      <SelectItem value="SALES">Sales</SelectItem>
-                      <SelectItem value="ADMIN">Admin Reviewer</SelectItem>
-                      <SelectItem value="FINANCE">Finance Reviewer</SelectItem>
-                      <SelectItem value="MASTER">Master Operator</SelectItem>
+                      <SelectItem value="level1">Level 1</SelectItem>
+                      <SelectItem value="level2">Sales</SelectItem>
+                      <SelectItem value="level3">Level 3</SelectItem>
+                      <SelectItem value="admin">Admin Reviewer</SelectItem>
+                      <SelectItem value="finance">Finance Reviewer</SelectItem>
+                      <SelectItem value="master">Master Operator</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

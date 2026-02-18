@@ -6,6 +6,7 @@ import nodemailer from "npm:nodemailer@6.9.13";
 
 // Simple template engine (Mustache-style)
 function renderTemplate(template: string, data: Record<string, any>): string {
+
   let result = template;
   for (const [key, value] of Object.entries(data)) {
     const regex = new RegExp(`{{${key}}}`, 'g');
@@ -15,6 +16,20 @@ function renderTemplate(template: string, data: Record<string, any>): string {
     return data[varName] ? content : '';
   });
   return result;
+}
+
+function normalizeRoleForDb(input: string | null | undefined): string {
+  const raw = String(input || '').trim().toLowerCase();
+
+  if (raw === 'sales' || raw === 'level_2' || raw === 'level2') return 'level2';
+  if (raw === 'level_1' || raw === 'level1') return 'level1';
+  if (raw === 'level_3' || raw === 'level3') return 'level3';
+  if (raw === 'admin') return 'admin';
+  if (raw === 'finance' || raw === 'finance_reviewer') return 'finance';
+  if (raw === 'master') return 'master';
+
+  // Keep raw for explicit validation failure against DB check constraints.
+  return raw;
 }
 
 const corsHeaders = {
@@ -340,6 +355,7 @@ async function handleCreateUser(req: Request, supabase: any, adminId: string) {
   } = await req.json();
   
   const tempPassword = password || Math.random().toString(36).slice(-8) + 'A1!';
+  const dbRole = normalizeRoleForDb(role);
   
   // Create auth user
   const { data: authUser, error: authError } = await supabase.auth.admin.createUser({
@@ -349,7 +365,7 @@ async function handleCreateUser(req: Request, supabase: any, adminId: string) {
     user_metadata: {
       first_name: firstName,
       last_name: lastName,
-      role,
+      role: dbRole,
       department
     }
   });
@@ -364,7 +380,7 @@ async function handleCreateUser(req: Request, supabase: any, adminId: string) {
       email,
       first_name: firstName,
       last_name: lastName,
-      role,
+      role: dbRole,
       department,
       job_title: jobTitle,
       phone_number: phoneNumber,
@@ -406,12 +422,14 @@ async function handleUpdateUser(req: Request, supabase: any, adminId: string) {
     email 
   } = await req.json();
 
+  const dbRole = normalizeRoleForDb(role);
+
   // Update auth user metadata
   const { error: authError } = await supabase.auth.admin.updateUserById(userId, {
     user_metadata: {
       first_name: firstName,
       last_name: lastName,
-      role
+      role: dbRole
     },
     email_confirm: true
   });
@@ -424,7 +442,7 @@ async function handleUpdateUser(req: Request, supabase: any, adminId: string) {
     .update({
       first_name: firstName,
       last_name: lastName,
-      role,
+      role: dbRole,
       user_status: userStatus,
       department,
       job_title: jobTitle,
@@ -486,6 +504,7 @@ async function handleApproveRequest(req: Request, supabase: any, adminId: string
   }
 
   const userId = match.id;
+  const dbRole = normalizeRoleForDb(request.requested_role);
 
   // Upsert profile with all fields from request and activate
   const { error: profileError } = await supabase
@@ -495,7 +514,7 @@ async function handleApproveRequest(req: Request, supabase: any, adminId: string
       email: request.email,
       first_name: request.first_name,
       last_name: request.last_name,
-      role: request.requested_role,
+      role: dbRole,
       department: request.department,
       job_title: request.job_title,
       phone_number: request.phone_number,
