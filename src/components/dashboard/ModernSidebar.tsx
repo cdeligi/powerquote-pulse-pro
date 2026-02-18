@@ -84,8 +84,14 @@ export function ModernSidebar({ user, onLogout }: ModernSidebarProps) {
           </div>
           {!collapsed && (
             <div className="flex-1 min-w-0">
-              <p className="truncate text-sm font-medium leading-tight">{user.full_name || user.email}</p>
-              <p className="truncate text-xs text-muted-foreground leading-tight mt-0.5">{user.email}</p>
+              {user.full_name ? (
+                <>
+                  <p className="truncate text-sm font-medium leading-tight">{user.full_name}</p>
+                  <p className="truncate text-xs text-muted-foreground leading-tight mt-0.5">{user.email}</p>
+                </>
+              ) : (
+                <p className="truncate text-sm font-medium leading-tight">{user.email}</p>
+              )}
               {user.role && <div className="mt-1.5">{getRoleBadge(user.role)}</div>}
             </div>
           )}

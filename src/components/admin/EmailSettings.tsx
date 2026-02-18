@@ -130,11 +130,13 @@ export const EmailSettings = () => {
     }
   };
 
-  const saveEmailSettings = async () => {
+  const saveEmailSettings = async (override?: EmailSettings) => {
+    const next = override || settings;
+
     try {
       setSaving(true);
 
-      const updates = Object.entries(settings).map(([key, value]) => ({
+      const updates = Object.entries(next).map(([key, value]) => ({
         setting_key: key,
         setting_value: value,
       }));
@@ -293,40 +295,46 @@ export const EmailSettings = () => {
     }
   };
 
-  const addRecipient = (email: string, list: 'notification' | 'approval') => {
-    if (!email) return;
+  const normalizeEmail = (email: string) => email.trim().toLowerCase();
 
-    if (list === 'approval') {
-      if (!settings.approval_admin_recipients.includes(email)) {
-        setSettings({
-          ...settings,
-          approval_admin_recipients: [...settings.approval_admin_recipients, email],
-        });
-      }
-      return;
-    }
+  const addRecipient = async (email: string, list: 'notification' | 'approval') => {
+    const normalized = normalizeEmail(email);
+    if (!normalized) return;
 
-    if (!settings.notification_recipients.includes(email)) {
-      setSettings({
-        ...settings,
-        notification_recipients: [...settings.notification_recipients, email],
-      });
-    }
+    const next: EmailSettings = {
+      ...settings,
+      approval_admin_recipients:
+        list === 'approval'
+          ? Array.from(new Set([...settings.approval_admin_recipients.map(normalizeEmail), normalized]))
+          : settings.approval_admin_recipients,
+      notification_recipients:
+        list === 'notification'
+          ? Array.from(new Set([...settings.notification_recipients.map(normalizeEmail), normalized]))
+          : settings.notification_recipients,
+    };
+
+    // Update UI immediately, then persist to DB (same behavior as Save All Settings)
+    setSettings(next);
+    await saveEmailSettings(next);
   };
 
-  const removeRecipient = (email: string, list: 'notification' | 'approval') => {
-    if (list === 'approval') {
-      setSettings({
-        ...settings,
-        approval_admin_recipients: settings.approval_admin_recipients.filter(e => e !== email),
-      });
-      return;
-    }
+  const removeRecipient = async (email: string, list: 'notification' | 'approval') => {
+    const normalized = normalizeEmail(email);
 
-    setSettings({
+    const next: EmailSettings = {
       ...settings,
-      notification_recipients: settings.notification_recipients.filter(e => e !== email),
-    });
+      approval_admin_recipients:
+        list === 'approval'
+          ? settings.approval_admin_recipients.map(normalizeEmail).filter(e => e !== normalized)
+          : settings.approval_admin_recipients,
+      notification_recipients:
+        list === 'notification'
+          ? settings.notification_recipients.map(normalizeEmail).filter(e => e !== normalized)
+          : settings.notification_recipients,
+    };
+
+    setSettings(next);
+    await saveEmailSettings(next);
   };
 
   if (loading) {
@@ -502,15 +510,16 @@ export const EmailSettings = () => {
                     id="new-approval-recipient"
                   />
                   <Button
-                    onClick={() => {
+                    disabled={saving}
+                    onClick={async () => {
                       const input = document.getElementById('new-approval-recipient') as HTMLInputElement;
                       if (input.value) {
-                        addRecipient(input.value, 'approval');
+                        await addRecipient(input.value, 'approval');
                         input.value = '';
                       }
                     }}
                   >
-                    Add
+                    {saving ? 'Saving…' : 'Add'}
                   </Button>
                 </div>
 
@@ -544,15 +553,16 @@ export const EmailSettings = () => {
                     id="new-recipient"
                   />
                   <Button
-                    onClick={() => {
+                    disabled={saving}
+                    onClick={async () => {
                       const input = document.getElementById('new-recipient') as HTMLInputElement;
                       if (input.value) {
-                        addRecipient(input.value, 'notification');
+                        await addRecipient(input.value, 'notification');
                         input.value = '';
                       }
                     }}
                   >
-                    Add
+                    {saving ? 'Saving…' : 'Add'}
                   </Button>
                 </div>
               </div>
