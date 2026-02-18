@@ -48,13 +48,33 @@ interface UserProfile {
   role: string;
   department: string;
   user_status: string;
+  job_title?: string | null;
+  phone_number?: string | null;
+  manager_email?: string | null;
+  company_name?: string | null;
+  business_justification?: string | null;
   created_at: string;
   updated_at: string;
+  last_sign_in_at?: string | null;
+  lastSignInAt?: string | null;
 }
 
 interface UserManagementEnhancedProps {
   user: User;
 }
+
+const DEPARTMENT_FALLBACK: Department[] = [
+  { id: 'application-engineer', name: 'Application engineer', created_at: '' },
+  { id: 'quote-enginner', name: 'Quote Enginner', created_at: '' },
+  { id: 'ae-management', name: 'AE Management', created_at: '' },
+  { id: 'sales-engineer', name: 'Sales Engineer', created_at: '' },
+  { id: 'sales-director', name: 'Sales Director', created_at: '' },
+  { id: 'technical-application-engineer', name: 'Technical Application Engineer', created_at: '' },
+  { id: 'field-service-engineer', name: 'Field Service Engineer', created_at: '' },
+  { id: 'fse-management', name: 'FSE Management', created_at: '' },
+  { id: 'finance', name: 'Finance', created_at: '' },
+  { id: 'partner', name: 'Partner', created_at: '' },
+];
 
 const UserManagementEnhanced = ({ user }: UserManagementEnhancedProps) => {
   const [selectedRequest, setSelectedRequest] = useState<UserRegistrationRequest | null>(null);
@@ -70,7 +90,7 @@ const UserManagementEnhanced = ({ user }: UserManagementEnhancedProps) => {
   const [newPassword, setNewPassword] = useState('');
   const [newFirstName, setNewFirstName] = useState('');
   const [newLastName, setNewLastName] = useState('');
-  const [newRole, setNewRole] = useState<Role>('LEVEL_1'); // Default role
+  const [newRole, setNewRole] = useState<Role>('SALES'); // Default role
   const [newDepartment, setNewDepartment] = useState('');
   const [newJobTitle, setNewJobTitle] = useState('');
   const [newPhoneNumber, setNewPhoneNumber] = useState('');
@@ -83,56 +103,44 @@ const UserManagementEnhanced = ({ user }: UserManagementEnhancedProps) => {
   const [isCreatingDepartment, setIsCreatingDepartment] = useState(false);
   const [isDepartmentDialogOpen, setIsDepartmentDialogOpen] = useState(false); // For the new department dialog
 
-  // Mock data for registration requests - in real app this would come from API
-  const [pendingRequests, setPendingRequests] = useState<UserRegistrationRequest[]>([
-    {
-      id: 'REG-2024-001',
-      email: 'john.smith@acmepower.com',
-      firstName: 'John',
-      lastName: 'Smith',
-      department: 'sales',
-      jobTitle: 'Senior Sales Engineer',
-      phoneNumber: '+1 (555) 123-4567',
-      businessJustification: 'I need access to the PowerQuotePro system to generate quotes for our utility customers.',
-      requestedRole: 'level2',
-      managerEmail: 'manager@acmepower.com',
-      companyName: 'ACME Power Solutions',
-      status: 'pending',
-      createdAt: '2024-01-16T10:30:00Z',
-      ipAddress: '192.168.1.100',
-      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
-      loginAttempts: 0,
-      isLocked: false,
-      twoFactorEnabled: false,
-      agreedToTerms: true,
-      agreedToPrivacyPolicy: true
-    }
-  ]);
-
-  const auditLogs: SecurityAuditLog[] = [
-    {
-      id: 'AUDIT-001',
-      userId: 'REG-2024-001',
-      action: 'Registration Request Submitted',
-      details: 'New user registration request for Level 2 access',
-      ipAddress: '192.168.1.100',
-      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
-      timestamp: '2024-01-16T10:30:00Z',
-      severity: 'low'
-    }
-  ];
+  const [pendingRequests, setPendingRequests] = useState<UserRegistrationRequest[]>([]);
+  const [auditLogs, setAuditLogs] = useState<SecurityAuditLog[]>([]);
 
   // Fetch user profiles
   const fetchUserProfiles = async () => {
     setLoading(true);
     try {
+      // Prefer edge function list (admin scope), fallback to direct query.
+      const fnResult = await supabase.functions.invoke('admin-users', { method: 'GET' });
+      if (!fnResult.error && (fnResult.data as any)?.users) {
+        const normalized = ((fnResult.data as any).users || []).map((u: any) => ({
+          id: u.id,
+          email: u.email,
+          first_name: u.first_name ?? (u.fullName ? String(u.fullName).split(' ')[0] : ''),
+          last_name: u.last_name ?? (u.fullName ? String(u.fullName).split(' ').slice(1).join(' ') : ''),
+          role: u.role,
+          department: u.department ?? '',
+          user_status: u.userStatus ?? u.user_status ?? 'active',
+          job_title: u.jobTitle ?? u.job_title ?? null,
+          phone_number: u.phoneNumber ?? u.phone_number ?? null,
+          manager_email: u.managerEmail ?? u.manager_email ?? null,
+          company_name: u.companyName ?? u.company_name ?? null,
+          business_justification: u.businessJustification ?? u.business_justification ?? null,
+          created_at: u.createdAt ?? u.created_at ?? new Date().toISOString(),
+          updated_at: u.updatedAt ?? u.updated_at ?? new Date().toISOString(),
+          last_sign_in_at: u.lastSignInAt ?? u.last_sign_in_at ?? null,
+          lastSignInAt: u.lastSignInAt ?? u.last_sign_in_at ?? null,
+        }));
+        setUserProfiles(normalized);
+        return;
+      }
+
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-
       setUserProfiles(data || []);
     } catch (error) {
       console.error('Error fetching user profiles:', error);
@@ -146,17 +154,134 @@ const UserManagementEnhanced = ({ user }: UserManagementEnhancedProps) => {
     }
   };
 
+  const mapRequestRow = (row: any): UserRegistrationRequest => ({
+    id: row.id,
+    email: row.email ?? '',
+    firstName: row.first_name ?? '',
+    lastName: row.last_name ?? '',
+    department: row.department ?? '',
+    jobTitle: row.job_title ?? '',
+    phoneNumber: row.phone_number ?? '',
+    businessJustification: row.business_justification ?? '',
+    requestedRole: (row.requested_role ?? 'level1') as any,
+    managerEmail: row.manager_email ?? '',
+    companyName: row.company_name ?? '',
+    status: (row.status ?? 'pending') as any,
+    createdAt: row.requested_at ?? row.created_at ?? new Date().toISOString(),
+    reviewedAt: row.processed_at ?? undefined,
+    reviewedBy: row.processed_by ?? undefined,
+    rejectionReason: row.rejection_reason ?? undefined,
+    ipAddress: row.ip_address ?? '',
+    userAgent: row.user_agent ?? '',
+    loginAttempts: row.login_attempts ?? 0,
+    isLocked: row.is_locked ?? false,
+    twoFactorEnabled: row.two_factor_enabled ?? false,
+    agreedToTerms: row.agreed_to_terms ?? false,
+    agreedToPrivacyPolicy: row.agreed_to_privacy_policy ?? false,
+  });
+
+  const fetchPendingRequests = async () => {
+    try {
+      const fnResult = await supabase.functions.invoke('admin-users/user-requests', { method: 'GET' });
+      if (!fnResult.error && (fnResult.data as any)?.requests) {
+        setPendingRequests(((fnResult.data as any).requests || []).map(mapRequestRow));
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from('user_requests')
+        .select('*')
+        .order('requested_at', { ascending: false });
+      if (error) throw error;
+      setPendingRequests((data || []).map(mapRequestRow));
+    } catch (error) {
+      console.error('Error fetching registration requests:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to fetch registration requests.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const fetchAuditLogs = async () => {
+    try {
+      const fnResult = await supabase.functions.invoke('admin-users/audit-logs', { method: 'GET' });
+      if (fnResult.error) throw fnResult.error;
+
+      const sessions = ((fnResult.data as any)?.sessions || []) as any[];
+      const mapped: SecurityAuditLog[] = sessions.map((s) => ({
+        id: s.id,
+        userId: s.user_id || 'unknown',
+        action: s.event || 'Unknown Event',
+        details: s.user_agent || 'No details provided',
+        ipAddress: s.ip_address || 'Unknown',
+        userAgent: s.user_agent || '',
+        timestamp: s.created_at,
+        severity: /fail|reject|error|denied|blocked/i.test(String(s.event || '')) ? 'high' : 'low',
+      }));
+
+      setAuditLogs(mapped);
+    } catch (error) {
+      console.error('Error fetching audit logs:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to fetch security audit logs.',
+        variant: 'destructive',
+      });
+      setAuditLogs([]);
+    }
+  };
+
+
   useEffect(() => {
     fetchUserProfiles();
+    fetchPendingRequests();
+    fetchAuditLogs();
     const loadDepartments = async () => {
       const fetchedDepartments = await departmentService.fetchDepartments();
-      setDepartments(fetchedDepartments);
+      setDepartments((fetchedDepartments && fetchedDepartments.length > 0) ? fetchedDepartments : DEPARTMENT_FALLBACK);
     };
     loadDepartments();
   }, []);
 
+  const normalizeRole = (value?: string | null) => String(value || '').trim().toLowerCase();
+
+  const getRoleRank = (value?: string | null) => {
+    const role = normalizeRole(value);
+    if (role === 'master') return 60;
+    if (role === 'admin' || role === 'finance') return 50;
+    if (role === 'level3' || role === 'level_3') return 40;
+    if (role === 'level2' || role === 'sales') return 30;
+    if (role === 'level1') return 20;
+    return 10;
+  };
+
+  const canCurrentUserDelete = (target: UserProfile) => {
+    if (target.user_status !== 'active') return false;
+
+    const currentEmail = String(user?.email || '').toLowerCase();
+    const targetEmail = String(target.email || '').toLowerCase();
+    if (!currentEmail || currentEmail === targetEmail) return false;
+
+    // Explicit owner override requested.
+    if (currentEmail === 'cdeligi@qualitrolcorp.com') return true;
+
+    // Resolve current role from loaded profile list (more reliable than auth payload prop).
+    const currentProfile = userProfiles.find((p) => String(p.email || '').toLowerCase() === currentEmail);
+    const currentRank = getRoleRank(currentProfile?.role ?? (user as any)?.role);
+    const targetRank = getRoleRank(target.role);
+
+    // Higher role can delete downstream users only.
+    return currentRank > targetRank;
+  };
+
   const handleRemoveUser = async (userProfile: UserProfile) => {
     try {
+      if (!canCurrentUserDelete(userProfile)) {
+        throw new Error('You can only remove downstream users.');
+      }
+
       // Call the deactivate_user function
       const { error } = await supabase.rpc('deactivate_user', {
         target_user_id: userProfile.id
@@ -268,7 +393,7 @@ const UserManagementEnhanced = ({ user }: UserManagementEnhancedProps) => {
       setNewPassword('');
       setNewFirstName('');
       setNewLastName('');
-      setNewRole('LEVEL_1');
+      setNewRole('SALES');
       setNewDepartment('');
       setNewJobTitle('');
       setNewPhoneNumber('');
@@ -332,42 +457,59 @@ const UserManagementEnhanced = ({ user }: UserManagementEnhancedProps) => {
     }
   };
 
-  const handleApproveRequest = (requestId: string) => {
-    setPendingRequests(prev => 
-      prev.map(req => 
-        req.id === requestId 
-          ? { 
-              ...req, 
-              status: 'approved', 
-              reviewedAt: new Date().toISOString(),
-              reviewedBy: user.id 
-            }
-          : req
-      )
-    );
-    console.log(`Approved registration request: ${requestId}`);
+  const handleApproveRequest = async (requestId: string) => {
+    try {
+      const result = await supabase.functions.invoke('admin-users/approve-request', {
+        method: 'POST',
+        body: { requestId },
+      });
+
+      if (result.error) throw result.error;
+
+      toast({
+        title: 'Success',
+        description: 'Request approved. Invite email sent so user can create their password.',
+      });
+
+      await fetchPendingRequests();
+      await fetchUserProfiles();
+    } catch (error: any) {
+      console.error('Error approving request:', error);
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to approve request.',
+        variant: 'destructive',
+      });
+    }
   };
 
-  const handleRejectRequest = () => {
+  const handleRejectRequest = async () => {
     if (!selectedRequest || !rejectionReason.trim()) return;
 
-    setPendingRequests(prev => 
-      prev.map(req => 
-        req.id === selectedRequest.id 
-          ? { 
-              ...req, 
-              status: 'rejected', 
-              reviewedAt: new Date().toISOString(),
-              reviewedBy: user.id,
-              rejectionReason: rejectionReason.trim()
-            }
-          : req
-      )
-    );
-    
-    setIsReviewDialogOpen(false);
-    setSelectedRequest(null);
-    setRejectionReason('');
+    try {
+      const result = await supabase.functions.invoke('admin-users/reject-request', {
+        method: 'PUT',
+        body: { requestId: selectedRequest.id, reason: rejectionReason.trim() },
+      });
+      if (result.error) throw result.error;
+
+      toast({
+        title: 'Success',
+        description: 'Request rejected successfully.',
+      });
+
+      setIsReviewDialogOpen(false);
+      setSelectedRequest(null);
+      setRejectionReason('');
+      await fetchPendingRequests();
+    } catch (error: any) {
+      console.error('Error rejecting request:', error);
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to reject request.',
+        variant: 'destructive',
+      });
+    }
   };
 
   const getStatusBadge = (status: UserRegistrationRequest['status']) => {
@@ -427,7 +569,11 @@ const UserManagementEnhanced = ({ user }: UserManagementEnhancedProps) => {
         </div>
         <div className="flex items-center space-x-4">
           <Button
-            onClick={fetchUserProfiles}
+            onClick={() => {
+              fetchUserProfiles();
+              fetchPendingRequests();
+              fetchAuditLogs();
+            }}
             variant="outline"
             size="sm"
             disabled={loading}
@@ -581,11 +727,10 @@ const UserManagementEnhanced = ({ user }: UserManagementEnhancedProps) => {
                       <SelectValue placeholder="Select a role" />
                     </SelectTrigger>
                     <SelectContent className="bg-gray-800 border-gray-700 text-white">
-                      <SelectItem value="LEVEL_1">Level 1</SelectItem>
-                      <SelectItem value="LEVEL_2">Level 2</SelectItem>
-                      <SelectItem value="LEVEL_3">Level 3</SelectItem>
-                      <SelectItem value="ADMIN">Admin</SelectItem>
-                      <SelectItem value="FINANCE">Finance</SelectItem>
+                      <SelectItem value="SALES">Sales</SelectItem>
+                      <SelectItem value="ADMIN">Admin Reviewer</SelectItem>
+                      <SelectItem value="FINANCE">Finance Reviewer</SelectItem>
+                      <SelectItem value="MASTER">Master Operator</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -597,7 +742,7 @@ const UserManagementEnhanced = ({ user }: UserManagementEnhancedProps) => {
                         <SelectValue placeholder="Select a department" />
                       </SelectTrigger>
                        <SelectContent className="bg-gray-800 border-gray-700 text-white">
-                         {departments.map((dept) => (
+                         {(departments.length ? departments : DEPARTMENT_FALLBACK).map((dept) => (
                           <SelectItem key={dept.id} value={dept.name}>
                             {dept.name}
                           </SelectItem>
@@ -673,7 +818,7 @@ const UserManagementEnhanced = ({ user }: UserManagementEnhancedProps) => {
             <CardHeader>
               <CardTitle className="text-white flex items-center">
                 <Users className="h-5 w-5 mr-2" />
-                User Profiles ({userProfiles.length})
+                User Profiles ({userProfiles.filter(u => u.user_status === 'active').length})
               </CardTitle>
               <CardDescription className="text-gray-400">
                 Manage existing user accounts and permissions
@@ -690,12 +835,13 @@ const UserManagementEnhanced = ({ user }: UserManagementEnhancedProps) => {
                       <TableHead className="text-gray-300">Role</TableHead>
                       <TableHead className="text-gray-300">Department</TableHead>
                       <TableHead className="text-gray-300">Status</TableHead>
+                      <TableHead className="text-gray-300">Last Login</TableHead>
                       <TableHead className="text-gray-300">Created</TableHead>
                       <TableHead className="text-gray-300">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {userProfiles.map((profile) => (
+                    {userProfiles.filter((p) => p.user_status === 'active').map((profile) => (
                       <TableRow key={profile.id} className="border-gray-800">
                         <TableCell>
                           <div>
@@ -716,6 +862,11 @@ const UserManagementEnhanced = ({ user }: UserManagementEnhancedProps) => {
                         <TableCell>
                           {getUserStatusBadge(profile.user_status)}
                         </TableCell>
+                        <TableCell className="text-gray-300 text-xs">
+                          {profile.last_sign_in_at || profile.lastSignInAt
+                            ? new Date((profile.last_sign_in_at || profile.lastSignInAt) as string).toLocaleString()
+                            : 'Never'}
+                        </TableCell>
                         <TableCell className="text-gray-300">
                           {new Date(profile.created_at).toLocaleDateString()}
                         </TableCell>
@@ -731,7 +882,7 @@ const UserManagementEnhanced = ({ user }: UserManagementEnhancedProps) => {
                               <Edit className="h-4 w-4 text-black" />
                             </Button>
                             
-                            {profile.role !== 'ADMIN' && profile.user_status === 'active' && (
+                            {canCurrentUserDelete(profile) && (
                               <Button
                                 onClick={() => {
                                   setSelectedUserToRemove(profile);
@@ -795,7 +946,7 @@ const UserManagementEnhanced = ({ user }: UserManagementEnhancedProps) => {
                       </TableCell>
                       <TableCell>
                         <Badge variant="outline" className="text-blue-400 border-blue-400">
-                          {request.requestedRole === 'level1' ? 'Level 1 Sales' : 'Level 2 Sales'}
+                          {request.requestedRole === 'level1' ? 'Level 1' : request.requestedRole === 'level2' ? 'Level 2' : request.requestedRole === 'level3' ? 'Level 3' : request.requestedRole === 'admin' ? 'Admin' : request.requestedRole === 'finance' ? 'Finance' : request.requestedRole === 'master' ? 'Master' : request.requestedRole}
                         </Badge>
                       </TableCell>
                       <TableCell>
@@ -843,7 +994,7 @@ const UserManagementEnhanced = ({ user }: UserManagementEnhancedProps) => {
                                   <div>
                                     <Label className="text-gray-400">Requested Role</Label>
                                     <p className="text-white">
-                                      {request.requestedRole === 'level1' ? 'Level 1 Sales' : 'Level 2 Sales'}
+                                      {request.requestedRole === 'level1' ? 'Level 1' : request.requestedRole === 'level2' ? 'Level 2' : request.requestedRole === 'level3' ? 'Level 3' : request.requestedRole === 'admin' ? 'Admin' : request.requestedRole === 'finance' ? 'Finance' : request.requestedRole === 'master' ? 'Master' : request.requestedRole}
                                     </p>
                                   </div>
                                 </div>
@@ -1050,16 +1201,18 @@ const UserManagementEnhanced = ({ user }: UserManagementEnhancedProps) => {
           role: selectedUserForEdit.role,
           department: selectedUserForEdit.department,
           userStatus: selectedUserForEdit.user_status,
-          jobTitle: null,
-          phoneNumber: null,
-          managerEmail: null,
-          companyName: null,
-          businessJustification: null
+          jobTitle: selectedUserForEdit.job_title ?? null,
+          phoneNumber: selectedUserForEdit.phone_number ?? null,
+          managerEmail: selectedUserForEdit.manager_email ?? null,
+          companyName: selectedUserForEdit.company_name ?? null,
+          businessJustification: selectedUserForEdit.business_justification ?? null,
+          lastLoginAt: selectedUserForEdit.last_sign_in_at ?? selectedUserForEdit.lastSignInAt ?? null
         } : null}
         isOpen={!!selectedUserForEdit}
         onClose={() => setSelectedUserForEdit(null)}
         onSave={handleUpdateUser}
-        departments={departments} // Add this line
+        departments={departments.length ? departments : [{id:'application-engineer',name:'Application engineer'},{id:'quote-enginner',name:'Quote Enginner'},{id:'ae-management',name:'AE Management'},{id:'sales-engineer',name:'Sales Engineer'},{id:'sales-director',name:'Sales Director'},{id:'technical-application-engineer',name:'Technical Application Engineer'},{id:'field-service-engineer',name:'Field Service Engineer'},{id:'fse-management',name:'FSE Management'},{id:'finance',name:'Finance'},{id:'partner',name:'Partner'}]}
+        currentUserEmail={user?.email ?? null}
       />
 
       {/* New Department Dialog */}

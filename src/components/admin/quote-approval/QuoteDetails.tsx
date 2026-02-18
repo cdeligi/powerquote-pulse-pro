@@ -5,15 +5,16 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { CheckCircle, XCircle, Edit3, Save, X, Settings, Users } from "lucide-react";
+import { CheckCircle, XCircle, Edit3, Save, X, Settings, Users, AlertCircle } from "lucide-react";
 import QTMSConfigurationEditor from "@/components/bom/QTMSConfigurationEditor";
 import { consolidateQTMSConfiguration, QTMSConfiguration, ConsolidatedQTMS } from "@/utils/qtmsConsolidation";
 import { useState, useEffect, useMemo } from "react";
-import { Quote, BOMItemWithDetails } from "@/types/quote";
+import { Quote, BOMItemWithDetails, QuoteWorkflowState } from "@/types/quote";
 import { User } from "@/types/auth";
 import { useConfiguredQuoteFields } from "@/hooks/useConfiguredQuoteFields";
 import { FEATURES, usePermissions } from "@/hooks/usePermissions";
 import { extractCommissionFromQuoteFields, calculatePartnerCommission } from "@/utils/marginCalculations";
+import { deriveWorkflowState, getWorkflowLaneForState, isPendingWorkflowState } from "@/lib/workflow/utils";
 interface QuoteDetailsProps {
   quote: Quote;
   onApprove: (payload: {
@@ -25,6 +26,8 @@ interface QuoteDetailsProps {
   onReject: (notes?: string) => void;
   isLoading: boolean;
   user: User | null;
+  onClaim?: (lane: 'admin' | 'finance') => Promise<void>;
+  isClaiming?: boolean;
 }
 
 const QuoteDetails = ({
@@ -32,7 +35,9 @@ const QuoteDetails = ({
   onApprove,
   onReject,
   isLoading,
-  user
+  user,
+  onClaim,
+  isClaiming,
 }: QuoteDetailsProps) => {
   const [approvalNotes, setApprovalNotes] = useState('');
   const [rejectionReason, setRejectionReason] = useState('');
@@ -64,10 +69,34 @@ const QuoteDetails = ({
   const [qtmsConfig, setQtmsConfig] = useState<ConsolidatedQTMS | null>(null);
   const [editingQTMS, setEditingQTMS] = useState(false);
   const [approvedDiscountInput, setApprovedDiscountInput] = useState('0');
+  const [financeNotes, setFinanceNotes] = useState('');
   const { formattedFields: formattedConfiguredFields } =
     useConfiguredQuoteFields(quote.quote_fields);
   const { has } = usePermissions();
   const canShowPartnerCommission = has(FEATURES.BOM_SHOW_PARTNER_COMMISSION);
+
+  const workflowState: QuoteWorkflowState = deriveWorkflowState(quote);
+  const currentLane = getWorkflowLaneForState(workflowState);
+  const isWorkflowPending = isPendingWorkflowState(workflowState);
+  const userRole = user?.role ?? 'SALES';
+  const canAdminAct = currentLane === 'admin' && (userRole === 'ADMIN' || userRole === 'MASTER');
+  const canFinanceAct = currentLane === 'finance' && (userRole === 'FINANCE' || userRole === 'MASTER');
+  const canCurrentUserAct = canAdminAct || canFinanceAct;
+  const reviewedBy = (quote as any).reviewed_by as string | undefined;
+  const claimedByCurrentUser = currentLane === 'admin'
+    ? (quote.admin_reviewer_id ? quote.admin_reviewer_id === user?.id : reviewedBy === user?.id)
+    : currentLane === 'finance'
+      ? Boolean(quote.finance_reviewer_id && quote.finance_reviewer_id === user?.id)
+      : false;
+  const claimedByAnother = currentLane === 'admin'
+    ? Boolean((quote.admin_reviewer_id && quote.admin_reviewer_id !== user?.id) || (!quote.admin_reviewer_id && reviewedBy && reviewedBy !== user?.id))
+    : currentLane === 'finance'
+      ? false
+      : false;
+  const requiresClaim = currentLane === 'finance'
+    ? !claimedByCurrentUser
+    : currentLane !== null && !claimedByAnother && !claimedByCurrentUser;
+  const showWorkflowActions = Boolean(isWorkflowPending && canCurrentUserAct && claimedByCurrentUser);
 
   useEffect(() => {
     setBomItems(initialBOMItems);
@@ -94,6 +123,7 @@ const QuoteDetails = ({
     setApprovalNotes(quote.approval_notes || '');
     setRejectionReason(quote.rejection_reason || '');
     setQuoteAdditionalInfo(quote.additional_quote_information || '');
+    setFinanceNotes((quote as any).finance_notes || '');
   }, [
     quote.id,
     quote.approved_discount,
@@ -127,8 +157,10 @@ const QuoteDetails = ({
       ? Math.min(Math.max(parsedDiscount, 0), 100)
       : 0;
     const trimmedAdditionalInfo = quoteAdditionalInfo.trim();
+    const decisionNotes = currentLane === 'finance' ? financeNotes : approvalNotes;
+
     onApprove({
-      notes: approvalNotes,
+      notes: (decisionNotes || '').trim(),
       updatedBOMItems: bomItems,
       approvedDiscount: sanitizedDiscount / 100,
       additionalQuoteInformation: trimmedAdditionalInfo || undefined
@@ -248,13 +280,35 @@ const QuoteDetails = ({
   const discountedGrossProfit = discountedTotal - totals.effectiveTotalCost;
   const discountedMargin = discountedTotal > 0 ? (discountedGrossProfit / discountedTotal) * 100 : 0;
   const showDiscountBreakdown =
-    quote.status === 'pending_approval' ||
+    isWorkflowPending ||
     effectiveDiscountPercentage > 0 ||
     requestedDiscountPercentage > 0 ||
     (approvedDiscountFromQuote !== null && approvedDiscountFromQuote > 0);
   const discountDelta = effectiveDiscountPercentage - requestedDiscountPercentage;
   const storedAdditionalQuoteInfo = quote.additional_quote_information?.trim() ?? '';
   const hasStoredAdditionalQuoteInfo = storedAdditionalQuoteInfo.length > 0;
+
+
+  const toDate = (value?: string | null): Date | null => {
+    if (!value) return null;
+    const d = new Date(value);
+    return Number.isNaN(d.getTime()) ? null : d;
+  };
+
+  const ageDaysBetween = (start?: string | null, end?: string | null): string => {
+    const s = toDate(start);
+    const e = toDate(end);
+    if (!s || !e) return '-';
+    const days = Math.max(0, Math.ceil((e.getTime() - s.getTime()) / (1000 * 60 * 60 * 24)));
+    return `${days} day${days === 1 ? '' : 's'}`;
+  };
+
+  const submittedAt = quote.submitted_at || quote.created_at;
+  const adminClaimedAt = (quote as any).admin_claimed_at || quote.submitted_at || quote.created_at;
+  const adminDecidedAt = (quote as any).admin_decision_at || quote.reviewed_at;
+  const financeClaimedAt = (quote as any).finance_claimed_at;
+  const financeDecidedAt = (quote as any).finance_decision_at;
+  const finalDecisionAt = financeDecidedAt || adminDecidedAt || quote.reviewed_at || quote.updated_at;
 
   const formatCurrency = (value: number) => {
     return `${quote.currency} ${value.toLocaleString(undefined, {
@@ -264,17 +318,23 @@ const QuoteDetails = ({
   };
 
   const getStatusBadge = () => {
-    switch (quote.status) {
+    switch (workflowState) {
       case 'approved':
         return <Badge className="bg-green-600 text-white">Approved</Badge>;
       case 'rejected':
         return <Badge className="bg-red-600 text-white">Rejected</Badge>;
-      case 'pending_approval':
-        return <Badge className="bg-yellow-600 text-white">Pending Approval</Badge>;
+      case 'submitted':
+        return <Badge className="bg-blue-600 text-white">Submitted</Badge>;
+      case 'admin_review':
+        return <Badge className="bg-purple-600 text-white">Admin Review</Badge>;
+      case 'finance_review':
+        return <Badge className="bg-amber-600 text-white">Pending Finance Review</Badge>;
+      case 'needs_revision':
+        return <Badge className="bg-yellow-600 text-white">Needs Revision</Badge>;
       case 'draft':
         return <Badge className="bg-gray-600 text-white">Draft</Badge>;
       default:
-        return <Badge className="bg-gray-600 text-white">Unknown</Badge>;
+        return <Badge className="bg-gray-600 text-white">{workflowState}</Badge>;
     }
   };
 
@@ -515,13 +575,13 @@ const QuoteDetails = ({
                       <span>Requested Discount</span>
                       <span>{requestedDiscountPercentage.toFixed(2)}%</span>
                     </div>
-                    {approvedDiscountFromQuote !== null && quote.status !== 'pending_approval' && (
+                    {approvedDiscountFromQuote !== null && !isWorkflowPending && (
                       <div className="flex items-center justify-between text-xs text-gray-400">
                         <span>Approved Discount</span>
                         <span>{approvedDiscountFromQuote.toFixed(2)}%</span>
                       </div>
                     )}
-                    {quote.status === 'pending_approval' && (
+                    {isWorkflowPending && canCurrentUserAct && (
                       <div className="space-y-1">
                         <Label className="text-gray-400 text-xs uppercase">Approved Discount to Apply</Label>
                         <div className="flex flex-col sm:flex-row sm:items-center gap-2">
@@ -554,7 +614,7 @@ const QuoteDetails = ({
                         )}
                       </div>
                     )}
-                    {quote.status === 'pending_approval' && Math.abs(discountDelta) > 0.01 && (
+                    {isWorkflowPending && canCurrentUserAct && Math.abs(discountDelta) > 0.01 && (
                       <div className="text-xs text-gray-400">
                         {discountDelta > 0 ? 'Increasing' : 'Decreasing'} discount by {Math.abs(discountDelta).toFixed(2)}% from request.
                       </div>
@@ -602,160 +662,227 @@ const QuoteDetails = ({
       )}
 
       {/* Approval Actions */}
-      {quote.status === 'pending_approval' && (
+      {isWorkflowPending && currentLane && (
         <Card className="bg-gray-900 border-gray-800">
           <CardHeader>
-            <CardTitle className="text-white">Approval Actions</CardTitle>
+            <CardTitle className="text-white">
+              {currentLane === 'finance' ? 'Finance Decision' : 'Approval Actions'}
+            </CardTitle>
+            {!canCurrentUserAct && (
+              <p className="text-sm text-gray-400">Only {currentLane === 'finance' ? 'finance' : 'admin'} reviewers can act on this quote.</p>
+            )}
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-2 gap-3">
-              <Button
-                onClick={() => setSelectedAction('approve')}
-                variant={selectedAction === 'approve' ? 'default' : 'outline'}
-                className={`${
-                  selectedAction === 'approve' 
-                    ? 'bg-green-600 hover:bg-green-700 text-white' 
-                    : 'border-green-600 text-green-400 hover:bg-green-600 hover:text-white'
-                }`}
-                disabled={isLoading}
-              >
-                <CheckCircle className="h-4 w-4 mr-2" />
-                Approve Quote
-              </Button>
-              
-              <Button
-                onClick={() => setSelectedAction('reject')}
-                variant={selectedAction === 'reject' ? 'default' : 'outline'}
-                className={`${
-                  selectedAction === 'reject' 
-                    ? 'bg-red-600 hover:bg-red-700 text-white' 
-                    : 'border-red-600 text-red-400 hover:bg-red-600 hover:text-white'
-                }`}
-                disabled={isLoading}
-              >
-                <XCircle className="h-4 w-4 mr-2" />
-                Reject Quote
-              </Button>
-            </div>
+            {canCurrentUserAct && claimedByAnother && (
+              <div className="flex items-center gap-2 rounded-md border border-gray-700 bg-gray-800 px-4 py-3 text-sm text-gray-300">
+                <AlertCircle className="h-4 w-4 text-yellow-400" />
+                <span>This quote is currently assigned to another {currentLane === 'finance' ? 'finance' : 'admin'} reviewer.</span>
+              </div>
+            )}
 
-            {selectedAction === 'approve' && (
-              <div className="space-y-3 p-4 bg-green-900/20 border border-green-600 rounded-lg">
-                <Label htmlFor="approval-notes" className="text-white">
-                  Approval Notes (Optional)
-                </Label>
-                <Textarea
-                  id="approval-notes"
-                  value={approvalNotes}
-                  onChange={(e) => setApprovalNotes(e.target.value)}
-                  placeholder="Add any notes about the approval..."
-                  className="bg-gray-800 border-gray-700 text-white min-h-[80px]"
-                />
-                <div className="space-y-2">
-                  <Label htmlFor="additional-quote-info" className="text-white">
-                    Additional Quote Information (Visible on PDF)
-                  </Label>
-                  <Textarea
-                    id="additional-quote-info"
-                    value={quoteAdditionalInfo}
-                    onChange={(e) => setQuoteAdditionalInfo(e.target.value)}
-                    placeholder="Add optional context or special instructions to include on the quote PDF..."
-                    className="bg-gray-800 border-gray-700 text-white min-h-[80px]"
-                  />
-                  <p className="text-xs text-gray-400">
-                    This text will be added to the quote PDF when provided.
-                  </p>
-                </div>
-                <div className="flex space-x-2">
+            {canCurrentUserAct && requiresClaim && !claimedByAnother && onClaim && (
+              <div className="flex flex-col gap-3 rounded-md border border-gray-700 bg-gray-800 px-4 py-3">
+                <p className="text-sm text-gray-300">Claim this quote to take ownership of the {currentLane === 'finance' ? 'finance' : 'admin'} review lane.</p>
+                <div>
                   <Button
-                    onClick={handleApprove}
-                    className="bg-green-600 hover:bg-green-700 text-white"
-                    disabled={isLoading}
+                    onClick={() => onClaim(currentLane)}
+                    disabled={isClaiming}
+                    className="bg-blue-600 hover:bg-blue-700 text-white"
                   >
-                    {isLoading ? 'Processing...' : 'Confirm Approval'}
-                  </Button>
-                  <Button
-                    onClick={() => {
-                      setSelectedAction(null);
-                      setApprovalNotes(quote.approval_notes || '');
-                      setQuoteAdditionalInfo(quote.additional_quote_information || '');
-                    }}
-                    variant="outline"
-                    className="border-gray-600 text-gray-300 hover:bg-gray-800"
-                    disabled={isLoading}
-                  >
-                    Cancel
+                    {isClaiming ? 'Claiming...' : `Claim ${currentLane === 'finance' ? 'Finance' : 'Admin'} Lane`}
                   </Button>
                 </div>
               </div>
             )}
 
-            {selectedAction === 'reject' && (
-              <div className="space-y-3 p-4 bg-red-900/20 border border-red-600 rounded-lg">
-                <Label htmlFor="rejection-reason" className="text-white">
-                  Rejection Reason *
-                </Label>
-                <Textarea
-                  id="rejection-reason"
-                  value={rejectionReason}
-                  onChange={(e) => setRejectionReason(e.target.value)}
-                  placeholder="Explain why this quote is being rejected..."
-                  className="bg-gray-800 border-gray-700 text-white min-h-[100px]"
-                  required
-                />
-                <div className="flex space-x-2">
+            {showWorkflowActions && (
+              <>
+                <div className="grid grid-cols-2 gap-3">
                   <Button
-                    onClick={handleReject}
-                    className="bg-red-600 hover:bg-red-700 text-white"
-                    disabled={isLoading || !rejectionReason.trim()}
-                  >
-                    {isLoading ? 'Processing...' : 'Confirm Rejection'}
-                  </Button>
-                  <Button
-                    onClick={() => setSelectedAction(null)}
-                    variant="outline"
-                    className="border-gray-600 text-gray-300 hover:bg-gray-800"
+                    onClick={() => setSelectedAction('approve')}
+                    variant={selectedAction === 'approve' ? 'default' : 'outline'}
+                    className={`
+                      ${
+                        selectedAction === 'approve'
+                          ? 'bg-green-600 hover:bg-green-700 text-white'
+                          : 'border-green-600 text-green-400 hover:bg-green-600 hover:text-white'
+                      }
+                    `}
                     disabled={isLoading}
                   >
-                    Cancel
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                    {currentLane === 'finance' ? 'Approve (Finance)' : 'Approve Quote'}
+                  </Button>
+
+                  <Button
+                    onClick={() => setSelectedAction('reject')}
+                    variant={selectedAction === 'reject' ? 'default' : 'outline'}
+                    className={`
+                      ${
+                        selectedAction === 'reject'
+                          ? 'bg-red-600 hover:bg-red-700 text-white'
+                          : 'border-red-600 text-red-400 hover:bg-red-600 hover:text-white'
+                      }
+                    `}
+                    disabled={isLoading}
+                  >
+                    <XCircle className="h-4 w-4 mr-2" />
+                    {currentLane === 'finance' ? 'Reject (Finance)' : 'Reject Quote'}
                   </Button>
                 </div>
-              </div>
+
+                {selectedAction === 'approve' && (
+                  <div className="space-y-3 p-4 bg-green-900/20 border border-green-600 rounded-lg">
+                    <Label htmlFor="approval-notes" className="text-white">
+                      {currentLane === 'finance' ? 'Finance Notes' : 'Approval Notes (Optional)'}
+                    </Label>
+                    <Textarea
+                      id="approval-notes"
+                      value={currentLane === 'finance' ? financeNotes : approvalNotes}
+                      onChange={(e) => currentLane === 'finance' ? setFinanceNotes(e.target.value) : setApprovalNotes(e.target.value)}
+                      placeholder={currentLane === 'finance' ? 'Required: explain finance decision and justification...' : 'Add any notes about the approval...'}
+                      className="bg-gray-800 border-gray-700 text-white min-h-[80px]"
+                    />
+
+                    <div className="space-y-2">
+                      <Label htmlFor="additional-quote-info" className="text-white">
+                        Additional Quote Information (Visible on PDF)
+                      </Label>
+                      <Textarea
+                        id="additional-quote-info"
+                        value={quoteAdditionalInfo}
+                        onChange={(e) => setQuoteAdditionalInfo(e.target.value)}
+                        placeholder="Add optional context or special instructions to include on the quote PDF..."
+                        className="bg-gray-800 border-gray-700 text-white min-h-[80px]"
+                      />
+                      <p className="text-xs text-gray-400">
+                        This text will be added to the quote PDF when provided.
+                      </p>
+                    </div>
+                    <div className="flex space-x-2">
+                      <Button
+                        onClick={handleApprove}
+                        className="bg-green-600 hover:bg-green-700 text-white"
+                        disabled={isLoading || (currentLane === 'finance' && !financeNotes.trim())}
+                      >
+                        {isLoading ? 'Processing...' : 'Confirm Approval'}
+                      </Button>
+                      <Button
+                        onClick={() => {
+                          setSelectedAction(null);
+                          setApprovalNotes(quote.approval_notes || '');
+                          setQuoteAdditionalInfo(quote.additional_quote_information || '');
+    setFinanceNotes((quote as any).finance_notes || '');
+                        }}
+                        variant="outline"
+                        className="border-gray-600 text-gray-300 hover:bg-gray-800"
+                        disabled={isLoading}
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {selectedAction === 'reject' && (
+                  <div className="space-y-3 p-4 bg-red-900/20 border border-red-600 rounded-lg">
+                    <Label htmlFor="rejection-reason" className="text-white">
+                      Rejection Reason *
+                    </Label>
+                    <Textarea
+                      id="rejection-reason"
+                      value={rejectionReason}
+                      onChange={(e) => setRejectionReason(e.target.value)}
+                      placeholder="Explain why this quote is being rejected..."
+                      className="bg-gray-800 border-gray-700 text-white min-h-[100px]"
+                      required
+                    />
+                    <div className="flex space-x-2">
+                      <Button
+                        onClick={handleReject}
+                        className="bg-red-600 hover:bg-red-700 text-white"
+                        disabled={isLoading || !rejectionReason.trim()}
+                      >
+                        {isLoading ? 'Processing...' : 'Confirm Rejection'}
+                      </Button>
+                      <Button
+                        onClick={() => setSelectedAction(null)}
+                        variant="outline"
+                        className="border-gray-600 text-gray-300 hover:bg-gray-800"
+                        disabled={isLoading}
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </CardContent>
         </Card>
       )}
-
       {/* Status Information for Non-Pending Quotes */}
-      {quote.status !== 'pending_approval' && (
+      {!isWorkflowPending && (
         <Card className="bg-gray-900 border-gray-800">
           <CardHeader>
-            <CardTitle className="text-white">Quote Status</CardTitle>
+            <CardTitle className="text-white">Quote Status & Approval History</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-2">
+            <div className="space-y-3">
               <p className="text-gray-400">
-                This quote has been <span className="text-white font-medium">{quote.status.replace('_', ' ')}</span>
-                {quote.reviewed_at && (
-                  <span> on {new Date(quote.reviewed_at).toLocaleDateString()}</span>
-                )}
+                This quote has been <span className="text-white font-medium">{workflowState.replace('_', ' ')}</span>
+                {quote.reviewed_at && <span> on {new Date(quote.reviewed_at).toLocaleDateString()}</span>}
               </p>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div className="bg-gray-800 p-3 rounded">
+                  <p className="text-xs text-gray-400">Admin Step Age</p>
+                  <p className="text-white font-semibold">{ageDaysBetween(adminClaimedAt, adminDecidedAt)}</p>
+                </div>
+                <div className="bg-gray-800 p-3 rounded">
+                  <p className="text-xs text-gray-400">Finance Step Age</p>
+                  <p className="text-white font-semibold">{ageDaysBetween(financeClaimedAt, financeDecidedAt)}</p>
+                </div>
+                <div className="bg-gray-800 p-3 rounded">
+                  <p className="text-xs text-gray-400">Total Case Age</p>
+                  <p className="text-white font-semibold">{ageDaysBetween(submittedAt, finalDecisionAt)}</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="bg-gray-800 p-3 rounded">
+                  <p className="text-xs text-gray-400">Quote Review Claimed by</p>
+                  <p className="text-cyan-300 font-semibold mt-1">{(quote as any).admin_reviewer_name || quote.admin_reviewer_id || 'Unclaimed'}</p>
+                  <p className="text-xs text-gray-500 mt-1">{(quote as any).admin_claimed_at ? new Date((quote as any).admin_claimed_at).toLocaleString() : ''}</p>
+                </div>
+                <div className="bg-gray-800 p-3 rounded">
+                  <p className="text-xs text-gray-400">Finance Claimed by</p>
+                  <p className="text-amber-300 font-semibold mt-1">{(quote as any).finance_reviewer_name || quote.finance_reviewer_id || 'Unclaimed'}</p>
+                  <p className="text-xs text-gray-500 mt-1">{(quote as any).finance_claimed_at ? new Date((quote as any).finance_claimed_at).toLocaleString() : ''}</p>
+                </div>
+              </div>
+
               {quote.approval_notes && (
                 <div>
-                  <Label className="text-gray-400">Approval Notes:</Label>
-                  <p className="text-gray-300 bg-gray-800 p-2 rounded mt-1">{quote.approval_notes}</p>
+                  <Label className="text-gray-400">Admin Notes</Label>
+                  <p className="text-gray-300 bg-gray-800 p-2 rounded mt-1 whitespace-pre-wrap">{quote.approval_notes}</p>
+                </div>
+              )}
+              {((quote as any).finance_notes || quote.finance_decision_notes) && (
+                <div>
+                  <Label className="text-gray-400">Finance Notes</Label>
+                  <p className="text-gray-300 bg-gray-800 p-2 rounded mt-1 whitespace-pre-wrap">{(quote as any).finance_notes || quote.finance_decision_notes}</p>
                 </div>
               )}
               {hasStoredAdditionalQuoteInfo && (
                 <div>
-                  <Label className="text-gray-400">Additional Quote Information:</Label>
-                  <p className="text-gray-300 bg-gray-800 p-2 rounded mt-1 whitespace-pre-wrap">
-                    {storedAdditionalQuoteInfo}
-                  </p>
+                  <Label className="text-gray-400">Additional Quote Information</Label>
+                  <p className="text-gray-300 bg-gray-800 p-2 rounded mt-1 whitespace-pre-wrap">{storedAdditionalQuoteInfo}</p>
                 </div>
               )}
               {quote.rejection_reason && (
                 <div>
-                  <Label className="text-gray-400">Rejection Reason:</Label>
+                  <Label className="text-gray-400">Rejection Reason</Label>
                   <p className="text-gray-300 bg-gray-800 p-2 rounded mt-1">{quote.rejection_reason}</p>
                 </div>
               )}

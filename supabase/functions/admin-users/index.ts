@@ -1,6 +1,21 @@
 
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { Resend } from "https://esm.sh/resend@3.2.0";
+import nodemailer from "npm:nodemailer@6.9.13";
+
+// Simple template engine (Mustache-style)
+function renderTemplate(template: string, data: Record<string, any>): string {
+  let result = template;
+  for (const [key, value] of Object.entries(data)) {
+    const regex = new RegExp(`{{${key}}}`, 'g');
+    result = result.replace(regex, String(value ?? ''));
+  }
+  result = result.replace(/{{#if (\w+)}}([\s\S]*?){{\/if}}/g, (match, varName, content) => {
+    return data[varName] ? content : '';
+  });
+  return result;
+}
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -98,7 +113,9 @@ serve(async (req) => {
       .eq('id', user.id)
       .single();
 
-    if (profileError || !profile || (profile as any)?.role !== 'admin') {
+    const rawRole = String((profile as any)?.role || '').toLowerCase();
+    const isAdminLike = ['admin','master','level3','level_3'].includes(rawRole);
+    if (profileError || !profile || !isAdminLike) {
       throw new Error('Admin access required');
     }
 
@@ -193,6 +210,114 @@ async function handleListUsers(supabase: any) {
   });
 }
 
+async function logAuditEvent(supabase: any, payload: { user_id?: string | null; event: string; ip_address?: string | null; user_agent?: string | null; device_info?: any; location?: any; }) {
+  try {
+    await supabase.from('user_sessions').insert({
+      user_id: payload.user_id ?? null,
+      event: payload.event,
+      ip_address: payload.ip_address ?? null,
+      user_agent: payload.user_agent ?? null,
+      device_info: payload.device_info ?? {},
+      location: payload.location ?? {},
+    });
+  } catch (error) {
+    console.warn('Failed to write audit log event:', error);
+  }
+}
+
+async function getSetting(supabase: any, key: string) {
+  const { data, error } = await supabase
+    .from('email_settings')
+    .select('setting_value')
+    .eq('setting_key', key)
+    .maybeSingle();
+  if (error) return null;
+  return (data as any)?.setting_value ?? null;
+}
+
+async function sendEmailNotification(
+  supabase: any,
+  payload: { to: string[]; subject?: string; html?: string; template_type?: string; template_data?: Record<string, any> }
+) {
+  try {
+    const { data: settingsRows } = await supabase
+      .from('email_settings')
+      .select('setting_key, setting_value');
+
+    const settings: Record<string, any> = {};
+    for (const row of settingsRows ?? []) settings[row.setting_key] = row.setting_value;
+
+    if (settings.enable_notifications === false) return;
+
+    const fromEmail = settings.smtp_from_email as string | undefined;
+    const fromName = (settings.smtp_from_name as string | undefined) ?? 'PowerQuotePro';
+    if (!fromEmail) {
+      console.warn('smtp_from_email not configured; skipping email notification');
+      return;
+    }
+
+    const provider = String(settings.email_service_provider || 'resend').toLowerCase();
+
+    let subject = payload.subject || 'PowerQuotePro notification';
+    let html = payload.html || '<p>Hello,</p><p>This is a notification from PowerQuotePro.</p>';
+
+    if (payload.template_type) {
+      const { data: templateRow, error: templateErr } = await supabase
+        .from('email_templates')
+        .select('*')
+        .eq('template_type', payload.template_type)
+        .eq('enabled', true)
+        .maybeSingle();
+
+      if (templateErr) throw new Error(`Failed to fetch email template (${payload.template_type}): ${templateErr.message}`);
+      if (!templateRow) throw new Error(`Email template not found or disabled: ${payload.template_type}`);
+
+      const data = payload.template_data || {};
+      subject = renderTemplate(String(templateRow.subject_template || ''), data);
+      html = renderTemplate(String(templateRow.body_template || ''), data);
+    }
+
+    const from = `${fromName} <${fromEmail}>`;
+
+    if (provider === 'smtp') {
+      const host = String(settings.smtp_host || '').trim();
+      const port = Number(settings.smtp_port || 587);
+      const secure = Boolean(settings.smtp_secure);
+      if (!host) throw new Error('smtp_host not configured');
+
+      const user = Deno.env.get('SMTP_USER') || '';
+      const pass = Deno.env.get('SMTP_PASSWORD') || '';
+
+      const transport = nodemailer.createTransport({
+        host,
+        port,
+        secure,
+        auth: user && pass ? { user, pass } : undefined,
+      } as any);
+
+      await transport.sendMail({
+        from,
+        to: payload.to.join(', '),
+        subject,
+        html,
+      });
+      return;
+    }
+
+    // Default to Resend
+    const resendApiKey = Deno.env.get('RESEND_API_KEY');
+    if (!resendApiKey) {
+      console.warn('RESEND_API_KEY not configured; skipping email notification');
+      return;
+    }
+
+    const resend = new Resend(resendApiKey);
+    await resend.emails.send({ from, to: payload.to, subject, html });
+  } catch (error) {
+    console.warn('Failed to send email notification:', error);
+  }
+}
+
 async function handleCreateUser(req: Request, supabase: any, adminId: string) {
   const { 
     email, 
@@ -244,6 +369,11 @@ async function handleCreateUser(req: Request, supabase: any, adminId: string) {
     });
 
   if (profileError) throw profileError;
+
+  await logAuditEvent(supabase, {
+    user_id: adminId,
+    event: `ADMIN_CREATE_USER:${email}`,
+  });
 
   return new Response(JSON.stringify({ 
     success: true, 
@@ -302,6 +432,11 @@ async function handleUpdateUser(req: Request, supabase: any, adminId: string) {
 
   if (profileError) throw profileError;
 
+  await logAuditEvent(supabase, {
+    user_id: adminId,
+    event: `ADMIN_UPDATE_USER:${userId}`,
+  });
+
   return new Response(JSON.stringify({ success: true }), {
     headers: { ...corsHeaders, 'Content-Type': 'application/json' }
   });
@@ -335,28 +470,22 @@ async function handleApproveRequest(req: Request, supabase: any, adminId: string
 
   if (requestError) throw requestError;
 
-  const tempPassword = Math.random().toString(36).slice(-8) + 'A1!';
+  // Find existing auth user by email (user already chose password during registration)
+  const { data: authUsers, error: listError } = await supabase.auth.admin.listUsers();
+  if (listError) throw listError;
 
-  // Create auth user
-  const { data: authUser, error: authError } = await supabase.auth.admin.createUser({
-    email: request.email,
-    password: tempPassword,
-    email_confirm: true,
-    user_metadata: {
-      first_name: request.first_name,
-      last_name: request.last_name,
-      role: request.requested_role,
-      department: request.department
-    }
-  });
+  const match = (authUsers?.users || []).find((u: any) => String(u.email || '').toLowerCase() === String(request.email || '').toLowerCase());
+  if (!match?.id) {
+    throw new Error('No auth user found for this email. User must complete registration first.');
+  }
 
-  if (authError) throw authError;
+  const userId = match.id;
 
-  // Create profile with all fields from request
+  // Upsert profile with all fields from request and activate
   const { error: profileError } = await supabase
     .from('profiles')
-    .insert({
-      id: authUser.user.id,
+    .upsert({
+      id: userId,
       email: request.email,
       first_name: request.first_name,
       last_name: request.last_name,
@@ -384,10 +513,30 @@ async function handleApproveRequest(req: Request, supabase: any, adminId: string
 
   if (updateError) throw updateError;
 
+  await logAuditEvent(supabase, {
+    user_id: adminId,
+    event: `ADMIN_APPROVE_REQUEST:${request.email}`,
+  });
+
+  // Notify applicant (approval)
+  await sendEmailNotification(supabase, {
+    to: [String(request.email).trim()],
+    template_type: 'user_request_approved',
+    template_data: {
+      recipient_name: `${request.first_name ?? ''} ${request.last_name ?? ''}`.trim() || 'there',
+      recipient_email: String(request.email).trim(),
+      requested_role: request.requested_role,
+      request_id: request.id,
+      decision_date: new Date().toISOString(),
+      support_email: String((await getSetting(supabase, 'support_email')) || 'cdeligi@qualitrolcorp.com'),
+    },
+  });
+
   return new Response(JSON.stringify({ 
-    success: true, 
-    tempPassword,
-    userId: authUser.user.id 
+    success: true,
+    invited: false,
+    message: 'User approved. User can log in with the password created during registration.',
+    userId
   }), {
     headers: { ...corsHeaders, 'Content-Type': 'application/json' }
   });
@@ -395,6 +544,13 @@ async function handleApproveRequest(req: Request, supabase: any, adminId: string
 
 async function handleRejectRequest(req: Request, supabase: any, adminId: string) {
   const { requestId, reason } = await req.json();
+
+  // Fetch request email before updating (for notification)
+  const { data: requestRow } = await supabase
+    .from('user_requests')
+    .select('email, first_name, last_name')
+    .eq('id', requestId)
+    .maybeSingle();
 
   const { error } = await supabase
     .from('user_requests')
@@ -408,7 +564,30 @@ async function handleRejectRequest(req: Request, supabase: any, adminId: string)
 
   if (error) throw error;
 
-  return new Response(JSON.stringify({ success: true }), {
+  await logAuditEvent(supabase, {
+    user_id: adminId,
+    event: `ADMIN_REJECT_REQUEST:${requestId}`,
+  });
+
+  // Notify applicant (rejection)
+  if (requestRow?.email) {
+    const safeReason = reason ? String(reason).replaceAll('<','&lt;').replaceAll('>','&gt;') : '';
+
+    await sendEmailNotification(supabase, {
+      to: [String(requestRow.email).trim()],
+      template_type: 'user_request_rejected',
+      template_data: {
+        recipient_name: `${requestRow.first_name ?? ''} ${requestRow.last_name ?? ''}`.trim() || 'there',
+        recipient_email: String(requestRow.email).trim(),
+        request_id: requestId,
+        rejection_reason: safeReason,
+        decision_date: new Date().toISOString(),
+        support_email: String((await getSetting(supabase, 'support_email')) || 'cdeligi@qualitrolcorp.com'),
+      },
+    });
+  }
+
+  return new Response(JSON.stringify({ success: true }), { 
     headers: { ...corsHeaders, 'Content-Type': 'application/json' }
   });
 }

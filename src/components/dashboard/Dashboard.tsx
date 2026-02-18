@@ -148,7 +148,9 @@ const Dashboard = ({ user, onLogout }: DashboardProps) => {
       case 'pricing-analysis':
         return <PricingAnalysisDashboard />;
       case 'admin':
-        return user.role === 'ADMIN' ? <AdminPanel user={user} /> : <div className="text-white">Access Denied</div>;
+        return (has(FEATURES.ACCESS_ADMIN_PANEL) || ['ADMIN','MASTER'].includes(user.role))
+          ? <AdminPanel user={user} />
+          : <div className="text-white">Access Denied</div>;
       default:
         return <QuoteManager user={user} />;
     }

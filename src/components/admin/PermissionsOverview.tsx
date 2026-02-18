@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { getSupabaseClient } from "@/integrations/supabase/client";
+import { Role } from '@/types/auth';
 
 const supabase = getSupabaseClient();
 import { Loader2 } from 'lucide-react';
@@ -22,7 +23,30 @@ interface RoleDefault {
   allowed: boolean;
 }
 
-const ROLES = ['ADMIN', 'FINANCE', 'LEVEL_3', 'LEVEL_2', 'LEVEL_1'] as const;
+const ROLES = ['level1', 'level2', 'level3', 'admin', 'finance', 'master'] as const;
+
+const ROLE_ALIASES: Record<(typeof ROLES)[number], string[]> = {
+  level1: ['level1', 'level_1', 'sales'],
+  level2: ['level2', 'level_2'],
+  level3: ['level3', 'level_3'],
+  admin: ['admin'],
+  finance: ['finance'],
+  master: ['master'],
+};
+
+const ROLE_DB_CANONICAL: Record<(typeof ROLES)[number], string> = {
+  level1: 'LEVEL_1',
+  level2: 'LEVEL_2',
+  level3: 'LEVEL_3',
+  admin: 'ADMIN',
+  finance: 'FINANCE',
+  master: 'MASTER',
+};
+
+const roleMatches = (displayRole: (typeof ROLES)[number], dbRole: string): boolean => {
+  const val = String(dbRole || '').toLowerCase();
+  return ROLE_ALIASES[displayRole].includes(val);
+};
 
 const DEFAULT_FEATURES: Feature[] = [
   {
@@ -49,6 +73,11 @@ const DEFAULT_FEATURES: Feature[] = [
     key: 'FEATURE_BOM_SHOW_PARTNER_COMMISSION',
     label: 'View Partner Commission',
     description: 'Allows users to view partner commission costs in BOM',
+  },
+  {
+    key: 'FEATURE_ACCESS_ADMIN_PANEL',
+    label: 'Access to Admin Panel',
+    description: 'Allows user to open Admin Panel and manage administrative workflows.',
   }
 ];
 
@@ -110,39 +139,53 @@ export default function PermissionsOverview() {
     fetchData();
   }, []);
 
-  const getPermissionForRole = (featureKey: string, role: string): boolean => {
+  const getPermissionForRole = (featureKey: string, role: (typeof ROLES)[number]): boolean => {
     const roleDefault = roleDefaults.find(
-      rd => rd.feature_key === featureKey && rd.role === role
+      rd => rd.feature_key === featureKey && roleMatches(role, rd.role)
     );
     return roleDefault?.allowed || false;
   };
 
-  const updateRolePermission = async (featureKey: string, role: string, allowed: boolean) => {
+  const updateRolePermission = async (featureKey: string, role: (typeof ROLES)[number], allowed: boolean) => {
     try {
       setSaving(true);
       
       // Update local state first for immediate UI feedback
       setRoleDefaults(prev => {
-        const existing = prev.find(rd => rd.role === role && rd.feature_key === featureKey);
+        const existing = prev.find(rd => rd.feature_key === featureKey && roleMatches(role, String(rd.role || '')));
         if (existing) {
           return prev.map(rd => 
-            rd.role === role && rd.feature_key === featureKey 
-              ? { ...rd, allowed } 
+            rd.feature_key === featureKey && roleMatches(role, String(rd.role || ''))
+              ? { ...rd, allowed }
               : rd
           );
         }
-        return [...prev, { role, feature_key: featureKey, allowed }];
+        return [...prev, { role: ROLE_DB_CANONICAL[role], feature_key: featureKey, allowed } as any];
       });
 
-      // Update in database
-      const { error } = await supabase
+      // Update in database (safe path without assuming composite unique constraint)
+      const aliasValues = ROLE_ALIASES[role].map(v => v.toUpperCase());
+      const { data: existingRows, error: existingError } = await supabase
         .from('role_feature_defaults')
-        .upsert(
-          { role, feature_key: featureKey, allowed },
-          { onConflict: 'role,feature_key' }
-        );
+        .select('id, role')
+        .eq('feature_key', featureKey);
 
-      if (error) throw error;
+      if (existingError) throw existingError;
+
+      const existing = (existingRows || []).find((row: any) => aliasValues.includes(String(row.role || '').toUpperCase()));
+      if (existing?.id) {
+        const { error: updateError } = await supabase
+          .from('role_feature_defaults')
+          .update({ allowed })
+          .eq('id', existing.id);
+        if (updateError) throw updateError;
+      } else {
+        const preferredRoleValue = ROLE_DB_CANONICAL[role];
+        const { error: insertError } = await supabase
+          .from('role_feature_defaults')
+          .insert({ role: preferredRoleValue as any, feature_key: featureKey, allowed });
+        if (insertError) throw insertError;
+      }
       
       toast({
         title: "Success",
@@ -152,7 +195,7 @@ export default function PermissionsOverview() {
       console.error('Error updating permission:', error);
       toast({
         title: "Error",
-        description: "Failed to update permission. Please try again.",
+        description: error instanceof Error ? error.message : "Failed to update permission. Please try again.",
         variant: "destructive",
       });
       // Revert local state on error
@@ -221,7 +264,7 @@ export default function PermissionsOverview() {
                 <TableHead className="w-1/3">Feature</TableHead>
                 {ROLES.map(role => (
                   <TableHead key={role} className="text-center">
-                    {role.replace('_', ' ')}
+                    {({level1:'Level 1',level2:'Level 2',level3:'Level 3',admin:'Admin',finance:'Finance',master:'Master'} as any)[role] || role}
                   </TableHead>
                 ))}
               </TableRow>

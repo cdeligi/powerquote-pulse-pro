@@ -12,7 +12,7 @@ import { Shield, User, Mail, Phone, Building, FileText, ArrowLeft } from "lucide
 import { supabase } from "@/integrations/supabase/client";
 import LegalDocumentModal from "@/components/admin/LegalDocumentModal";
 import { departmentService, Department } from "@/services/departmentService";
-import { roleService, RoleMetadata } from "@/services/roleService";
+// role options are defined locally for stable onboarding UX
 
 interface UserRegistrationFormProps {
   onSubmit?: (data: Partial<UserRegistrationRequest>) => void;
@@ -22,13 +22,15 @@ interface UserRegistrationFormProps {
 const UserRegistrationForm = ({ onSubmit, onBack }: UserRegistrationFormProps) => {
   const [formData, setFormData] = useState({
     email: '',
+    password: '',
+    confirmPassword: '',
     firstName: '',
     lastName: '',
     department: '',
     jobTitle: '',
     phoneNumber: '',
     businessJustification: '',
-    requestedRole: 'LEVEL_1' as 'LEVEL_1' | 'LEVEL_2' | 'LEVEL_3' | 'ADMIN' | 'FINANCE',
+    requestedRole: 'level1',
     managerEmail: '',
     companyName: '',
     agreedToTerms: false,
@@ -36,22 +38,39 @@ const UserRegistrationForm = ({ onSubmit, onBack }: UserRegistrationFormProps) =
   });
 
   const [departments, setDepartments] = useState<Department[]>([]);
-  const [rolesMetadata, setRolesMetadata] = useState<RoleMetadata[]>([]);
+
+  const FALLBACK_DEPARTMENTS = [
+    { id: 'application-engineer', name: 'Application engineer' },
+    { id: 'quote-enginner', name: 'Quote Enginner' },
+    { id: 'ae-management', name: 'AE Management' },
+    { id: 'sales-engineer', name: 'Sales Engineer' },
+    { id: 'sales-director', name: 'Sales Director' },
+    { id: 'technical-application-engineer', name: 'Technical Application Engineer' },
+    { id: 'field-service-engineer', name: 'Field Service Engineer' },
+    { id: 'fse-management', name: 'FSE Management' },
+    { id: 'finance', name: 'Finance' },
+    { id: 'partner', name: 'Partner' },
+  ];
+
+  const FALLBACK_ACCESS_LEVELS = [
+    { value: 'level1', label: 'Level 1 - Partner Access' },
+    { value: 'level2', label: 'Level 2 - Sales Engineer Access' },
+    { value: 'level3', label: 'Level 3 - Directors Access' },
+    { value: 'admin', label: 'Admin - Quotes Engineering Team' },
+    { value: 'finance', label: 'Finance - Finance Approval' },
+    { value: 'master', label: 'Master - Full Control' },
+  ];
 
   useEffect(() => {
     const loadDepartments = async () => {
       const fetchedDepartments = await departmentService.fetchDepartments();
       setDepartments(fetchedDepartments);
     };
-    const loadRoles = async () => {
-      const fetchedRoles = await roleService.fetchRoles();
-      setRolesMetadata(fetchedRoles);
-    };
     loadDepartments();
-    loadRoles();
   }, []);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitNotice, setSubmitNotice] = useState<string | null>(null);
   const [showTerms, setShowTerms] = useState(false);
   const [showPrivacy, setShowPrivacy] = useState(false);
 
@@ -68,9 +87,64 @@ const UserRegistrationForm = ({ onSubmit, onBack }: UserRegistrationFormProps) =
     }
 
     setIsSubmitting(true);
+    setSubmitNotice(null);
     
     try {
-      // Insert into real database
+      // Validate password (current security standards: length + block common weak patterns)
+      const emailLower = String(formData.email || '').trim().toLowerCase();
+      const pass = String(formData.password || '');
+      const passLower = pass.toLowerCase();
+
+      const commonBad = new Set([
+        'password',
+        'password123',
+        '123456789012',
+        '1234567890123',
+        '12345678901234',
+        'qwertyuiopasdf',
+        'adminadminadmin',
+      ]);
+
+      if (pass.length < 12) {
+        setSubmitNotice('Registration failed: Password must be at least 12 characters.');
+        setIsSubmitting(false);
+        return;
+      }
+      if (pass !== formData.confirmPassword) {
+        setSubmitNotice('Registration failed: Passwords do not match.');
+        setIsSubmitting(false);
+        return;
+      }
+      if (commonBad.has(passLower)) {
+        setSubmitNotice('Registration failed: Password is too common. Choose a stronger password.');
+        setIsSubmitting(false);
+        return;
+      }
+      if (emailLower && (passLower.includes(emailLower) || passLower.includes(emailLower.split('@')[0] || ''))) {
+        setSubmitNotice('Registration failed: Password must not contain your email.');
+        setIsSubmitting(false);
+        return;
+      }
+
+      // Create auth user (email confirmation required)
+      const { error: signUpError } = await supabase.auth.signUp({
+        email: formData.email,
+        password: formData.password,
+        options: {
+          data: {
+            first_name: formData.firstName,
+            last_name: formData.lastName,
+          },
+          emailRedirectTo: `${window.location.origin}/#login`,
+        },
+      });
+
+      if (signUpError) {
+        console.error('Auth signup error:', signUpError);
+        throw signUpError;
+      }
+
+      // Insert request into database
       const { error } = await supabase
         .from('user_requests')
         .insert({
@@ -95,28 +169,143 @@ const UserRegistrationForm = ({ onSubmit, onBack }: UserRegistrationFormProps) =
       }
 
       console.log('Registration request submitted to database');
+
+      // Notify admins for review workflow
+      try {
+        const fnUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-quote-notifications`;
+
+        const { data: emailSettings } = await supabase
+          .from('email_settings')
+          .select('approval_admin_recipients')
+          .limit(1)
+          .maybeSingle();
+
+        const recipients = Array.isArray((emailSettings as any)?.approval_admin_recipients)
+          ? (emailSettings as any).approval_admin_recipients
+          : [];
+
+        const regId = `REG-${Date.now()}`;
+
+        // Notify admins/masters
+        if (recipients.length > 0) {
+          const results = await Promise.all(
+            recipients.map(async (recipientEmail: string) => {
+              const res = await fetch(fnUrl, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
+                },
+                body: JSON.stringify({
+                  recipientEmail,
+                  recipientName: 'Admin',
+                  senderName: `${formData.firstName} ${formData.lastName}`,
+                  quoteId: regId,
+                  quoteName: 'New User Registration Request',
+                  permissionLevel: 'view',
+                  template_type: 'user_request_admin_review',
+                  template_data: {
+                    requester_name: `${formData.firstName} ${formData.lastName}`.trim(),
+                    requester_email: formData.email,
+                    requested_role: formData.requestedRole,
+                    request_id: regId,
+                    sla_text: 'within 2 business days (48 hours)',
+                  },
+                }),
+              });
+              const json = await res.json().catch(() => ({}));
+              return { recipientEmail, error: res.ok ? null : json, data: json };
+            })
+          );
+
+          const failed = results.filter((r) => r.error);
+          if (failed.length > 0) {
+            console.warn('Admin notifications failed:', failed);
+          } else {
+            console.log('Admin notifications sent:', results);
+          }
+        }
+
+        // Notify applicant (direct fetch to avoid auth/RLS issues on public registration page)
+        const applicantRes = await fetch(fnUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
+          },
+          body: JSON.stringify({
+            recipientEmail: formData.email,
+            recipientName: `${formData.firstName} ${formData.lastName}`.trim(),
+            senderName: 'PowerQuotePro',
+            quoteId: regId,
+            quoteName: 'Access Request Received',
+            permissionLevel: 'view',
+            template_type: 'user_request_received',
+            template_data: {
+              recipient_name: `${formData.firstName} ${formData.lastName}`.trim(),
+              recipient_email: formData.email,
+              requested_role: formData.requestedRole,
+              request_id: regId,
+              sla_text: 'up to 2 business days (48 hours)',
+              support_email: 'cpq-admin@qualitrolcorp.com',
+            },
+          }),
+        });
+
+        const applicantJson = await applicantRes.json().catch(() => ({}));
+        if (!applicantRes.ok) {
+          console.warn('Applicant notification failed:', applicantJson);
+          setSubmitNotice(`Email notification failed: ${JSON.stringify(applicantJson)}`);
+        } else {
+          console.log('Applicant notification sent:', applicantJson);
+          const emailId = applicantJson?.result?.data?.id || applicantJson?.result?.data?.[0]?.id;
+          setSubmitNotice(`Confirmation email sent (id: ${emailId || 'unknown'}). Check Inbox/Spam/Promotions.`);
+        }
+
+        await supabase.from('admin_notifications').insert({
+          quote_id: regId,
+          notification_type: 'user_registration_pending_review',
+          message_content: {
+            email: formData.email,
+            requested_role: formData.requestedRole,
+            department: formData.department,
+            details: 'New user registration request pending admin approval',
+          },
+          sent_to: recipients,
+        });
+      } catch (notifyError) {
+        console.warn('Failed to notify admins of registration request:', notifyError);
+      }
       
-      alert('Registration request submitted successfully! You will receive an email once your request has been reviewed.');
+      // Final UX note (some mobile webviews suppress window.alert)
+      setSubmitNotice((prev) => prev || 'Request submitted successfully. If you do not see the email, check Spam/Promotions.');
       
       // Reset form
       setFormData({
         email: '',
+        password: '',
+        confirmPassword: '',
         firstName: '',
         lastName: '',
         department: '',
         jobTitle: '',
         phoneNumber: '',
         businessJustification: '',
-        requestedRole: 'LEVEL_1',
+        requestedRole: 'level1',
         managerEmail: '',
         companyName: '',
         agreedToTerms: false,
         agreedToPrivacyPolicy: false
       });
       
-    } catch (error) {
+    } catch (error: any) {
       console.error('Registration error:', error);
-      alert('An error occurred during registration. Please try again.');
+      const msg =
+        error?.message ||
+        error?.error_description ||
+        error?.details ||
+        'An error occurred during registration. Please try again.';
+      setSubmitNotice(`Registration failed: ${msg}`);
     } finally {
       setIsSubmitting(false);
     }
@@ -218,6 +407,37 @@ const UserRegistrationForm = ({ onSubmit, onBack }: UserRegistrationFormProps) =
                 />
               </div>
 
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="password" className="text-gray-700 dark:text-white font-medium mb-2 block">
+                    Password *
+                  </Label>
+                  <Input
+                    id="password"
+                    type="password"
+                    value={formData.password}
+                    onChange={(e) => handleInputChange('password', e.target.value)}
+                    className="bg-gray-50 dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white placeholder:text-gray-500 dark:placeholder:text-gray-400 focus:border-red-500 focus:ring-red-500"
+                    placeholder="Minimum 12 characters"
+                    required
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="confirmPassword" className="text-gray-700 dark:text-white font-medium mb-2 block">
+                    Confirm Password *
+                  </Label>
+                  <Input
+                    id="confirmPassword"
+                    type="password"
+                    value={formData.confirmPassword}
+                    onChange={(e) => handleInputChange('confirmPassword', e.target.value)}
+                    className="bg-gray-50 dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white placeholder:text-gray-500 dark:placeholder:text-gray-400 focus:border-red-500 focus:ring-red-500"
+                    placeholder="Repeat password"
+                    required
+                  />
+                </div>
+              </div>
+
               <div>
                 <Label htmlFor="phoneNumber" className="text-gray-700 dark:text-white font-medium mb-2 block">
                   Phone Number *
@@ -271,7 +491,7 @@ const UserRegistrationForm = ({ onSubmit, onBack }: UserRegistrationFormProps) =
                       <SelectValue placeholder="Select a department" />
                     </SelectTrigger>
                     <SelectContent className="bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 z-50">
-                      {departments.map((dept) => (
+                      {(departments.length > 0 ? departments : FALLBACK_DEPARTMENTS).map((dept) => (
                         <SelectItem key={dept.id} value={dept.name} className="text-gray-900 dark:text-white">
                           {dept.name}
                         </SelectItem>
@@ -324,14 +544,14 @@ const UserRegistrationForm = ({ onSubmit, onBack }: UserRegistrationFormProps) =
                 <Label htmlFor="requestedRole" className="text-gray-700 dark:text-white font-medium mb-2 block">
                   Requested Access Level *
                 </Label>
-                <Select value={formData.requestedRole} onValueChange={(value: 'LEVEL_1' | 'LEVEL_2' | 'LEVEL_3' | 'ADMIN' | 'FINANCE') => handleInputChange('requestedRole', value)}>
+                <Select value={formData.requestedRole} onValueChange={(value: string) => handleInputChange('requestedRole', value)}>
                   <SelectTrigger className="bg-gray-50 dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white focus:border-red-500 focus:ring-red-500">
                     <SelectValue placeholder="Select access level" />
                   </SelectTrigger>
                   <SelectContent className="bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 z-50">
-                    {rolesMetadata.map((role) => (
-                      <SelectItem key={role.role_name} value={role.role_name} className="text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700 focus:bg-gray-100 dark:focus:bg-gray-700">
-                        {role.display_name}
+                    {FALLBACK_ACCESS_LEVELS.map((role) => (
+                      <SelectItem key={role.value} value={role.value} className="text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700 focus:bg-gray-100 dark:focus:bg-gray-700">
+                        {role.label}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -401,6 +621,12 @@ const UserRegistrationForm = ({ onSubmit, onBack }: UserRegistrationFormProps) =
                 {isSubmitting ? 'Submitting Request...' : 'Request Access'}
               </Button>
               
+              {submitNotice && (
+                <div className="mt-4 rounded-md border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 p-3 text-sm text-gray-800 dark:text-gray-200">
+                  {submitNotice}
+                </div>
+              )}
+
               <p className="text-gray-500 dark:text-gray-400 text-sm text-center mt-3">
                 Your request will be reviewed by an administrator. You will receive an email notification once your request has been processed.
               </p>

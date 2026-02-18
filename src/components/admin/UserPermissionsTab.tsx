@@ -5,10 +5,9 @@ import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, RotateCcw } from 'lucide-react';
-import { getSupabaseClient, getSupabaseAdminClient, isAdminAvailable } from "@/integrations/supabase/client";
+import { getSupabaseClient } from "@/integrations/supabase/client";
 
 const supabase = getSupabaseClient();
-const supabaseAdmin = getSupabaseAdminClient();;
 import { toast } from '@/hooks/use-toast';
 import { Role, Feature, UserFeatureOverride } from '@/types/auth';
 
@@ -48,13 +47,24 @@ const UserPermissionsTab = ({ userProfile }: UserPermissionsTabProps) => {
 
       if (featuresError) throw featuresError;
 
-      // Fetch role defaults for this user's role
-      const { data: roleDefaults, error: roleError } = await supabase
+      // Fetch role defaults (load all + filter client-side to avoid enum literal mismatches)
+      const { data: allRoleDefaults, error: roleError } = await supabase
         .from('role_feature_defaults')
-        .select('feature_key, allowed')
-        .eq('role', userProfile.role);
+        .select('role, feature_key, allowed');
 
       if (roleError) throw roleError;
+
+      const normalizedUserRole = String(userProfile.role || '').toLowerCase();
+      const userRoleAliases: Record<string, string[]> = {
+        level1: ['level1','level_1','sales'],
+        level2: ['level2','level_2'],
+        level3: ['level3','level_3'],
+        admin: ['admin'],
+        finance: ['finance'],
+        master: ['master'],
+      };
+      const aliases = userRoleAliases[normalizedUserRole] || [normalizedUserRole];
+      const roleDefaults = (allRoleDefaults || []).filter((row: any) => aliases.includes(String(row.role || '').toLowerCase()));
 
       // Fetch user overrides
       const { data: userOverrides, error: overrideError } = await supabase
@@ -70,8 +80,8 @@ const UserPermissionsTab = ({ userProfile }: UserPermissionsTabProps) => {
       const userOverridesMap = new Map(userOverrides?.map(uo => [uo.feature_key, uo.allowed]) || []);
 
       const permissions: FeaturePermission[] = filteredFeatures.map(feature => {
-        const roleDefault = roleDefaultsMap.get(feature.key) || false;
-        const userOverride = userOverridesMap.get(feature.key) || null;
+        const roleDefault = roleDefaultsMap.has(feature.key) ? Boolean(roleDefaultsMap.get(feature.key)) : false;
+        const userOverride = userOverridesMap.has(feature.key) ? (userOverridesMap.get(feature.key) as boolean | null) : null;
         const effectivePermission = userOverride !== null ? userOverride : roleDefault;
 
         return {
@@ -120,7 +130,7 @@ const UserPermissionsTab = ({ userProfile }: UserPermissionsTabProps) => {
             user_id: userProfile.id,
             feature_key: featureKey,
             allowed
-          });
+          }, { onConflict: 'user_id,feature_key' });
 
         if (error) throw error;
       }

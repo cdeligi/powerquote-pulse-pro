@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+// checkbox removed: master now represented directly in role select
 import { toast } from "@/hooks/use-toast";
 import { Department } from "@/services/departmentService";
 
@@ -21,6 +22,7 @@ interface User {
   managerEmail?: string | null;
   companyName?: string | null;
   businessJustification?: string | null;
+  lastLoginAt?: string | null;
 }
 
 interface UserEditDialogProps {
@@ -28,13 +30,24 @@ interface UserEditDialogProps {
   isOpen: boolean;
   onClose: () => void;
   onSave: (userData: any) => Promise<void>;
-  departments: Department[]; // Add this prop
+  departments: Department[];
+  currentUserEmail?: string | null;
 }
 
-export default function UserEditDialog({ user, isOpen, onClose, onSave, departments }: UserEditDialogProps) {
+export default function UserEditDialog({ user, isOpen, onClose, onSave, departments, currentUserEmail }: UserEditDialogProps) {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [role, setRole] = useState('level1');
+
+  const normalizeRoleForEditor = (rawRole: string | null | undefined): string => {
+    const value = String(rawRole || '').toLowerCase();
+    if (['level1', 'level2', 'level3', 'admin', 'finance', 'master'].includes(value)) {
+      return value;
+    }
+    if (value === 'sales') return 'level1';
+    if (value === 'administrator') return 'admin';
+    return 'level1';
+  };
   const [userStatus, setUserStatus] = useState('active');
   const [department, setDepartment] = useState('');
   const [jobTitle, setJobTitle] = useState('');
@@ -50,7 +63,7 @@ export default function UserEditDialog({ user, isOpen, onClose, onSave, departme
       const nameParts = user.fullName.split(' ');
       setFirstName(nameParts[0] || '');
       setLastName(nameParts.slice(1).join(' ') || '');
-      setRole(user.role);
+      setRole(normalizeRoleForEditor(user.role));
       setUserStatus(user.userStatus);
       setDepartment(user.department || '');
       setJobTitle(user.jobTitle || '');
@@ -122,6 +135,25 @@ export default function UserEditDialog({ user, isOpen, onClose, onSave, departme
           
           <div className="grid grid-cols-2 gap-4">
             <div>
+              <Label className="text-gray-400">Last Login</Label>
+              <Input
+                value={user.lastLoginAt ? new Date(user.lastLoginAt).toLocaleString() : 'Never'}
+                disabled
+                className="bg-gray-800 border-gray-700 text-gray-400"
+              />
+            </div>
+            <div>
+              <Label className="text-gray-400">User ID</Label>
+              <Input
+                value={user.id}
+                disabled
+                className="bg-gray-800 border-gray-700 text-gray-500"
+              />
+            </div>
+          </div>
+          
+          <div className="grid grid-cols-2 gap-4">
+            <div>
               <Label htmlFor="firstName" className="text-gray-400">First Name</Label>
               <Input
                 id="firstName"
@@ -151,10 +183,15 @@ export default function UserEditDialog({ user, isOpen, onClose, onSave, departme
                 <SelectContent className="bg-gray-800 border-gray-700">
                   <SelectItem value="level1">Level 1</SelectItem>
                   <SelectItem value="level2">Level 2</SelectItem>
+                  <SelectItem value="level3">Level 3</SelectItem>
                   <SelectItem value="admin">Admin</SelectItem>
                   <SelectItem value="finance">Finance</SelectItem>
+                  <SelectItem value="master" disabled={currentUserEmail !== 'cdeligi@qualitrolcorp.com' || user.email !== 'cdeligi@qualitrolcorp.com'}>Master</SelectItem>
                 </SelectContent>
               </Select>
+              {(currentUserEmail !== 'cdeligi@qualitrolcorp.com' || user.email !== 'cdeligi@qualitrolcorp.com') && (
+                <p className="text-xs text-amber-400 mt-1">Master role is restricted to cdeligi@qualitrolcorp.com only.</p>
+              )}
             </div>
             <div>
               <Label htmlFor="status" className="text-gray-400">Status</Label>

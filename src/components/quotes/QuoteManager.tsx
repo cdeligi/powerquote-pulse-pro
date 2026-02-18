@@ -121,10 +121,60 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
   
   // Fetch BOM item count for each quote
   const [bomCounts, setBomCounts] = useState<Record<string, number>>({});
+  const [reviewerNameById, setReviewerNameById] = useState<Record<string, string>>({});
 
   useEffect(() => {
     fetchQuotes();
   }, []);
+
+  useEffect(() => {
+    const loadReviewerNames = async () => {
+      const ids = Array.from(new Set(
+        quotes
+          .flatMap((q: any) => [q.admin_reviewer_id, q.finance_reviewer_id])
+          .filter((v): v is string => typeof v === 'string' && v.length > 0)
+      ));
+
+      if (ids.length === 0) {
+        setReviewerNameById({});
+        return;
+      }
+
+      const mapped: Record<string, string> = {};
+
+      const { data: profileData } = await supabase
+        .from('profiles')
+        .select('id, first_name, last_name, email')
+        .in('id', ids);
+
+      (profileData || []).forEach((r: any) => {
+        const fullName = [r.first_name, r.last_name]
+          .filter((v: unknown) => typeof v === 'string' && v.trim().length > 0)
+          .join(' ')
+          .trim();
+        const candidate = fullName || (typeof r.email === 'string' && r.email.trim().length > 0 ? r.email.trim() : null);
+        if (candidate) mapped[r.id] = candidate;
+      });
+
+      const missingIds = ids.filter((id) => !mapped[id]);
+      if (missingIds.length > 0) {
+        const { data: userData } = await supabase
+          .from('users')
+          .select('id, first_name, last_name, email')
+          .in('id', missingIds);
+
+        (userData || []).forEach((u: any) => {
+          const fullName = [u.first_name, u.last_name].filter((v: unknown) => typeof v === 'string' && v.trim().length > 0).join(' ').trim();
+          const candidate = fullName || (typeof u.email === 'string' ? u.email : '');
+          if (candidate) mapped[u.id] = candidate;
+        });
+      }
+
+      setReviewerNameById(mapped);
+    };
+
+    loadReviewerNames();
+  }, [quotes]);
 
   const normalizePercentage = (value?: number | null) => {
     if (value === null || value === undefined) {
@@ -137,6 +187,20 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
     }
 
     return value;
+  };
+
+  const toDate = (value?: string | null): Date | null => {
+    if (!value) return null;
+    const d = new Date(value);
+    return Number.isNaN(d.getTime()) ? null : d;
+  };
+
+  const ageDaysBetween = (start?: string | null, end?: string | null): string => {
+    const s = toDate(start);
+    const e = toDate(end);
+    if (!s || !e) return '-';
+    const days = Math.max(0, Math.ceil((e.getTime() - s.getTime()) / (1000 * 60 * 60 * 24)));
+    return `${days}d`;
   };
 
   // Filter and process quotes with real BOM item counts
@@ -329,7 +393,17 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
       updatedAt: new Date(quote.updated_at).toLocaleDateString(),
       items: bomCounts[quote.id] || 0,
       hasDiscount,
-      pdfUrl: quote.status === 'draft' ? null : `/quotes/${quote.id}.pdf`
+      pdfUrl: quote.status === 'draft' ? null : `/quotes/${quote.id}.pdf`,
+      adminReviewerId: (quote as any).admin_reviewer_id || null,
+      financeReviewerId: (quote as any).finance_reviewer_id || null,
+      adminClaimedAt: (quote as any).admin_claimed_at || null,
+      financeClaimedAt: (quote as any).finance_claimed_at || null,
+      adminDecisionAt: (quote as any).admin_decision_at || (quote as any).reviewed_at || null,
+      financeDecisionAt: (quote as any).finance_decision_at || null,
+      submittedAt: (quote as any).submitted_at || quote.created_at,
+      financeNotes: (quote as any).finance_notes || null,
+      admin_reviewer_name: (quote as any).admin_reviewer_name || null,
+      finance_reviewer_name: (quote as any).finance_reviewer_name || null,
     };
   });
 
@@ -516,7 +590,8 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
     }
   };
 
-  const canSeePrices = user.role !== 'LEVEL_1';
+  // Prices/discounts must remain visible in generated quote pages for requester workflows.
+  const canSeePrices = true;
 
   const updatePdfLoading = (quoteId: string, isLoading: boolean) => {
     setPdfLoadingStates(prev => {
@@ -567,10 +642,14 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
 
           return {
             id: item.id || crypto.randomUUID(),
+            product_id: item.productId || item.product_id || item.product?.id,
             product: {
+              id: item.productId || item.product_id || item.product?.id,
               name: item.name || item.product?.name || 'Unknown Product',
               description: item.description || item.product?.description || '',
               price: productPrice,
+              productInfoUrl: item.product?.productInfoUrl || item.product?.product_info_url,
+              product_info_url: item.product?.product_info_url || item.product?.productInfoUrl,
             },
             quantity: item.quantity || 1,
             enabled: item.enabled !== false,
@@ -613,10 +692,14 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
 
           return {
             id: item.id || crypto.randomUUID(),
+            product_id: item.product_id,
             product: {
+              id: item.product_id,
               name: item.name || product?.name || 'Unknown Product',
               description: item.description || product?.description || '',
               price: item.unit_price || product?.price || 0,
+              productInfoUrl: product?.product_info_url || null,
+              product_info_url: product?.product_info_url || null,
             },
             quantity: item.quantity || 1,
             enabled: true,
@@ -1087,9 +1170,9 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
               return (
                 <div
                   key={quote.id}
-                  className="flex items-center justify-between p-4 bg-gray-800 rounded-lg hover:bg-gray-750 transition-colors"
+                  className="flex flex-col lg:flex-row lg:items-start justify-between gap-4 p-4 bg-gray-800 rounded-lg hover:bg-gray-750 transition-colors"
                 >
-                  <div className="flex-1 grid grid-cols-1 md:grid-cols-5 gap-4">
+                  <div className="flex-1 grid grid-cols-1 md:grid-cols-4 gap-4 items-start">
                     <div>
                       <div className="flex items-center space-x-3">
                         <span className="text-white font-bold">
@@ -1109,9 +1192,9 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
                       </p>
                     </div>
                     
-                    <div className="text-right">
+                    <div className="text-left md:text-right">
                       {canSeePrices ? (
-                        <div className="flex flex-col items-end">
+                        <div className="flex flex-col items-start md:items-end">
                           {quote.hasDiscount && (
                             <span className="text-sm text-gray-400 line-through">
                               {formatCurrency(quote.value, quote.currency)}
@@ -1142,13 +1225,21 @@ const QuoteManager = ({ user }: QuoteManagerProps) => {
                       )}
                     </div>
                     
-                    <div>
+                    <div className="min-w-0 md:min-w-[260px] lg:min-w-[280px]">
                       <p className="text-white">Created: {quote.createdAt}</p>
                       <p className="text-gray-400 text-sm">Updated: {quote.updatedAt}</p>
+                      <div className="mt-1 min-h-[40px] space-y-0.5">
+                        <p className="text-gray-400 text-xs whitespace-nowrap overflow-hidden text-ellipsis">
+                          Quote Review Claimed by: <span className="text-cyan-300">{(quote as any).admin_reviewer_name || (quote.adminReviewerId ? (reviewerNameById[quote.adminReviewerId] || 'Assigned reviewer') : 'Unclaimed')}</span>
+                        </p>
+                        <p className="text-gray-400 text-xs whitespace-nowrap overflow-hidden text-ellipsis">
+                          Finance Claimed by: <span className="text-amber-300">{(quote as any).finance_reviewer_name || (quote.financeReviewerId ? (reviewerNameById[quote.financeReviewerId] || 'Assigned reviewer') : 'Unclaimed')}</span>
+                        </p>
+                      </div>
                     </div>
                   </div>
                   
-                  <div className="flex flex-wrap items-center gap-2 ml-4">
+                  <div className="flex w-full lg:shrink-0 lg:w-[430px] items-center justify-start lg:justify-end gap-2 ml-0 lg:ml-2 flex-wrap">
                     <Button
                       variant="ghost"
                       size="sm"

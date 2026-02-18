@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.50.0";
 import { Resend } from "npm:resend@2.0.0";
+import nodemailer from "npm:nodemailer@6.9.13";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -215,8 +216,46 @@ const handler = async (req: Request): Promise<Response> => {
     };
 
     // 6. Send emails
-    const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
-    const emailResults = [];
+    const provider = String(settings.email_service_provider || 'resend').toLowerCase();
+
+    const sendViaResend = async (payload: { from: string; to: string[]; subject: string; html: string }) => {
+      const key = Deno.env.get("RESEND_API_KEY");
+      if (!key) throw new Error('RESEND_API_KEY not configured');
+      const resend = new Resend(key);
+      const { data, error } = await resend.emails.send(payload as any);
+      if (error) throw new Error(error.message);
+      return { messageId: data?.id };
+    };
+
+    const sendViaSMTP = async (payload: { from: string; to: string[]; subject: string; html: string }) => {
+      const host = String(settings.smtp_host || '').trim();
+      const port = Number(settings.smtp_port || 587);
+      const secure = Boolean(settings.smtp_secure);
+
+      if (!host) throw new Error('smtp_host not configured (Email Settings → SMTP Host)');
+
+      // Optional auth via secrets (recommended). For IP-based relay/connector, omit user/pass.
+      const user = Deno.env.get('SMTP_USER') || '';
+      const pass = Deno.env.get('SMTP_PASSWORD') || '';
+
+      const transport = nodemailer.createTransport({
+        host,
+        port,
+        secure,
+        auth: user && pass ? { user, pass } : undefined,
+      } as any);
+
+      const info = await transport.sendMail({
+        from: payload.from,
+        to: payload.to.join(', '),
+        subject: payload.subject,
+        html: payload.html,
+      });
+
+      return { messageId: (info as any)?.messageId };
+    };
+
+    const emailResults: any[] = [];
 
     for (const recipient of recipients) {
       const recipientTemplateData = {
@@ -228,56 +267,39 @@ const handler = async (req: Request): Promise<Response> => {
       const body = renderTemplate(template.body_template, recipientTemplateData);
 
       try {
-        const emailPayload: any = {
+        const emailPayload = {
           from: `${settings.smtp_from_name} <${settings.smtp_from_email}>`,
           to: [recipient],
-          subject: subject,
+          subject,
           html: body,
         };
-        
-        const { data, error } = await resend.emails.send(emailPayload);
 
-        if (error) {
-          console.error(`Failed to send email to ${recipient}:`, error);
-          
-          await supabase.from('email_audit_log').insert({
-            quote_id: quoteId,
-            template_type: templateType,
-            recipient_email: recipient,
-            recipient_name: recipientTemplateData.recipient_name,
-            subject: subject,
-            body: body,
-            status: 'failed',
-            error_message: error.message,
-          });
+        const result = provider === 'smtp'
+          ? await sendViaSMTP(emailPayload)
+          : await sendViaResend(emailPayload);
 
-          emailResults.push({ recipient, status: 'failed', error: error.message });
-        } else {
-          console.log(`Email sent successfully to ${recipient}`);
-          
-          await supabase.from('email_audit_log').insert({
-            quote_id: quoteId,
-            template_type: templateType,
-            recipient_email: recipient,
-            recipient_name: recipientTemplateData.recipient_name,
-            subject: subject,
-            body: body,
-            status: 'sent',
-            sent_at: new Date().toISOString(),
-          });
-
-          emailResults.push({ recipient, status: 'sent', messageId: data?.id });
-        }
-      } catch (sendError: any) {
-        console.error(`Exception sending email to ${recipient}:`, sendError);
-        
         await supabase.from('email_audit_log').insert({
           quote_id: quoteId,
           template_type: templateType,
           recipient_email: recipient,
           recipient_name: recipientTemplateData.recipient_name,
-          subject: subject,
-          body: body,
+          subject,
+          body,
+          status: 'sent',
+          sent_at: new Date().toISOString(),
+        });
+
+        emailResults.push({ recipient, status: 'sent', messageId: result?.messageId });
+      } catch (sendError: any) {
+        console.error(`Exception sending email to ${recipient}:`, sendError);
+
+        await supabase.from('email_audit_log').insert({
+          quote_id: quoteId,
+          template_type: templateType,
+          recipient_email: recipient,
+          recipient_name: recipientTemplateData.recipient_name,
+          subject,
+          body,
           status: 'failed',
           error_message: sendError.message,
         });

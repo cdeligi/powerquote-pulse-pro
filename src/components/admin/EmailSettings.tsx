@@ -22,9 +22,17 @@ interface EmailSettings {
   smtp_secure: boolean;
   smtp_from_email: string;
   smtp_from_name: string;
+  // 'resend' | 'smtp' | 'sendgrid'
   email_service_provider: string;
+
+  // Quote and system notifications (non-approval)
   notification_recipients: string[];
+
+  // Admins responsible for user access approvals (used for onboarding requests + reminders)
+  approval_admin_recipients: string[];
+
   enable_notifications: boolean;
+  support_email?: string;
 }
 
 interface EmailTemplate {
@@ -49,12 +57,16 @@ export const EmailSettings = () => {
     smtp_from_name: 'QUALITROL Quote System',
     email_service_provider: 'resend',
     notification_recipients: [],
+    approval_admin_recipients: [],
     enable_notifications: true,
+    support_email: 'cdeligi@qualitrolcorp.com',
   });
 
   const [templates, setTemplates] = useState<EmailTemplate[]>([]);
   const [selectedTemplate, setSelectedTemplate] = useState<EmailTemplate | null>(null);
   const [previewHtml, setPreviewHtml] = useState('');
+
+  const [newTemplate, setNewTemplate] = useState<{ template_type: string; variables: string } | null>(null);
 
   useEffect(() => {
     fetchEmailSettings();
@@ -83,7 +95,9 @@ export const EmailSettings = () => {
         smtp_from_name: settingsObj.smtp_from_name || 'QUALITROL Quote System',
         email_service_provider: settingsObj.email_service_provider || 'resend',
         notification_recipients: settingsObj.notification_recipients || [],
+        approval_admin_recipients: settingsObj.approval_admin_recipients || [],
         enable_notifications: settingsObj.enable_notifications ?? true,
+        support_email: settingsObj.support_email || 'cdeligi@qualitrolcorp.com',
       });
     } catch (error: any) {
       console.error('Error fetching email settings:', error);
@@ -164,6 +178,7 @@ export const EmailSettings = () => {
           subject_template: template.subject_template,
           body_template: template.body_template,
           enabled: template.enabled,
+          variables: template.variables,
         })
         .eq('id', template.id);
 
@@ -187,16 +202,72 @@ export const EmailSettings = () => {
     }
   };
 
+  const createEmailTemplate = async () => {
+    if (!newTemplate) return;
+
+    const templateType = newTemplate.template_type.trim();
+    const variables = newTemplate.variables
+      .split(',')
+      .map((v) => v.trim())
+      .filter(Boolean);
+
+    if (!templateType) {
+      toast({ title: 'Error', description: 'Template type is required', variant: 'destructive' });
+      return;
+    }
+
+    try {
+      setSaving(true);
+
+      const { data, error } = await supabase
+        .from('email_templates')
+        .insert({
+          template_type: templateType,
+          subject_template: `${templateType.replaceAll('_', ' ')} notification`,
+          body_template: '<p>Hello {{recipient_name}},</p>\n<p>TODO: write template.</p>',
+          variables,
+          enabled: true,
+        })
+        .select('*')
+        .single();
+
+      if (error) throw error;
+
+      toast({ title: 'Success', description: 'Email template created successfully' });
+      setNewTemplate(null);
+      await fetchEmailTemplates();
+      if (data) setSelectedTemplate(data as any);
+    } catch (error: any) {
+      console.error('Error creating email template:', error);
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to create email template',
+        variant: 'destructive',
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const testSMTPConnection = async () => {
     try {
       setTestingSMTP(true);
-      
+
       // Use notification recipients for test email (not the from_email which is the sender)
-      const testRecipients = settings.notification_recipients.length > 0 
-        ? settings.notification_recipients 
-        : ['carlosdeligi@gmail.com']; // Fallback to default
-      
-      const { data, error } = await supabase.functions.invoke('send-quote-status-email', {
+      const testRecipients = settings.notification_recipients.length > 0
+        ? settings.notification_recipients
+        : [];
+
+      if (testRecipients.length === 0) {
+        toast({
+          title: 'Add a test recipient',
+          description: 'Please add at least one Notification Recipient before sending a test email.',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      const { error } = await supabase.functions.invoke('send-quote-status-email', {
         body: {
           quoteId: 'TEST',
           action: 'approved',
@@ -222,8 +293,20 @@ export const EmailSettings = () => {
     }
   };
 
-  const addRecipient = (email: string) => {
-    if (email && !settings.notification_recipients.includes(email)) {
+  const addRecipient = (email: string, list: 'notification' | 'approval') => {
+    if (!email) return;
+
+    if (list === 'approval') {
+      if (!settings.approval_admin_recipients.includes(email)) {
+        setSettings({
+          ...settings,
+          approval_admin_recipients: [...settings.approval_admin_recipients, email],
+        });
+      }
+      return;
+    }
+
+    if (!settings.notification_recipients.includes(email)) {
       setSettings({
         ...settings,
         notification_recipients: [...settings.notification_recipients, email],
@@ -231,7 +314,15 @@ export const EmailSettings = () => {
     }
   };
 
-  const removeRecipient = (email: string) => {
+  const removeRecipient = (email: string, list: 'notification' | 'approval') => {
+    if (list === 'approval') {
+      setSettings({
+        ...settings,
+        approval_admin_recipients: settings.approval_admin_recipients.filter(e => e !== email),
+      });
+      return;
+    }
+
     setSettings({
       ...settings,
       notification_recipients: settings.notification_recipients.filter(e => e !== email),
@@ -308,6 +399,15 @@ export const EmailSettings = () => {
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2 col-span-2">
+                    <Label>Support Email (for onboarding / access requests)</Label>
+                    <Input
+                      type="email"
+                      value={settings.support_email || ''}
+                      onChange={(e) => setSettings({ ...settings, support_email: e.target.value })}
+                      placeholder="cdeligi@qualitrolcorp.com"
+                    />
+                  </div>
                   <div className="space-y-2">
                     <Label>From Email</Label>
                     <Input
@@ -331,6 +431,42 @@ export const EmailSettings = () => {
                   </div>
                 </div>
 
+
+                {settings.email_service_provider === 'smtp' && (
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>SMTP Host</Label>
+                      <Input
+                        value={settings.smtp_host}
+                        onChange={(e) => setSettings({ ...settings, smtp_host: e.target.value })}
+                        placeholder="smtp.office365.com or <tenant>.mail.protection.outlook.com"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>SMTP Port</Label>
+                      <Input
+                        type="number"
+                        value={settings.smtp_port}
+                        onChange={(e) => setSettings({ ...settings, smtp_port: Number(e.target.value || 0) })}
+                        placeholder="25 / 587"
+                      />
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Switch
+                        checked={settings.smtp_secure}
+                        onCheckedChange={(checked) => setSettings({ ...settings, smtp_secure: checked })}
+                      />
+                      <Label>Use TLS (secure)</Label>
+                    </div>
+                    <Alert className="col-span-2">
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertDescription>
+                        For enterprise deployments, we recommend SMTP relay/connector (no password) or storing SMTP credentials as Supabase secrets (not in the database/UI).
+                      </AlertDescription>
+                    </Alert>
+                  </div>
+                )}
+
                 <Button onClick={testSMTPConnection} disabled={testingSMTP} variant="outline">
                   <Send className="w-4 h-4 mr-2" />
                   {testingSMTP ? 'Testing...' : 'Send Test Email'}
@@ -352,12 +488,55 @@ export const EmailSettings = () => {
               <Alert>
                 <AlertCircle className="h-4 w-4" />
                 <AlertDescription>
-                  The quote submitter will always receive notifications. Add additional recipients below.
+                  The quote submitter will always receive quote status notifications. Configure additional recipients and approval admins below.
                 </AlertDescription>
               </Alert>
 
+              {/* Approval Admin Recipients */}
               <div className="space-y-2">
-                <Label>Add Recipient Email</Label>
+                <Label>Approval Admin Recipients (new user access approvals)</Label>
+                <div className="flex gap-2">
+                  <Input
+                    type="email"
+                    placeholder="approver@qualitrolcorp.com"
+                    id="new-approval-recipient"
+                  />
+                  <Button
+                    onClick={() => {
+                      const input = document.getElementById('new-approval-recipient') as HTMLInputElement;
+                      if (input.value) {
+                        addRecipient(input.value, 'approval');
+                        input.value = '';
+                      }
+                    }}
+                  >
+                    Add
+                  </Button>
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  {settings.approval_admin_recipients.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No approval admins configured</p>
+                  ) : (
+                    settings.approval_admin_recipients.map((email) => (
+                      <Badge key={email} variant="secondary" className="gap-2">
+                        <Mail className="w-3 h-3" />
+                        {email}
+                        <button
+                          onClick={() => removeRecipient(email, 'approval')}
+                          className="ml-1 hover:text-destructive"
+                        >
+                          ×
+                        </button>
+                      </Badge>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              {/* Notification Recipients */}
+              <div className="space-y-2">
+                <Label>Notification Recipients (quote status notifications)</Label>
                 <div className="flex gap-2">
                   <Input
                     type="email"
@@ -368,7 +547,7 @@ export const EmailSettings = () => {
                     onClick={() => {
                       const input = document.getElementById('new-recipient') as HTMLInputElement;
                       if (input.value) {
-                        addRecipient(input.value);
+                        addRecipient(input.value, 'notification');
                         input.value = '';
                       }
                     }}
@@ -379,17 +558,17 @@ export const EmailSettings = () => {
               </div>
 
               <div className="space-y-2">
-                <Label>Current Recipients</Label>
+                <Label>Current Notification Recipients</Label>
                 <div className="flex flex-wrap gap-2">
                   {settings.notification_recipients.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">No additional recipients configured</p>
+                    <p className="text-sm text-muted-foreground">No additional notification recipients configured</p>
                   ) : (
                     settings.notification_recipients.map((email) => (
                       <Badge key={email} variant="secondary" className="gap-2">
                         <Mail className="w-3 h-3" />
                         {email}
                         <button
-                          onClick={() => removeRecipient(email)}
+                          onClick={() => removeRecipient(email, 'notification')}
                           className="ml-1 hover:text-destructive"
                         >
                           ×
@@ -408,9 +587,41 @@ export const EmailSettings = () => {
             <Card>
               <CardHeader>
                 <CardTitle>Email Templates</CardTitle>
-                <CardDescription>Select a template to edit</CardDescription>
+                <CardDescription>Create and edit templates (supports adding new templates in the future)</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-2">
+              <CardContent className="space-y-3">
+                <Button
+                  variant="secondary"
+                  className="w-full"
+                  onClick={() => setNewTemplate({ template_type: '', variables: 'recipient_name' })}
+                >
+                  + Add Template
+                </Button>
+
+                {newTemplate && (
+                  <div className="border rounded p-3 space-y-2">
+                    <div className="space-y-1">
+                      <Label>Template Type (unique key)</Label>
+                      <Input
+                        value={newTemplate.template_type}
+                        onChange={(e) => setNewTemplate({ ...newTemplate, template_type: e.target.value })}
+                        placeholder="user_request_received"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label>Variables (comma-separated)</Label>
+                      <Input
+                        value={newTemplate.variables}
+                        onChange={(e) => setNewTemplate({ ...newTemplate, variables: e.target.value })}
+                        placeholder="recipient_name, requested_role, request_id"
+                      />
+                    </div>
+                    <div className="flex gap-2">
+                      <Button onClick={createEmailTemplate} disabled={saving}>Create</Button>
+                      <Button variant="outline" onClick={() => setNewTemplate(null)} disabled={saving}>Cancel</Button>
+                    </div>
+                  </div>
+                )}
                 {templates.map((template) => (
                   <Button
                     key={template.id}

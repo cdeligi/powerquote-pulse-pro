@@ -22,6 +22,17 @@ import {
   parseQuoteFieldsValue,
 } from '@/utils/additionalQuoteInformation';
 
+interface QuoteEvent {
+  id: string;
+  event_type: string;
+  actor_id?: string | null;
+  actor_role?: string | null;
+  previous_state?: string | null;
+  new_state?: string | null;
+  payload?: Record<string, any> | null;
+  created_at: string;
+}
+
 interface Quote {
   id: string;
   status: string;
@@ -50,6 +61,13 @@ interface Quote {
   submitted_at?: string;
   created_at: string;
   updated_at: string;
+  admin_reviewer_id?: string | null;
+  finance_reviewer_id?: string | null;
+  admin_claimed_at?: string | null;
+  finance_claimed_at?: string | null;
+  finance_notes?: string | null;
+  admin_reviewer_name?: string | null;
+  finance_reviewer_name?: string | null;
 }
 
 const QuoteViewer: React.FC = () => {
@@ -63,6 +81,8 @@ const QuoteViewer: React.FC = () => {
   const [bomItems, setBomItems] = useState<BOMItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [quoteEvents, setQuoteEvents] = useState<QuoteEvent[]>([]);
+  const [reviewerNames, setReviewerNames] = useState<Record<string, string>>({});
 
   const isDraft = quote?.status === 'draft';
   const isExplicitView = mode === 'view';
@@ -118,6 +138,21 @@ const QuoteViewer: React.FC = () => {
 
     return value;
   };
+
+  const formatElapsed = (from?: string | null, to?: string | null) => {
+    if (!from || !to) return null;
+    const a = new Date(from).getTime();
+    const b = new Date(to).getTime();
+    if (!Number.isFinite(a) || !Number.isFinite(b)) return null;
+    const ms = Math.max(0, b - a);
+    const minutes = Math.floor(ms / 60000);
+    if (minutes < 60) return `${minutes}m`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}h`;
+    const days = Math.floor(hours / 24);
+    return `${days}d`;
+  };
+
 
   useEffect(() => {
     if (!id) {
@@ -178,6 +213,31 @@ const QuoteViewer: React.FC = () => {
         customer_name: resolvedCustomerName,
       });
 
+      const reviewerIds = [quoteData.admin_reviewer_id, quoteData.finance_reviewer_id].filter(Boolean);
+      if (reviewerIds.length > 0) {
+        const { data: reviewers } = await supabase
+          .from('profiles')
+          .select('id, first_name, last_name, email')
+          .in('id', reviewerIds as string[]);
+        const mapped: Record<string, string> = {};
+        (reviewers || []).forEach((r: any) => {
+          const fullName = [r.first_name, r.last_name]
+            .filter((v: unknown) => typeof v === 'string' && v.trim().length > 0)
+            .join(' ')
+            .trim();
+          mapped[r.id] = fullName || r.email || r.id;
+        });
+        setReviewerNames(mapped);
+      }
+
+      const { data: eventsData } = await supabase
+        .from('quote_events')
+        .select('*')
+        .eq('quote_id', quoteId)
+        .order('created_at', { ascending: false })
+        .limit(30);
+      setQuoteEvents((eventsData || []) as QuoteEvent[]);
+
       if (quoteData.status === 'draft' && quoteData.draft_bom?.items && Array.isArray(quoteData.draft_bom.items)) {
         const loadedItems: BOMItem[] = quoteData.draft_bom.items.map((item: any) => {
           const storedSlotAssignments = item.slotAssignments as SerializedSlotAssignment[] | undefined;
@@ -205,7 +265,35 @@ const QuoteViewer: React.FC = () => {
           };
         });
 
-        setBomItems(loadedItems);
+        
+          const productIds = Array.from(new Set(loadedItems
+            .map((it: any) => it?.product?.id)
+            .filter((id: unknown): id is string => typeof id === 'string' && id.length > 0)));
+
+          if (productIds.length > 0) {
+            const { data: productRows } = await supabase
+              .from('products')
+              .select('id, product_info_url')
+              .in('id', productIds);
+
+            const urlById = new Map<string, string>();
+            (productRows || []).forEach((row: any) => {
+              if (row?.id && typeof row.product_info_url === 'string' && row.product_info_url.trim().length > 0) {
+                urlById.set(row.id, row.product_info_url.trim());
+              }
+            });
+
+            loadedItems.forEach((it: any) => {
+              const pid = it?.product?.id;
+              const infoUrl = pid ? urlById.get(pid) : null;
+              if (infoUrl && it?.product) {
+                it.product.productInfoUrl = infoUrl;
+                it.product.product_info_url = infoUrl;
+              }
+            });
+          }
+
+setBomItems(loadedItems);
       } else {
         // Load BOM items from persistent storage
         const { data: bomData, error: bomError } = await supabase
@@ -433,6 +521,27 @@ const QuoteViewer: React.FC = () => {
         </Alert>
       )}
 
+      {!isEditable && quote.status !== 'draft' && (
+        <div className="container mx-auto px-6 pt-0 pb-2">
+          <Card>
+            <CardContent className="py-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                <div>
+                  <p className="text-muted-foreground">Quote Review Claimed by</p>
+                  <p className="font-semibold text-cyan-700 dark:text-cyan-300">{quote.admin_reviewer_name || reviewerNames[quote.admin_reviewer_id || ''] || quote.admin_reviewer_id || 'Unclaimed'}</p>
+                  <p className="text-xs text-muted-foreground">{quote.admin_claimed_at ? new Date(quote.admin_claimed_at).toLocaleString() : ''}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Finance Claimed by</p>
+                  <p className="font-semibold text-amber-700 dark:text-amber-300">{quote.finance_reviewer_name || reviewerNames[quote.finance_reviewer_id || ''] || quote.finance_reviewer_id || 'Unclaimed'}</p>
+                  <p className="text-xs text-muted-foreground">{quote.finance_claimed_at ? new Date(quote.finance_claimed_at).toLocaleString() : ''}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
       {/* Content */}
       <div className="container mx-auto px-6 py-6 space-y-6">
         {/* Quote Information */}
@@ -592,10 +701,16 @@ const QuoteViewer: React.FC = () => {
                 <div className="space-y-3">
                   {hasApprovalNotes && (
                     <div className="space-y-1">
-                      <label className="text-sm font-medium text-muted-foreground">Approval Notes</label>
+                      <label className="text-sm font-medium text-muted-foreground">Admin Notes</label>
                       <p className="rounded-md bg-muted/40 p-3 text-sm text-foreground whitespace-pre-line">
                         {quote.approval_notes.trim()}
                       </p>
+                    </div>
+                  )}
+                  {quote.finance_notes && (
+                    <div className="space-y-1">
+                      <label className="text-sm font-medium text-muted-foreground">Finance Notes</label>
+                      <p className="rounded-md bg-muted/40 p-3 text-sm text-foreground whitespace-pre-line">{quote.finance_notes}</p>
                     </div>
                   )}
                   {hasRejectionReason && (
@@ -627,12 +742,35 @@ const QuoteViewer: React.FC = () => {
                   No BOM items in this quote
                 </div>
               ) : (
-                bomItems.map((item, index) => (
+                bomItems.map((item, index) => {
+                  const rawInfoUrl =
+                    (item.product as any)?.productInfoUrl ||
+                    (item.product as any)?.product_info_url ||
+                    (item as any)?.productInfoUrl ||
+                    (item as any)?.product_info_url;
+                  const infoUrl = typeof rawInfoUrl === 'string' && /^https?:\/\//i.test(rawInfoUrl) ? rawInfoUrl : null;
+
+                  return (
                   <div key={item.id || index} className="border border-border rounded-lg p-4 bg-card">
                     <div className="flex justify-between items-start">
                       <div className="flex-1">
                         <h4 className="font-medium text-foreground">{item.product.name}</h4>
                         <p className="text-sm text-muted-foreground">{item.product.description}</p>
+                        <div className="mt-1 rounded border border-dashed border-slate-300 px-2 py-1 text-xs">
+                          <span className="font-semibold text-slate-700">Product Info Link:</span>{' '}
+                          {infoUrl ? (
+                            <a
+                              href={infoUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-blue-600 hover:text-blue-500 underline break-all"
+                            >
+                              {infoUrl}
+                            </a>
+                          ) : (
+                            <span className="text-muted-foreground">Not available</span>
+                          )}
+                        </div>
                         <p className="text-sm text-muted-foreground">Part Number: {item.partNumber}</p>
                       </div>
                       <div className="text-right">
@@ -646,13 +784,54 @@ const QuoteViewer: React.FC = () => {
                       </div>
                     </div>
                   </div>
-                ))
+                  );
+                })
               )}
             </div>
           </CardContent>
         </Card>
       </div>
-    </div>
+    
+          <Card className="mt-6">
+            <CardHeader>
+              <CardTitle>Approval Timeline & Audit Log</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {quoteEvents.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No workflow events recorded yet.</p>
+              ) : (
+                <div className="space-y-0">
+                  {quoteEvents.map((ev, idx) => {
+                    const next = quoteEvents[idx + 1];
+                    const gap = next ? formatElapsed(next.created_at, ev.created_at) : null;
+                    return (
+                      <div key={ev.id} className="relative pl-8 pb-6">
+                        <span className="absolute left-2 top-2 h-3 w-3 rounded-full bg-primary" />
+                        {idx < quoteEvents.length - 1 && (
+                          <span className="absolute left-[0.83rem] top-5 bottom-0 w-px bg-border" />
+                        )}
+                        {gap && (
+                          <span className="absolute -left-1 top-10 text-[10px] rounded bg-muted px-1 py-0.5 text-muted-foreground">{gap}</span>
+                        )}
+                        <div className="rounded border p-3 text-sm bg-card">
+                          <div className="font-medium">{ev.event_type.replaceAll('_', ' ')}</div>
+                          <div className="text-muted-foreground text-xs">{new Date(ev.created_at).toLocaleString()} · {ev.actor_role || 'system'} · {ev.actor_id ? (reviewerNames[ev.actor_id] || (ev.actor_role === 'FINANCE' ? (quote.finance_reviewer_name || ev.actor_id) : (quote.admin_reviewer_name || ev.actor_id))) : '-'}</div>
+                          {(ev.previous_state || ev.new_state) && (
+                            <div className="text-xs text-muted-foreground mt-1">{ev.previous_state || '-'} → {ev.new_state || '-'}</div>
+                          )}
+                          {ev.payload?.notes && (
+                            <div className="mt-2 text-xs"><span className="font-medium">Notes:</span> {String(ev.payload.notes)}</div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+</div>
   );
 };
 

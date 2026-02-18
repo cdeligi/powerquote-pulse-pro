@@ -10,6 +10,7 @@ import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   Plus, 
   Edit2, 
@@ -28,6 +29,7 @@ import ConditionalLogicEditor from "@/components/admin/ConditionalLogicEditor";
 import {
   QuoteFieldConfiguration as QuoteFieldConfig,
   QuoteFieldType,
+  SalesforceFieldMapping,
 } from "@/types/quote-field";
 import {
   normalizeQuoteFieldConditionalRules,
@@ -36,6 +38,25 @@ import {
 
 const supabase = getSupabaseClient();
 const POSTGREST_SCHEMA_RELOAD_ERROR_CODE = "PGRST204";
+
+
+const normalizeSalesforceApiName = (value: string): string => {
+  const trimmed = (value || '').trim();
+  if (!trimmed) return '';
+  let cleaned = trimmed.replace(/[^A-Za-z0-9_]/g, '_').replace(/_+/g, '_').replace(/^_+|_+$/g, '');
+  if (!/^[A-Za-z]/.test(cleaned)) cleaned = `F_${cleaned}`;
+  return cleaned;
+};
+
+const getConditionalSubfieldLabels = (field: QuoteField): string[] => {
+  const labels = new Set<string>();
+  (field.conditional_logic || []).forEach((rule) => {
+    (rule.fields || []).forEach((sub) => {
+      if (sub?.label?.trim()) labels.add(sub.label.trim());
+    });
+  });
+  return Array.from(labels);
+};
 
 const getMutationErrorMessage = (error: { code?: string; message?: string }) => {
   if (error?.code === POSTGREST_SCHEMA_RELOAD_ERROR_CODE) {
@@ -105,6 +126,22 @@ interface QuoteFieldConfigurationProps {
   user: User;
 }
 
+type SalesforceConnectionConfig = {
+  instanceUrl: string;
+  authUrl: string;
+  tokenUrl: string;
+  clientId: string;
+  clientSecret: string;
+};
+
+const DEFAULT_SALESFORCE_CONFIG: SalesforceConnectionConfig = {
+  instanceUrl: '',
+  authUrl: '',
+  tokenUrl: '',
+  clientId: '',
+  clientSecret: '',
+};
+
 const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
   const [quoteFields, setQuoteFields] = useState<QuoteField[]>([]);
   const [loading, setLoading] = useState(true);
@@ -114,6 +151,18 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
   const [isAdmin, setIsAdmin] = useState(false);
   const [authLoading, setAuthLoading] = useState(true);
   const [draggedFieldId, setDraggedFieldId] = useState<string | null>(null);
+  const [quoteFieldsView, setQuoteFieldsView] = useState<'data-fields' | 'field-mapping-table' | 'salesforce-connection'>('data-fields');
+  const [mappingDrafts, setMappingDrafts] = useState<Record<string, QuoteField>>({});
+  const [salesforceConfig, setSalesforceConfig] = useState<SalesforceConnectionConfig>(DEFAULT_SALESFORCE_CONFIG);
+  const [showClientSecret, setShowClientSecret] = useState(false);
+  const [savingSalesforceConfig, setSavingSalesforceConfig] = useState(false);
+  const [testingSalesforceConfig, setTestingSalesforceConfig] = useState(false);
+  const [salesforceConfigUnlocked, setSalesforceConfigUnlocked] = useState(false);
+  const [salesforceUnlockPassword, setSalesforceUnlockPassword] = useState('');
+  const [salesforceConnectionState, setSalesforceConnectionState] = useState<'not_tested' | 'passed' | 'failed'>('not_tested');
+  const [salesforceLastTestAt, setSalesforceLastTestAt] = useState<string | null>(null);
+  const [salesforceTestMessage, setSalesforceTestMessage] = useState<string>('');
+  const [salesforceRecentChecks, setSalesforceRecentChecks] = useState<Array<{ at: string; status: 'passed' | 'failed'; message: string }>>([]);
   const { toast } = useToast();
 
   const handleDragStart = (e: React.DragEvent, field: QuoteField) => {
@@ -175,7 +224,9 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
   };
 
   const DragHandle = ({ field }: { field: QuoteField }) => (
-    <div 
+    <div
+      draggable
+      onDragStart={(e) => handleDragStart(e, field)}
       className="flex items-center cursor-move hover:bg-gray-700 rounded-sm p-1 transition-colors"
     >
       <GripVertical className="h-4 w-4 mr-1" />
@@ -186,6 +237,7 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
   useEffect(() => {
     checkAuthAndRole();
     fetchQuoteFields();
+    fetchSalesforceConnectionConfig();
   }, []);
 
   const checkAuthAndRole = async () => {
@@ -203,7 +255,8 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
           .eq('id', session.user.id)
           .single();
         
-        setIsAdmin(profile?.role === 'admin');
+        const r = String(profile?.role || '').toLowerCase();
+        setIsAdmin(['admin','master','level3','level_3'].includes(r));
       }
     } catch (error) {
       console.error('Error checking auth:', error);
@@ -232,6 +285,7 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
         display_order: field.display_order ?? 0,
         include_in_pdf: Boolean(field.include_in_pdf),
         conditional_logic: normalizeQuoteFieldConditionalRules(field.conditional_logic),
+        salesforce_mapping: (field.salesforce_mapping as SalesforceFieldMapping | null) ?? null,
       })) as QuoteField[];
 
       // Sort fields by display_order and then by label
@@ -279,6 +333,21 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
       uniqueFields.sort((a, b) => a.display_order - b.display_order);
 
       setQuoteFields(uniqueFields);
+      setMappingDrafts(
+        uniqueFields.reduce((acc, field) => {
+          acc[field.id] = {
+            ...field,
+            salesforce_mapping: field.salesforce_mapping ?? {
+              enabled: true,
+              objectName: 'Opportunity',
+              fieldApiName: field.label,
+              direction: 'to_salesforce',
+              transformRule: '',
+            },
+          };
+          return acc;
+        }, {} as Record<string, QuoteField>)
+      );
     } catch (error) {
       console.error('Error fetching quote fields:', error);
       toast({
@@ -308,6 +377,7 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
               display_order: fieldData.display_order,
               include_in_pdf: fieldData.include_in_pdf || false,
               conditional_logic: fieldData.conditional_logic ?? [],
+              salesforce_mapping: fieldData.salesforce_mapping ?? null,
             }),
         { reloadClient: mutationClient }
       );
@@ -345,6 +415,7 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
               display_order: fieldData.display_order,
               include_in_pdf: fieldData.include_in_pdf || false,
               conditional_logic: fieldData.conditional_logic ?? [],
+              salesforce_mapping: fieldData.salesforce_mapping ?? null,
             })
             .eq('id', fieldId),
         { reloadClient: mutationClient }
@@ -469,6 +540,386 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
     setDialogOpen(true);
   };
 
+  const fetchSalesforceConnectionConfig = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('app_settings')
+        .select('value')
+        .eq('key', 'salesforce_connection_config')
+        .maybeSingle();
+
+      if (error) throw error;
+
+      const value = (data?.value as (Partial<SalesforceConnectionConfig> & {
+        last_tested_at?: string;
+        test_status?: 'passed' | 'failed' | 'not_tested';
+        test_message?: string;
+        recent_checks?: Array<{ at: string; status: 'passed' | 'failed'; message: string }>;
+      }) | null) ?? null;
+      if (value) {
+        setSalesforceConfig({
+          ...DEFAULT_SALESFORCE_CONFIG,
+          ...value,
+        });
+        setSalesforceLastTestAt(value.last_tested_at ?? null);
+        setSalesforceConnectionState(value.test_status ?? 'not_tested');
+        setSalesforceTestMessage(value.test_message ?? '');
+        setSalesforceRecentChecks(Array.isArray(value.recent_checks) ? value.recent_checks : []);
+      }
+    } catch (error) {
+      console.error('Error fetching Salesforce connection config:', error);
+    }
+  };
+
+  const isSalesforceConfigComplete = Boolean(
+    salesforceConfig.instanceUrl.trim() &&
+      salesforceConfig.authUrl.trim() &&
+      salesforceConfig.tokenUrl.trim() &&
+      salesforceConfig.clientId.trim() &&
+      salesforceConfig.clientSecret.trim()
+  );
+
+  const pushSalesforceCheckEvent = (status: 'passed' | 'failed', message: string) => {
+    const next = [
+      { at: new Date().toISOString(), status, message },
+      ...salesforceRecentChecks,
+    ].slice(0, 10);
+    setSalesforceRecentChecks(next);
+    return next;
+  };
+
+  const validateSalesforceConfig = () => {
+    const checks = [salesforceConfig.instanceUrl, salesforceConfig.authUrl, salesforceConfig.tokenUrl];
+    const invalid = checks.find((url) => !/^https:\/\//i.test(url.trim()));
+    if (invalid) {
+      return { ok: false as const, message: 'URLs must start with https:// (Instance/Auth/Token).' };
+    }
+
+    if (!/salesforce\.com/i.test(salesforceConfig.instanceUrl)) {
+      return { ok: false as const, message: 'Instance URL should be your Salesforce domain.' };
+    }
+
+    return { ok: true as const, message: 'Configuration format looks valid. Ready for IT credential handshake.' };
+  };
+
+  const runSalesforceConnectionCheck = () => {
+    const result = validateSalesforceConfig();
+    const status = result.ok ? 'passed' : 'failed';
+    const nextEvents = pushSalesforceCheckEvent(status, result.message);
+    setSalesforceConnectionState(result.ok ? 'passed' : 'failed');
+    setSalesforceTestMessage(result.message);
+    setSalesforceLastTestAt(new Date().toISOString());
+    return { result, nextEvents };
+  };
+
+  const saveSalesforceConnectionConfig = async () => {
+    try {
+      setSavingSalesforceConfig(true);
+
+      const payload = {
+        key: 'salesforce_connection_config',
+        value: {
+          instanceUrl: salesforceConfig.instanceUrl.trim(),
+          authUrl: salesforceConfig.authUrl.trim(),
+          tokenUrl: salesforceConfig.tokenUrl.trim(),
+          clientId: salesforceConfig.clientId.trim(),
+          clientSecret: salesforceConfig.clientSecret.trim(),
+          last_tested_at: salesforceLastTestAt,
+          test_status: salesforceConnectionState,
+          test_message: salesforceTestMessage,
+          recent_checks: salesforceRecentChecks,
+        },
+        description: 'Salesforce OAuth connection settings for PowerQuote integration',
+        updated_by: user?.id ?? null,
+      };
+
+      const { error } = await supabase
+        .from('app_settings')
+        .upsert(payload, { onConflict: 'key' });
+
+      if (error) throw error;
+
+      toast({
+        title: 'Saved',
+        description: 'Salesforce connection settings saved successfully.',
+      });
+    } catch (error) {
+      console.error('Error saving Salesforce connection config:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to save Salesforce connection settings.',
+        variant: 'destructive',
+      });
+    } finally {
+      setSavingSalesforceConfig(false);
+    }
+  };
+
+  const unlockSalesforceConfig = () => {
+    if (salesforceUnlockPassword === 'admin') {
+      setSalesforceConfigUnlocked(true);
+      setSalesforceUnlockPassword('');
+      toast({ title: 'Unlocked', description: 'Salesforce settings are now editable.' });
+      return;
+    }
+
+    toast({ title: 'Invalid password', description: 'Password is incorrect.', variant: 'destructive' });
+  };
+
+  const handleSalesforceConnectionTest = async () => {
+    setTestingSalesforceConfig(true);
+    try {
+      const { result, nextEvents } = runSalesforceConnectionCheck();
+
+      const { error } = await supabase
+        .from('app_settings')
+        .upsert(
+          {
+            key: 'salesforce_connection_config',
+            value: {
+              instanceUrl: salesforceConfig.instanceUrl.trim(),
+              authUrl: salesforceConfig.authUrl.trim(),
+              tokenUrl: salesforceConfig.tokenUrl.trim(),
+              clientId: salesforceConfig.clientId.trim(),
+              clientSecret: salesforceConfig.clientSecret.trim(),
+              last_tested_at: new Date().toISOString(),
+              test_status: result.ok ? 'passed' : 'failed',
+              test_message: result.message,
+              recent_checks: nextEvents,
+            },
+            description: 'Salesforce OAuth connection settings for PowerQuote integration',
+            updated_by: user?.id ?? null,
+          },
+          { onConflict: 'key' }
+        );
+
+      if (error) throw error;
+
+      toast({
+        title: result.ok ? 'Connection check passed' : 'Connection check failed',
+        description: result.message,
+        variant: result.ok ? 'default' : 'destructive',
+      });
+    } catch (error) {
+      console.error('Error running Salesforce connection check:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to run connection check.',
+        variant: 'destructive',
+      });
+    } finally {
+      setTestingSalesforceConfig(false);
+    }
+  };
+
+  const updateMappingDraft = (fieldId: string, patch: Partial<QuoteField>) => {
+    setMappingDrafts((prev) => ({
+      ...prev,
+      [fieldId]: {
+        ...(prev[fieldId] ?? quoteFields.find((f) => f.id === fieldId)!),
+        ...patch,
+      },
+    }));
+  };
+
+  const updateConditionalSubfieldMapping = (
+    parentFieldId: string,
+    subfieldKey: string,
+    patch: Partial<SalesforceFieldMapping>
+  ) => {
+    const base = mappingDrafts[parentFieldId] ?? quoteFields.find((f) => f.id === parentFieldId);
+    if (!base) return;
+
+    const normalizeKey = (value: string) => value.trim().toLowerCase().replace(/\s*\([^)]*\)\s*$/,'').trim();
+    const targetKey = normalizeKey(subfieldKey);
+
+    const nextConditional = (base.conditional_logic || []).map((rule) => ({
+      ...rule,
+      fields: (rule.fields || []).map((sub: any) => {
+        const key = normalizeKey(String(sub.label || sub.id || ''));
+        if (key !== targetKey) return sub;
+
+        const currentMapping = (sub as any).salesforce_mapping ?? {
+          enabled: true,
+          objectName: 'Opportunity',
+          fieldApiName: sub.label?.replace(/\s+/g, '_') || sub.id,
+          direction: 'to_salesforce' as const,
+          transformRule: '',
+        };
+
+        return {
+          ...sub,
+          salesforce_mapping: {
+            ...currentMapping,
+            ...patch,
+          },
+        };
+      }),
+    }));
+
+    updateMappingDraft(parentFieldId, { conditional_logic: nextConditional });
+  };
+
+  const getMappingIssues = (row: QuoteField, allRows: QuoteField[]) => {
+    const issues: string[] = [];
+    const mapping = row.salesforce_mapping;
+
+    // Only enforce mapping validation when both the field and mapping are enabled.
+    if (!row.enabled || mapping?.enabled === false) {
+      return issues;
+    }
+
+    if (!mapping) {
+      issues.push('Missing Salesforce mapping.');
+      return issues;
+    }
+
+    if (!mapping.objectName?.trim()) {
+      issues.push('Missing SF object.');
+    }
+
+    const apiName = mapping.fieldApiName?.trim();
+    if (!apiName) {
+      issues.push('Missing SF field API name.');
+    }
+
+    const duplicateCount = allRows.filter((candidate) => {
+      const c = candidate.salesforce_mapping;
+      return (
+        c?.enabled !== false &&
+        mapping.enabled !== false &&
+        c?.objectName?.trim().toLowerCase() === mapping.objectName?.trim().toLowerCase() &&
+        c?.fieldApiName?.trim().toLowerCase() === apiName?.toLowerCase()
+      );
+    }).length;
+
+    if (apiName && duplicateCount > 1) {
+      issues.push('Duplicate mapping target.');
+    }
+
+    return issues;
+  };
+
+  const exportMappingTableCsv = () => {
+    const rows = quoteFields.map((field) => mappingDrafts[field.id] ?? field);
+    const header = [
+      'Field Label',
+      'Field ID',
+      'Type',
+      'Required',
+      'Enabled',
+      'Include In Quote',
+      'SF Sync Enabled',
+      'SF Object',
+      'SF Field API Name',
+      'Direction',
+      'Transform Rule',
+    ];
+
+    const csvLines = [
+      header.join(','),
+      ...rows.map((row) => {
+        const m = row.salesforce_mapping;
+        const cols = [
+          row.label,
+          row.id,
+          row.type,
+          String(row.required),
+          String(row.enabled),
+          String(Boolean(row.include_in_pdf)),
+          String(m?.enabled !== false),
+          m?.objectName ?? '',
+          m?.fieldApiName ?? '',
+          m?.direction ?? '',
+          m?.transformRule ?? '',
+        ];
+        return cols.map((c) => `"${String(c).replaceAll('"', '""')}"`).join(',');
+      }),
+    ];
+
+    const blob = new Blob([csvLines.join('\n')], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `field-mapping-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const saveMappingTable = async () => {
+    try {
+      const rows = Object.values(mappingDrafts).map((row) => {
+        const mapping = row.salesforce_mapping
+          ? { ...row.salesforce_mapping, fieldApiName: normalizeSalesforceApiName(row.salesforce_mapping.fieldApiName || row.label) }
+          : row.salesforce_mapping;
+
+        const conditional_logic = (row.conditional_logic || []).map((rule) => ({
+          ...rule,
+          fields: (rule.fields || []).map((sub: any) => {
+            const sf = (sub as any).salesforce_mapping;
+            if (!sf) return sub;
+            return {
+              ...sub,
+              salesforce_mapping: {
+                ...sf,
+                fieldApiName: normalizeSalesforceApiName(sf.fieldApiName || sub.label || sub.id),
+              },
+            };
+          }),
+        }));
+
+        return {
+          ...row,
+          salesforce_mapping: mapping,
+          conditional_logic,
+        };
+      });
+
+      const rowsWithIssues = rows
+        .map((row) => ({ row, issues: getMappingIssues(row, rows) }))
+        .filter((entry) => entry.issues.length > 0);
+
+      if (rowsWithIssues.length > 0) {
+        toast({
+          title: 'Validation required',
+          description: `Please fix ${rowsWithIssues.length} row(s) with mapping issues before saving.`,
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      await Promise.all(
+        rows.map((row) =>
+          supabase
+            .from('quote_fields')
+            .update({
+              required: row.required,
+              enabled: row.enabled,
+              include_in_pdf: row.include_in_pdf || false,
+              salesforce_mapping: row.salesforce_mapping ?? null,
+              conditional_logic: row.conditional_logic ?? [],
+            })
+            .eq('id', row.id)
+        )
+      );
+
+      toast({
+        title: 'Success',
+        description: 'Field Mapping Table saved successfully',
+      });
+      await fetchQuoteFields();
+    } catch (error) {
+      console.error('Error saving mapping table:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to save field mapping table',
+        variant: 'destructive',
+      });
+    }
+  };
+
   if (authLoading || loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -551,118 +1002,495 @@ const QuoteFieldConfiguration = ({ user }: QuoteFieldConfigurationProps) => {
     <div className="space-y-4">
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-xl font-medium text-white">Quote Field Configuration</h2>
-          <p className="text-gray-400 text-sm">Configure and manage quote request form fields</p>
+          <h2 className="text-xl font-medium text-white">Data Fields</h2>
+          <p className="text-gray-400 text-sm">Manage quote fields and edit Salesforce mappings in one place.</p>
         </div>
-        <Button 
-          className="bg-red-600 hover:bg-red-700"
-          onClick={openCreateDialog}
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          Add Field
-        </Button>
+        <div className="flex items-center gap-2">
+          {quoteFieldsView === 'field-mapping-table' && (
+            <>
+              <Button variant="outline" className="border-gray-700 text-gray-200" onClick={exportMappingTableCsv}>
+                Export CSV
+              </Button>
+              <Button className="bg-emerald-600 hover:bg-emerald-700" onClick={saveMappingTable}>
+                Save All
+              </Button>
+            </>
+          )}
+          {quoteFieldsView !== 'salesforce-connection' && (
+            <Button
+              className="bg-red-600 hover:bg-red-700"
+              onClick={openCreateDialog}
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Add Field
+            </Button>
+          )}
+        </div>
       </div>
 
-      {/* Fields Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-        {quoteFields.map((field, index) => (
-          <Card 
-            key={field.id} 
-            draggable={true}
-            onDragStart={(e) => handleDragStart(e, field)}
-            onDragOver={(e) => handleDragOver(e, field)}
-            onDrop={(e) => handleDrop(e, field)}
-            className={`bg-gray-900 border-gray-800 hover:bg-gray-800 transition-colors ${
-              field.id === draggedFieldId ? 'opacity-50' : ''
-            }`}
-          >
-            <CardHeader className="p-3">
-              <div className="flex justify-between items-start">
-                <div className="flex-1">
-                  <div className="flex items-center space-x-2">
-                    <div className="flex-1">
-                      <div className="flex items-center space-x-2">
-                        <DragHandle field={field} />
-                        <CardTitle className={`${field.required ? 'text-red-400' : 'text-white'} text-sm font-medium truncate`}>
-                          {field.label}
-                        </CardTitle>
+      <Tabs value={quoteFieldsView} onValueChange={(v) => setQuoteFieldsView(v as 'data-fields' | 'field-mapping-table' | 'salesforce-connection')}>
+        <TabsList className="bg-gray-800">
+          <TabsTrigger value="data-fields" className="text-white data-[state=active]:bg-red-600 data-[state=active]:text-white">Data Fields</TabsTrigger>
+          <TabsTrigger value="field-mapping-table" className="text-white data-[state=active]:bg-red-600 data-[state=active]:text-white">Field Mapping Table</TabsTrigger>
+          <TabsTrigger value="salesforce-connection" className="text-white data-[state=active]:bg-red-600 data-[state=active]:text-white">Salesforce Connection</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="data-fields" className="mt-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {quoteFields.map((field) => (
+              <Card
+                key={field.id}
+                onDragOver={(e) => handleDragOver(e, field)}
+                onDrop={(e) => handleDrop(e, field)}
+                className={`bg-gray-900 border-gray-800 hover:bg-gray-800 transition-colors ${
+                  field.id === draggedFieldId ? 'opacity-50' : ''
+                }`}
+              >
+                <CardHeader className="p-3">
+                  <div className="flex justify-between items-start gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start gap-2">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center space-x-2">
+                            <DragHandle field={field} />
+                            <CardTitle className={`${field.required ? 'text-red-400' : 'text-white'} text-sm font-medium truncate`}>
+                              {field.label}
+                            </CardTitle>
+                          </div>
+                          <div className="flex gap-1 mt-1">
+                            <Badge variant="outline" className="text-xs capitalize border-gray-600 text-gray-400">
+                              {field.type.toUpperCase()}
+                            </Badge>
+                            {field.conditional_logic && field.conditional_logic.length > 0 && (
+                              <Badge variant="outline" className="text-xs border-red-600 text-red-300 bg-red-900/20">
+                                Conditional ({getConditionalSubfieldLabels(field).length})
+                              </Badge>
+                            )}
+                            {field.include_in_pdf && (
+                              <Badge variant="outline" className="text-xs bg-blue-900/30 text-blue-400 border-blue-600">
+                                QUOTE
+                              </Badge>
+                            )}
+                          </div>
+                          {field.conditional_logic && field.conditional_logic.length > 0 && (
+                            <div className="mt-2 text-xs text-gray-300">
+                              <p className="text-gray-400">Sub-items:</p>
+                              <p className="truncate max-w-full">{getConditionalSubfieldLabels(field).join(', ') || 'None'}</p>
+                            </div>
+                          )}
+                          <div className="flex items-center gap-2 mt-2">
+                            <Label htmlFor={`include-quote-${field.id}`} className="text-xs text-gray-400 cursor-pointer">
+                              Include in the Quote
+                            </Label>
+                            <Switch
+                              id={`include-quote-${field.id}`}
+                              checked={field.include_in_pdf || false}
+                              onCheckedChange={() => toggleIncludeInQuote(field.id)}
+                              className="data-[state=checked]:bg-blue-500"
+                            />
+                          </div>
+                        </div>
+                        <div className="shrink-0 pt-0.5">
+                          <Switch
+                            id={`enabled-${field.id}`}
+                            checked={field.enabled}
+                            onCheckedChange={() => toggleFieldEnabled(field.id)}
+                            className="data-[state=checked]:bg-green-500 data-[state=unchecked]:bg-red-500 hover:bg-gray-700"
+                          />
+                        </div>
                       </div>
-                       <div className="flex gap-1 mt-1">
-                        <Badge
-                          variant="outline"
-                          className="text-xs capitalize border-gray-600 text-gray-400"
-                        >
-                          {field.type.toUpperCase()}
-                        </Badge>
-                        {field.conditional_logic && field.conditional_logic.length > 0 && (
-                          <Badge
-                            variant="outline"
-                            className="text-xs border-red-600 text-red-300 bg-red-900/20"
-                          >
-                            Conditional
-                          </Badge>
-                        )}
-                        {field.include_in_pdf && (
-                          <Badge 
-                            variant="outline" 
-                            className="text-xs bg-blue-900/30 text-blue-400 border-blue-600"
-                          >
-                            QUOTE
-                          </Badge>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2 mt-2">
-                        <Label htmlFor={`include-quote-${field.id}`} className="text-xs text-gray-400 cursor-pointer">
-                          Include in the Quote
-                        </Label>
-                        <Switch
-                          id={`include-quote-${field.id}`}
-                          checked={field.include_in_pdf || false}
-                          onCheckedChange={() => toggleIncludeInQuote(field.id)}
-                          className="data-[state=checked]:bg-blue-500"
-                        />
+                      <div className="flex items-center space-x-2 mt-1 text-xs text-gray-400">
+                        <code className="bg-gray-800 px-1 rounded">{field.id}</code>
                       </div>
                     </div>
-                    <div className="flex-shrink-0">
-                      <Switch
-                        id={`enabled-${field.id}`}
-                        checked={field.enabled}
-                        onCheckedChange={() => toggleFieldEnabled(field.id)}
-                        className={`
-                          data-[state=checked]:bg-green-500
-                          data-[state=unchecked]:bg-red-500
-                          hover:bg-gray-700
-                        `}
-                      />
+                    <div className="flex shrink-0 items-center space-x-1">
+                      <Button variant="ghost" size="sm" onClick={() => openEditDialog(field)} className="text-blue-400 hover:text-blue-300">
+                        <Edit2 className="h-4 w-4" />
+                      </Button>
+                      <Button variant="ghost" size="sm" onClick={() => handleDeleteField(field.id)} className="text-red-400 hover:text-red-300">
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
                     </div>
                   </div>
-                  <div className="flex items-center space-x-2 mt-1 text-xs text-gray-400">
-                    <code className="bg-gray-800 px-1 rounded">{field.id}</code>
+                </CardHeader>
+              </Card>
+            ))}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="field-mapping-table" className="mt-4">
+          <div className="overflow-x-auto rounded-md border border-gray-800">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-900 text-gray-300">
+                <tr>
+                  <th className="text-left p-2">Field Label</th>
+                  <th className="text-left p-2">Type</th>
+                  <th className="text-left p-2">Required</th>
+                  <th className="text-left p-2">Enabled</th>
+                  <th className="text-left p-2">Include in Quote</th>
+                  <th className="text-left p-2">SF Sync</th>
+                  <th className="text-left p-2">SF Object</th>
+                  <th className="text-left p-2">SF Field API Name</th>
+                  <th className="text-left p-2">Direction</th>
+                  <th className="text-left p-2">Validation</th>
+                </tr>
+              </thead>
+              <tbody>
+                {quoteFields.map((field) => {
+                  const row = mappingDrafts[field.id] ?? field;
+                  const mapping = row.salesforce_mapping ?? {
+                    enabled: true,
+                    objectName: 'Opportunity',
+                    fieldApiName: row.label,
+                    direction: 'to_salesforce' as const,
+                    transformRule: '',
+                  };
+                  const issues = getMappingIssues({ ...row, salesforce_mapping: mapping }, quoteFields.map((f) => mappingDrafts[f.id] ?? f));
+                  const subRows = (() => {
+                    const byKey = new Map<string, any>();
+                    (row.conditional_logic || []).forEach((rule) => {
+                      (rule.fields || []).forEach((sub: any) => {
+                        const key = String(sub.label || sub.id || '').trim().toLowerCase().replace(/\s*\([^)]*\)\s*$/,'').trim();
+                        if (!key) return;
+                        if (!byKey.has(key)) {
+                          byKey.set(key, sub);
+                        }
+                      });
+                    });
+                    return Array.from(byKey.values());
+                  })();
+
+                  return (
+                    <>
+                      <tr key={field.id} className="border-t border-gray-800 bg-gray-950 text-white">
+                        <td className="p-2">
+                          <div>{row.label}</div>
+                          {getConditionalSubfieldLabels(row).length > 0 && (
+                            <div className="text-xs text-gray-400 mt-1">
+                              Follow-up fields below
+                            </div>
+                          )}
+                        </td>
+                        <td className="p-2 text-gray-300">{row.type.toUpperCase()}</td>
+                        <td className="p-2">
+                          <Switch
+                            className="data-[state=checked]:bg-emerald-500"
+                            checked={row.required}
+                            onCheckedChange={(v) => updateMappingDraft(field.id, { required: v })}
+                          />
+                        </td>
+                        <td className="p-2">
+                          <Switch
+                            className="data-[state=checked]:bg-emerald-500"
+                            checked={row.enabled}
+                            onCheckedChange={(v) => updateMappingDraft(field.id, { enabled: v })}
+                          />
+                        </td>
+                        <td className="p-2">
+                          <Switch
+                            className="data-[state=checked]:bg-emerald-500"
+                            checked={row.include_in_pdf || false}
+                            onCheckedChange={(v) => updateMappingDraft(field.id, { include_in_pdf: v })}
+                          />
+                        </td>
+                        <td className="p-2">
+                          <Switch
+                            className="data-[state=checked]:bg-emerald-500"
+                            checked={mapping.enabled !== false}
+                            onCheckedChange={(v) =>
+                              updateMappingDraft(field.id, {
+                                salesforce_mapping: { ...mapping, enabled: v },
+                              })
+                            }
+                          />
+                        </td>
+                        <td className="p-2 min-w-[140px]">
+                          <Select
+                            value={mapping.objectName}
+                            onValueChange={(value) =>
+                              updateMappingDraft(field.id, {
+                                salesforce_mapping: { ...mapping, objectName: value },
+                              })
+                            }
+                            disabled={mapping.enabled === false}
+                          >
+                            <SelectTrigger className="bg-gray-800 border-gray-700 text-white h-8">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent className="bg-gray-800 border-gray-700">
+                              <SelectItem value="Opportunity" className="text-white">Opportunity</SelectItem>
+                              <SelectItem value="Case" className="text-white">Case</SelectItem>
+                              <SelectItem value="Quote" className="text-white">Quote</SelectItem>
+                              <SelectItem value="Account" className="text-white">Account</SelectItem>
+                              <SelectItem value="Contact" className="text-white">Contact</SelectItem>
+                              <SelectItem value="Custom" className="text-white">Custom</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </td>
+                        <td className="p-2 min-w-[220px]">
+                          <Input
+                            value={mapping.fieldApiName}
+                            onChange={(e) =>
+                              updateMappingDraft(field.id, {
+                                salesforce_mapping: { ...mapping, fieldApiName: e.target.value },
+                              })
+                            }
+                            disabled={mapping.enabled === false}
+                            className="bg-gray-800 border-gray-700 text-white h-8 disabled:opacity-50"
+                          />
+                        </td>
+                        <td className="p-2 min-w-[190px]">
+                          <Select
+                            value={mapping.direction}
+                            onValueChange={(value: 'to_salesforce' | 'from_salesforce' | 'bidirectional') =>
+                              updateMappingDraft(field.id, {
+                                salesforce_mapping: { ...mapping, direction: value },
+                              })
+                            }
+                            disabled={mapping.enabled === false}
+                          >
+                            <SelectTrigger className="bg-gray-800 border-gray-700 text-white h-8">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent className="bg-gray-800 border-gray-700">
+                              <SelectItem value="to_salesforce" className="text-white">PowerQuote → Salesforce</SelectItem>
+                              <SelectItem value="from_salesforce" className="text-white">Salesforce → PowerQuote</SelectItem>
+                              <SelectItem value="bidirectional" className="text-white">Bidirectional</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </td>
+                        <td className="p-2 min-w-[220px]">
+                          {issues.length === 0 ? (
+                            <span className="text-emerald-400 text-xs">OK</span>
+                          ) : (
+                            <div className="text-xs text-amber-300 space-y-1">
+                              {issues.map((issue) => (
+                                <div key={issue} className="flex items-center gap-1">
+                                  <AlertCircle className="h-3 w-3" />
+                                  <span>{issue}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+
+                      {subRows.map((sub) => {
+                        const subMapping = (sub as any).salesforce_mapping ?? {
+                          enabled: true,
+                          objectName: mapping.objectName,
+                          fieldApiName: (sub.label || sub.id || '').replace(/\s+/g, '_'),
+                          direction: mapping.direction,
+                          transformRule: '',
+                        };
+
+                        return (
+                          <tr key={`${field.id}-${String(sub.label || sub.id).toLowerCase().replace(/\s*\([^)]*\)\s*$/, '').trim()}`} className="border-t border-gray-800 bg-gray-900/70 text-white">
+                            <td className="p-2 pl-6 text-cyan-300">↳ {String(sub.label || sub.id).replace(/\s*\([^)]*\)\s*$/, '').trim()}</td>
+                            <td className="p-2 text-gray-300">{String(sub.type || 'text').toUpperCase()}</td>
+                            <td className="p-2"><span className="text-xs text-gray-400">{sub.required ? 'Yes' : 'No'}</span></td>
+                            <td className="p-2"><span className="text-xs text-gray-400">{sub.enabled === false ? 'No' : 'Yes'}</span></td>
+                            <td className="p-2"><span className="text-xs text-gray-400">{sub.include_in_pdf ? 'Yes' : 'No'}</span></td>
+                            <td className="p-2">
+                              <Switch
+                                className="data-[state=checked]:bg-emerald-500"
+                                checked={subMapping.enabled !== false}
+                                onCheckedChange={(v) => updateConditionalSubfieldMapping(field.id, String(sub.label || sub.id), { enabled: v })}
+                              />
+                            </td>
+                            <td className="p-2 min-w-[140px]">
+                              <Select
+                                value={subMapping.objectName}
+                                onValueChange={(value) => updateConditionalSubfieldMapping(field.id, String(sub.label || sub.id), { objectName: value })}
+                                disabled={subMapping.enabled === false}
+                              >
+                                <SelectTrigger className="bg-gray-800 border-gray-700 text-white h-8"><SelectValue /></SelectTrigger>
+                                <SelectContent className="bg-gray-800 border-gray-700">
+                                  <SelectItem value="Opportunity" className="text-white">Opportunity</SelectItem>
+                                  <SelectItem value="Case" className="text-white">Case</SelectItem>
+                                  <SelectItem value="Quote" className="text-white">Quote</SelectItem>
+                                  <SelectItem value="Account" className="text-white">Account</SelectItem>
+                                  <SelectItem value="Contact" className="text-white">Contact</SelectItem>
+                                  <SelectItem value="Custom" className="text-white">Custom</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </td>
+                            <td className="p-2 min-w-[220px]"><Input value={subMapping.fieldApiName} onChange={(e)=>updateConditionalSubfieldMapping(field.id, String(sub.label || sub.id), { fieldApiName: e.target.value })} disabled={subMapping.enabled === false} className="bg-gray-800 border-gray-700 text-white h-8 disabled:opacity-50" /></td>
+                            <td className="p-2 min-w-[190px]">
+                              <Select
+                                value={subMapping.direction}
+                                onValueChange={(value: 'to_salesforce' | 'from_salesforce' | 'bidirectional') => updateConditionalSubfieldMapping(field.id, String(sub.label || sub.id), { direction: value })}
+                                disabled={subMapping.enabled === false}
+                              >
+                                <SelectTrigger className="bg-gray-800 border-gray-700 text-white h-8"><SelectValue /></SelectTrigger>
+                                <SelectContent className="bg-gray-800 border-gray-700">
+                                  <SelectItem value="to_salesforce" className="text-white">PowerQuote → Salesforce</SelectItem>
+                                  <SelectItem value="from_salesforce" className="text-white">Salesforce → PowerQuote</SelectItem>
+                                  <SelectItem value="bidirectional" className="text-white">Bidirectional</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </td>
+                            <td className="p-2 min-w-[220px]"><span className="text-emerald-400 text-xs">OK</span></td>
+                          </tr>
+                        );
+                      })}
+                    </>
+                  );
+                })}              </tbody>
+            </table>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="salesforce-connection" className="mt-4">
+          <Card className="bg-gray-900 border-gray-800">
+            <CardHeader>
+              <div className="flex items-center justify-between gap-3">
+                <CardTitle className="text-white">Salesforce Connection Settings</CardTitle>
+                <Badge className={isSalesforceConfigComplete ? 'bg-emerald-600 text-white' : 'bg-amber-600 text-white'}>
+                  {isSalesforceConfigComplete ? 'Configured' : 'Incomplete'}
+                </Badge>
+              </div>
+              <CardDescription className="text-gray-400">
+                Add Salesforce OAuth details provided by IT. These settings are used for bridge authentication.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <Alert className="border-amber-500/40 bg-amber-500/10 text-amber-100">
+                <AlertDescription>
+                  Use a dedicated integration user and connected app credentials. Keep values restricted to admins only.
+                </AlertDescription>
+              </Alert>
+
+              {!salesforceConfigUnlocked ? (
+                <div className="rounded-md border border-gray-700 bg-gray-800/60 p-3 space-y-2">
+                  <Label className="text-white">Unlock to view/edit credentials</Label>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="password"
+                      value={salesforceUnlockPassword}
+                      onChange={(e) => setSalesforceUnlockPassword(e.target.value)}
+                      placeholder="Enter admin password"
+                      className="bg-gray-800 border-gray-700 text-white"
+                    />
+                    <Button type="button" onClick={unlockSalesforceConfig} className="bg-red-600 hover:bg-red-700">Unlock</Button>
                   </div>
+                  <p className="text-xs text-gray-400">Temporary UI gate requested by admin. Recommend replacing this with server-side secret vault policy.</p>
                 </div>
-                <div className="flex space-x-2">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => openEditDialog(field)}
-                    className="text-blue-400 hover:text-blue-300"
-                  >
-                    <Edit2 className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleDeleteField(field.id)}
-                    className="text-red-400 hover:text-red-300"
-                  >
-                    <Trash2 className="h-4 w-4" />
+              ) : null}
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-white">Salesforce Instance URL</Label>
+                  <Input
+                    value={salesforceConfig.instanceUrl}
+                    onChange={(e) => setSalesforceConfig((prev) => ({ ...prev, instanceUrl: e.target.value }))}
+                    placeholder="https://your-org.my.salesforce.com"
+                    disabled={!salesforceConfigUnlocked}
+                    className="bg-gray-800 border-gray-700 text-white disabled:opacity-60"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-white">Auth URL</Label>
+                  <Input
+                    value={salesforceConfig.authUrl}
+                    onChange={(e) => setSalesforceConfig((prev) => ({ ...prev, authUrl: e.target.value }))}
+                    placeholder="https://login.salesforce.com/services/oauth2/authorize"
+                    disabled={!salesforceConfigUnlocked}
+                    className="bg-gray-800 border-gray-700 text-white disabled:opacity-60"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-white">Token URL</Label>
+                  <Input
+                    value={salesforceConfig.tokenUrl}
+                    onChange={(e) => setSalesforceConfig((prev) => ({ ...prev, tokenUrl: e.target.value }))}
+                    placeholder="https://login.salesforce.com/services/oauth2/token"
+                    disabled={!salesforceConfigUnlocked}
+                    className="bg-gray-800 border-gray-700 text-white disabled:opacity-60"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-white">Client ID</Label>
+                  <Input
+                    value={salesforceConfig.clientId}
+                    onChange={(e) => setSalesforceConfig((prev) => ({ ...prev, clientId: e.target.value }))}
+                    placeholder="Consumer Key"
+                    disabled={!salesforceConfigUnlocked}
+                    className="bg-gray-800 border-gray-700 text-white disabled:opacity-60"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-white">Client Secret</Label>
+                <div className="flex items-center gap-2">
+                  <Input
+                    type={showClientSecret ? 'text' : 'password'}
+                    value={salesforceConfig.clientSecret}
+                    onChange={(e) => setSalesforceConfig((prev) => ({ ...prev, clientSecret: e.target.value }))}
+                    placeholder="Consumer Secret"
+                    disabled={!salesforceConfigUnlocked}
+                    className="bg-gray-800 border-gray-700 text-white disabled:opacity-60"
+                  />
+                  <Button type="button" variant="outline" className="border-gray-700 text-gray-200" onClick={() => setShowClientSecret((v) => !v)} disabled={!salesforceConfigUnlocked}>
+                    {showClientSecret ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </Button>
                 </div>
               </div>
-            </CardHeader>
+
+              <div className="rounded-md border border-gray-700 bg-gray-800/40 p-3 space-y-1 text-xs">
+                <p className="text-gray-300">
+                  Connection Check Status:{' '}
+                  <span className={salesforceConnectionState === 'passed' ? 'text-emerald-400' : salesforceConnectionState === 'failed' ? 'text-red-400' : 'text-amber-300'}>
+                    {salesforceConnectionState === 'passed' ? 'Passed' : salesforceConnectionState === 'failed' ? 'Failed' : 'Not tested'}
+                  </span>
+                </p>
+                <p className="text-gray-400">Last Check: {salesforceLastTestAt ? new Date(salesforceLastTestAt).toLocaleString() : 'Never'}</p>
+                {salesforceTestMessage ? <p className="text-gray-300">Message: {salesforceTestMessage}</p> : null}
+              </div>
+
+              {!isSalesforceConfigComplete && (
+                <p className="text-xs text-amber-300">
+                  Fill all five fields to enable Save and Test.
+                </p>
+              )}
+
+              <div className="flex flex-wrap justify-end gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="border-cyan-700 text-cyan-300"
+                  onClick={handleSalesforceConnectionTest}
+                  disabled={testingSalesforceConfig || !isSalesforceConfigComplete || !salesforceConfigUnlocked}
+                >
+                  {testingSalesforceConfig ? 'Testing...' : 'Test Connection'}
+                </Button>
+                <Button
+                  type="button"
+                  onClick={saveSalesforceConnectionConfig}
+                  className="bg-emerald-600 hover:bg-emerald-700"
+                  disabled={savingSalesforceConfig || !isSalesforceConfigComplete || !salesforceConfigUnlocked}
+                >
+                  {savingSalesforceConfig ? 'Saving...' : 'Save Salesforce Settings'}
+                </Button>
+              </div>
+
+              {salesforceRecentChecks.length > 0 && (
+                <div className="rounded-md border border-gray-700 bg-gray-800/30 p-3">
+                  <p className="text-xs text-gray-300 mb-2">Recent Checks</p>
+                  <div className="space-y-1 max-h-36 overflow-y-auto">
+                    {salesforceRecentChecks.map((entry, idx) => (
+                      <p key={`${entry.at}-${idx}`} className="text-xs text-gray-400">
+                        {new Date(entry.at).toLocaleString()} — <span className={entry.status === 'passed' ? 'text-emerald-400' : 'text-red-400'}>{entry.status.toUpperCase()}</span> — {entry.message}
+                      </p>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </CardContent>
           </Card>
-        ))}
-      </div>
+        </TabsContent>
+      </Tabs>
 
       {/* Create/Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
@@ -700,6 +1528,13 @@ const QuoteFieldForm = ({ onSubmit, initialData, onCancel }: QuoteFieldFormProps
     display_order: initialData?.display_order || 1,
     include_in_pdf: initialData?.include_in_pdf ?? false,
     conditional_logic: initialData?.conditional_logic ?? [],
+    salesforce_mapping: initialData?.salesforce_mapping ?? {
+      enabled: true,
+      objectName: 'Opportunity',
+      fieldApiName: initialData?.label || '',
+      direction: 'to_salesforce',
+      transformRule: '',
+    },
   });
 
   const [optionsText, setOptionsText] = useState(
@@ -831,6 +1666,93 @@ const QuoteFieldForm = ({ onSubmit, initialData, onCancel }: QuoteFieldFormProps
           onChange={(rules) => setFormData({ ...formData, conditional_logic: rules })}
           parentFieldLabel={formData.label || 'Quote Field'}
         />
+      </div>
+
+      <div className="space-y-3 border border-gray-800 rounded-md p-3">
+        <div>
+          <Label className="text-white">Salesforce Mapping</Label>
+          <p className="text-xs text-gray-400">Define which Salesforce field this quote field maps to.</p>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div>
+            <Label htmlFor="sf-object" className="text-white">Object</Label>
+            <Select
+              value={formData.salesforce_mapping?.objectName || 'Opportunity'}
+              onValueChange={(value) =>
+                setFormData({
+                  ...formData,
+                  salesforce_mapping: {
+                    enabled: formData.salesforce_mapping?.enabled ?? true,
+                    objectName: value,
+                    fieldApiName: formData.salesforce_mapping?.fieldApiName || formData.label,
+                    direction: formData.salesforce_mapping?.direction ?? 'to_salesforce',
+                    transformRule: formData.salesforce_mapping?.transformRule || '',
+                  },
+                })
+              }
+            >
+              <SelectTrigger id="sf-object" className="bg-gray-800 border-gray-700 text-white">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className="bg-gray-800 border-gray-700">
+                <SelectItem value="Opportunity" className="text-white">Opportunity</SelectItem>
+                <SelectItem value="Case" className="text-white">Case</SelectItem>
+                <SelectItem value="Quote" className="text-white">Quote</SelectItem>
+                <SelectItem value="Account" className="text-white">Account</SelectItem>
+                <SelectItem value="Contact" className="text-white">Contact</SelectItem>
+                <SelectItem value="Custom" className="text-white">Custom</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label htmlFor="sf-api-name" className="text-white">Salesforce Field API Name</Label>
+            <Input
+              id="sf-api-name"
+              value={formData.salesforce_mapping?.fieldApiName || ''}
+              onChange={(e) =>
+                setFormData({
+                  ...formData,
+                  salesforce_mapping: {
+                    enabled: formData.salesforce_mapping?.enabled ?? true,
+                    objectName: formData.salesforce_mapping?.objectName || 'Opportunity',
+                    fieldApiName: e.target.value,
+                    direction: formData.salesforce_mapping?.direction ?? 'to_salesforce',
+                    transformRule: formData.salesforce_mapping?.transformRule || '',
+                  },
+                })
+              }
+              className="bg-gray-800 border-gray-700 text-white"
+              placeholder="e.g. Opportunity_Name__c"
+            />
+          </div>
+          <div>
+            <Label htmlFor="sf-direction" className="text-white">Sync Direction</Label>
+            <Select
+              value={formData.salesforce_mapping?.direction || 'to_salesforce'}
+              onValueChange={(value: 'to_salesforce' | 'from_salesforce' | 'bidirectional') =>
+                setFormData({
+                  ...formData,
+                  salesforce_mapping: {
+                    enabled: formData.salesforce_mapping?.enabled ?? true,
+                    objectName: formData.salesforce_mapping?.objectName || 'Opportunity',
+                    fieldApiName: formData.salesforce_mapping?.fieldApiName || formData.label,
+                    direction: value,
+                    transformRule: formData.salesforce_mapping?.transformRule || '',
+                  },
+                })
+              }
+            >
+              <SelectTrigger id="sf-direction" className="bg-gray-800 border-gray-700 text-white">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className="bg-gray-800 border-gray-700">
+                <SelectItem value="to_salesforce" className="text-white">PowerQuote → Salesforce</SelectItem>
+                <SelectItem value="from_salesforce" className="text-white">Salesforce → PowerQuote</SelectItem>
+                <SelectItem value="bidirectional" className="text-white">Bidirectional</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
       </div>
 
       <div className="grid grid-cols-3 gap-4">
