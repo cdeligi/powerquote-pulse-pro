@@ -401,11 +401,24 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         throw new Error("Failed to load user profile");
       }
 
-      // Block login unless approved/active
-      // Security: if user_status is missing/null, treat as pending (never grant access by default)
+      // Block login unless approved/active.
+      // Defense-in-depth: even if profiles.user_status is mistakenly 'active',
+      // do not allow access while there is a pending user_request for this email.
       const status = String((profileData as any).user_status || 'pending').toLowerCase();
-      if (status !== 'active') {
-        console.warn('[AuthProvider] User is not active; blocking login:', { email: profileData.email, status });
+
+      const { data: latestReq } = await supabase
+        .from('user_requests')
+        .select('status, requested_at')
+        .eq('email', profileData.email)
+        .order('requested_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      const reqStatus = String((latestReq as any)?.status || '').toLowerCase();
+      const hasPendingRequest = reqStatus === 'pending';
+
+      if (status !== 'active' || hasPendingRequest) {
+        console.warn('[AuthProvider] Access blocked (not approved yet):', { email: profileData.email, status, reqStatus });
         await supabase.auth.signOut();
         setUser(null);
         setSession(null);

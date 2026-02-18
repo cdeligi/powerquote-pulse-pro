@@ -71,14 +71,33 @@ const handler = async (req: Request): Promise<Response> => {
       });
     }
 
-    const subject = `PowerQuotePro Notification: ${quoteName}`;
-    const html = `
+    const safeMsg = message
+      ? String(message).replaceAll('<', '&lt;').replaceAll('>', '&gt;')
+      : '';
+
+    const isAccessRequest = String(quoteName || '').toLowerCase() === 'access request received';
+
+    const subject = isAccessRequest
+      ? `PowerQuotePro: Access Request Received`
+      : `PowerQuotePro Notification: ${quoteName}`;
+
+    const html = isAccessRequest
+      ? `
+      <div style="font-family:Arial,sans-serif;line-height:1.5">
+        <p>Hello ${recipientName || 'there'},</p>
+        <p>Your access request were received</p>
+        <p><strong>ID:</strong> ${quoteId}</p>
+        <p><strong>Message:</strong><br/>${safeMsg}</p>
+        <p style="margin-top:16px">Regards,<br/>PowerQuotePro</p>
+      </div>
+    `
+      : `
       <div style="font-family:Arial,sans-serif;line-height:1.5">
         <p>Hello ${recipientName || 'there'},</p>
         <p><strong>${senderName}</strong> sent a notification from PowerQuotePro.</p>
         <p><strong>Context:</strong> ${quoteName}</p>
         <p><strong>ID:</strong> ${quoteId}</p>
-        ${message ? `<div style="margin-top:12px;padding:12px;border:1px solid #e5e7eb;border-radius:8px;background:#f9fafb"><strong>Message:</strong><br/>${String(message).replaceAll('<','&lt;').replaceAll('>','&gt;')}</div>` : ''}
+        ${message ? `<div style="margin-top:12px;padding:12px;border:1px solid #e5e7eb;border-radius:8px;background:#f9fafb"><strong>Message:</strong><br/>${safeMsg}</div>` : ''}
         <p style="margin-top:16px">Regards,<br/>PowerQuotePro</p>
       </div>
     `;
