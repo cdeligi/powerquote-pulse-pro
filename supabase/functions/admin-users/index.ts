@@ -189,8 +189,14 @@ serve(async (req) => {
 
   } catch (error: any) {
     console.error('Error in admin-users function:', error);
-    return new Response(JSON.stringify({ error: error.message }), {
-      status: 500,
+
+    const message = String(error?.message || 'Unexpected error');
+    const status = /required|invalid|already|constraint|not found|admin access required|no authorization header/i.test(message)
+      ? 400
+      : 500;
+
+    return new Response(JSON.stringify({ error: message }), {
+      status,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
   }
@@ -350,12 +356,12 @@ async function sendEmailNotification(
 }
 
 async function handleCreateUser(req: Request, supabase: any, adminId: string) {
-  const { 
-    email, 
-    firstName, 
-    lastName, 
-    role, 
-    department, 
+  const {
+    email,
+    firstName,
+    lastName,
+    role,
+    department,
     password,
     jobTitle,
     phoneNumber,
@@ -363,31 +369,50 @@ async function handleCreateUser(req: Request, supabase: any, adminId: string) {
     companyName,
     businessJustification
   } = await req.json();
-  
+
+  const safeEmail = String(email || '').trim().toLowerCase();
+  if (!safeEmail) throw new Error('Email is required');
+  if (!firstName || !lastName) throw new Error('First name and last name are required');
+  if (!department) throw new Error('Department is required');
+
   const tempPassword = password || Math.random().toString(36).slice(-8) + 'A1!';
   const dbRole = ensureRole(role);
-  
-  // Create auth user
-  const { data: authUser, error: authError } = await supabase.auth.admin.createUser({
-    email,
-    password: tempPassword,
-    email_confirm: true,
-    user_metadata: {
-      first_name: firstName,
-      last_name: lastName,
-      role: dbRole,
-      department
-    }
-  });
 
-  if (authError) throw authError;
+  // Try to find existing auth user first to avoid duplicate-user failures.
+  const { data: usersPage, error: listUsersError } = await supabase.auth.admin.listUsers();
+  if (listUsersError) throw listUsersError;
 
-  // Create profile with all fields
+  const existingAuthUser = (usersPage?.users || []).find(
+    (u: any) => String(u.email || '').toLowerCase() === safeEmail,
+  );
+
+  let userId = existingAuthUser?.id as string | undefined;
+
+  if (!userId) {
+    const { data: authUser, error: authError } = await supabase.auth.admin.createUser({
+      email: safeEmail,
+      password: tempPassword,
+      email_confirm: true,
+      user_metadata: {
+        first_name: firstName,
+        last_name: lastName,
+        role: dbRole,
+        department,
+      },
+    });
+
+    if (authError) throw authError;
+    userId = authUser?.user?.id;
+  }
+
+  if (!userId) throw new Error('Unable to resolve auth user id');
+
+  // Upsert profile (works for new and existing users)
   const { error: profileError } = await supabase
     .from('profiles')
-    .insert({
-      id: authUser.user.id,
-      email,
+    .upsert({
+      id: userId,
+      email: safeEmail,
       first_name: firstName,
       last_name: lastName,
       role: dbRole,
@@ -397,20 +422,24 @@ async function handleCreateUser(req: Request, supabase: any, adminId: string) {
       manager_email: managerEmail,
       company_name: companyName || 'QUALITROL',
       business_justification: businessJustification,
-      user_status: 'active'
+      user_status: 'active',
+      updated_at: new Date().toISOString(),
     });
 
   if (profileError) throw profileError;
 
   await logAuditEvent(supabase, {
     user_id: adminId,
-    event: `ADMIN_CREATE_USER:${email}`,
+    event: `ADMIN_CREATE_USER:${safeEmail}`,
   });
 
-  return new Response(JSON.stringify({ 
-    success: true, 
-    tempPassword,
-    userId: authUser.user.id 
+  return new Response(JSON.stringify({
+    success: true,
+    userId,
+    existed: Boolean(existingAuthUser),
+    message: existingAuthUser
+      ? 'User already existed in Auth. Profile was updated and activated.'
+      : 'User created successfully.',
   }), {
     headers: { ...corsHeaders, 'Content-Type': 'application/json' }
   });
