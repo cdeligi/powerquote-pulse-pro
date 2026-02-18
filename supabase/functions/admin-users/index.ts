@@ -149,6 +149,12 @@ serve(async (req) => {
           return await handleRejectRequest(req, supabaseAdmin, user.id);
         }
         break;
+
+      case 'DELETE':
+        if (path === 'delete-rejected-request') {
+          return await handleDeleteRejectedRequest(req, supabaseAdmin, user.id);
+        }
+        break;
     }
 
     return new Response(JSON.stringify({ error: 'Method not allowed' }), {
@@ -588,6 +594,57 @@ async function handleRejectRequest(req: Request, supabase: any, adminId: string)
   }
 
   return new Response(JSON.stringify({ success: true }), { 
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+  });
+}
+
+async function handleDeleteRejectedRequest(req: Request, supabase: any, adminId: string) {
+  const { requestId } = await req.json();
+
+  if (!requestId) throw new Error('requestId is required');
+
+  const { data: request, error: requestError } = await supabase
+    .from('user_requests')
+    .select('id, email, status')
+    .eq('id', requestId)
+    .maybeSingle();
+
+  if (requestError) throw requestError;
+  if (!request) throw new Error('Request not found');
+  if (request.status !== 'rejected') {
+    throw new Error('Only rejected requests can be hard deleted');
+  }
+
+  // Find auth user by email (if exists)
+  const { data: authUsers, error: listError } = await supabase.auth.admin.listUsers();
+  if (listError) throw listError;
+
+  const authUser = (authUsers?.users || []).find(
+    (u: any) => String(u.email || '').toLowerCase() === String(request.email || '').toLowerCase(),
+  );
+
+  // Delete related profile first (if present)
+  if (authUser?.id) {
+    await supabase.from('profiles').delete().eq('id', authUser.id);
+
+    const { error: authDeleteError } = await supabase.auth.admin.deleteUser(authUser.id);
+    if (authDeleteError) throw authDeleteError;
+  }
+
+  // Delete request row
+  const { error: requestDeleteError } = await supabase
+    .from('user_requests')
+    .delete()
+    .eq('id', requestId);
+
+  if (requestDeleteError) throw requestDeleteError;
+
+  await logAuditEvent(supabase, {
+    user_id: adminId,
+    event: `ADMIN_HARD_DELETE_REJECTED_REQUEST:${request.email}`,
+  });
+
+  return new Response(JSON.stringify({ success: true }), {
     headers: { ...corsHeaders, 'Content-Type': 'application/json' }
   });
 }

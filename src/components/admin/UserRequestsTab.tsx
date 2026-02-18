@@ -6,12 +6,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { CheckCircle, XCircle, Eye, Clock } from "lucide-react";
+import { CheckCircle, XCircle, Eye, Trash2 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
-import { getSupabaseClient, getSupabaseAdminClient, isAdminAvailable } from "@/integrations/supabase/client";
+import { getSupabaseClient } from "@/integrations/supabase/client";
 
 const supabase = getSupabaseClient();
-const supabaseAdmin = getSupabaseAdminClient();;
 
 interface UserRequest {
   id: string;
@@ -43,7 +42,9 @@ export default function UserRequestsTab() {
   const [selectedRequest, setSelectedRequest] = useState<UserRequest | null>(null);
   const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
   const [isRejectDialogOpen, setIsRejectDialogOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [rejectionReason, setRejectionReason] = useState('');
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [processingRequest, setProcessingRequest] = useState<string | null>(null);
 
   const fetchRequests = async () => {
@@ -170,6 +171,50 @@ export default function UserRequestsTab() {
     }
   };
 
+  const handleHardDeleteRejected = async () => {
+    if (!selectedRequest) return;
+
+    try {
+      setProcessingRequest(selectedRequest.id);
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('No session found');
+
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-users/delete-rejected-request`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ requestId: selectedRequest.id }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to hard delete rejected user');
+      }
+
+      toast({
+        title: 'Rejected user deleted',
+        description: 'Auth user, profile, and request record were permanently deleted.',
+      });
+
+      setIsDeleteDialogOpen(false);
+      setSelectedRequest(null);
+      setDeleteConfirmText('');
+      await fetchRequests();
+    } catch (error: any) {
+      console.error('Error hard deleting rejected request:', error);
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to hard delete rejected user.',
+        variant: 'destructive',
+      });
+    } finally {
+      setProcessingRequest(null);
+    }
+  };
+
   const getStatusBadge = (status: string) => {
     const colors = {
       pending: 'bg-yellow-600',
@@ -272,6 +317,22 @@ export default function UserRequestsTab() {
                         <XCircle className="h-4 w-4" />
                       </Button>
                     </>
+                  )}
+
+                  {request.status === 'rejected' && (
+                    <Button
+                      onClick={() => {
+                        setSelectedRequest(request);
+                        setDeleteConfirmText('');
+                        setIsDeleteDialogOpen(true);
+                      }}
+                      disabled={processingRequest === request.id}
+                      size="sm"
+                      variant="destructive"
+                      title="Hard delete rejected user"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
                   )}
                 </div>
               </TableCell>
@@ -413,6 +474,56 @@ export default function UserRequestsTab() {
                 variant="destructive"
               >
                 {processingRequest === selectedRequest?.id ? 'Rejecting...' : 'Reject Request'}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Hard Delete Rejected Dialog */}
+      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <DialogContent className="bg-gray-900 border-gray-800">
+          <DialogHeader>
+            <DialogTitle className="text-white">Hard Delete Rejected User</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-gray-300">
+              This will permanently delete the auth user, profile, and request record for:
+              <span className="font-semibold text-white"> {selectedRequest?.email}</span>
+            </p>
+            <p className="text-sm text-red-400">This action cannot be undone.</p>
+
+            <div>
+              <Label htmlFor="delete-confirm" className="text-white">
+                Type <span className="font-mono">DELETE</span> to confirm
+              </Label>
+              <Textarea
+                id="delete-confirm"
+                value={deleteConfirmText}
+                onChange={(e) => setDeleteConfirmText(e.target.value)}
+                className="bg-gray-800 border-gray-700 text-white mt-2"
+                placeholder="DELETE"
+                rows={1}
+              />
+            </div>
+
+            <div className="flex justify-end space-x-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setIsDeleteDialogOpen(false);
+                  setDeleteConfirmText('');
+                }}
+                className="border-gray-600 text-white hover:bg-gray-800"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleHardDeleteRejected}
+                disabled={deleteConfirmText.trim() !== 'DELETE' || processingRequest === selectedRequest?.id}
+                variant="destructive"
+              >
+                {processingRequest === selectedRequest?.id ? 'Deleting...' : 'Delete Permanently'}
               </Button>
             </div>
           </div>
