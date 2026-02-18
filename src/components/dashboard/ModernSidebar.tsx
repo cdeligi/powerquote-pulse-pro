@@ -18,6 +18,7 @@ import { FEATURES, usePermissions } from '@/hooks/usePermissions';
 interface ModernSidebarProps {
   user: {
     email: string;
+    name?: string;
     full_name?: string;
     role?: string;
   };
@@ -73,6 +74,8 @@ export function ModernSidebar({ user, onLogout }: ModernSidebarProps) {
     return <Badge className={cn('text-xs', config.className)}>{config.label}</Badge>;
   };
 
+  const displayName = (user.full_name || user.name || '').trim();
+
   // Desktop sidebar content
   const SidebarContent = ({ collapsed = false, isMobile = false }: { collapsed?: boolean; isMobile?: boolean }) => (
     <div className="flex h-full flex-col overflow-hidden">
@@ -80,13 +83,13 @@ export function ModernSidebar({ user, onLogout }: ModernSidebarProps) {
       <div className="border-b border-border p-3 flex-shrink-0">
         <div className="flex items-center gap-2 min-w-0">
           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground text-sm font-semibold">
-            {user.full_name?.[0]?.toUpperCase() || user.email[0]?.toUpperCase()}
+            {displayName?.[0]?.toUpperCase() || user.email[0]?.toUpperCase()}
           </div>
           {!collapsed && (
             <div className="flex-1 min-w-0">
-              {user.full_name ? (
+              {displayName ? (
                 <>
-                  <p className="truncate text-sm font-medium leading-tight">{user.full_name}</p>
+                  <p className="truncate text-sm font-medium leading-tight">{displayName}</p>
                   <p className="truncate text-xs text-muted-foreground leading-tight mt-0.5">{user.email}</p>
                 </>
               ) : (
