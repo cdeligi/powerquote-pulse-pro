@@ -328,10 +328,11 @@ export default function UserRequestsTab() {
                       }}
                       disabled={processingRequest === request.id}
                       size="sm"
-                      variant="destructive"
+                      className="bg-red-600 hover:bg-red-700 text-white"
                       title="Hard delete rejected user"
                     >
-                      <Trash2 className="h-4 w-4" />
+                      <Trash2 className="h-4 w-4 mr-1" />
+                      Delete
                     </Button>
                   )}
                 </div>
