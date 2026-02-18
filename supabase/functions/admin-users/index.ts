@@ -18,6 +18,8 @@ function renderTemplate(template: string, data: Record<string, any>): string {
   return result;
 }
 
+const ALLOWED_DB_ROLES = new Set(['level1', 'level2', 'level3', 'admin', 'finance', 'master']);
+
 function normalizeRoleForDb(input: string | null | undefined): string {
   const raw = String(input || '').trim().toLowerCase();
 
@@ -28,8 +30,13 @@ function normalizeRoleForDb(input: string | null | undefined): string {
   if (raw === 'finance' || raw === 'finance_reviewer') return 'finance';
   if (raw === 'master') return 'master';
 
-  // Keep raw for explicit validation failure against DB check constraints.
   return raw;
+}
+
+function ensureRole(input: string | null | undefined): string {
+  const role = normalizeRoleForDb(input);
+  if (!ALLOWED_DB_ROLES.has(role)) return 'level2';
+  return role;
 }
 
 const corsHeaders = {
@@ -358,7 +365,7 @@ async function handleCreateUser(req: Request, supabase: any, adminId: string) {
   } = await req.json();
   
   const tempPassword = password || Math.random().toString(36).slice(-8) + 'A1!';
-  const dbRole = normalizeRoleForDb(role);
+  const dbRole = ensureRole(role);
   
   // Create auth user
   const { data: authUser, error: authError } = await supabase.auth.admin.createUser({
@@ -388,7 +395,7 @@ async function handleCreateUser(req: Request, supabase: any, adminId: string) {
       job_title: jobTitle,
       phone_number: phoneNumber,
       manager_email: managerEmail,
-      company_name: companyName,
+      company_name: companyName || 'QUALITROL',
       business_justification: businessJustification,
       user_status: 'active'
     });
@@ -425,7 +432,7 @@ async function handleUpdateUser(req: Request, supabase: any, adminId: string) {
     email 
   } = await req.json();
 
-  const dbRole = normalizeRoleForDb(role);
+  const dbRole = ensureRole(role);
 
   // Update auth user metadata
   const { error: authError } = await supabase.auth.admin.updateUserById(userId, {
@@ -507,7 +514,7 @@ async function handleApproveRequest(req: Request, supabase: any, adminId: string
   }
 
   const userId = match.id;
-  const dbRole = normalizeRoleForDb(request.requested_role);
+  const dbRole = ensureRole(request.requested_role);
 
   // Upsert profile with all fields from request and activate
   const { error: profileError } = await supabase

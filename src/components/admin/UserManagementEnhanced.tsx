@@ -390,9 +390,14 @@ const UserManagementEnhanced = ({ user }: UserManagementEnhancedProps) => {
       await fetchUserProfiles();
     } catch (error: any) {
       console.error('Error creating user:', error);
+      const details =
+        error?.context?.error ||
+        error?.context?.message ||
+        error?.message ||
+        'Failed to create user.';
       toast({
         title: 'Error',
-        description: error.message || 'Failed to create user.',
+        description: details,
         variant: 'destructive',
       });
     } finally {
@@ -743,11 +748,10 @@ const UserManagementEnhanced = ({ user }: UserManagementEnhancedProps) => {
                     </SelectTrigger>
                     <SelectContent className="bg-gray-800 border-gray-700 text-white">
                       <SelectItem value="level1">Level 1</SelectItem>
-                      <SelectItem value="level2">Sales</SelectItem>
+                      <SelectItem value="level2">Level 2 (Sales)</SelectItem>
                       <SelectItem value="level3">Level 3</SelectItem>
                       <SelectItem value="admin">Admin Reviewer</SelectItem>
                       <SelectItem value="finance">Finance Reviewer</SelectItem>
-                      <SelectItem value="master">Master Operator</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -820,7 +824,26 @@ const UserManagementEnhanced = ({ user }: UserManagementEnhancedProps) => {
                   />
                 </div>
               </div>
-              <div className="flex justify-end mt-6">
+              <div className="flex justify-end gap-2 mt-6">
+                <Button
+                  variant="outline"
+                  className="border-gray-600 text-white hover:bg-gray-800"
+                  onClick={() => {
+                    setNewEmail('');
+                    setNewPassword('');
+                    setNewFirstName('');
+                    setNewLastName('');
+                    setNewRole('level2');
+                    setNewDepartment('');
+                    setNewJobTitle('');
+                    setNewPhoneNumber('');
+                    setNewManagerEmail('');
+                    setNewBusinessJustification('');
+                  }}
+                  disabled={isCreatingUser}
+                >
+                  Clear
+                </Button>
                 <Button
                   onClick={handleCreateUser}
                   disabled={isCreatingUser || !newEmail || !newPassword || !newFirstName || !newLastName || !newDepartment || !newJobTitle}
