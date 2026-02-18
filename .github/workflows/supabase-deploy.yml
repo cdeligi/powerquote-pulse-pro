@@ -20,14 +20,22 @@ jobs:
         with:
           version: latest
 
-      - name: Link + Deploy DB migrations
-        env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
-          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
-        run: |
-          supabase link --project-ref "$SUPABASE_PROJECT_REF"
-          supabase db push
+      # NOTE (temporary): DB migration history in the remote project is out of sync with the repo.
+      # `supabase db push` fails with "Remote migration versions not found in local migrations directory".
+      # We will apply DB changes via SQL Editor until migration history is repaired.
+      #
+      # To re-enable:
+      # - Run `supabase db pull` and commit missing migrations OR repair migration history.
+      # - Then restore the db push step below.
+      #
+      #- name: Link + Deploy DB migrations
+      #  env:
+      #    SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      #    SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      #    SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+      #  run: |
+      #    supabase link --project-ref "$SUPABASE_PROJECT_REF"
+      #    supabase db push
 
       - name: Deploy Edge Functions
         env:
