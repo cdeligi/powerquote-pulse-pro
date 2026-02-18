@@ -71,9 +71,8 @@ const LoginForm = ({ onLogin }: LoginFormProps) => {
     }
   };
 
-  const handleRegistrationSubmit = (request: any) => {
-    console.log('Registration request submitted:', request);
-    alert('Registration request submitted successfully! You will receive an email notification once reviewed.');
+  const handleRegistrationSubmit = (_request: any) => {
+    // Registration form now shows an inline confirmation (mobile-friendly) and triggers email notifications.
     setShowRegistration(false);
   };
 
