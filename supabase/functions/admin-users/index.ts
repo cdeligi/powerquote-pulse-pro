@@ -2,6 +2,20 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { Resend } from "https://esm.sh/resend@3.2.0";
+import nodemailer from "npm:nodemailer@6.9.13";
+
+// Simple template engine (Mustache-style)
+function renderTemplate(template: string, data: Record<string, any>): string {
+  let result = template;
+  for (const [key, value] of Object.entries(data)) {
+    const regex = new RegExp(`{{${key}}}`, 'g');
+    result = result.replace(regex, String(value ?? ''));
+  }
+  result = result.replace(/{{#if (\w+)}}([\s\S]*?){{\/if}}/g, (match, varName, content) => {
+    return data[varName] ? content : '';
+  });
+  return result;
+}
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -211,14 +225,21 @@ async function logAuditEvent(supabase: any, payload: { user_id?: string | null; 
   }
 }
 
-async function sendEmailNotification(supabase: any, payload: { to: string[]; subject: string; html: string }) {
-  try {
-    const resendApiKey = Deno.env.get('RESEND_API_KEY');
-    if (!resendApiKey) {
-      console.warn('RESEND_API_KEY not configured; skipping email notification');
-      return;
-    }
+async function getSetting(supabase: any, key: string) {
+  const { data, error } = await supabase
+    .from('email_settings')
+    .select('setting_value')
+    .eq('setting_key', key)
+    .maybeSingle();
+  if (error) return null;
+  return (data as any)?.setting_value ?? null;
+}
 
+async function sendEmailNotification(
+  supabase: any,
+  payload: { to: string[]; subject?: string; html?: string; template_type?: string; template_data?: Record<string, any> }
+) {
+  try {
     const { data: settingsRows } = await supabase
       .from('email_settings')
       .select('setting_key, setting_value');
@@ -235,13 +256,63 @@ async function sendEmailNotification(supabase: any, payload: { to: string[]; sub
       return;
     }
 
+    const provider = String(settings.email_service_provider || 'resend').toLowerCase();
+
+    let subject = payload.subject || 'PowerQuotePro notification';
+    let html = payload.html || '<p>Hello,</p><p>This is a notification from PowerQuotePro.</p>';
+
+    if (payload.template_type) {
+      const { data: templateRow, error: templateErr } = await supabase
+        .from('email_templates')
+        .select('*')
+        .eq('template_type', payload.template_type)
+        .eq('enabled', true)
+        .maybeSingle();
+
+      if (templateErr) throw new Error(`Failed to fetch email template (${payload.template_type}): ${templateErr.message}`);
+      if (!templateRow) throw new Error(`Email template not found or disabled: ${payload.template_type}`);
+
+      const data = payload.template_data || {};
+      subject = renderTemplate(String(templateRow.subject_template || ''), data);
+      html = renderTemplate(String(templateRow.body_template || ''), data);
+    }
+
+    const from = `${fromName} <${fromEmail}>`;
+
+    if (provider === 'smtp') {
+      const host = String(settings.smtp_host || '').trim();
+      const port = Number(settings.smtp_port || 587);
+      const secure = Boolean(settings.smtp_secure);
+      if (!host) throw new Error('smtp_host not configured');
+
+      const user = Deno.env.get('SMTP_USER') || '';
+      const pass = Deno.env.get('SMTP_PASSWORD') || '';
+
+      const transport = nodemailer.createTransport({
+        host,
+        port,
+        secure,
+        auth: user && pass ? { user, pass } : undefined,
+      } as any);
+
+      await transport.sendMail({
+        from,
+        to: payload.to.join(', '),
+        subject,
+        html,
+      });
+      return;
+    }
+
+    // Default to Resend
+    const resendApiKey = Deno.env.get('RESEND_API_KEY');
+    if (!resendApiKey) {
+      console.warn('RESEND_API_KEY not configured; skipping email notification');
+      return;
+    }
+
     const resend = new Resend(resendApiKey);
-    await resend.emails.send({
-      from: `${fromName} <${fromEmail}>`,
-      to: payload.to,
-      subject: payload.subject,
-      html: payload.html,
-    });
+    await resend.emails.send({ from, to: payload.to, subject, html });
   } catch (error) {
     console.warn('Failed to send email notification:', error);
   }
@@ -447,26 +518,25 @@ async function handleApproveRequest(req: Request, supabase: any, adminId: string
     event: `ADMIN_APPROVE_REQUEST:${request.email}`,
   });
 
-  // Notify applicant (approval). The invite email handles password creation.
+  // Notify applicant (approval)
   await sendEmailNotification(supabase, {
     to: [String(request.email).trim()],
-    subject: 'PowerQuotePro access approved',
-    html: `
-      <div style="font-family:Arial,sans-serif;line-height:1.5">
-        <p>Hello ${request.first_name ?? ''} ${request.last_name ?? ''},</p>
-        <p>Your access request has been <strong>approved</strong>.</p>
-        <p>You can now log in using the password you created during registration.</p>
-        <p>If you forgot your password, use the “Forgot password” link on the login screen.</p>
-        <p>Regards,<br/>PowerQuotePro</p>
-      </div>
-    `,
+    template_type: 'user_request_approved',
+    template_data: {
+      recipient_name: `${request.first_name ?? ''} ${request.last_name ?? ''}`.trim() || 'there',
+      recipient_email: String(request.email).trim(),
+      requested_role: request.requested_role,
+      request_id: request.id,
+      decision_date: new Date().toISOString(),
+      support_email: String((await getSetting(supabase, 'support_email')) || 'cdeligi@qualitrolcorp.com'),
+    },
   });
 
   return new Response(JSON.stringify({ 
     success: true,
-    invited: true,
-    message: 'User approved. Invite email sent so user can create their own password.',
-    userId: invitedUserId 
+    invited: false,
+    message: 'User approved. User can log in with the password created during registration.',
+    userId
   }), {
     headers: { ...corsHeaders, 'Content-Type': 'application/json' }
   });
@@ -501,18 +571,19 @@ async function handleRejectRequest(req: Request, supabase: any, adminId: string)
 
   // Notify applicant (rejection)
   if (requestRow?.email) {
+    const safeReason = reason ? String(reason).replaceAll('<','&lt;').replaceAll('>','&gt;') : '';
+
     await sendEmailNotification(supabase, {
       to: [String(requestRow.email).trim()],
-      subject: 'PowerQuotePro access request update',
-      html: `
-        <div style="font-family:Arial,sans-serif;line-height:1.5">
-          <p>Hello ${requestRow.first_name ?? ''} ${requestRow.last_name ?? ''},</p>
-          <p>Your access request has been <strong>denied</strong>.</p>
-          ${reason ? `<p><strong>Reason:</strong> ${String(reason).replaceAll('<','&lt;').replaceAll('>','&gt;')}</p>` : ''}
-          <p>If you believe this is a mistake, please contact the admin team.</p>
-          <p>Regards,<br/>PowerQuotePro</p>
-        </div>
-      `,
+      template_type: 'user_request_rejected',
+      template_data: {
+        recipient_name: `${requestRow.first_name ?? ''} ${requestRow.last_name ?? ''}`.trim() || 'there',
+        recipient_email: String(requestRow.email).trim(),
+        request_id: requestId,
+        rejection_reason: safeReason,
+        decision_date: new Date().toISOString(),
+        support_email: String((await getSetting(supabase, 'support_email')) || 'cdeligi@qualitrolcorp.com'),
+      },
     });
   }
 

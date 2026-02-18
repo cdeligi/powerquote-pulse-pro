@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { Resend } from "https://esm.sh/resend@3.2.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import nodemailer from "npm:nodemailer@6.9.13";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -16,6 +17,22 @@ interface QuoteNotificationRequest {
   quoteName: string;
   permissionLevel: 'view' | 'edit';
   message?: string;
+  // Optional: use email_templates table
+  template_type?: string;
+  template_data?: Record<string, any>;
+}
+
+// Simple template engine (Mustache-style)
+function renderTemplate(template: string, data: Record<string, any>): string {
+  let result = template;
+  for (const [key, value] of Object.entries(data)) {
+    const regex = new RegExp(`{{${key}}}`, 'g');
+    result = result.replace(regex, String(value ?? ''));
+  }
+  result = result.replace(/{{#if (\w+)}}([\s\S]*?){{\/if}}/g, (match, varName, content) => {
+    return data[varName] ? content : '';
+  });
+  return result;
 }
 
 const handler = async (req: Request): Promise<Response> => {
@@ -32,16 +49,10 @@ const handler = async (req: Request): Promise<Response> => {
       quoteId,
       quoteName,
       permissionLevel,
-      message
+      message,
+      template_type,
+      template_data,
     }: QuoteNotificationRequest = await req.json();
-
-    const resendApiKey = Deno.env.get('RESEND_API_KEY');
-    if (!resendApiKey) {
-      return new Response(JSON.stringify({ error: 'RESEND_API_KEY not configured' }), {
-        status: 500,
-        headers: { "Content-Type": "application/json", ...corsHeaders },
-      });
-    }
 
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -71,27 +82,13 @@ const handler = async (req: Request): Promise<Response> => {
       });
     }
 
-    const safeMsg = message
-      ? String(message).replaceAll('<', '&lt;').replaceAll('>', '&gt;')
-      : '';
+    const provider = String(settings.email_service_provider || 'resend').toLowerCase();
 
-    const isAccessRequest = String(quoteName || '').toLowerCase() === 'access request received';
+    // Default subject/body if no template is provided
+    const safeMsg = message ? String(message).replaceAll('<', '&lt;').replaceAll('>', '&gt;') : '';
 
-    const subject = isAccessRequest
-      ? `PowerQuotePro: Access Request Received`
-      : `PowerQuotePro Notification: ${quoteName}`;
-
-    const html = isAccessRequest
-      ? `
-      <div style="font-family:Arial,sans-serif;line-height:1.5">
-        <p>Hello ${recipientName || 'there'},</p>
-        <p>Your access request were received</p>
-        <p><strong>ID:</strong> ${quoteId}</p>
-        <p><strong>Message:</strong><br/>${safeMsg}</p>
-        <p style="margin-top:16px">Regards,<br/>PowerQuotePro</p>
-      </div>
-    `
-      : `
+    let subject = `PowerQuotePro Notification: ${quoteName}`;
+    let html = `
       <div style="font-family:Arial,sans-serif;line-height:1.5">
         <p>Hello ${recipientName || 'there'},</p>
         <p><strong>${senderName}</strong> sent a notification from PowerQuotePro.</p>
@@ -102,13 +99,63 @@ const handler = async (req: Request): Promise<Response> => {
       </div>
     `;
 
-    const resend = new Resend(resendApiKey);
-    const result = await resend.emails.send({
-      from: `${fromName} <${fromEmail}>`,
-      to: [recipientEmail],
-      subject,
-      html,
-    });
+    // If template_type is provided, pull from email_templates
+    if (template_type) {
+      const { data: templateRow, error: templateErr } = await supabaseAdmin
+        .from('email_templates')
+        .select('*')
+        .eq('template_type', template_type)
+        .eq('enabled', true)
+        .maybeSingle();
+
+      if (templateErr) throw new Error(`Failed to fetch email template (${template_type}): ${templateErr.message}`);
+      if (!templateRow) throw new Error(`Email template not found or disabled: ${template_type}`);
+
+      const data = {
+        recipient_name: recipientName || 'there',
+        recipient_email: recipientEmail,
+        sender_name: senderName,
+        quote_id: quoteId,
+        quote_name: quoteName,
+        permission_level: permissionLevel,
+        message: safeMsg,
+        ...(template_data || {}),
+      };
+
+      subject = renderTemplate(String(templateRow.subject_template || ''), data);
+      html = renderTemplate(String(templateRow.body_template || ''), data);
+    }
+
+    const from = `${fromName} <${fromEmail}>`;
+
+    const sendViaResend = async () => {
+      const resendApiKey = Deno.env.get('RESEND_API_KEY');
+      if (!resendApiKey) throw new Error('RESEND_API_KEY not configured');
+      const resend = new Resend(resendApiKey);
+      return await resend.emails.send({ from, to: [recipientEmail], subject, html });
+    };
+
+    const sendViaSMTP = async () => {
+      const host = String(settings.smtp_host || '').trim();
+      const port = Number(settings.smtp_port || 587);
+      const secure = Boolean(settings.smtp_secure);
+      if (!host) throw new Error('smtp_host not configured');
+
+      const user = Deno.env.get('SMTP_USER') || '';
+      const pass = Deno.env.get('SMTP_PASSWORD') || '';
+
+      const transport = nodemailer.createTransport({
+        host,
+        port,
+        secure,
+        auth: user && pass ? { user, pass } : undefined,
+      } as any);
+
+      const info = await transport.sendMail({ from, to: recipientEmail, subject, html });
+      return { data: { id: (info as any)?.messageId } };
+    };
+
+    const result = provider === 'smtp' ? await sendViaSMTP() : await sendViaResend();
 
     return new Response(JSON.stringify({ status: 'sent', result }), {
       status: 200,

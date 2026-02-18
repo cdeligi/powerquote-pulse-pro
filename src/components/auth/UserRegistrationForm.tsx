@@ -176,24 +176,13 @@ const UserRegistrationForm = ({ onSubmit, onBack }: UserRegistrationFormProps) =
 
         const { data: emailSettings } = await supabase
           .from('email_settings')
-          .select('notification_recipients')
+          .select('approval_admin_recipients')
           .limit(1)
           .maybeSingle();
 
-        const baseRecipients = Array.isArray((emailSettings as any)?.notification_recipients)
-          ? (emailSettings as any).notification_recipients
+        const recipients = Array.isArray((emailSettings as any)?.approval_admin_recipients)
+          ? (emailSettings as any).approval_admin_recipients
           : [];
-
-        const { data: adminProfiles } = await supabase
-          .from('profiles')
-          .select('email, role');
-
-        const roleRecipients = (adminProfiles || [])
-          .filter((p: any) => ['admin', 'master'].includes(String(p.role || '').toLowerCase()))
-          .map((p: any) => String(p.email || '').trim())
-          .filter((e: string) => e.length > 0);
-
-        const recipients = Array.from(new Set([...(baseRecipients || []), ...roleRecipients]));
 
         const regId = `REG-${Date.now()}`;
 
@@ -214,7 +203,14 @@ const UserRegistrationForm = ({ onSubmit, onBack }: UserRegistrationFormProps) =
                   quoteId: regId,
                   quoteName: 'New User Registration Request',
                   permissionLevel: 'view',
-                  message: `New user request: ${formData.email}. Requested access level: ${formData.requestedRole}. Please review within 2 business days (48 hours) and approve or deny.`, 
+                  template_type: 'user_request_admin_review',
+                  template_data: {
+                    requester_name: `${formData.firstName} ${formData.lastName}`.trim(),
+                    requester_email: formData.email,
+                    requested_role: formData.requestedRole,
+                    request_id: regId,
+                    sla_text: 'within 2 business days (48 hours)',
+                  },
                 }),
               });
               const json = await res.json().catch(() => ({}));
@@ -244,8 +240,15 @@ const UserRegistrationForm = ({ onSubmit, onBack }: UserRegistrationFormProps) =
             quoteId: regId,
             quoteName: 'Access Request Received',
             permissionLevel: 'view',
-            message:
-              `We received your access request for access level: ${formData.requestedRole}. It is now under analysis and may take up to 2 business days (48 hours) to approve or deny. You will receive an email when a decision is made.`, 
+            template_type: 'user_request_received',
+            template_data: {
+              recipient_name: `${formData.firstName} ${formData.lastName}`.trim(),
+              recipient_email: formData.email,
+              requested_role: formData.requestedRole,
+              request_id: regId,
+              sla_text: 'up to 2 business days (48 hours)',
+              support_email: 'cpq-admin@qualitrolcorp.com',
+            },
           }),
         });
 
