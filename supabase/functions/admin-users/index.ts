@@ -633,27 +633,41 @@ async function handleDeleteRejectedRequest(req: Request, supabase: any, adminId:
 
   if (requestError) throw requestError;
   if (!request) throw new Error('Request not found');
-  if (request.status !== 'rejected') {
-    throw new Error('Only rejected requests can be hard deleted');
+
+  const status = String((request as any).status || '').trim().toLowerCase();
+  if (status !== 'rejected') {
+    throw new Error(`Only rejected requests can be hard deleted (current status: ${request.status})`);
   }
+
+  let deletedAuthUserId: string | null = null;
 
   // Find auth user by email (if exists)
   const { data: authUsers, error: listError } = await supabase.auth.admin.listUsers();
-  if (listError) throw listError;
+  if (listError) {
+    console.warn('listUsers failed during hard delete:', listError);
+  }
 
   const authUser = (authUsers?.users || []).find(
     (u: any) => String(u.email || '').toLowerCase() === String(request.email || '').toLowerCase(),
   );
 
-  // Delete related profile first (if present)
+  // Delete related profile first (if present). Do not fail hard if already missing.
   if (authUser?.id) {
-    await supabase.from('profiles').delete().eq('id', authUser.id);
+    const { error: profileDeleteError } = await supabase.from('profiles').delete().eq('id', authUser.id);
+    if (profileDeleteError) {
+      console.warn('Profile delete warning during hard delete:', profileDeleteError);
+    }
 
     const { error: authDeleteError } = await supabase.auth.admin.deleteUser(authUser.id);
-    if (authDeleteError) throw authDeleteError;
+    if (authDeleteError) {
+      // Continue request cleanup so rejected rows can still be removed from queue.
+      console.warn('Auth delete warning during hard delete:', authDeleteError);
+    } else {
+      deletedAuthUserId = authUser.id;
+    }
   }
 
-  // Delete request row
+  // Delete request row (primary expected action in Registration Requests queue)
   const { error: requestDeleteError } = await supabase
     .from('user_requests')
     .delete()
@@ -666,7 +680,13 @@ async function handleDeleteRejectedRequest(req: Request, supabase: any, adminId:
     event: `ADMIN_HARD_DELETE_REJECTED_REQUEST:${request.email}`,
   });
 
-  return new Response(JSON.stringify({ success: true }), {
+  return new Response(JSON.stringify({
+    success: true,
+    deletedAuthUserId,
+    message: deletedAuthUserId
+      ? 'Rejected request, profile, and auth user deleted.'
+      : 'Rejected request deleted. Auth user may already be missing or could not be deleted.',
+  }), {
     headers: { ...corsHeaders, 'Content-Type': 'application/json' }
   });
 }
