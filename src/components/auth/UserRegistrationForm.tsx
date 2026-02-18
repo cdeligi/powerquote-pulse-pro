@@ -148,6 +148,8 @@ const UserRegistrationForm = ({ onSubmit, onBack }: UserRegistrationFormProps) =
 
       // Notify admins for review workflow
       try {
+        const fnUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-quote-notifications`;
+
         const { data: emailSettings } = await supabase
           .from('email_settings')
           .select('notification_recipients')
@@ -205,7 +207,6 @@ const UserRegistrationForm = ({ onSubmit, onBack }: UserRegistrationFormProps) =
         }
 
         // Notify applicant (direct fetch to avoid auth/RLS issues on public registration page)
-        const fnUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-quote-notifications`;
         const applicantRes = await fetch(fnUrl, {
           method: 'POST',
           headers: {
@@ -270,9 +271,14 @@ const UserRegistrationForm = ({ onSubmit, onBack }: UserRegistrationFormProps) =
         agreedToPrivacyPolicy: false
       });
       
-    } catch (error) {
+    } catch (error: any) {
       console.error('Registration error:', error);
-      alert('An error occurred during registration. Please try again.');
+      const msg =
+        error?.message ||
+        error?.error_description ||
+        error?.details ||
+        'An error occurred during registration. Please try again.';
+      setSubmitNotice(`Registration failed: ${msg}`);
     } finally {
       setIsSubmitting(false);
     }
