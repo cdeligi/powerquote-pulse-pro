@@ -103,7 +103,7 @@ export const useQuotes = () => {
         .maybeSingle();
 
       const normalizedRole = String((profileData as any)?.role || '').toLowerCase();
-      const isPrivileged = ['admin', 'master', 'finance', 'level3', 'level_3'].includes(normalizedRole);
+      const isPrivileged = ['admin', 'master', 'finance'].includes(normalizedRole);
 
       console.log('User authenticated, fetching quotes...', { normalizedRole, isPrivileged });
       
