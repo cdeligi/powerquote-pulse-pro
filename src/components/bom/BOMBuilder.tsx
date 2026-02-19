@@ -4164,6 +4164,22 @@ let loadedItems: BOMItem[] = [];
         console.warn('Failed to send admin notifications:', notificationError);
       }
 
+      // Send submission email to submitter + configured notification recipients
+      try {
+        const { error: submitEmailError } = await supabase.functions.invoke('send-quote-status-email', {
+          body: {
+            quoteId,
+            action: 'submitted',
+          },
+        });
+
+        if (submitEmailError) {
+          console.warn('Submission email notification failed:', submitEmailError);
+        }
+      } catch (submitEmailException) {
+        console.warn('Submission email notification exception:', submitEmailException);
+      }
+
       toast({
         title: 'Quote Submitted Successfully',
         description: `Your quote ${quoteId} has been submitted for approval.`,

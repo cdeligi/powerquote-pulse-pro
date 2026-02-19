@@ -10,7 +10,7 @@ const corsHeaders = {
 
 interface EmailRequest {
   quoteId: string;
-  action: 'approved' | 'rejected';
+  action: 'submitted' | 'approved' | 'rejected';
   recipientEmails?: string[];
 }
 
@@ -82,18 +82,23 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
-    // 2. Fetch email template
-    const templateType = action === 'approved' ? 'quote_approved' : 'quote_rejected';
+    // 2. Fetch email template (fallback to default body if not found)
+    const templateType = action === 'submitted'
+      ? 'quote_submitted'
+      : (action === 'approved' ? 'quote_approved' : 'quote_rejected');
+
     const { data: templateRecord, error: templateError } = await supabase
       .from('email_templates')
       .select('*')
       .eq('template_type', templateType)
       .eq('enabled', true)
-      .single();
+      .maybeSingle();
 
-    if (templateError) throw new Error(`Failed to fetch email template: ${templateError.message}`);
+    if (templateError) {
+      console.warn(`Template fetch warning (${templateType}):`, templateError.message);
+    }
 
-    const template: EmailTemplate = templateRecord;
+    const template: EmailTemplate | null = templateRecord || null;
 
     // 3. Fetch quote details or use mock data for testing
     let quoteData: any;
@@ -263,8 +268,24 @@ const handler = async (req: Request): Promise<Response> => {
         recipient_name: recipient === quoteData.submitter?.email ? submitterName : 'Team Member',
       };
 
-      const subject = renderTemplate(template.subject_template, recipientTemplateData);
-      const body = renderTemplate(template.body_template, recipientTemplateData);
+      const defaultSubject = action === 'submitted'
+        ? `Quote ${quoteId} submitted for approval`
+        : action === 'approved'
+          ? `Quote ${quoteId} approved`
+          : `Quote ${quoteId} rejected`;
+
+      const defaultBody = `
+        <div style="font-family:Arial,sans-serif;line-height:1.5">
+          <p>Hello ${recipientTemplateData.recipient_name || 'there'},</p>
+          <p>The quote <strong>${quoteId}</strong> for <strong>${recipientTemplateData.customer_name || 'Customer'}</strong> was <strong>${action}</strong>.</p>
+          <p>Submitted by: ${quoteData.submitted_by_name || quoteData.submitted_by_email || 'Unknown'}</p>
+          ${action === 'approved' ? `<p>${recipientTemplateData.pdf_link}</p>` : ''}
+          <p style="margin-top:16px">Regards,<br/>PowerQuotePro</p>
+        </div>
+      `;
+
+      const subject = template ? renderTemplate(template.subject_template, recipientTemplateData) : defaultSubject;
+      const body = template ? renderTemplate(template.body_template, recipientTemplateData) : defaultBody;
 
       try {
         const emailPayload = {
