@@ -147,10 +147,17 @@ const Dashboard = ({ user, onLogout }: DashboardProps) => {
         return <QuoteManager user={user} />;
       case 'pricing-analysis':
         return <PricingAnalysisDashboard />;
-      case 'admin':
-        return (has(FEATURES.ACCESS_ADMIN_PANEL) || ['ADMIN','MASTER'].includes(user.role))
-          ? <AdminPanel user={user} />
-          : <div className="text-white">Access Denied</div>;
+      case 'admin': {
+        const canAccessAdmin = has(FEATURES.ACCESS_ADMIN_PANEL) || ['ADMIN','MASTER'].includes(user.role);
+        if (canAccessAdmin) return <AdminPanel user={user} />;
+
+        // Avoid blank-looking page on light themes when hash points to #admin without access.
+        if (typeof window !== 'undefined' && window.location.hash === '#admin') {
+          window.location.hash = 'quotes';
+        }
+
+        return <QuoteManager user={user} />;
+      }
       default:
         return <QuoteManager user={user} />;
     }
