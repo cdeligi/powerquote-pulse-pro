@@ -268,29 +268,29 @@ const AdminSettings = () => {
       </div>
 
       <Tabs defaultValue="general" className="w-full">
-        <TabsList className="grid w-full grid-cols-8 bg-gray-800">
-          <TabsTrigger value="general" className="text-white data-[state=active]:bg-red-600">
+        <TabsList className="w-full bg-gray-800 flex overflow-x-auto whitespace-nowrap h-auto p-1 gap-1">
+          <TabsTrigger value="general" className="shrink-0 min-w-max text-xs md:text-sm px-3 text-white data-[state=active]:bg-red-600">
             General
           </TabsTrigger>
-          <TabsTrigger value="quotes" className="text-white data-[state=active]:bg-red-600">
+          <TabsTrigger value="quotes" className="shrink-0 min-w-max text-xs md:text-sm px-3 text-white data-[state=active]:bg-red-600">
             Quote Management
           </TabsTrigger>
-          <TabsTrigger value="pdf-template" className="text-white data-[state=active]:bg-red-600">
+          <TabsTrigger value="pdf-template" className="shrink-0 min-w-max text-xs md:text-sm px-3 text-white data-[state=active]:bg-red-600">
             PDF Template
           </TabsTrigger>
-          <TabsTrigger value="session" className="text-white data-[state=active]:bg-red-600">
+          <TabsTrigger value="session" className="shrink-0 min-w-max text-xs md:text-sm px-3 text-white data-[state=active]:bg-red-600">
             Session Management
           </TabsTrigger>
-          <TabsTrigger value="email" className="text-white data-[state=active]:bg-red-600">
+          <TabsTrigger value="email" className="shrink-0 min-w-max text-xs md:text-sm px-3 text-white data-[state=active]:bg-red-600">
             Email Settings
           </TabsTrigger>
-          <TabsTrigger value="terms" className="text-white data-[state=active]:bg-red-600">
+          <TabsTrigger value="terms" className="shrink-0 min-w-max text-xs md:text-sm px-3 text-white data-[state=active]:bg-red-600">
             Terms & Conditions
           </TabsTrigger>
-          <TabsTrigger value="sharing" className="text-white data-[state=active]:bg-red-600">
+          <TabsTrigger value="sharing" className="shrink-0 min-w-max text-xs md:text-sm px-3 text-white data-[state=active]:bg-red-600">
             User Sharing
           </TabsTrigger>
-          <TabsTrigger value="legal" className="text-white data-[state=active]:bg-red-600">
+          <TabsTrigger value="legal" className="shrink-0 min-w-max text-xs md:text-sm px-3 text-white data-[state=active]:bg-red-600">
             Legal
           </TabsTrigger>
         </TabsList>

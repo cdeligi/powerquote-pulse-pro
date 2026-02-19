@@ -169,7 +169,7 @@ const Dashboard = ({ user, onLogout }: DashboardProps) => {
         user={user}
         onLogout={onLogout}
       />
-      <main className="md:ml-16 transition-all duration-200 p-4 md:p-8">
+      <main className="md:ml-16 transition-all duration-200 p-4 pt-16 md:pt-8 md:p-8">
         <Routes>
           {/* BOM editing routes */}
           <Route path="/bom-edit/:quoteId" element={renderContent()} />

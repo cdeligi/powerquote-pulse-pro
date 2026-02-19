@@ -72,45 +72,45 @@ const AdminPanel = ({ user }: AdminPanelProps) => {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="w-full bg-gray-800 flex overflow-x-auto whitespace-nowrap h-auto">
+        <TabsList className="w-full bg-gray-800 flex overflow-x-auto whitespace-nowrap h-auto p-1 gap-1">
           <TabsTrigger 
             value="products" 
-            className="shrink-0 text-xs md:text-sm px-3 text-white data-[state=active]:bg-red-600 data-[state=active]:text-white"
+            className="shrink-0 min-w-max text-xs md:text-sm px-3 text-white data-[state=active]:bg-red-600 data-[state=active]:text-white"
           >
             <Package className="hidden md:inline-block h-4 w-4 mr-2" />
             Products
           </TabsTrigger>
           <TabsTrigger 
             value="quote-fields" 
-            className="shrink-0 text-xs md:text-sm px-3 text-white data-[state=active]:bg-red-600 data-[state=active]:text-white"
+            className="shrink-0 min-w-max text-xs md:text-sm px-3 text-white data-[state=active]:bg-red-600 data-[state=active]:text-white"
           >
             <FileText className="hidden md:inline-block h-4 w-4 mr-2" />
             Quote Fields
           </TabsTrigger>
           <TabsTrigger 
             value="users" 
-            className="shrink-0 text-xs md:text-sm px-3 text-white data-[state=active]:bg-red-600 data-[state=active]:text-white"
+            className="shrink-0 min-w-max text-xs md:text-sm px-3 text-white data-[state=active]:bg-red-600 data-[state=active]:text-white"
           >
             <Users className="hidden md:inline-block h-4 w-4 mr-2" />
             Users
           </TabsTrigger>
           <TabsTrigger 
             value="analytics" 
-            className="shrink-0 text-xs md:text-sm px-3 text-white data-[state=active]:bg-red-600 data-[state=active]:text-white"
+            className="shrink-0 min-w-max text-xs md:text-sm px-3 text-white data-[state=active]:bg-red-600 data-[state=active]:text-white"
           >
             <BarChart3 className="hidden md:inline-block h-4 w-4 mr-2" />
             Analytics
           </TabsTrigger>
           <TabsTrigger 
             value="approval" 
-            className="shrink-0 text-xs md:text-sm px-3 text-white data-[state=active]:bg-red-600 data-[state=active]:text-white"
+            className="shrink-0 min-w-max text-xs md:text-sm px-3 text-white data-[state=active]:bg-red-600 data-[state=active]:text-white"
           >
             <CheckCircle className="hidden md:inline-block h-4 w-4 mr-2" />
             Approval
           </TabsTrigger>
           <TabsTrigger 
             value="settings" 
-            className="shrink-0 text-xs md:text-sm px-3 text-white data-[state=active]:bg-red-600 data-[state=active]:text-white"
+            className="shrink-0 min-w-max text-xs md:text-sm px-3 text-white data-[state=active]:bg-red-600 data-[state=active]:text-white"
           >
             <Settings className="hidden md:inline-block h-4 w-4 mr-2" />
             Settings
