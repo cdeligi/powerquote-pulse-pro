@@ -95,7 +95,17 @@ export const useQuotes = () => {
         throw new Error('Not authenticated. Please log in again.');
       }
 
-      console.log('User authenticated, fetching quotes...');
+      // Resolve profile role for visibility rules
+      const { data: profileData } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      const normalizedRole = String((profileData as any)?.role || '').toLowerCase();
+      const isPrivileged = ['admin', 'master', 'finance', 'level3', 'level_3'].includes(normalizedRole);
+
+      console.log('User authenticated, fetching quotes...', { normalizedRole, isPrivileged });
       
       const { data: quotesData, error: quotesError } = await supabase
         .from('quotes')
@@ -126,8 +136,31 @@ export const useQuotes = () => {
         };
       });
 
+      let visibleQuotes = normalizedQuotes;
+
+      if (!isPrivileged) {
+        // Non-privileged users: own quotes + explicitly shared quotes only
+        const { data: sharedRows } = await supabase
+          .from('quote_shares')
+          .select('quote_id, expires_at')
+          .eq('shared_with', user.id);
+
+        const now = Date.now();
+        const sharedIds = new Set(
+          (sharedRows || [])
+            .filter((row: any) => !row.expires_at || new Date(row.expires_at).getTime() > now)
+            .map((row: any) => row.quote_id)
+        );
+
+        visibleQuotes = normalizedQuotes.filter((quote: any) => {
+          const ownedByUser = quote.user_id === user.id || String(quote.submitted_by_email || '').toLowerCase() === String(user.email || '').toLowerCase();
+          const sharedWithUser = sharedIds.has(quote.id);
+          return ownedByUser || sharedWithUser;
+        });
+      }
+
       // Filter and validate quotes to prevent crashes
-      const validQuotes = normalizedQuotes.filter(quote => {
+      const validQuotes = visibleQuotes.filter(quote => {
         return quote &&
                quote.id &&
                quote.customer_name &&
