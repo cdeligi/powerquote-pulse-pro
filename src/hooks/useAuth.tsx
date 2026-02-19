@@ -6,20 +6,27 @@ import { User, AuthError, Role } from "@/types/auth";
 
 // Helper function to map database role to app role
 const mapDatabaseRoleToAppRole = (dbRole: string | null | undefined): Role => {
-  const normalized = (dbRole || '').toString().toUpperCase();
-  if (normalized === 'LEVEL_1' || normalized === 'LEVEL_2' || normalized === 'SALES') {
-    return 'SALES';
+  const normalized = (dbRole || '').toString().trim().toUpperCase();
+
+  if (normalized === 'LEVEL1' || normalized === 'LEVEL_1' || normalized === 'SALES') {
+    return 'LEVEL_1';
   }
-  if (normalized === 'LEVEL_3' || normalized === 'ADMIN' || normalized === 'APPROVER') {
+  if (normalized === 'LEVEL2' || normalized === 'LEVEL_2') {
+    return 'LEVEL_2';
+  }
+  if (normalized === 'LEVEL3' || normalized === 'LEVEL_3' || normalized === 'APPROVER') {
+    return 'LEVEL_3';
+  }
+  if (normalized === 'ADMIN') {
     return 'ADMIN';
   }
   if (normalized === 'FINANCE') {
     return 'FINANCE';
   }
   if (normalized === 'MASTER') {
-    return 'MASTER';
+    return 'MASTER' as Role;
   }
-  return 'SALES';
+  return 'LEVEL_1';
 };
 
 interface AuthContextType {

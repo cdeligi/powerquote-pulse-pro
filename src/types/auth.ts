@@ -1,4 +1,4 @@
-export type Role = 'LEVEL_1' | 'LEVEL_2' | 'LEVEL_3' | 'ADMIN' | 'FINANCE';
+export type Role = 'LEVEL_1' | 'LEVEL_2' | 'LEVEL_3' | 'ADMIN' | 'FINANCE' | 'MASTER';
 
 export interface User {
   id: string;
