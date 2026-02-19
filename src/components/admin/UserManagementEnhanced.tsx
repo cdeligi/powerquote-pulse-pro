@@ -30,7 +30,12 @@ import {
   Trash2,
   RefreshCw,
   Shield,
-  Edit
+  Edit,
+  Eye,
+  EyeOff,
+  Pencil,
+  Check,
+  X
 } from "lucide-react";
 import { getSupabaseClient } from "@/integrations/supabase/client";
 
@@ -102,6 +107,11 @@ const UserManagementEnhanced = ({ user }: UserManagementEnhancedProps) => {
   const [newDepartmentName, setNewDepartmentName] = useState('');
   const [isCreatingDepartment, setIsCreatingDepartment] = useState(false);
   const [isDepartmentDialogOpen, setIsDepartmentDialogOpen] = useState(false); // For the new department dialog
+  const [editingDepartmentId, setEditingDepartmentId] = useState<string | null>(null);
+  const [editingDepartmentName, setEditingDepartmentName] = useState('');
+  const [isUpdatingDepartment, setIsUpdatingDepartment] = useState(false);
+  const [isDeletingDepartment, setIsDeletingDepartment] = useState(false);
+  const [showNewUserPassword, setShowNewUserPassword] = useState(false);
 
   const [pendingRequests, setPendingRequests] = useState<UserRegistrationRequest[]>([]);
   const [auditLogs, setAuditLogs] = useState<SecurityAuditLog[]>([]);
@@ -458,6 +468,55 @@ const UserManagementEnhanced = ({ user }: UserManagementEnhancedProps) => {
     }
   };
 
+  const handleStartEditDepartment = (dept: Department) => {
+    setEditingDepartmentId(dept.id);
+    setEditingDepartmentName(dept.name);
+  };
+
+  const handleCancelEditDepartment = () => {
+    setEditingDepartmentId(null);
+    setEditingDepartmentName('');
+  };
+
+  const handleUpdateDepartment = async () => {
+    if (!editingDepartmentId || !editingDepartmentName.trim()) return;
+
+    setIsUpdatingDepartment(true);
+    try {
+      const updated = await departmentService.updateDepartment(editingDepartmentId, editingDepartmentName.trim());
+      if (!updated) throw new Error('Failed to update department');
+
+      const updatedDepartments = await departmentService.fetchDepartments();
+      setDepartments(updatedDepartments);
+      setNewDepartment((prev) => (prev === updated.name ? updated.name : prev));
+      toast({ title: 'Success', description: 'Department updated successfully.' });
+      handleCancelEditDepartment();
+    } catch (error: any) {
+      toast({ title: 'Error', description: error?.message || 'Failed to update department.', variant: 'destructive' });
+    } finally {
+      setIsUpdatingDepartment(false);
+    }
+  };
+
+  const handleDeleteDepartment = async (dept: Department) => {
+    if (!confirm(`Delete department "${dept.name}"?`)) return;
+
+    setIsDeletingDepartment(true);
+    try {
+      const ok = await departmentService.deleteDepartment(dept.id);
+      if (!ok) throw new Error('Failed to delete department');
+
+      const updatedDepartments = await departmentService.fetchDepartments();
+      setDepartments(updatedDepartments);
+      if (newDepartment === dept.name) setNewDepartment('');
+      toast({ title: 'Success', description: 'Department deleted successfully.' });
+    } catch (error: any) {
+      toast({ title: 'Error', description: error?.message || 'Failed to delete department.', variant: 'destructive' });
+    } finally {
+      setIsDeletingDepartment(false);
+    }
+  };
+
   const handleApproveRequest = async (requestId: string) => {
     try {
       const result = await supabase.functions.invoke('admin-users/approve-request', {
@@ -722,14 +781,26 @@ const UserManagementEnhanced = ({ user }: UserManagementEnhancedProps) => {
                 </div>
                 <div>
                   <Label htmlFor="new-password" className="text-white">Password</Label>
-                  <Input
-                    id="new-password"
-                    type="password"
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    className="bg-gray-800 border-gray-700 text-white"
-                    placeholder="********"
-                  />
+                  <div className="relative">
+                    <Input
+                      id="new-password"
+                      type={showNewUserPassword ? 'text' : 'password'}
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      className="bg-gray-800 border-gray-700 text-white pr-10"
+                      placeholder="********"
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8 text-gray-300 hover:text-white"
+                      onClick={() => setShowNewUserPassword((v) => !v)}
+                      title={showNewUserPassword ? 'Hide password' : 'Show password'}
+                    >
+                      {showNewUserPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </Button>
+                  </div>
                 </div>
                 <div>
                   <Label htmlFor="new-first-name" className="text-white">First Name</Label>
@@ -758,11 +829,11 @@ const UserManagementEnhanced = ({ user }: UserManagementEnhancedProps) => {
                       <SelectValue placeholder="Select a role" />
                     </SelectTrigger>
                     <SelectContent className="bg-gray-800 border-gray-700 text-white">
-                      <SelectItem value="level1">level1</SelectItem>
-                      <SelectItem value="level2">level2</SelectItem>
-                      <SelectItem value="level3">level3</SelectItem>
-                      <SelectItem value="admin">admin</SelectItem>
-                      <SelectItem value="finance">finance</SelectItem>
+                      <SelectItem className="text-white focus:text-white" value="level1">level1</SelectItem>
+                      <SelectItem className="text-white focus:text-white" value="level2">level2</SelectItem>
+                      <SelectItem className="text-white focus:text-white" value="level3">level3</SelectItem>
+                      <SelectItem className="text-white focus:text-white" value="admin">admin</SelectItem>
+                      <SelectItem className="text-white focus:text-white" value="finance">finance</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -775,7 +846,7 @@ const UserManagementEnhanced = ({ user }: UserManagementEnhancedProps) => {
                       </SelectTrigger>
                        <SelectContent className="bg-gray-800 border-gray-700 text-white">
                          {(departments.length ? departments : DEPARTMENT_FALLBACK).map((dept) => (
-                          <SelectItem key={dept.id} value={dept.name}>
+                          <SelectItem className="text-white focus:text-white" key={dept.id} value={dept.name}>
                             {dept.name}
                           </SelectItem>
                         ))}
@@ -788,7 +859,7 @@ const UserManagementEnhanced = ({ user }: UserManagementEnhancedProps) => {
                       className="text-white border-gray-600 hover:bg-gray-700"
                       title="Add New Department"
                     >
-                      <span className="text-black">+</span>
+                      <span className="text-white">+</span>
                     </Button>
                   </div>
                 </div>
@@ -1276,37 +1347,87 @@ const UserManagementEnhanced = ({ user }: UserManagementEnhancedProps) => {
         currentUserEmail={user?.email ?? null}
       />
 
-      {/* New Department Dialog */}
+      {/* Department Management Dialog */}
       <Dialog open={isDepartmentDialogOpen} onOpenChange={setIsDepartmentDialogOpen}>
-        <DialogContent className="bg-gray-900 border-gray-800">
+        <DialogContent className="bg-gray-900 border-gray-800 max-w-2xl">
           <DialogHeader>
-            <DialogTitle className="text-white">Create New Department</DialogTitle>
+            <DialogTitle className="text-white">Manage Departments</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4">
+          <div className="space-y-5">
             <div>
-              <Label htmlFor="department-name" className="text-white">Department Name</Label>
-              <Input
-                id="department-name"
-                value={newDepartmentName}
-                onChange={(e) => setNewDepartmentName(e.target.value)}
-                className="bg-gray-800 border-gray-700 text-white"
-                placeholder="e.g., Engineering, Marketing"
-              />
+              <Label htmlFor="department-name" className="text-white">Add Department</Label>
+              <div className="flex gap-2 mt-2">
+                <Input
+                  id="department-name"
+                  value={newDepartmentName}
+                  onChange={(e) => setNewDepartmentName(e.target.value)}
+                  className="bg-gray-800 border-gray-700 text-white"
+                  placeholder="e.g., Engineering, Marketing"
+                />
+                <Button
+                  onClick={handleCreateDepartment}
+                  disabled={isCreatingDepartment || !newDepartmentName.trim()}
+                  className="bg-green-600 hover:bg-green-700 text-white"
+                >
+                  {isCreatingDepartment ? 'Creating...' : 'Add'}
+                </Button>
+              </div>
             </div>
-            <div className="flex justify-end space-x-2">
+
+            <div>
+              <Label className="text-white">Existing Departments</Label>
+              <div className="mt-2 max-h-72 overflow-y-auto space-y-2 pr-1">
+                {(departments.length ? departments : DEPARTMENT_FALLBACK).map((dept) => (
+                  <div key={dept.id} className="flex items-center gap-2 bg-gray-800 border border-gray-700 rounded p-2">
+                    {editingDepartmentId === dept.id ? (
+                      <>
+                        <Input
+                          value={editingDepartmentName}
+                          onChange={(e) => setEditingDepartmentName(e.target.value)}
+                          className="bg-gray-900 border-gray-600 text-white"
+                        />
+                        <Button
+                          size="icon"
+                          variant="outline"
+                          className="border-green-600 text-green-400"
+                          onClick={handleUpdateDepartment}
+                          disabled={isUpdatingDepartment || !editingDepartmentName.trim()}
+                        >
+                          <Check className="h-4 w-4" />
+                        </Button>
+                        <Button size="icon" variant="outline" className="border-gray-600 text-white" onClick={handleCancelEditDepartment}>
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </>
+                    ) : (
+                      <>
+                        <div className="flex-1 text-white">{dept.name}</div>
+                        <Button size="icon" variant="outline" className="border-gray-600 text-white" onClick={() => handleStartEditDepartment(dept)}>
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="destructive"
+                          className="bg-red-600 hover:bg-red-700"
+                          onClick={() => handleDeleteDepartment(dept)}
+                          disabled={isDeletingDepartment}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex justify-end">
               <Button
                 variant="outline"
                 onClick={() => setIsDepartmentDialogOpen(false)}
                 className="border-gray-600 text-white hover:bg-gray-800"
               >
-                Cancel
-              </Button>
-              <Button
-                onClick={handleCreateDepartment}
-                disabled={isCreatingDepartment || !newDepartmentName.trim()}
-                className="bg-green-600 hover:bg-green-700 text-white"
-              >
-                {isCreatingDepartment ? 'Creating...' : 'Create Department'}
+                Done
               </Button>
             </div>
           </div>

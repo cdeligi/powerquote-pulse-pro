@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { User, LoginCredentials } from "@/types/auth";
-import { Activity, Shield, Zap } from "lucide-react";
+import { Activity, Shield, Zap, Eye, EyeOff } from "lucide-react";
 import UserRegistrationForm from "./UserRegistrationForm";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
@@ -25,6 +25,7 @@ export function ModernLoginPage({ onLogin }: ModernLoginPageProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [showRegistration, setShowRegistration] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -223,15 +224,27 @@ export function ModernLoginPage({ onLogin }: ModernLoginPageProps) {
                         Forgot password?
                       </Button>
                     </div>
-                    <Input
-                      id="password"
-                      type="password"
-                      value={credentials.password}
-                      onChange={(e) => setCredentials(prev => ({ ...prev, password: e.target.value }))}
-                      className="bg-white border-slate-300 text-slate-900 placeholder:text-slate-400 focus:border-red-500 focus:ring-red-500/20 h-11"
-                      placeholder="Enter your password"
-                      required
-                    />
+                    <div className="relative">
+                      <Input
+                        id="password"
+                        type={showPassword ? 'text' : 'password'}
+                        value={credentials.password}
+                        onChange={(e) => setCredentials(prev => ({ ...prev, password: e.target.value }))}
+                        className="bg-white border-slate-300 text-slate-900 placeholder:text-slate-400 focus:border-red-500 focus:ring-red-500/20 h-11 pr-10"
+                        placeholder="Enter your password"
+                        required
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8 text-slate-500 hover:text-slate-900"
+                        onClick={() => setShowPassword((v) => !v)}
+                        title={showPassword ? 'Hide password' : 'Show password'}
+                      >
+                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </Button>
+                    </div>
                   </div>
                   
                   <Button

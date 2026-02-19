@@ -56,6 +56,38 @@ class DepartmentService {
     }
   }
 
+  async updateDepartment(id: string, name: string): Promise<Department | null> {
+    try {
+      const { data, error } = await supabase
+        .from('departments')
+        .update({ name })
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error('Error updating department:', error);
+      return null;
+    }
+  }
+
+  async deleteDepartment(id: string): Promise<boolean> {
+    try {
+      const { error } = await supabase
+        .from('departments')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+      return true;
+    } catch (error) {
+      console.error('Error deleting department:', error);
+      return false;
+    }
+  }
+
   getDepartmentsSync(): Department[] {
     return [...this.departments];
   }
