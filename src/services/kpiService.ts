@@ -150,11 +150,41 @@ class KpiService {
     }
 
     // Fallback: compute live KPI on client if RPC/migration is unavailable OR returns safe-mode zeros.
-    const { data: rows, error } = await supabase
-      .from('quotes')
-      .select('id,status,created_at,submitted_at,admin_claimed_at,admin_decision_at,reviewed_at,finance_required_at,finance_claimed_at,finance_decision_at,requires_finance_approval,admin_reviewer_id,finance_reviewer_id')
-      .gte('created_at', params.start.toISOString())
-      .lt('created_at', params.end.toISOString());
+    const quoteSelectColumns = [
+      'id',
+      'status',
+      'created_at',
+      'submitted_at',
+      'admin_claimed_at',
+      'admin_decision_at',
+      'reviewed_at',
+      'finance_required_at',
+      'finance_claimed_at',
+      'finance_decision_at',
+      'requires_finance_approval',
+      'admin_reviewer_id',
+      'finance_reviewer_id',
+    ];
+
+    // Some environments may not have all KPI columns yet; degrade gracefully.
+    let rows: any[] | null = null;
+    let error: any = null;
+    for (let i = quoteSelectColumns.length; i >= 8; i--) {
+      const cols = quoteSelectColumns.slice(0, i).join(',');
+      const result = await supabase
+        .from('quotes')
+        .select(cols)
+        .gte('created_at', params.start.toISOString())
+        .lt('created_at', params.end.toISOString());
+
+      if (!result.error) {
+        rows = (result.data || []) as any[];
+        error = null;
+        break;
+      }
+
+      error = result.error;
+    }
 
     if (error) throw error;
     const now = Date.now();
