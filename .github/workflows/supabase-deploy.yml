@@ -46,6 +46,7 @@ jobs:
           supabase functions deploy send-quote-status-email
           supabase functions deploy send-quote-notifications
           supabase functions deploy admin-users
+          supabase functions deploy quote-workflow
           supabase functions deploy send-user-request-reminders
 
       # Note: Scheduling (cron) for reminders is configured in Supabase Dashboard.
