@@ -148,11 +148,13 @@ const handler = async (req: Request): Promise<Response> => {
     if (recipientEmails && recipientEmails.length > 0) {
       recipients = recipientEmails;
     } else {
-      // Default recipients: quote submitter + configured notification emails
+      // Default recipients policy:
+      // - submitted: submitter + notification_recipients (Salesforce case trigger copy)
+      // - approved/rejected: submitter only (avoid creating duplicate Salesforce cases)
       if (quoteData.submitter?.email) {
         recipients.push(quoteData.submitter.email);
       }
-      if (settings.notification_recipients && Array.isArray(settings.notification_recipients)) {
+      if (action === 'submitted' && settings.notification_recipients && Array.isArray(settings.notification_recipients)) {
         recipients.push(...settings.notification_recipients);
       }
     }

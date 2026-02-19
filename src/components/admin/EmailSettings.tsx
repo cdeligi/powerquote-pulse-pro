@@ -489,14 +489,14 @@ export const EmailSettings = () => {
             <CardHeader>
               <CardTitle>Notification Recipients</CardTitle>
               <CardDescription>
-                Configure recipients for quote submission copies (Salesforce case trigger) and quote decision emails (approved/rejected)
+                Configure recipients for quote submission copies (Salesforce case trigger)
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <Alert>
                 <AlertCircle className="h-4 w-4" />
                 <AlertDescription>
-                  The quote submitter will always receive quote notifications. Additional recipients below will receive a copy when a quote is submitted (for Salesforce case creation) and when it is approved/rejected. External domains are allowed.
+                  The quote submitter will always receive quote notifications. Additional recipients below will receive a copy only when a quote is submitted (for Salesforce case creation). They will not receive approved/rejected status emails. External domains are allowed.
                 </AlertDescription>
               </Alert>
 
@@ -545,7 +545,7 @@ export const EmailSettings = () => {
 
               {/* Notification Recipients */}
               <div className="space-y-2">
-                <Label>Notification Recipients (quote submission copy + status notifications)</Label>
+                <Label>Notification Recipients (quote submission copy only)</Label>
                 <div className="flex gap-2">
                   <Input
                     type="email"
