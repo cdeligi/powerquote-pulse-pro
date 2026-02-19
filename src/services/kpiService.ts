@@ -61,22 +61,17 @@ export const secondsToHours = (seconds?: number | null): number =>
 
 class KpiService {
   async getDefaultSlaHours(): Promise<number> {
-    const { data, error } = await supabase
-      .from('app_settings')
-      .select('value')
-      .eq('key', 'kpi_sla_hours_total')
-      .maybeSingle();
-
-    if (error) return 48;
-    const value = Number((data as any)?.value);
-    return Number.isFinite(value) && value > 0 ? value : 48;
+    try {
+      const raw = localStorage.getItem('kpi_sla_hours_total');
+      const value = Number(raw);
+      return Number.isFinite(value) && value > 0 ? value : 48;
+    } catch {
+      return 48;
+    }
   }
 
   async saveDefaultSlaHours(hours: number): Promise<void> {
-    const { error } = await supabase
-      .from('app_settings')
-      .upsert({ key: 'kpi_sla_hours_total', value: Number(hours) }, { onConflict: 'key' });
-    if (error) throw error;
+    localStorage.setItem('kpi_sla_hours_total', String(Number(hours) || 48));
   }
 
   async getKpiMetrics(params: {
