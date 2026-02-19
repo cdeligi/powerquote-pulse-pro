@@ -137,11 +137,19 @@ class KpiService {
       p_sla_hours: params.slaHours,
     });
 
-    if (!rpc.error && rpc.data) {
+    const hasMeaningfulRpcData = (payload: any) => {
+      if (!payload) return false;
+      const total = Number(payload?.summary?.total_submitted || 0);
+      const tsLen = Array.isArray(payload?.timeseries) ? payload.timeseries.length : 0;
+      const usersLen = Array.isArray(payload?.per_user) ? payload.per_user.length : 0;
+      return total > 0 || tsLen > 0 || usersLen > 0;
+    };
+
+    if (!rpc.error && rpc.data && hasMeaningfulRpcData(rpc.data)) {
       return rpc.data as KpiPayload;
     }
 
-    // Fallback: compute live KPI on client if RPC/migration is unavailable.
+    // Fallback: compute live KPI on client if RPC/migration is unavailable OR returns safe-mode zeros.
     const { data: rows, error } = await supabase
       .from('quotes')
       .select('id,status,created_at,submitted_at,admin_claimed_at,admin_decision_at,reviewed_at,finance_required_at,finance_claimed_at,finance_decision_at,requires_finance_approval,admin_reviewer_id,finance_reviewer_id')
