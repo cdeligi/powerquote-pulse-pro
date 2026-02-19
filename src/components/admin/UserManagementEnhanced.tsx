@@ -1389,20 +1389,20 @@ const UserManagementEnhanced = ({ user }: UserManagementEnhancedProps) => {
                         <Button
                           size="icon"
                           variant="outline"
-                          className="border-green-600 text-green-400"
+                          className="border-green-600 text-green-400 bg-gray-900 hover:bg-green-900/30"
                           onClick={handleUpdateDepartment}
                           disabled={isUpdatingDepartment || !editingDepartmentName.trim()}
                         >
                           <Check className="h-4 w-4" />
                         </Button>
-                        <Button size="icon" variant="outline" className="border-gray-600 text-white" onClick={handleCancelEditDepartment}>
+                        <Button size="icon" variant="outline" className="border-gray-600 text-white bg-gray-900 hover:bg-gray-800" onClick={handleCancelEditDepartment}>
                           <X className="h-4 w-4" />
                         </Button>
                       </>
                     ) : (
                       <>
                         <div className="flex-1 text-white">{dept.name}</div>
-                        <Button size="icon" variant="outline" className="border-gray-600 text-white" onClick={() => handleStartEditDepartment(dept)}>
+                        <Button size="icon" variant="outline" className="border-gray-600 text-white bg-gray-900 hover:bg-gray-800" onClick={() => handleStartEditDepartment(dept)}>
                           <Pencil className="h-4 w-4" />
                         </Button>
                         <Button
@@ -1425,7 +1425,7 @@ const UserManagementEnhanced = ({ user }: UserManagementEnhancedProps) => {
               <Button
                 variant="outline"
                 onClick={() => setIsDepartmentDialogOpen(false)}
-                className="border-gray-600 text-white hover:bg-gray-800"
+                className="border-gray-600 text-white bg-gray-900 hover:bg-gray-800"
               >
                 Done
               </Button>
