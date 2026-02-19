@@ -152,6 +152,8 @@ serve(async (req) => {
           return await handleListUserRequests(supabaseAdmin);
         } else if (path === 'audit-logs') {
           return await handleListAuditLogs(supabaseAdmin);
+        } else if (path === 'user-permissions') {
+          return await handleListUserPermissions(supabaseAdmin);
         } else {
           return await handleListUsers(supabaseAdmin);
         }
@@ -164,6 +166,8 @@ serve(async (req) => {
         } else if (path === 'delete-rejected-request') {
           // Allow POST for compatibility (some clients may drop DELETE bodies)
           return await handleDeleteRejectedRequest(req, supabaseAdmin, user.id);
+        } else if (path === 'grant-permissions') {
+          return await handleGrantPermissions(req, supabaseAdmin, user.id);
         }
         break;
       
@@ -172,12 +176,16 @@ serve(async (req) => {
           return await handleUpdateUser(req, supabaseAdmin, user.id);
         } else if (path === 'reject-request') {
           return await handleRejectRequest(req, supabaseAdmin, user.id);
+        } else if (path === 'update-permission') {
+          return await handleUpdatePermission(req, supabaseAdmin, user.id);
         }
         break;
 
       case 'DELETE':
         if (path === 'delete-rejected-request') {
           return await handleDeleteRejectedRequest(req, supabaseAdmin, user.id);
+        } else if (path === 'revoke-permission') {
+          return await handleRevokePermission(req, supabaseAdmin, user.id);
         }
         break;
     }
@@ -773,6 +781,116 @@ async function handleDeleteRejectedRequest(req: Request, supabase: any, adminId:
       ? 'Rejected request, profile, and auth user deleted.'
       : 'Rejected request deleted. Auth user may already be missing or could not be deleted.',
   }), {
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+  });
+}
+
+async function handleListUserPermissions(supabase: any) {
+  const { data, error } = await supabase
+    .from('user_permissions')
+    .select(`
+      *,
+      user:profiles!user_permissions_user_id_fkey(id, email, first_name, last_name, role, department)
+    `)
+    .eq('resource_type', 'quotes')
+    .order('created_at', { ascending: false });
+
+  if (error) throw error;
+
+  return new Response(JSON.stringify({ permissions: data || [] }), {
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+  });
+}
+
+async function handleGrantPermissions(req: Request, supabase: any, adminId: string) {
+  const { userIds, permissionType } = await req.json();
+  const normalizedType = String(permissionType || '').toLowerCase();
+  if (!Array.isArray(userIds) || userIds.length === 0) throw new Error('userIds is required');
+  if (!['view', 'edit', 'admin'].includes(normalizedType)) throw new Error('Invalid permission type');
+
+  const { data: existing, error: existingError } = await supabase
+    .from('user_permissions')
+    .select('id, user_id')
+    .eq('resource_type', 'quotes')
+    .in('user_id', userIds);
+
+  if (existingError) throw existingError;
+
+  const existingByUserId = new Map((existing || []).map((row: any) => [row.user_id, row.id]));
+
+  for (const userId of userIds) {
+    const existingId = existingByUserId.get(userId);
+    if (existingId) {
+      const { error } = await supabase
+        .from('user_permissions')
+        .update({ permission_type: normalizedType, enabled: true, granted_by: adminId })
+        .eq('id', existingId);
+      if (error) throw error;
+    } else {
+      const { error } = await supabase
+        .from('user_permissions')
+        .insert({
+          user_id: userId,
+          granted_by: adminId,
+          permission_type: normalizedType,
+          resource_type: 'quotes',
+          enabled: true,
+        });
+      if (error) throw error;
+    }
+  }
+
+  await logAuditEvent(supabase, {
+    user_id: adminId,
+    event: `ADMIN_GRANT_PERMISSIONS:${normalizedType}:${userIds.length}`,
+  });
+
+  return new Response(JSON.stringify({ success: true }), {
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+  });
+}
+
+async function handleUpdatePermission(req: Request, supabase: any, adminId: string) {
+  const { permissionId, permissionType } = await req.json();
+  const normalizedType = String(permissionType || '').toLowerCase();
+  if (!permissionId) throw new Error('permissionId is required');
+  if (!['view', 'edit', 'admin'].includes(normalizedType)) throw new Error('Invalid permission type');
+
+  const { error } = await supabase
+    .from('user_permissions')
+    .update({ permission_type: normalizedType, enabled: true, granted_by: adminId })
+    .eq('id', permissionId);
+
+  if (error) throw error;
+
+  await logAuditEvent(supabase, {
+    user_id: adminId,
+    event: `ADMIN_UPDATE_PERMISSION:${permissionId}:${normalizedType}`,
+  });
+
+  return new Response(JSON.stringify({ success: true }), {
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+  });
+}
+
+async function handleRevokePermission(req: Request, supabase: any, adminId: string) {
+  const body = await req.json().catch(() => ({} as any));
+  const permissionId = (body as any)?.permissionId;
+  if (!permissionId) throw new Error('permissionId is required');
+
+  const { error } = await supabase
+    .from('user_permissions')
+    .delete()
+    .eq('id', permissionId);
+
+  if (error) throw error;
+
+  await logAuditEvent(supabase, {
+    user_id: adminId,
+    event: `ADMIN_REVOKE_PERMISSION:${permissionId}`,
+  });
+
+  return new Response(JSON.stringify({ success: true }), {
     headers: { ...corsHeaders, 'Content-Type': 'application/json' }
   });
 }

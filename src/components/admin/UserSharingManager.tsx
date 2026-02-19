@@ -77,25 +77,41 @@ export const UserSharingManager: React.FC<UserSharingManagerProps> = ({ onClose 
     }
   };
 
+  const callAdminUsers = async (path: string, method: 'GET' | 'POST' | 'PUT' | 'DELETE', body?: any) => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) throw new Error('No session found');
+
+    const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-users/${path}`, {
+      method,
+      headers: {
+        Authorization: `Bearer ${session.access_token}`,
+        apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
+        'Content-Type': 'application/json',
+      },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+
+    const json = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(json?.error || `admin-users ${path} failed (${response.status})`);
+    }
+
+    return json;
+  };
+
   const fetchPermissions = async () => {
     try {
-      const { data, error } = await supabase
-        .from('user_permissions')
-        .select(`
-          *,
-          user:profiles!user_permissions_user_id_fkey(
-            id, email, first_name, last_name, role, department
-          )
-        `)
-        .eq('resource_type', 'quotes')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setPermissions(data || []);
+      const result = await callAdminUsers('user-permissions', 'GET');
+      setPermissions((result?.permissions || []) as UserPermission[]);
       setLoading(false);
     } catch (error) {
       console.error('Error fetching permissions:', error);
       setLoading(false);
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to load permissions',
+        variant: 'destructive'
+      });
     }
   };
 
@@ -132,52 +148,11 @@ export const UserSharingManager: React.FC<UserSharingManagerProps> = ({ onClose 
     }
 
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Not authenticated');
-
       const userIds = Array.from(selectedUsers);
-
-      // Update existing permissions first
-      const { data: existingPermissions, error: existingError } = await supabase
-        .from('user_permissions')
-        .select('id, user_id')
-        .eq('resource_type', 'quotes')
-        .in('user_id', userIds);
-
-      if (existingError) throw existingError;
-
-      const existingByUserId = new Map((existingPermissions || []).map((p: any) => [p.user_id, p.id]));
-
-      const updateOps = userIds
-        .filter((uid) => existingByUserId.has(uid))
-        .map((uid) =>
-          supabase
-            .from('user_permissions')
-            .update({ permission_type: selectedPermissionType, enabled: true, granted_by: user.id })
-            .eq('id', existingByUserId.get(uid)!)
-        );
-
-      const insertPayload = userIds
-        .filter((uid) => !existingByUserId.has(uid))
-        .map((uid) => ({
-          user_id: uid,
-          granted_by: user.id,
-          permission_type: selectedPermissionType,
-          resource_type: 'quotes',
-          enabled: true,
-        }));
-
-      const updateResults = await Promise.all(updateOps);
-      const updateError = updateResults.find((r) => r.error)?.error;
-      if (updateError) throw updateError;
-
-      if (insertPayload.length > 0) {
-        const { error: insertError } = await supabase
-          .from('user_permissions')
-          .insert(insertPayload)
-          .select();
-        if (insertError) throw insertError;
-      }
+      await callAdminUsers('grant-permissions', 'POST', {
+        userIds,
+        permissionType: selectedPermissionType,
+      });
 
       toast({
         title: 'Permissions Saved',
@@ -216,12 +191,10 @@ export const UserSharingManager: React.FC<UserSharingManagerProps> = ({ onClose 
 
   const updatePermissionType = async (permissionId: string, permissionType: 'view' | 'edit' | 'admin') => {
     try {
-      const { error } = await supabase
-        .from('user_permissions')
-        .update({ permission_type: permissionType, enabled: true })
-        .eq('id', permissionId);
-
-      if (error) throw error;
+      await callAdminUsers('update-permission', 'PUT', {
+        permissionId,
+        permissionType,
+      });
 
       toast({
         title: 'Permission Updated',
@@ -233,7 +206,7 @@ export const UserSharingManager: React.FC<UserSharingManagerProps> = ({ onClose 
       console.error('Error updating permission:', error);
       toast({
         title: 'Error',
-        description: 'Failed to update permission',
+        description: error instanceof Error ? error.message : 'Failed to update permission',
         variant: 'destructive',
       });
     }
@@ -241,12 +214,7 @@ export const UserSharingManager: React.FC<UserSharingManagerProps> = ({ onClose 
 
   const removePermission = async (permissionId: string) => {
     try {
-      const { error } = await supabase
-        .from('user_permissions')
-        .delete()
-        .eq('id', permissionId);
-
-      if (error) throw error;
+      await callAdminUsers('revoke-permission', 'DELETE', { permissionId });
 
       toast({
         title: 'Permission Removed',
@@ -258,7 +226,7 @@ export const UserSharingManager: React.FC<UserSharingManagerProps> = ({ onClose 
       console.error('Error removing permission:', error);
       toast({
         title: 'Error',
-        description: 'Failed to remove permission',
+        description: error instanceof Error ? error.message : 'Failed to remove permission',
         variant: 'destructive',
       });
     }
