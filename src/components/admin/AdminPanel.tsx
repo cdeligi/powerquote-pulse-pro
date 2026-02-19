@@ -66,53 +66,53 @@ const AdminPanel = ({ user }: AdminPanelProps) => {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">Admin Panel</h1>
-          <p className="text-muted-foreground">Manage products, users, and system configuration</p>
+          <h1 className="text-2xl md:text-3xl font-bold text-foreground">Admin Panel</h1>
+          <p className="text-muted-foreground text-sm md:text-base">Manage products, users, and system configuration</p>
         </div>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-6 bg-gray-800">
+        <TabsList className="w-full bg-gray-800 flex overflow-x-auto whitespace-nowrap h-auto">
           <TabsTrigger 
             value="products" 
-            className="text-white data-[state=active]:bg-red-600 data-[state=active]:text-white"
+            className="shrink-0 text-xs md:text-sm px-3 text-white data-[state=active]:bg-red-600 data-[state=active]:text-white"
           >
-            <Package className="h-4 w-4 mr-2" />
+            <Package className="hidden md:inline-block h-4 w-4 mr-2" />
             Products
           </TabsTrigger>
           <TabsTrigger 
             value="quote-fields" 
-            className="text-white data-[state=active]:bg-red-600 data-[state=active]:text-white"
+            className="shrink-0 text-xs md:text-sm px-3 text-white data-[state=active]:bg-red-600 data-[state=active]:text-white"
           >
-            <FileText className="h-4 w-4 mr-2" />
+            <FileText className="hidden md:inline-block h-4 w-4 mr-2" />
             Quote Fields
           </TabsTrigger>
           <TabsTrigger 
             value="users" 
-            className="text-white data-[state=active]:bg-red-600 data-[state=active]:text-white"
+            className="shrink-0 text-xs md:text-sm px-3 text-white data-[state=active]:bg-red-600 data-[state=active]:text-white"
           >
-            <Users className="h-4 w-4 mr-2" />
+            <Users className="hidden md:inline-block h-4 w-4 mr-2" />
             Users
           </TabsTrigger>
           <TabsTrigger 
             value="analytics" 
-            className="text-white data-[state=active]:bg-red-600 data-[state=active]:text-white"
+            className="shrink-0 text-xs md:text-sm px-3 text-white data-[state=active]:bg-red-600 data-[state=active]:text-white"
           >
-            <BarChart3 className="h-4 w-4 mr-2" />
+            <BarChart3 className="hidden md:inline-block h-4 w-4 mr-2" />
             Analytics
           </TabsTrigger>
           <TabsTrigger 
             value="approval" 
-            className="text-white data-[state=active]:bg-red-600 data-[state=active]:text-white"
+            className="shrink-0 text-xs md:text-sm px-3 text-white data-[state=active]:bg-red-600 data-[state=active]:text-white"
           >
-            <CheckCircle className="h-4 w-4 mr-2" />
+            <CheckCircle className="hidden md:inline-block h-4 w-4 mr-2" />
             Approval
           </TabsTrigger>
           <TabsTrigger 
             value="settings" 
-            className="text-white data-[state=active]:bg-red-600 data-[state=active]:text-white"
+            className="shrink-0 text-xs md:text-sm px-3 text-white data-[state=active]:bg-red-600 data-[state=active]:text-white"
           >
-            <Settings className="h-4 w-4 mr-2" />
+            <Settings className="hidden md:inline-block h-4 w-4 mr-2" />
             Settings
           </TabsTrigger>
         </TabsList>

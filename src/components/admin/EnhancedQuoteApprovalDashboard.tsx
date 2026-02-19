@@ -817,10 +817,10 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
   console.log('Filtered quotes for tab:', activeTab, filteredQuotes);
 
   return (
-                  <div className="w-full max-w-none p-6 space-y-6">
-      <div className="flex justify-between items-center">
+                  <div className="w-full max-w-none p-3 md:p-6 space-y-4 md:space-y-6 overflow-x-hidden">
+      <div className="flex flex-col md:flex-row justify-between md:items-center gap-3">
         <div>
-          <h1 className="text-3xl font-semibold text-white mb-2">Quote Approval Dashboard</h1>
+          <h1 className="text-xl md:text-3xl font-semibold text-white mb-1 md:mb-2">Quote Approval Dashboard</h1>
           <p className="text-gray-400">Manage and review quote requests with enhanced workflow</p>
         </div>
         <Button variant="outline" disabled={loading} onClick={refetch}>
@@ -830,7 +830,7 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="w-full justify-start bg-gray-800">
+        <TabsList className="w-full grid grid-cols-1 md:grid-cols-2 bg-gray-800 h-auto gap-1">
           <TabsTrigger value="pending_approval" className="text-white data-[state=active]:bg-red-600">
             Pending Queue ({quotes.filter(isQuoteInQueue).length})
           </TabsTrigger>
@@ -839,7 +839,7 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
           </TabsTrigger>
         </TabsList>
 
-        <div className="flex space-x-4 my-4">
+        <div className="flex flex-col md:flex-row gap-3 md:gap-4 my-4">
           <Input
             placeholder="Search by ID, customer, or month..."
             value={searchQuery}
@@ -902,14 +902,14 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
                         className="flex items-center justify-between cursor-pointer"
                         onClick={() => handleQuoteToggle(quote.id)}
                       >
-                        <div className="flex items-center space-x-4 flex-1">
+                        <div className="flex flex-col md:flex-row md:items-center gap-3 md:gap-4 flex-1 min-w-0">
                           <div className="flex items-center space-x-2">
                             {expandedQuotes[quote.id] ? (
                               <ChevronDown className="h-4 w-4 text-gray-400" />
                             ) : (
                               <ChevronRight className="h-4 w-4 text-gray-400" />
                             )}
-                            <div className="font-mono text-white font-medium">
+                            <div className="font-mono text-white font-medium break-all">
                               {quote.id}
                             </div>
                           </div>
@@ -923,17 +923,17 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
                             </div>
                           </div>
                           
-                          <div className="flex items-center space-x-2 text-sm text-gray-400">
+                          <div className="flex items-center space-x-2 text-sm text-gray-400 md:min-w-[150px]">
                             <UserIcon className="h-4 w-4" />
                             <span>{(quote as any).submitted_by_display || quote.submitted_by_name || quote.submitted_by_email}</span>
                           </div>
                           
-                          <div className="flex items-center space-x-2 text-sm text-gray-400">
+                          <div className="flex items-center space-x-2 text-sm text-gray-400 md:min-w-[100px]">
                             <Clock className="h-4 w-4" />
                             <span>{getAgingDays(quote.created_at)} days</span>
                           </div>
 
-                          <div className="flex flex-col text-sm">
+                          <div className="flex flex-col text-xs md:text-sm">
                             <span><span className="text-gray-500">Quote Review Claimed by:</span> <span className="text-cyan-300">{(quote as any).admin_reviewer_name || getClaimOwnerLabel(quote)}</span></span>
                             {(quote.requires_finance_approval || quote.finance_reviewer_id || (quote as any).finance_reviewer_name || quote.finance_decision_at || (quote as any).finance_notes) && <span><span className="text-gray-500">Finance Claimed by:</span> <span className="text-amber-300">{(quote as any).finance_reviewer_name || quote.finance_reviewer_id || 'Unclaimed'}</span></span>}
                           </div>
@@ -964,7 +964,7 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
                   
                   {/* Expanded Quote Details */}
                   {expandedQuotes[quote.id] && selectedQuote?.id === quote.id && (
-                    <Card className="bg-gray-800 border-gray-700 ml-6">
+                    <Card className="bg-gray-800 border-gray-700 ml-0 md:ml-6">
                       <CardContent className="p-6">
                         <QuoteDetails
                           quote={selectedQuote}
@@ -1012,14 +1012,14 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
                         className="flex items-center justify-between cursor-pointer"
                         onClick={() => handleQuoteToggle(quote.id)}
                       >
-                        <div className="flex items-center space-x-4 flex-1">
+                        <div className="flex flex-col md:flex-row md:items-center gap-3 md:gap-4 flex-1 min-w-0">
                           <div className="flex items-center space-x-2">
                             {expandedQuotes[quote.id] ? (
                               <ChevronDown className="h-4 w-4 text-gray-400" />
                             ) : (
                               <ChevronRight className="h-4 w-4 text-gray-400" />
                             )}
-                            <div className="font-mono text-white font-medium">
+                            <div className="font-mono text-white font-medium break-all">
                               {quote.id}
                             </div>
                           </div>
@@ -1038,7 +1038,7 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
                             <span>{new Date(quote.reviewed_at || quote.updated_at).toLocaleDateString()}</span>
                           </div>
 
-                          <div className="flex flex-col text-sm">
+                          <div className="flex flex-col text-xs md:text-sm">
                             <span><span className="text-gray-500">Quote Review Claimed by:</span> <span className="text-cyan-300">{(quote as any).admin_reviewer_name || getClaimOwnerLabel(quote)}</span></span>
                             {(quote.requires_finance_approval || quote.finance_reviewer_id || (quote as any).finance_reviewer_name || quote.finance_decision_at || (quote as any).finance_notes) && <span><span className="text-gray-500">Finance Claimed by:</span> <span className="text-amber-300">{(quote as any).finance_reviewer_name || quote.finance_reviewer_id || 'Unclaimed'}</span></span>}
                           </div>
@@ -1068,7 +1068,7 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
                   </Card>
                   
                   {expandedQuotes[quote.id] && selectedQuote?.id === quote.id && (
-                    <Card className="bg-gray-800 border-gray-700 ml-6">
+                    <Card className="bg-gray-800 border-gray-700 ml-0 md:ml-6">
                       <CardContent className="p-6">
                         <QuoteDetails
                           quote={selectedQuote}
