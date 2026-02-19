@@ -200,9 +200,9 @@ export default function UserEditDialog({ user, isOpen, onClose, onSave, departme
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent className="bg-gray-800 border-gray-700 text-white">
-                  <SelectItem className="text-white focus:text-white" value="active">Active</SelectItem>
-                  <SelectItem className="text-white focus:text-white" value="inactive">Inactive</SelectItem>
-                  <SelectItem className="text-white focus:text-white" value="suspended">Suspended</SelectItem>
+                  <SelectItem className="text-white data-[highlighted]:bg-gray-700 data-[highlighted]:text-white" value="active">Active</SelectItem>
+                  <SelectItem className="text-white data-[highlighted]:bg-gray-700 data-[highlighted]:text-white" value="inactive">Inactive</SelectItem>
+                  <SelectItem className="text-white data-[highlighted]:bg-gray-700 data-[highlighted]:text-white" value="suspended">Suspended</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -217,7 +217,7 @@ export default function UserEditDialog({ user, isOpen, onClose, onSave, departme
                 </SelectTrigger>
                 <SelectContent className="bg-gray-800 border-gray-700 text-white">
                   {departments.map((dept) => (
-                    <SelectItem className="text-white focus:text-white" key={dept.id} value={dept.name}>
+                    <SelectItem className="text-white data-[highlighted]:bg-gray-700 data-[highlighted]:text-white" key={dept.id} value={dept.name}>
                       {dept.name}
                     </SelectItem>
                   ))}

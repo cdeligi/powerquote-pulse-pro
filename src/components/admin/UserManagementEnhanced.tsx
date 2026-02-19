@@ -829,11 +829,11 @@ const UserManagementEnhanced = ({ user }: UserManagementEnhancedProps) => {
                       <SelectValue placeholder="Select a role" />
                     </SelectTrigger>
                     <SelectContent className="bg-gray-800 border-gray-700 text-white">
-                      <SelectItem className="text-white focus:text-white" value="level1">level1</SelectItem>
-                      <SelectItem className="text-white focus:text-white" value="level2">level2</SelectItem>
-                      <SelectItem className="text-white focus:text-white" value="level3">level3</SelectItem>
-                      <SelectItem className="text-white focus:text-white" value="admin">admin</SelectItem>
-                      <SelectItem className="text-white focus:text-white" value="finance">finance</SelectItem>
+                      <SelectItem className="text-white data-[highlighted]:bg-gray-700 data-[highlighted]:text-white" value="level1">level1</SelectItem>
+                      <SelectItem className="text-white data-[highlighted]:bg-gray-700 data-[highlighted]:text-white" value="level2">level2</SelectItem>
+                      <SelectItem className="text-white data-[highlighted]:bg-gray-700 data-[highlighted]:text-white" value="level3">level3</SelectItem>
+                      <SelectItem className="text-white data-[highlighted]:bg-gray-700 data-[highlighted]:text-white" value="admin">admin</SelectItem>
+                      <SelectItem className="text-white data-[highlighted]:bg-gray-700 data-[highlighted]:text-white" value="finance">finance</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -846,7 +846,7 @@ const UserManagementEnhanced = ({ user }: UserManagementEnhancedProps) => {
                       </SelectTrigger>
                        <SelectContent className="bg-gray-800 border-gray-700 text-white">
                          {(departments.length ? departments : DEPARTMENT_FALLBACK).map((dept) => (
-                          <SelectItem className="text-white focus:text-white" key={dept.id} value={dept.name}>
+                          <SelectItem className="text-white data-[highlighted]:bg-gray-700 data-[highlighted]:text-white" key={dept.id} value={dept.name}>
                             {dept.name}
                           </SelectItem>
                         ))}
