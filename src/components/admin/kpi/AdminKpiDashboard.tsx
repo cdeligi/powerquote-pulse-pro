@@ -111,9 +111,9 @@ export default function AdminKpiDashboard({ user }: Props) {
           <Select value={lane} onValueChange={(v: KpiLane) => setLane(v)}>
             <SelectTrigger className="w-[130px] bg-gray-800 border-gray-700 text-white"><SelectValue /></SelectTrigger>
             <SelectContent className="bg-gray-800 border-gray-700 text-white">
-              <SelectItem value="both">Both</SelectItem>
-              <SelectItem value="admin">Admin</SelectItem>
-              <SelectItem value="finance">Finance</SelectItem>
+              <SelectItem className="text-white data-[highlighted]:bg-gray-700 data-[highlighted]:text-white" value="both">Both</SelectItem>
+              <SelectItem className="text-white data-[highlighted]:bg-gray-700 data-[highlighted]:text-white" value="admin">Admin</SelectItem>
+              <SelectItem className="text-white data-[highlighted]:bg-gray-700 data-[highlighted]:text-white" value="finance">Finance</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -122,10 +122,10 @@ export default function AdminKpiDashboard({ user }: Props) {
           <Select value={bucket} onValueChange={(v: KpiBucket) => setBucket(v)}>
             <SelectTrigger className="w-[130px] bg-gray-800 border-gray-700 text-white"><SelectValue /></SelectTrigger>
             <SelectContent className="bg-gray-800 border-gray-700 text-white">
-              <SelectItem value="day">Day</SelectItem>
-              <SelectItem value="week">Week</SelectItem>
-              <SelectItem value="biweek">Biweekly</SelectItem>
-              <SelectItem value="month">Month</SelectItem>
+              <SelectItem className="text-white data-[highlighted]:bg-gray-700 data-[highlighted]:text-white" value="day">Day</SelectItem>
+              <SelectItem className="text-white data-[highlighted]:bg-gray-700 data-[highlighted]:text-white" value="week">Week</SelectItem>
+              <SelectItem className="text-white data-[highlighted]:bg-gray-700 data-[highlighted]:text-white" value="biweek">Biweekly</SelectItem>
+              <SelectItem className="text-white data-[highlighted]:bg-gray-700 data-[highlighted]:text-white" value="month">Month</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -134,11 +134,11 @@ export default function AdminKpiDashboard({ user }: Props) {
           <Select value={rangePreset} onValueChange={(v: any) => setRangePreset(v)}>
             <SelectTrigger className="w-[140px] bg-gray-800 border-gray-700 text-white"><SelectValue /></SelectTrigger>
             <SelectContent className="bg-gray-800 border-gray-700 text-white">
-              <SelectItem value="7">Last 7d</SelectItem>
-              <SelectItem value="14">Last 14d</SelectItem>
-              <SelectItem value="30">Last 30d</SelectItem>
-              <SelectItem value="90">Last 90d</SelectItem>
-              <SelectItem value="custom">Custom</SelectItem>
+              <SelectItem className="text-white data-[highlighted]:bg-gray-700 data-[highlighted]:text-white" value="7">Last 7d</SelectItem>
+              <SelectItem className="text-white data-[highlighted]:bg-gray-700 data-[highlighted]:text-white" value="14">Last 14d</SelectItem>
+              <SelectItem className="text-white data-[highlighted]:bg-gray-700 data-[highlighted]:text-white" value="30">Last 30d</SelectItem>
+              <SelectItem className="text-white data-[highlighted]:bg-gray-700 data-[highlighted]:text-white" value="90">Last 90d</SelectItem>
+              <SelectItem className="text-white data-[highlighted]:bg-gray-700 data-[highlighted]:text-white" value="custom">Custom</SelectItem>
             </SelectContent>
           </Select>
         </div>
