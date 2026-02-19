@@ -131,24 +131,53 @@ export const UserSharingManager: React.FC<UserSharingManagerProps> = ({ onClose 
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
-      const permissionInserts = Array.from(selectedUsers).map(userId => ({
-        user_id: userId,
-        granted_by: user.id,
-        permission_type: selectedPermissionType,
-        resource_type: 'quotes',
-        enabled: true
-      }));
+      const userIds = Array.from(selectedUsers);
 
-      const { error } = await supabase
+      // Update existing permissions first
+      const { data: existingPermissions, error: existingError } = await supabase
         .from('user_permissions')
-        .insert(permissionInserts)
-        .select();
+        .select('id, user_id')
+        .eq('resource_type', 'quotes')
+        .in('user_id', userIds);
 
-      if (error) throw error;
+      if (existingError) throw existingError;
+
+      const existingByUserId = new Map((existingPermissions || []).map((p: any) => [p.user_id, p.id]));
+
+      const updateOps = userIds
+        .filter((uid) => existingByUserId.has(uid))
+        .map((uid) =>
+          supabase
+            .from('user_permissions')
+            .update({ permission_type: selectedPermissionType, enabled: true, granted_by: user.id })
+            .eq('id', existingByUserId.get(uid)!)
+        );
+
+      const insertPayload = userIds
+        .filter((uid) => !existingByUserId.has(uid))
+        .map((uid) => ({
+          user_id: uid,
+          granted_by: user.id,
+          permission_type: selectedPermissionType,
+          resource_type: 'quotes',
+          enabled: true,
+        }));
+
+      const updateResults = await Promise.all(updateOps);
+      const updateError = updateResults.find((r) => r.error)?.error;
+      if (updateError) throw updateError;
+
+      if (insertPayload.length > 0) {
+        const { error: insertError } = await supabase
+          .from('user_permissions')
+          .insert(insertPayload)
+          .select();
+        if (insertError) throw insertError;
+      }
 
       toast({
-        title: 'Permissions Granted',
-        description: `${selectedPermissionType} permissions granted to ${selectedUsers.size} user(s).`
+        title: 'Permissions Saved',
+        description: `${selectedPermissionType} permissions applied to ${selectedUsers.size} user(s).`
       });
 
       setSelectedUsers(new Set());
@@ -157,7 +186,7 @@ export const UserSharingManager: React.FC<UserSharingManagerProps> = ({ onClose 
       console.error('Error granting permissions:', error);
       toast({
         title: 'Error',
-        description: 'Failed to grant permissions',
+        description: 'Failed to save permissions',
         variant: 'destructive'
       });
     }
@@ -178,6 +207,56 @@ export const UserSharingManager: React.FC<UserSharingManagerProps> = ({ onClose 
       case 'edit': return 'bg-green-600';
       case 'admin': return 'bg-red-600';
       default: return 'bg-gray-600';
+    }
+  };
+
+  const updatePermissionType = async (permissionId: string, permissionType: 'view' | 'edit' | 'admin') => {
+    try {
+      const { error } = await supabase
+        .from('user_permissions')
+        .update({ permission_type: permissionType, enabled: true })
+        .eq('id', permissionId);
+
+      if (error) throw error;
+
+      toast({
+        title: 'Permission Updated',
+        description: `Permission changed to ${permissionType}.`,
+      });
+
+      await fetchPermissions();
+    } catch (error) {
+      console.error('Error updating permission:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to update permission',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const removePermission = async (permissionId: string) => {
+    try {
+      const { error } = await supabase
+        .from('user_permissions')
+        .delete()
+        .eq('id', permissionId);
+
+      if (error) throw error;
+
+      toast({
+        title: 'Permission Removed',
+        description: 'User permission has been revoked.',
+      });
+
+      await fetchPermissions();
+    } catch (error) {
+      console.error('Error removing permission:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to remove permission',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -262,7 +341,8 @@ export const UserSharingManager: React.FC<UserSharingManagerProps> = ({ onClose 
                 <div className="flex items-center gap-3">
                   <Checkbox
                     checked={selectedUsers.has(user.id)}
-                    onChange={() => toggleUserSelection(user.id)}
+                    onCheckedChange={() => toggleUserSelection(user.id)}
+                    onClick={(e) => e.stopPropagation()}
                   />
                   <div>
                     <div className="text-white font-medium">
@@ -318,13 +398,25 @@ export const UserSharingManager: React.FC<UserSharingManagerProps> = ({ onClose 
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Badge className={getPermissionColor(permission.permission_type)}>
-                      {permission.permission_type}
-                    </Badge>
+                    <Select
+                      value={permission.permission_type}
+                      onValueChange={(value: 'view' | 'edit' | 'admin') => updatePermissionType(permission.id, value)}
+                    >
+                      <SelectTrigger className="w-[120px] h-8 bg-gray-700 border-gray-600 text-white">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="view">view</SelectItem>
+                        <SelectItem value="edit">edit</SelectItem>
+                        <SelectItem value="admin">admin</SelectItem>
+                      </SelectContent>
+                    </Select>
                     <Button
                       size="sm"
                       variant="ghost"
                       className="text-red-400 hover:text-red-300 hover:bg-red-900/20"
+                      onClick={() => removePermission(permission.id)}
+                      title="Revoke permission"
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
