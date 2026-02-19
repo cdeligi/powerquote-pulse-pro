@@ -105,6 +105,10 @@ export const UserSharingManager: React.FC<UserSharingManagerProps> = ({ onClose 
     user.role.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  const permissionByUserId = new Map(
+    permissions.map((p) => [p.user_id, p] as const)
+  );
+
   const toggleUserSelection = (userId: string) => {
     setSelectedUsers(prev => {
       const newSet = new Set(prev);
@@ -328,41 +332,74 @@ export const UserSharingManager: React.FC<UserSharingManagerProps> = ({ onClose 
 
           {/* Users List */}
           <div className="space-y-2 max-h-96 overflow-y-auto">
-            {filteredUsers.map((user) => (
-              <div
-                key={user.id}
-                className={`flex items-center justify-between p-3 rounded-lg border transition-colors cursor-pointer ${
-                  selectedUsers.has(user.id)
-                    ? 'bg-blue-900/30 border-blue-600'
-                    : 'bg-gray-800 border-gray-700 hover:border-gray-600'
-                }`}
-                onClick={() => toggleUserSelection(user.id)}
-              >
-                <div className="flex items-center gap-3">
-                  <Checkbox
-                    checked={selectedUsers.has(user.id)}
-                    onCheckedChange={() => toggleUserSelection(user.id)}
-                    onClick={(e) => e.stopPropagation()}
-                  />
-                  <div>
-                    <div className="text-white font-medium">
-                      {user.first_name} {user.last_name}
+            {filteredUsers.map((user) => {
+              const existingPermission = permissionByUserId.get(user.id);
+
+              return (
+                <div
+                  key={user.id}
+                  className={`flex items-center justify-between p-3 rounded-lg border transition-colors cursor-pointer ${
+                    selectedUsers.has(user.id)
+                      ? 'bg-blue-900/30 border-blue-600'
+                      : 'bg-gray-800 border-gray-700 hover:border-gray-600'
+                  }`}
+                  onClick={() => toggleUserSelection(user.id)}
+                >
+                  <div className="flex items-center gap-3">
+                    <Checkbox
+                      checked={selectedUsers.has(user.id)}
+                      onCheckedChange={() => toggleUserSelection(user.id)}
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                    <div>
+                      <div className="text-white font-medium">
+                        {user.first_name} {user.last_name}
+                      </div>
+                      <div className="text-gray-400 text-sm">{user.email}</div>
                     </div>
-                    <div className="text-gray-400 text-sm">{user.email}</div>
+                  </div>
+                  <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                    <Badge variant="outline" className="text-xs">
+                      {user.role}
+                    </Badge>
+                    {user.department && (
+                      <Badge variant="secondary" className="text-xs">
+                        {user.department}
+                      </Badge>
+                    )}
+
+                    {existingPermission ? (
+                      <>
+                        <Select
+                          value={existingPermission.permission_type}
+                          onValueChange={(value: 'view' | 'edit' | 'admin') => updatePermissionType(existingPermission.id, value)}
+                        >
+                          <SelectTrigger className="w-[120px] h-8 bg-gray-700 border-gray-600 text-white">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="view">view</SelectItem>
+                            <SelectItem value="edit">edit</SelectItem>
+                            <SelectItem value="admin">admin</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="text-red-400 hover:text-red-300 hover:bg-red-900/20"
+                          onClick={() => removePermission(existingPermission.id)}
+                          title="Revoke permission"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </>
+                    ) : (
+                      <Badge className="bg-gray-700 text-gray-200 text-xs">no grant</Badge>
+                    )}
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Badge variant="outline" className="text-xs">
-                    {user.role}
-                  </Badge>
-                  {user.department && (
-                    <Badge variant="secondary" className="text-xs">
-                      {user.department}
-                    </Badge>
-                  )}
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           {filteredUsers.length === 0 && (
