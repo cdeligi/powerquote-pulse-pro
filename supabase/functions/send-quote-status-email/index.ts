@@ -199,7 +199,7 @@ const handler = async (req: Request): Promise<Response> => {
 
     // Generate PDF access link with configurable domain
     const projectRef = supabaseUrl.match(/https:\/\/([^.]+)\.supabase\.co/)?.[1] || '';
-    const appDomain = Deno.env.get("APP_DOMAIN") || `${projectRef}.lovable.app`;
+    const appDomain = Deno.env.get("APP_DOMAIN") || `${projectRef}.vercel.app`;
     const pdfUrl = `https://${appDomain}/quote-pdf/${quoteId}`;
     
     console.log(`Generated PDF access URL: ${pdfUrl}`);

@@ -25,7 +25,7 @@ This doc outlines **two viable approaches**. We can implement both behind a togg
 
 ### Required Salesforce settings (Connected App)
 - Enable OAuth settings
-- Callback URL: `https://powerquote-pulse-pro.vercel.app/api/salesforce/oauth/callback` (example)
+- Callback URL: `https://powerquotepro.vercel.app/api/salesforce/oauth/callback` (example)
 - Scopes (typical): `api`, `refresh_token` (or `offline_access` depending on org)
 - Refresh token policy set to allow long-lived refresh where appropriate
 

@@ -48,7 +48,7 @@ const Sidebar = ({ user, activeView, onViewChange, onLogout }: SidebarProps) => 
         <div className="flex items-center space-x-2 mb-4">
           <Shield className="h-6 w-6 text-red-600" />
           <Zap className="h-6 w-6 text-red-600" />
-          <span className="text-gray-900 dark:text-white font-bold text-lg">PowerQuote</span>
+          <span className="text-gray-900 dark:text-white font-bold text-lg">PowerQuotePro</span>
         </div>
         
         <div className="space-y-2">
@@ -111,13 +111,10 @@ const Sidebar = ({ user, activeView, onViewChange, onLogout }: SidebarProps) => 
 
       {/* Footer */}
       <div className="p-4 border-t border-gray-200 dark:border-gray-800 space-y-4">
-        {/* Qualitrol Logo */}
         <div className="flex justify-center">
-          <img 
-            src="/lovable-uploads/2955a70a-6714-4ded-af05-c5f87bbda099.png" 
-            alt="Qualitrol Logo" 
-            className="h-10 w-10 opacity-90 hover:opacity-100 transition-opacity"
-          />
+          <div className="h-10 w-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-bold">
+            PQ
+          </div>
         </div>
         
         <Button

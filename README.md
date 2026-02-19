@@ -1,4 +1,4 @@
-# PowerQuote Pulse Pro
+# PowerQuotePro
 
 **Copyright © 2025 Carlos Deligi. All Rights Reserved.**
 
@@ -6,7 +6,7 @@
 
 ## Overview
 
-PowerQuote Pulse Pro is a comprehensive enterprise quoting system designed for power monitoring and control equipment. The application provides advanced product configuration, quote management, and approval workflows for electrical monitoring systems.
+PowerQuotePro is a comprehensive enterprise quoting system designed for power monitoring and control equipment. The application provides advanced product configuration, quote management, and approval workflows for electrical monitoring systems.
 
 ## Technologies
 

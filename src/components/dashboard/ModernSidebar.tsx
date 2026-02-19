@@ -157,11 +157,9 @@ export function ModernSidebar({ user, onLogout }: ModernSidebarProps) {
       {/* Footer with logo and logout */}
       <div className="border-t border-border p-3 space-y-2 flex-shrink-0">
         <div className={cn('flex items-center min-w-0', collapsed ? 'justify-center' : 'gap-2')}>
-          <img
-            src="/lovable-uploads/2955a70a-6714-4ded-af05-c5f87bbda099.png"
-            alt="PowerQuotePro"
-            className={cn('h-7 object-contain', collapsed ? 'w-7' : 'max-w-full')}
-          />
+          <div className={cn('h-7 w-7 rounded bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold', collapsed ? '' : '')}>
+            PQ
+          </div>
           {!collapsed && (
             <span className="text-sm font-semibold truncate">PowerQuotePro</span>
           )}
