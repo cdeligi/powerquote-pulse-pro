@@ -786,18 +786,33 @@ async function handleDeleteRejectedRequest(req: Request, supabase: any, adminId:
 }
 
 async function handleListUserPermissions(supabase: any) {
-  const { data, error } = await supabase
+  const { data: rows, error } = await supabase
     .from('user_permissions')
-    .select(`
-      *,
-      user:profiles!user_permissions_user_id_fkey(id, email, first_name, last_name, role, department)
-    `)
+    .select('*')
     .eq('resource_type', 'quotes')
     .order('created_at', { ascending: false });
 
   if (error) throw error;
 
-  return new Response(JSON.stringify({ permissions: data || [] }), {
+  const userIds = [...new Set((rows || []).map((r: any) => r.user_id).filter(Boolean))];
+
+  let profilesById = new Map<string, any>();
+  if (userIds.length > 0) {
+    const { data: profiles, error: profileError } = await supabase
+      .from('profiles')
+      .select('id, email, first_name, last_name, role, department')
+      .in('id', userIds);
+
+    if (profileError) throw profileError;
+    profilesById = new Map((profiles || []).map((p: any) => [p.id, p]));
+  }
+
+  const permissions = (rows || []).map((r: any) => ({
+    ...r,
+    user: profilesById.get(r.user_id) || null,
+  }));
+
+  return new Response(JSON.stringify({ permissions }), {
     headers: { ...corsHeaders, 'Content-Type': 'application/json' }
   });
 }
