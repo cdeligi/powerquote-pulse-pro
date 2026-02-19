@@ -231,14 +231,14 @@ export const ProductManagement = () => {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 overflow-x-hidden">
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight">Product Management</h2>
+          <h2 className="text-2xl md:text-3xl font-bold tracking-tight">Product Management</h2>
           <p className="text-muted-foreground">
             Manage your product hierarchy and configurations across all levels.
           </p>
-          <div className="mt-2 text-sm text-gray-600 flex items-center gap-4">
+          <div className="mt-2 text-sm text-gray-600 flex flex-wrap items-center gap-3 md:gap-4">
             <span>Level 1: {level1Products.length} products</span>
             <span>Level 2: {level2Products.length} products</span>
             <span>Level 3: {level3Products.length} products</span>
@@ -246,7 +246,7 @@ export const ProductManagement = () => {
               onClick={refreshProductData} 
               variant="ghost" 
               size="sm"
-              className="h-6 px-2 text-xs"
+              className="h-7 px-2 text-xs"
             >
               <RefreshCw className="h-3 w-3 mr-1" />
               Refresh
@@ -256,14 +256,14 @@ export const ProductManagement = () => {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="grid w-full grid-cols-7">
-          <TabsTrigger value="level1">Level 1</TabsTrigger>
-          <TabsTrigger value="level2">Level 2</TabsTrigger>
-          <TabsTrigger value="level3">Level 3</TabsTrigger>
-          <TabsTrigger value="level4">Level 4</TabsTrigger>
-          <TabsTrigger value="partnumbers">Part Numbers</TabsTrigger>
-          <TabsTrigger value="chassis-types">Chassis Types</TabsTrigger>
-          <TabsTrigger value="bulk-update">Bulk Update</TabsTrigger>
+        <TabsList className="w-full flex overflow-x-auto whitespace-nowrap h-auto">
+          <TabsTrigger className="shrink-0" value="level1">Level 1</TabsTrigger>
+          <TabsTrigger className="shrink-0" value="level2">Level 2</TabsTrigger>
+          <TabsTrigger className="shrink-0" value="level3">Level 3</TabsTrigger>
+          <TabsTrigger className="shrink-0" value="level4">Level 4</TabsTrigger>
+          <TabsTrigger className="shrink-0" value="partnumbers">Part Numbers</TabsTrigger>
+          <TabsTrigger className="shrink-0" value="chassis-types">Chassis Types</TabsTrigger>
+          <TabsTrigger className="shrink-0" value="bulk-update">Bulk Update</TabsTrigger>
         </TabsList>
 
         <TabsContent value="level1" className="space-y-4">
