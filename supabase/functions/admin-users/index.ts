@@ -211,44 +211,47 @@ serve(async (req) => {
 });
 
 async function handleListUsers(supabase: any) {
-  // Get auth users
-  const { data: authUsers, error: authError } = await supabase.auth.admin.listUsers();
-  if (authError) throw authError;
-
-  // Get profiles with all fields
+  // Use profiles as source of truth to avoid auth.admin.listUsers instability
   const { data: profiles, error: profilesError } = await supabase
     .from('profiles')
     .select(`
-      *,
+      id,
+      email,
+      first_name,
+      last_name,
+      role,
+      department,
+      user_status,
       job_title,
       phone_number,
       manager_email,
       company_name,
-      business_justification
-    `);
-  
+      business_justification,
+      created_at,
+      updated_at,
+      last_sign_in_at
+    `)
+    .order('created_at', { ascending: false });
+
   if (profilesError) throw profilesError;
 
-  // Merge data
-  const users = authUsers.users.map((authUser: any) => {
-    const profile = profiles.find((p: any) => p.id === authUser.id);
-    return {
-      id: authUser.id,
-      email: authUser.email || profile?.email || '',
-      fullName: profile ? `${profile.first_name || ''} ${profile.last_name || ''}`.trim() : '',
-      role: profile?.role || 'level1',
-      department: profile?.department || null,
-      userStatus: profile?.user_status || 'active',
-      jobTitle: profile?.job_title || null,
-      phoneNumber: profile?.phone_number || null,
-      managerEmail: profile?.manager_email || null,
-      companyName: profile?.company_name || null,
-      businessJustification: profile?.business_justification || null,
-      confirmedAt: authUser.confirmed_at,
-      lastSignInAt: authUser.last_sign_in_at,
-      createdAt: authUser.created_at
-    };
-  });
+  const users = (profiles || []).map((profile: any) => ({
+    id: profile.id,
+    email: profile.email || '',
+    fullName: `${profile.first_name || ''} ${profile.last_name || ''}`.trim(),
+    role: profile.role || 'level1',
+    department: profile.department || null,
+    userStatus: profile.user_status || 'active',
+    jobTitle: profile.job_title || null,
+    phoneNumber: profile.phone_number || null,
+    managerEmail: profile.manager_email || null,
+    companyName: profile.company_name || null,
+    businessJustification: profile.business_justification || null,
+    confirmedAt: null,
+    lastSignInAt: profile.last_sign_in_at || null,
+    createdAt: profile.created_at,
+    updatedAt: profile.updated_at,
+  }));
 
   return new Response(JSON.stringify({ users }), {
     headers: { ...corsHeaders, 'Content-Type': 'application/json' }

@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -427,7 +427,8 @@ const UserManagementEnhanced = ({ user }: UserManagementEnhancedProps) => {
   };
 
   const handleCreateDepartment = async () => {
-    if (!newDepartmentName.trim()) {
+    const candidate = newDepartmentName.trim();
+    if (!candidate) {
       toast({
         title: "Error",
         description: "Department name cannot be empty.",
@@ -435,24 +436,35 @@ const UserManagementEnhanced = ({ user }: UserManagementEnhancedProps) => {
       });
       return;
     }
+
+    const exists = (departments.length ? departments : DEPARTMENT_FALLBACK)
+      .some((d) => d.name.trim().toLowerCase() === candidate.toLowerCase());
+    if (exists) {
+      toast({
+        title: "Duplicate department",
+        description: `Department "${candidate}" already exists.`,
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsCreatingDepartment(true);
     try {
-      const newDept = await departmentService.createDepartment(newDepartmentName.trim());
+      const newDept = await departmentService.createDepartment(candidate);
       if (newDept) {
         toast({
           title: "Success",
           description: `Department "${newDept.name}" created.`,
         });
         setNewDepartmentName('');
-        setIsDepartmentDialogOpen(false);
-        
+
         // Instead of optimistically adding, re-fetch all departments to ensure sync
         const updatedDepartments = await departmentService.fetchDepartments();
         setDepartments(updatedDepartments);
       } else {
         toast({
           title: "Error",
-          description: "Failed to create department. It might already exist.",
+          description: "Failed to create department.",
           variant: "destructive",
         });
       }
@@ -481,9 +493,21 @@ const UserManagementEnhanced = ({ user }: UserManagementEnhancedProps) => {
   const handleUpdateDepartment = async () => {
     if (!editingDepartmentId || !editingDepartmentName.trim()) return;
 
+    const candidate = editingDepartmentName.trim();
+    const exists = (departments.length ? departments : DEPARTMENT_FALLBACK)
+      .some((d) => d.id !== editingDepartmentId && d.name.trim().toLowerCase() === candidate.toLowerCase());
+    if (exists) {
+      toast({
+        title: 'Duplicate department',
+        description: `Department "${candidate}" already exists.`,
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setIsUpdatingDepartment(true);
     try {
-      const updated = await departmentService.updateDepartment(editingDepartmentId, editingDepartmentName.trim());
+      const updated = await departmentService.updateDepartment(editingDepartmentId, candidate);
       if (!updated) throw new Error('Failed to update department');
 
       const updatedDepartments = await departmentService.fetchDepartments();
@@ -1090,6 +1114,9 @@ const UserManagementEnhanced = ({ user }: UserManagementEnhancedProps) => {
                                 <DialogTitle className="text-white">
                                   Registration Request Details
                                 </DialogTitle>
+                                <DialogDescription className="text-gray-400">
+                                  Review requester details before approval or rejection.
+                                </DialogDescription>
                               </DialogHeader>
                               <div className="space-y-4">
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1241,6 +1268,9 @@ const UserManagementEnhanced = ({ user }: UserManagementEnhancedProps) => {
         <DialogContent className="bg-gray-900 border-gray-800">
           <DialogHeader>
             <DialogTitle className="text-white">Remove User</DialogTitle>
+            <DialogDescription className="text-gray-400">
+              Confirm user deactivation and access revocation.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <Alert className="border-red-600 bg-red-600/10">
@@ -1279,6 +1309,9 @@ const UserManagementEnhanced = ({ user }: UserManagementEnhancedProps) => {
         <DialogContent className="bg-gray-900 border-gray-800">
           <DialogHeader>
             <DialogTitle className="text-white">Reject Registration Request</DialogTitle>
+            <DialogDescription className="text-gray-400">
+              Provide a clear reason that will be shared with the requester.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <Alert className="border-red-600 bg-red-600/10">
@@ -1352,6 +1385,9 @@ const UserManagementEnhanced = ({ user }: UserManagementEnhancedProps) => {
         <DialogContent className="bg-gray-900 border-gray-800 max-w-2xl">
           <DialogHeader>
             <DialogTitle className="text-white">Manage Departments</DialogTitle>
+            <DialogDescription className="text-gray-400">
+              Add, rename, and remove department options used in user forms.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-5">
             <div>
