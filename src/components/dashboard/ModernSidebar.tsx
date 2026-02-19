@@ -157,9 +157,11 @@ export function ModernSidebar({ user, onLogout }: ModernSidebarProps) {
       {/* Footer with logo and logout */}
       <div className="border-t border-border p-3 space-y-2 flex-shrink-0">
         <div className={cn('flex items-center min-w-0', collapsed ? 'justify-center' : 'gap-2')}>
-          <div className={cn('h-7 w-7 rounded bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold', collapsed ? '' : '')}>
-            PQ
-          </div>
+          <img
+            src="/assets/brand/qualitrol-q-red.png"
+            alt="Qualitrol Q logo"
+            className={cn('h-7 object-contain', collapsed ? 'w-7' : 'w-7')}
+          />
           {!collapsed && (
             <span className="text-sm font-semibold truncate">PowerQuotePro</span>
           )}

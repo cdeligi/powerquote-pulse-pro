@@ -112,9 +112,11 @@ const Sidebar = ({ user, activeView, onViewChange, onLogout }: SidebarProps) => 
       {/* Footer */}
       <div className="p-4 border-t border-gray-200 dark:border-gray-800 space-y-4">
         <div className="flex justify-center">
-          <div className="h-10 w-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-bold">
-            PQ
-          </div>
+          <img
+            src="/assets/brand/qualitrol-q-red.png"
+            alt="Qualitrol Q logo"
+            className="h-10 w-10 object-contain opacity-90 hover:opacity-100 transition-opacity"
+          />
         </div>
         
         <Button
