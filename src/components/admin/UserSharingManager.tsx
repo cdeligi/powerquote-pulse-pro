@@ -378,60 +378,7 @@ export const UserSharingManager: React.FC<UserSharingManagerProps> = ({ onClose 
         </CardContent>
       </Card>
 
-      {/* Current Permissions (if any exist) */}
-      {permissions.length > 0 && (
-        <Card className="bg-gray-900 border-gray-800">
-          <CardHeader>
-            <CardTitle className="text-white">Current Permissions</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              {permissions.map((permission) => (
-                <div
-                  key={permission.id}
-                  className="flex items-center justify-between p-3 bg-gray-800 rounded-lg border border-gray-700"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className={`p-2 rounded ${getPermissionColor(permission.permission_type)}`}>
-                      {getPermissionIcon(permission.permission_type)}
-                    </div>
-                    <div>
-                      <div className="text-white font-medium">
-                        {permission.user.first_name} {permission.user.last_name}
-                      </div>
-                      <div className="text-gray-400 text-sm">{permission.user.email}</div>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Select
-                      value={permission.permission_type}
-                      onValueChange={(value: 'view' | 'edit' | 'admin') => updatePermissionType(permission.id, value)}
-                    >
-                      <SelectTrigger className="w-[120px] h-8 bg-gray-700 border-gray-600 text-white">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="view">view</SelectItem>
-                        <SelectItem value="edit">edit</SelectItem>
-                        <SelectItem value="admin">admin</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="text-red-400 hover:text-red-300 hover:bg-red-900/20"
-                      onClick={() => removePermission(permission.id)}
-                      title="Revoke permission"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
+      {/* Permissions are managed inline in the user list above to avoid duplicated sections */}
     </div>
   );
 };
