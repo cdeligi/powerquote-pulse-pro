@@ -62,6 +62,7 @@ export interface Quote {
   finance_reviewer_id?: string | null;
   admin_claimed_at?: string | null;
   finance_claimed_at?: string | null;
+  finance_required_at?: string | null;
   admin_decision_status?: QuoteDecisionStatus;
   admin_decision_notes?: string | null;
   admin_decision_at?: string | null;

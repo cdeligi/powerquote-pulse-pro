@@ -1,29 +1,19 @@
 import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { User } from "@/types/auth";
-import { BOMItem, Level1Product } from "@/types/product";
 import { ProductManagement } from "./ProductManagement";
 import UserManagementEnhanced from "./UserManagementEnhanced";
 import QuoteFieldConfiguration from "./QuoteFieldConfiguration";
 import AdminSettings from "./AdminSettings";
-import MarginDashboard from "./MarginDashboard";
-import QuoteAnalyticsDashboard from "../dashboard/QuoteAnalyticsDashboard";
 import QuoteApprovalDashboard from "./QuoteApprovalDashboard";
-import { ChassisTypeManager } from "./ChassisTypeManager";
-import PartNumberConfigManager from "./PartNumberConfigManager";
-import PermissionsOverview from "./PermissionsOverview";
-import { productDataService } from "@/services/productDataService";
+import AdminKpiDashboard from "./kpi/AdminKpiDashboard";
 import { 
   Package, 
   Users, 
   Settings, 
-  BarChart3, 
-  TrendingUp,
+  BarChart3,
   FileText,
   CheckCircle,
-  Grid3X3,
-  Shield,
-  Wrench
 } from "lucide-react";
 
 interface AdminPanelProps {
@@ -33,36 +23,7 @@ interface AdminPanelProps {
 const AdminPanel = ({ user }: AdminPanelProps) => {
   const [activeTab, setActiveTab] = useState("products");
 
-  // Mock analytics data for the dashboard
-  const mockAnalytics = {
-    monthly: {
-      executed: 25,
-      approved: 15,
-      underAnalysis: 8,
-      rejected: 5,
-      totalQuotedValue: 450000
-    },
-    yearly: {
-      executed: 280,
-      approved: 180,
-      underAnalysis: 95,
-      rejected: 65,
-      totalQuotedValue: 5200000
-    }
-  };
-
-  // Get mock BOM items from actual product data - use sync method for mock data
-  const getMockBomItems = (): BOMItem[] => {
-    const level1Products = productDataService.getLevel1ProductsSync();
-    return level1Products.slice(0, 2).map((product, index) => ({
-      id: `${index + 1}`,
-      product,
-      quantity: index === 0 ? 2 : 1,
-      enabled: true
-    }));
-  };
-
-  return (
+    return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
@@ -95,11 +56,11 @@ const AdminPanel = ({ user }: AdminPanelProps) => {
             Users
           </TabsTrigger>
           <TabsTrigger 
-            value="analytics" 
+            value="kpi" 
             className="shrink-0 min-w-max text-xs md:text-sm px-3 text-white data-[state=active]:bg-red-600 data-[state=active]:text-white"
           >
             <BarChart3 className="hidden md:inline-block h-4 w-4 mr-2" />
-            Analytics
+            KPI
           </TabsTrigger>
           <TabsTrigger 
             value="approval" 
@@ -129,23 +90,8 @@ const AdminPanel = ({ user }: AdminPanelProps) => {
           <UserManagementEnhanced user={user} />
         </TabsContent>
 
-        <TabsContent value="analytics" className="mt-6">
-          <div className="space-y-6">
-            <Tabs defaultValue="overview" className="w-full">
-              <TabsList>
-                <TabsTrigger value="overview">Overview</TabsTrigger>
-                <TabsTrigger value="margins">Margins</TabsTrigger>
-              </TabsList>
-              
-              <TabsContent value="overview">
-                <QuoteAnalyticsDashboard analytics={mockAnalytics} isAdmin={true} />
-              </TabsContent>
-              
-              <TabsContent value="margins">
-                <MarginDashboard bomItems={getMockBomItems()} user={user} />
-              </TabsContent>
-            </Tabs>
-          </div>
+        <TabsContent value="kpi" className="mt-6">
+          <AdminKpiDashboard user={user} />
         </TabsContent>
 
         <TabsContent value="approval" className="mt-6">

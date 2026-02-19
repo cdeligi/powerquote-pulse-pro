@@ -25,11 +25,14 @@ interface Database {
           finance_reviewer_id: string | null;
           admin_decision_status: string | null;
           admin_decision_notes: string | null;
+          admin_decision_at: string | null;
+          admin_decision_by: string | null;
           finance_decision_status: string | null;
           finance_decision_notes: string | null;
           finance_threshold_snapshot: Record<string, any> | null;
           finance_margin_breached: boolean | null;
           requires_finance_approval: boolean | null;
+          finance_required_at: string | null;
           submitted_at: string | null;
           submitted_by_email: string | null;
           submitted_by_name: string | null;
@@ -264,7 +267,7 @@ async function handleClaim(
 
   const { data: before, error: beforeError } = await supabase
     .from("quotes")
-    .select("id, status, requires_finance_approval")
+    .select("id, status, workflow_state, requires_finance_approval, admin_claimed_at, finance_claimed_at")
     .eq("id", quoteId)
     .single();
 
@@ -277,6 +280,7 @@ async function handleClaim(
   }
 
   let data: any = null;
+  const now = new Date().toISOString();
   // Legacy quotes.status check constraint allows: draft/submitted/pending_approval/approved/rejected/in_process/under-review
   const nextState = "under-review";
 
@@ -292,17 +296,17 @@ async function handleClaim(
     // Legacy-schema fallback: many environments do not have claim RPC/reviewer columns.
     const claimPayload: Record<string, any> = {
       status: nextState,
-      updated_at: new Date().toISOString(),
+      updated_at: now,
     };
     if (lane === 'admin') {
       claimPayload.admin_reviewer_id = context.userId;
       claimPayload.reviewed_by = context.userId;
-      claimPayload.reviewed_at = new Date().toISOString();
-      claimPayload.admin_claimed_at = new Date().toISOString();
+      claimPayload.reviewed_at = now;
+      claimPayload.admin_claimed_at = (before as any).admin_claimed_at ?? now;
     }
     if (lane === 'finance') {
       claimPayload.finance_reviewer_id = context.userId;
-      claimPayload.finance_claimed_at = new Date().toISOString();
+      claimPayload.finance_claimed_at = (before as any).finance_claimed_at ?? now;
     }
 
     const updated = await supabase
@@ -365,6 +369,10 @@ async function handleAdminDecision(
     reviewed_by: context.userId,
     reviewed_at: now,
     updated_at: now,
+    admin_decision_at: now,
+    admin_decision_by: context.userId,
+    admin_decision_status: decision,
+    admin_decision_notes: notes ?? null,
   };
 
   let nextState = (quote as any).workflow_state ?? 'admin_review';
@@ -386,6 +394,7 @@ async function handleAdminDecision(
       status: "under-review",
       requires_finance_approval: true,
       finance_reviewer_id: null,
+      finance_required_at: now,
     });
     nextState = "finance_review";
   } else if (decision === "approved") {
@@ -483,6 +492,8 @@ async function handleFinanceDecision(
     finance_reviewer_id: context.userId,
     finance_decision_by: context.userId,
     finance_decision_at: now,
+    finance_decision_status: decision,
+    finance_decision_notes: notes ?? null,
     requires_finance_approval: false,
     status: decision === "approved" ? "approved" : "rejected",
   };
