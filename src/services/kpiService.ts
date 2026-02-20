@@ -193,7 +193,10 @@ const buildPayloadFromFacts = (
   const completed = facts.filter((f) => !!f.finalDecision);
   const metSla = completed.filter((f) => (f.totalCycleSec || Infinity) <= slaSec).length;
 
-  const adminBacklog = facts.filter((f) => !f.requiresFinance && !f.admin_claimed_at);
+  // Admin backlog should include *all* submitted quotes that are still unclaimed by admin,
+  // including quotes that will later require finance. Restricting this to non-finance quotes
+  // undercounts true queue pressure and makes SLA risk look artificially low.
+  const adminBacklog = facts.filter((f) => !f.admin_claimed_at);
   const financeBacklog = facts.filter((f) => f.requiresFinance && f.financeRequiredAt && !f.finance_claimed_at);
 
   const backlogAge = (startCol: 'submittedAt' | 'financeRequiredAt', arr: any[]) =>
