@@ -56,6 +56,26 @@ export interface KpiPayload {
   per_user: KpiPerUser[];
 }
 
+interface KpiFactRow {
+  status?: string | null;
+  submitted_at?: string | null;
+  requires_finance?: boolean | null;
+  requires_finance_approval?: boolean | null;
+  admin_reviewer_id?: string | null;
+  finance_reviewer_id?: string | null;
+  admin_claimed_at?: string | null;
+  admin_decision_at?: string | null;
+  finance_required_at?: string | null;
+  finance_claimed_at?: string | null;
+  finance_decision_at?: string | null;
+  reviewed_at?: string | null;
+  total_cycle_seconds?: number | null;
+  admin_claim_seconds?: number | null;
+  admin_work_seconds?: number | null;
+  finance_claim_seconds?: number | null;
+  finance_work_seconds?: number | null;
+}
+
 export const secondsToHours = (seconds?: number | null): number =>
   seconds == null ? 0 : Number((seconds / 3600).toFixed(2));
 
@@ -107,6 +127,157 @@ const bucketStartIso = (d: Date, bucket: KpiBucket): string => {
   return dt.toISOString();
 };
 
+const hasMeaningfulRpcData = (payload: any) => {
+  if (!payload) return false;
+  const total = Number(payload?.summary?.total_submitted || 0);
+  const tsLen = Array.isArray(payload?.timeseries) ? payload.timeseries.length : 0;
+  const usersLen = Array.isArray(payload?.per_user) ? payload.per_user.length : 0;
+  return total > 0 || tsLen > 0 || usersLen > 0;
+};
+
+const sec = (a?: string | null, b?: string | null) => {
+  if (!a || !b) return null;
+  return (new Date(b).getTime() - new Date(a).getTime()) / 1000;
+};
+
+const buildPayloadFromFacts = (
+  rows: KpiFactRow[],
+  params: { bucket: KpiBucket; lane: KpiLane; slaHours: number },
+): KpiPayload => {
+  if (!rows.length) return emptyPayload();
+
+  const now = Date.now();
+  const slaSec = params.slaHours * 3600;
+
+  const facts = rows.map((q) => {
+    const submittedAt = q.submitted_at;
+    const requiresFinance = Boolean(q.requires_finance ?? q.requires_finance_approval);
+
+    const adminDecision = q.admin_decision_at || q.reviewed_at;
+    const financeRequiredAt = q.finance_required_at;
+    const financeDecision = q.finance_decision_at;
+    const finalDecision = requiresFinance ? financeDecision : adminDecision;
+
+    const adminClaimSec =
+      typeof q.admin_claim_seconds === 'number' ? q.admin_claim_seconds : sec(submittedAt, q.admin_claimed_at);
+    const adminWorkSec =
+      typeof q.admin_work_seconds === 'number' ? q.admin_work_seconds : sec(q.admin_claimed_at, adminDecision);
+    const financeClaimSec =
+      typeof q.finance_claim_seconds === 'number' ? q.finance_claim_seconds : sec(financeRequiredAt, q.finance_claimed_at);
+    const financeWorkSec =
+      typeof q.finance_work_seconds === 'number' ? q.finance_work_seconds : sec(q.finance_claimed_at, financeDecision);
+    const totalCycleSec =
+      typeof q.total_cycle_seconds === 'number' ? q.total_cycle_seconds : sec(submittedAt, finalDecision);
+
+    return {
+      ...q,
+      submittedAt,
+      requiresFinance,
+      finalDecision,
+      adminClaimSec,
+      adminWorkSec,
+      financeClaimSec,
+      financeWorkSec,
+      totalCycleSec,
+      financeRequiredAt,
+    };
+  }).filter((q) => {
+    if (!q.submittedAt) return false;
+    if (params.lane === 'admin') return !q.requiresFinance;
+    if (params.lane === 'finance') return q.requiresFinance;
+    return true;
+  });
+
+  if (!facts.length) return emptyPayload();
+
+  const completed = facts.filter((f) => !!f.finalDecision);
+  const metSla = completed.filter((f) => (f.totalCycleSec || Infinity) <= slaSec).length;
+
+  const adminBacklog = facts.filter((f) => !f.requiresFinance && !f.admin_claimed_at);
+  const financeBacklog = facts.filter((f) => f.requiresFinance && f.financeRequiredAt && !f.finance_claimed_at);
+
+  const backlogAge = (startCol: 'submittedAt' | 'financeRequiredAt', arr: any[]) =>
+    arr
+      .map((r) => {
+        const start = r[startCol];
+        if (!start) return null;
+        return (now - new Date(start).getTime()) / 1000;
+      })
+      .filter((v: number | null): v is number => typeof v === 'number' && Number.isFinite(v));
+
+  const byBucket: Record<string, any[]> = {};
+  facts.forEach((f) => {
+    const key = bucketStartIso(new Date(f.submittedAt), params.bucket);
+    byBucket[key] = byBucket[key] || [];
+    byBucket[key].push(f);
+  });
+
+  const timeseries = Object.entries(byBucket).sort((a, b) => a[0].localeCompare(b[0])).map(([bucket_start, arr]) => {
+    const done = arr.filter((x) => !!x.finalDecision);
+    return {
+      bucket_start,
+      submitted: arr.length,
+      completed: done.length,
+      avg_cycle_seconds: avg(done.map((x) => x.totalCycleSec)),
+      met_sla: done.filter((x) => (x.totalCycleSec || Infinity) <= slaSec).length,
+      considered_sla: done.length,
+    } as KpiTimeseriesPoint;
+  });
+
+  const perUserMap: Record<string, any[]> = {};
+  facts.forEach((f) => {
+    const userId = f.requiresFinance ? f.finance_reviewer_id : f.admin_reviewer_id;
+    const key = userId || 'unassigned';
+    perUserMap[key] = perUserMap[key] || [];
+    perUserMap[key].push(f);
+  });
+
+  const per_user: KpiPerUser[] = Object.entries(perUserMap).map(([user_id, arr]) => {
+    const done = arr.filter((x) => !!x.finalDecision);
+    return {
+      user_id: user_id === 'unassigned' ? null : user_id,
+      completed: done.length,
+      approved: done.filter((x) => x.status === 'approved').length,
+      rejected: done.filter((x) => x.status === 'rejected').length,
+      avg_cycle_seconds: avg(done.map((x) => x.totalCycleSec)),
+      avg_claim_seconds: avg(arr.map((x) => (x.requiresFinance ? x.financeClaimSec : x.adminClaimSec))),
+      avg_work_seconds: avg(arr.map((x) => (x.requiresFinance ? x.financeWorkSec : x.adminWorkSec))),
+      met_sla: done.filter((x) => (x.totalCycleSec || Infinity) <= slaSec).length,
+      considered_sla: done.length,
+    };
+  });
+
+  return {
+    summary: {
+      total_submitted: facts.length,
+      total_completed: completed.length,
+      approved: completed.filter((f) => f.status === 'approved').length,
+      rejected: completed.filter((f) => f.status === 'rejected').length,
+      avg_total_cycle_seconds: avg(completed.map((f) => f.totalCycleSec)),
+      avg_admin_claim_seconds: avg(facts.map((f) => f.adminClaimSec)),
+      avg_admin_work_seconds: avg(facts.map((f) => f.adminWorkSec)),
+      avg_finance_claim_seconds: avg(facts.map((f) => f.financeClaimSec)),
+      avg_finance_work_seconds: avg(facts.map((f) => f.financeWorkSec)),
+      met_sla: metSla,
+      considered_sla: completed.length,
+    },
+    backlog: {
+      admin: {
+        backlog: adminBacklog.length,
+        backlog_over_sla: adminBacklog.filter((r) => ((now - new Date(r.submittedAt).getTime()) / 1000) > slaSec).length,
+        avg_age_seconds: avg(backlogAge('submittedAt', adminBacklog)),
+      },
+      finance: {
+        backlog: financeBacklog.length,
+        backlog_over_sla: financeBacklog.filter((r) => ((now - new Date(r.financeRequiredAt).getTime()) / 1000) > slaSec).length,
+        avg_age_seconds: avg(backlogAge('financeRequiredAt', financeBacklog)),
+      },
+    },
+    timeseries,
+    per_user,
+  };
+};
+
 class KpiService {
   async getDefaultSlaHours(): Promise<number> {
     try {
@@ -137,141 +308,39 @@ class KpiService {
       p_sla_hours: params.slaHours,
     });
 
-    const hasMeaningfulRpcData = (payload: any) => {
-      if (!payload) return false;
-      const total = Number(payload?.summary?.total_submitted || 0);
-      const tsLen = Array.isArray(payload?.timeseries) ? payload.timeseries.length : 0;
-      const usersLen = Array.isArray(payload?.per_user) ? payload.per_user.length : 0;
-      return total > 0 || tsLen > 0 || usersLen > 0;
-    };
-
     if (!rpc.error && rpc.data && hasMeaningfulRpcData(rpc.data)) {
       return rpc.data as KpiPayload;
     }
 
-    // Fallback: compute live KPI on client if RPC/migration is unavailable OR returns safe-mode zeros.
-    // Keep fallback query compatible with legacy schemas (avoid selecting optional KPI columns).
-    const { data: rows, error } = await supabase
+    // Fallback #1 (DB-full path): aggregate from quote_kpi_facts directly when RPC is unavailable/empty.
+    const factsView = await supabase
+      .from('quote_kpi_facts')
+      .select('status,submitted_at,requires_finance,admin_reviewer_id,finance_reviewer_id,admin_claimed_at,admin_decision_at,finance_required_at,finance_claimed_at,finance_decision_at,total_cycle_seconds,admin_claim_seconds,admin_work_seconds,finance_claim_seconds,finance_work_seconds')
+      .gte('submitted_at', params.start.toISOString())
+      .lt('submitted_at', params.end.toISOString());
+
+    if (!factsView.error && Array.isArray(factsView.data)) {
+      return buildPayloadFromFacts(factsView.data as KpiFactRow[], params);
+    }
+
+    // Fallback #2 (legacy-safe): older schemas without KPI columns/view.
+    const legacy = await supabase
       .from('quotes')
-      .select('id,status,created_at,submitted_at,reviewed_at,requires_finance_approval,admin_reviewer_id,finance_reviewer_id')
+      .select('status,created_at,submitted_at,reviewed_at,requires_finance_approval,admin_reviewer_id,finance_reviewer_id')
       .gte('created_at', params.start.toISOString())
       .lt('created_at', params.end.toISOString());
 
-    if (error) throw error;
-    const now = Date.now();
-    const slaSec = params.slaHours * 3600;
+    if (legacy.error) {
+      throw legacy.error;
+    }
 
-    const facts = (rows || []).map((q: any) => {
-      const submittedAt = q.submitted_at || q.created_at;
-      const requiresFinance = Boolean(q.requires_finance_approval);
-      const adminClaim = q.admin_claimed_at;
-      const adminDecision = q.admin_decision_at || q.reviewed_at;
-      const financeRequired = q.finance_required_at;
-      const financeClaim = q.finance_claimed_at;
-      const financeDecision = q.finance_decision_at;
-      const finalDecision = requiresFinance ? financeDecision : adminDecision;
+    const rows = (legacy.data || []).map((q: any) => ({
+      ...q,
+      submitted_at: q.submitted_at || q.created_at,
+      admin_decision_at: q.reviewed_at,
+    })) as KpiFactRow[];
 
-      const sec = (a?: string | null, b?: string | null) => {
-        if (!a || !b) return null;
-        return (new Date(b).getTime() - new Date(a).getTime()) / 1000;
-      };
-
-      return {
-        ...q,
-        submittedAt,
-        requiresFinance,
-        finalDecision,
-        adminClaimSec: sec(submittedAt, adminClaim),
-        adminWorkSec: sec(adminClaim, adminDecision),
-        financeClaimSec: sec(financeRequired, financeClaim),
-        financeWorkSec: sec(financeClaim, financeDecision),
-        totalCycleSec: sec(submittedAt, finalDecision),
-      };
-    }).filter((q) => {
-      if (params.lane === 'admin') return !q.requiresFinance;
-      if (params.lane === 'finance') return q.requiresFinance;
-      return true;
-    });
-
-    const completed = facts.filter((f) => !!f.finalDecision);
-    const metSla = completed.filter((f) => (f.totalCycleSec || Infinity) <= slaSec).length;
-
-    const adminBacklog = facts.filter((f) => !f.requiresFinance && !f.admin_claimed_at);
-    const financeBacklog = facts.filter((f) => f.requiresFinance && f.finance_required_at && !f.finance_claimed_at);
-
-    const backlogAge = (startCol: string, arr: any[]) => arr.map((r) => (now - new Date(r[startCol]).getTime()) / 1000);
-
-    const byBucket: Record<string, any[]> = {};
-    facts.forEach((f) => {
-      const key = bucketStartIso(new Date(f.submittedAt), params.bucket);
-      byBucket[key] = byBucket[key] || [];
-      byBucket[key].push(f);
-    });
-
-    const timeseries = Object.entries(byBucket).sort((a, b) => a[0].localeCompare(b[0])).map(([bucket_start, arr]) => {
-      const done = arr.filter((x) => !!x.finalDecision);
-      return {
-        bucket_start,
-        submitted: arr.length,
-        completed: done.length,
-        avg_cycle_seconds: avg(done.map((x) => x.totalCycleSec)),
-        met_sla: done.filter((x) => (x.totalCycleSec || Infinity) <= slaSec).length,
-        considered_sla: done.length,
-      } as KpiTimeseriesPoint;
-    });
-
-    const perUserMap: Record<string, any[]> = {};
-    facts.forEach((f) => {
-      const userId = f.requiresFinance ? f.finance_reviewer_id : f.admin_reviewer_id;
-      const key = userId || 'unassigned';
-      perUserMap[key] = perUserMap[key] || [];
-      perUserMap[key].push(f);
-    });
-
-    const per_user: KpiPerUser[] = Object.entries(perUserMap).map(([user_id, arr]) => {
-      const done = arr.filter((x) => !!x.finalDecision);
-      return {
-        user_id: user_id === 'unassigned' ? null : user_id,
-        completed: done.length,
-        approved: done.filter((x) => x.status === 'approved').length,
-        rejected: done.filter((x) => x.status === 'rejected').length,
-        avg_cycle_seconds: avg(done.map((x) => x.totalCycleSec)),
-        avg_claim_seconds: avg(arr.map((x) => x.requiresFinance ? x.financeClaimSec : x.adminClaimSec)),
-        avg_work_seconds: avg(arr.map((x) => x.requiresFinance ? x.financeWorkSec : x.adminWorkSec)),
-        met_sla: done.filter((x) => (x.totalCycleSec || Infinity) <= slaSec).length,
-        considered_sla: done.length,
-      };
-    });
-
-    return {
-      summary: {
-        total_submitted: facts.length,
-        total_completed: completed.length,
-        approved: completed.filter((f) => f.status === 'approved').length,
-        rejected: completed.filter((f) => f.status === 'rejected').length,
-        avg_total_cycle_seconds: avg(completed.map((f) => f.totalCycleSec)),
-        avg_admin_claim_seconds: avg(facts.map((f) => f.adminClaimSec)),
-        avg_admin_work_seconds: avg(facts.map((f) => f.adminWorkSec)),
-        avg_finance_claim_seconds: avg(facts.map((f) => f.financeClaimSec)),
-        avg_finance_work_seconds: avg(facts.map((f) => f.financeWorkSec)),
-        met_sla: metSla,
-        considered_sla: completed.length,
-      },
-      backlog: {
-        admin: {
-          backlog: adminBacklog.length,
-          backlog_over_sla: adminBacklog.filter((r) => ((now - new Date(r.submittedAt).getTime()) / 1000) > slaSec).length,
-          avg_age_seconds: avg(backlogAge('submittedAt', adminBacklog)),
-        },
-        finance: {
-          backlog: financeBacklog.length,
-          backlog_over_sla: financeBacklog.filter((r) => ((now - new Date(r.finance_required_at).getTime()) / 1000) > slaSec).length,
-          avg_age_seconds: avg(backlogAge('finance_required_at', financeBacklog)),
-        },
-      },
-      timeseries,
-      per_user,
-    };
+    return buildPayloadFromFacts(rows, params);
   }
 
   async resolveUsers(userIds: string[]): Promise<Record<string, { name: string; email: string; role: string }>> {
