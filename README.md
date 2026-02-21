@@ -125,3 +125,5 @@ See the [LICENSE](LICENSE) file for full terms.
 
 ## KPI Day Conversion Notes (2026-02-21)
 - Placeholder entry to verify anti-idle commit.
+
+- [ ] Convert KPI widgets to show durations in days
