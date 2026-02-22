@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { toast } from '@/components/ui/use-toast';
 import type { User } from '@/types/auth';
-import { kpiService, KpiBucket, KpiLane, KpiPayload, secondsToHours } from '@/services/kpiService';
+import { kpiService, KpiBucket, KpiLane, KpiPayload, secondsToHours, secondsToDays, secondsToDaysDisplay } from '@/services/kpiService';
 import {
   ResponsiveContainer,
   LineChart,
@@ -82,9 +82,9 @@ export default function AdminKpiDashboard({ user }: Props) {
       ...r,
       user_name: r.user_id ? (userMap[r.user_id]?.name || userMap[r.user_id]?.email || r.user_id) : 'Unassigned',
       otd: Number(pct(r.met_sla || 0, r.considered_sla || 0)),
-      avg_claim_h: secondsToHours(r.avg_claim_seconds),
-      avg_work_h: secondsToHours(r.avg_work_seconds),
-      avg_cycle_h: secondsToHours(r.avg_cycle_seconds),
+      avg_claim_d: secondsToDaysDisplay(r.avg_claim_seconds),
+      avg_work_d: secondsToDaysDisplay(r.avg_work_seconds),
+      avg_cycle_d: secondsToDaysDisplay(r.avg_cycle_seconds),
     }));
 
     return rows.sort((a, b) => (b.completed || 0) - (a.completed || 0));
@@ -94,13 +94,14 @@ export default function AdminKpiDashboard({ user }: Props) {
     bucket: String(r.bucket_start).slice(0, 10),
     submitted: r.submitted,
     completed: r.completed,
-    avgCycleH: secondsToHours(r.avg_cycle_seconds),
+    avgCycleD: secondsToDays(r.avg_cycle_seconds),
     otd: Number(pct(r.met_sla || 0, r.considered_sla || 0)),
   }));
 
   const s = payload?.summary;
   const backlogAdmin = payload?.backlog?.admin;
   const backlogFinance = payload?.backlog?.finance;
+  const backlogThresholdDays = Number((slaHours / 24).toFixed(1));
 
   return (
     <div className="space-y-4">
@@ -161,11 +162,11 @@ export default function AdminKpiDashboard({ user }: Props) {
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-6 gap-3">
         <Card className="bg-gray-900 border-gray-800"><CardHeader><CardTitle className="text-white text-sm">OTD ≤ SLA</CardTitle></CardHeader><CardContent className="text-2xl text-green-400">{pct(s?.met_sla || 0, s?.considered_sla || 0)}%</CardContent></Card>
-        <Card className="bg-gray-900 border-gray-800"><CardHeader><CardTitle className="text-white text-sm">Avg Cycle (h)</CardTitle></CardHeader><CardContent className="text-2xl text-white">{secondsToHours(s?.avg_total_cycle_seconds)}</CardContent></Card>
-        <Card className="bg-gray-900 border-gray-800"><CardHeader><CardTitle className="text-white text-sm">Avg Admin Claim (h)</CardTitle></CardHeader><CardContent className="text-2xl text-white">{secondsToHours(s?.avg_admin_claim_seconds)}</CardContent></Card>
-        <Card className="bg-gray-900 border-gray-800"><CardHeader><CardTitle className="text-white text-sm">Avg Admin Work (h)</CardTitle></CardHeader><CardContent className="text-2xl text-white">{secondsToHours(s?.avg_admin_work_seconds)}</CardContent></Card>
-        <Card className="bg-gray-900 border-gray-800"><CardHeader><CardTitle className="text-white text-sm">Avg Finance Claim (h)</CardTitle></CardHeader><CardContent className="text-2xl text-white">{secondsToHours(s?.avg_finance_claim_seconds)}</CardContent></Card>
-        <Card className="bg-gray-900 border-gray-800"><CardHeader><CardTitle className="text-white text-sm">Avg Finance Work (h)</CardTitle></CardHeader><CardContent className="text-2xl text-white">{secondsToHours(s?.avg_finance_work_seconds)}</CardContent></Card>
+        <Card className="bg-gray-900 border-gray-800"><CardHeader><CardTitle className="text-white text-sm">Avg Cycle (d)</CardTitle></CardHeader><CardContent className="text-2xl text-white">{secondsToDaysDisplay(s?.avg_total_cycle_seconds)}</CardContent></Card>
+        <Card className="bg-gray-900 border-gray-800"><CardHeader><CardTitle className="text-white text-sm">Avg Admin Claim (d)</CardTitle></CardHeader><CardContent className="text-2xl text-white">{secondsToDaysDisplay(s?.avg_admin_claim_seconds)}</CardContent></Card>
+        <Card className="bg-gray-900 border-gray-800"><CardHeader><CardTitle className="text-white text-sm">Avg Admin Work (d)</CardTitle></CardHeader><CardContent className="text-2xl text-white">{secondsToDaysDisplay(s?.avg_admin_work_seconds)}</CardContent></Card>
+        <Card className="bg-gray-900 border-gray-800"><CardHeader><CardTitle className="text-white text-sm">Avg Finance Claim (d)</CardTitle></CardHeader><CardContent className="text-2xl text-white">{secondsToDaysDisplay(s?.avg_finance_claim_seconds)}</CardContent></Card>
+        <Card className="bg-gray-900 border-gray-800"><CardHeader><CardTitle className="text-white text-sm">Avg Finance Work (d)</CardTitle></CardHeader><CardContent className="text-2xl text-white">{secondsToDaysDisplay(s?.avg_finance_work_seconds)}</CardContent></Card>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -183,7 +184,7 @@ export default function AdminKpiDashboard({ user }: Props) {
         </TabsList>
 
         <TabsContent value="overview" className="space-y-4">
-          <Card className="bg-gray-900 border-gray-800"><CardHeader><CardTitle className="text-white">Average Cycle Time Trend (h)</CardTitle></CardHeader><CardContent className="h-72">{loading ? <div className="text-gray-400">Loading...</div> : <ResponsiveContainer width="100%" height="100%"><LineChart data={ts}><CartesianGrid strokeDasharray="3 3" stroke="#334155" /><XAxis dataKey="bucket" stroke="#94a3b8" /><YAxis stroke="#94a3b8" /><Tooltip /><Line type="monotone" dataKey="avgCycleH" stroke="#22c55e" strokeWidth={2} /></LineChart></ResponsiveContainer>}</CardContent></Card>
+          <Card className="bg-gray-900 border-gray-800"><CardHeader><CardTitle className="text-white">Average Cycle Time Trend (d)</CardTitle></CardHeader><CardContent className="h-72">{loading ? <div className="text-gray-400">Loading...</div> : <ResponsiveContainer width="100%" height="100%"><LineChart data={ts}><CartesianGrid strokeDasharray="3 3" stroke="#334155" /><XAxis dataKey="bucket" stroke="#94a3b8" /><YAxis stroke="#94a3b8" /><Tooltip /><Line type="monotone" dataKey="avgCycleD" stroke="#22c55e" strokeWidth={2} /></LineChart></ResponsiveContainer>}</CardContent></Card>
           <Card className="bg-gray-900 border-gray-800"><CardHeader><CardTitle className="text-white">Completed vs Submitted</CardTitle></CardHeader><CardContent className="h-72">{loading ? <div className="text-gray-400">Loading...</div> : <ResponsiveContainer width="100%" height="100%"><BarChart data={ts}><CartesianGrid strokeDasharray="3 3" stroke="#334155" /><XAxis dataKey="bucket" stroke="#94a3b8" /><YAxis stroke="#94a3b8" /><Tooltip /><Bar dataKey="submitted" fill="#64748b" /><Bar dataKey="completed" fill="#ef4444" /></BarChart></ResponsiveContainer>}</CardContent></Card>
         </TabsContent>
 
@@ -195,11 +196,11 @@ export default function AdminKpiDashboard({ user }: Props) {
             <CardHeader><CardTitle className="text-white">Productivity Ranking by User</CardTitle></CardHeader>
             <CardContent className="overflow-x-auto">
               <table className="w-full text-sm text-left">
-                <thead className="text-gray-400 border-b border-gray-700"><tr><th>User</th><th>Completed</th><th>Approved</th><th>Rejected</th><th>OTD%</th><th>Avg Claim(h)</th><th>Avg Work(h)</th><th>Avg Cycle(h)</th></tr></thead>
+                <thead className="text-gray-400 border-b border-gray-700"><tr><th>User</th><th>Completed</th><th>Approved</th><th>Rejected</th><th>OTD%</th><th>Avg Claim(d)</th><th>Avg Work(d)</th><th>Avg Cycle(d)</th></tr></thead>
                 <tbody>
                   {leaderboard.map((r, i) => (
                     <tr key={`${r.user_id}-${i}`} className="border-b border-gray-800 text-gray-200">
-                      <td>{r.user_name}</td><td>{r.completed || 0}</td><td>{r.approved || 0}</td><td>{r.rejected || 0}</td><td>{pct(r.met_sla || 0, r.considered_sla || 0)}%</td><td>{r.avg_claim_h}</td><td>{r.avg_work_h}</td><td>{r.avg_cycle_h}</td>
+                      <td>{r.user_name}</td><td>{r.completed || 0}</td><td>{r.approved || 0}</td><td>{r.rejected || 0}</td><td>{pct(r.met_sla || 0, r.considered_sla || 0)}%</td><td>{r.avg_claim_d}</td><td>{r.avg_work_d}</td><td>{r.avg_cycle_d}</td>
                     </tr>
                   ))}
                 </tbody>

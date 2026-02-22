@@ -122,3 +122,24 @@ This project is proprietary software.
 Unauthorized copying, modification, distribution, or use of this software, via any medium, is strictly prohibited without explicit written permission from the copyright holder.
 
 See the [LICENSE](LICENSE) file for full terms.
+
+## KPI Day Conversion Notes (2026-02-21)
+- Placeholder entry to verify anti-idle commit.
+- KPI "Age" = (now - createdAt)/24h, renderizada com duas casas decimais.
+- KPIs convertidos: average cycle/claim/work (admin + finance), backlog average age, leaderboard e trend line.
+- Backlog >SLA agora destacado em dias usando SLA configurável (48h = 2d por padrão).
+
+- [ ] Convert KPI widgets to show durations in days
+
+### KPI widgets semantics
+- **Avg Total Cycle (d)** = created_at → final decision (finance if required).
+- **Avg Admin Claim Age (d)** = created_at → admin claimed_at.
+- **Avg Admin Work (d)** = admin claimed_at → admin/overall decision.
+- **Avg Finance Claim Age (d)** = finance_required_at → finance claimed_at.
+- **Avg Finance Work (d)** = finance claimed_at → finance decision.
+- **Backlog Avg Age (d)** = now → last activity timestamp for items still waiting.
+
+### Examples
+- 24h (86,400s) ⇒ 1.00d
+- 48h (172,800s) ⇒ 2.00d
+- 60h (216,000s) ⇒ 2.50d
