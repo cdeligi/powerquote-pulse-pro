@@ -79,6 +79,16 @@ interface KpiFactRow {
 export const secondsToHours = (seconds?: number | null): number =>
   seconds == null ? 0 : Number((seconds / 3600).toFixed(2));
 
+export const secondsToDays = (seconds?: number | null): number =>
+  seconds == null ? 0 : Number((seconds / 86400).toFixed(2));
+
+if (import.meta?.env?.DEV) {
+  const sanityCheck = secondsToDays(172800);
+  if (sanityCheck !== 2) {
+    console.warn('[KPI] secondsToDays sanity check failed', sanityCheck);
+  }
+}
+
 const avg = (values: Array<number | null | undefined>): number | null => {
   const valid = values.filter((v): v is number => typeof v === 'number' && Number.isFinite(v));
   if (!valid.length) return null;

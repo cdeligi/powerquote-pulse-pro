@@ -125,5 +125,8 @@ See the [LICENSE](LICENSE) file for full terms.
 
 ## KPI Day Conversion Notes (2026-02-21)
 - Placeholder entry to verify anti-idle commit.
+- KPI "Age" = (now - createdAt)/24h, renderizada com duas casas decimais.
+- KPIs convertidos: average cycle/claim/work (admin + finance), backlog average age, leaderboard e trend line.
+- Backlog >SLA agora destacado em dias usando SLA configurável (48h = 2d por padrão).
 
 - [ ] Convert KPI widgets to show durations in days
