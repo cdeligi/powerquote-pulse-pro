@@ -82,6 +82,9 @@ export const secondsToHours = (seconds?: number | null): number =>
 export const secondsToDays = (seconds?: number | null): number =>
   seconds == null ? 0 : Number((seconds / 86400).toFixed(2));
 
+export const secondsToDaysDisplay = (seconds?: number | null, fallback = '—'): string =>
+  seconds == null ? fallback : Number((seconds / 86400).toFixed(2)).toFixed(2);
+
 if (import.meta?.env?.DEV) {
   const sanityCheck = secondsToDays(172800);
   if (sanityCheck !== 2) {

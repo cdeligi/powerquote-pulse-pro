@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { toast } from '@/components/ui/use-toast';
 import type { User } from '@/types/auth';
-import { kpiService, KpiBucket, KpiLane, KpiPayload, secondsToHours, secondsToDays } from '@/services/kpiService';
+import { kpiService, KpiBucket, KpiLane, KpiPayload, secondsToHours, secondsToDays, secondsToDaysDisplay } from '@/services/kpiService';
 import {
   ResponsiveContainer,
   LineChart,
@@ -82,9 +82,9 @@ export default function AdminKpiDashboard({ user }: Props) {
       ...r,
       user_name: r.user_id ? (userMap[r.user_id]?.name || userMap[r.user_id]?.email || r.user_id) : 'Unassigned',
       otd: Number(pct(r.met_sla || 0, r.considered_sla || 0)),
-      avg_claim_d: secondsToDays(r.avg_claim_seconds),
-      avg_work_d: secondsToDays(r.avg_work_seconds),
-      avg_cycle_d: secondsToDays(r.avg_cycle_seconds),
+      avg_claim_d: secondsToDaysDisplay(r.avg_claim_seconds),
+      avg_work_d: secondsToDaysDisplay(r.avg_work_seconds),
+      avg_cycle_d: secondsToDaysDisplay(r.avg_cycle_seconds),
     }));
 
     return rows.sort((a, b) => (b.completed || 0) - (a.completed || 0));
@@ -162,11 +162,11 @@ export default function AdminKpiDashboard({ user }: Props) {
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-6 gap-3">
         <Card className="bg-gray-900 border-gray-800"><CardHeader><CardTitle className="text-white text-sm">OTD ≤ SLA</CardTitle></CardHeader><CardContent className="text-2xl text-green-400">{pct(s?.met_sla || 0, s?.considered_sla || 0)}%</CardContent></Card>
-        <Card className="bg-gray-900 border-gray-800"><CardHeader><CardTitle className="text-white text-sm">Avg Cycle (d)</CardTitle></CardHeader><CardContent className="text-2xl text-white">{secondsToDays(s?.avg_total_cycle_seconds)}</CardContent></Card>
-        <Card className="bg-gray-900 border-gray-800"><CardHeader><CardTitle className="text-white text-sm">Avg Admin Claim (d)</CardTitle></CardHeader><CardContent className="text-2xl text-white">{secondsToDays(s?.avg_admin_claim_seconds)}</CardContent></Card>
-        <Card className="bg-gray-900 border-gray-800"><CardHeader><CardTitle className="text-white text-sm">Avg Admin Work (d)</CardTitle></CardHeader><CardContent className="text-2xl text-white">{secondsToDays(s?.avg_admin_work_seconds)}</CardContent></Card>
-        <Card className="bg-gray-900 border-gray-800"><CardHeader><CardTitle className="text-white text-sm">Avg Finance Claim (d)</CardTitle></CardHeader><CardContent className="text-2xl text-white">{secondsToDays(s?.avg_finance_claim_seconds)}</CardContent></Card>
-        <Card className="bg-gray-900 border-gray-800"><CardHeader><CardTitle className="text-white text-sm">Avg Finance Work (d)</CardTitle></CardHeader><CardContent className="text-2xl text-white">{secondsToDays(s?.avg_finance_work_seconds)}</CardContent></Card>
+        <Card className="bg-gray-900 border-gray-800"><CardHeader><CardTitle className="text-white text-sm">Avg Cycle (d)</CardTitle></CardHeader><CardContent className="text-2xl text-white">{secondsToDaysDisplay(s?.avg_total_cycle_seconds)}</CardContent></Card>
+        <Card className="bg-gray-900 border-gray-800"><CardHeader><CardTitle className="text-white text-sm">Avg Admin Claim (d)</CardTitle></CardHeader><CardContent className="text-2xl text-white">{secondsToDaysDisplay(s?.avg_admin_claim_seconds)}</CardContent></Card>
+        <Card className="bg-gray-900 border-gray-800"><CardHeader><CardTitle className="text-white text-sm">Avg Admin Work (d)</CardTitle></CardHeader><CardContent className="text-2xl text-white">{secondsToDaysDisplay(s?.avg_admin_work_seconds)}</CardContent></Card>
+        <Card className="bg-gray-900 border-gray-800"><CardHeader><CardTitle className="text-white text-sm">Avg Finance Claim (d)</CardTitle></CardHeader><CardContent className="text-2xl text-white">{secondsToDaysDisplay(s?.avg_finance_claim_seconds)}</CardContent></Card>
+        <Card className="bg-gray-900 border-gray-800"><CardHeader><CardTitle className="text-white text-sm">Avg Finance Work (d)</CardTitle></CardHeader><CardContent className="text-2xl text-white">{secondsToDaysDisplay(s?.avg_finance_work_seconds)}</CardContent></Card>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
