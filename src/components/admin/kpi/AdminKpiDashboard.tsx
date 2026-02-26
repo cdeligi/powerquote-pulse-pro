@@ -33,14 +33,14 @@ export default function AdminKpiDashboard({ user }: Props) {
   const [rangePreset, setRangePreset] = useState<'7' | '14' | '30' | '90' | 'custom'>('30');
   const [startDate, setStartDate] = useState(toDateInput(new Date(Date.now() - 30 * 86400000)));
   const [endDate, setEndDate] = useState(toDateInput(new Date()));
-  const [slaHours, setSlaHours] = useState(48);
+  const [slaDays, setSlaDays] = useState(2);
   const [loading, setLoading] = useState(false);
   const [payload, setPayload] = useState<KpiPayload | null>(null);
   const [userMap, setUserMap] = useState<Record<string, { name: string; email: string; role: string }>>({});
   const [tab, setTab] = useState('overview');
 
   useEffect(() => {
-    kpiService.getDefaultSlaHours().then(setSlaHours).catch(() => null);
+    kpiService.getDefaultSlaHours().then((hours) => setSlaDays(Math.max(1, Math.round(hours / 24)))).catch(() => null);
   }, []);
 
   useEffect(() => {
@@ -58,7 +58,7 @@ export default function AdminKpiDashboard({ user }: Props) {
         end: new Date(`${endDate}T23:59:59Z`),
         bucket,
         lane,
-        slaHours,
+        slaHours: Math.max(1, slaDays) * 24,
       });
       setPayload(data);
 
@@ -75,7 +75,7 @@ export default function AdminKpiDashboard({ user }: Props) {
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lane, bucket, startDate, endDate, slaHours]);
+  }, [lane, bucket, startDate, endDate, slaDays]);
 
   const leaderboard = useMemo(() => {
     const rows = (payload?.per_user || []).map((r) => ({
@@ -87,7 +87,15 @@ export default function AdminKpiDashboard({ user }: Props) {
       avg_cycle_d: secondsToDaysDisplay(r.avg_cycle_seconds),
     }));
 
-    return rows.sort((a, b) => (b.completed || 0) - (a.completed || 0));
+    return rows.sort((a, b) => {
+      const completed = (b.completed || 0) - (a.completed || 0);
+      if (completed !== 0) return completed;
+      const otd = (b.otd || 0) - (a.otd || 0);
+      if (otd !== 0) return otd;
+      const aCycle = Number(a.avg_cycle_seconds ?? Infinity);
+      const bCycle = Number(b.avg_cycle_seconds ?? Infinity);
+      return aCycle - bCycle;
+    });
   }, [payload?.per_user, userMap]);
 
   const ts = (payload?.timeseries || []).map((r) => ({
@@ -101,7 +109,7 @@ export default function AdminKpiDashboard({ user }: Props) {
   const s = payload?.summary;
   const backlogAdmin = payload?.backlog?.admin;
   const backlogFinance = payload?.backlog?.finance;
-  const backlogThresholdDays = Number((slaHours / 24).toFixed(1));
+  const backlogThresholdDays = Number(Math.max(1, slaDays).toFixed(1));
 
   return (
     <div className="space-y-4">
@@ -152,10 +160,10 @@ export default function AdminKpiDashboard({ user }: Props) {
           <Input type="date" value={endDate} onChange={(e) => { setRangePreset('custom'); setEndDate(e.target.value); }} className="bg-gray-800 border-gray-700 text-white" />
         </div>
         <div>
-          <Label className="text-gray-300">SLA Hours</Label>
-          <Input type="number" min={1} value={slaHours} onChange={(e) => setSlaHours(Number(e.target.value || 48))} className="w-[110px] bg-gray-800 border-gray-700 text-white" />
+          <Label className="text-gray-300">SLA Days</Label>
+          <Input type="number" min={1} value={slaDays} onChange={(e) => setSlaDays(Number(e.target.value || 2))} className="w-[110px] bg-gray-800 border-gray-700 text-white" />
         </div>
-        <Button className="bg-red-600 hover:bg-red-700" onClick={async () => { try { await kpiService.saveDefaultSlaHours(slaHours); toast({ title: 'Saved', description: 'Default SLA updated.' }); } catch (e: any) { toast({ title: 'Error', description: e?.message || 'Could not save SLA', variant: 'destructive' }); } }}>
+        <Button className="bg-red-600 hover:bg-red-700" onClick={async () => { try { await kpiService.saveDefaultSlaHours(Math.max(1, slaDays) * 24); toast({ title: 'Saved', description: 'Default SLA updated.' }); } catch (e: any) { toast({ title: 'Error', description: e?.message || 'Could not save SLA', variant: 'destructive' }); } }}>
           Save as default
         </Button>
       </div>
@@ -170,8 +178,8 @@ export default function AdminKpiDashboard({ user }: Props) {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        <Card className="bg-gray-900 border-gray-800"><CardHeader><CardTitle className="text-white text-sm">Admin Backlog / &gt;SLA / Avg Age(h)</CardTitle></CardHeader><CardContent className="text-gray-200">{backlogAdmin?.backlog || 0} / {backlogAdmin?.backlog_over_sla || 0} / {secondsToHours(backlogAdmin?.avg_age_seconds)}</CardContent></Card>
-        <Card className="bg-gray-900 border-gray-800"><CardHeader><CardTitle className="text-white text-sm">Finance Backlog / &gt;SLA / Avg Age(h)</CardTitle></CardHeader><CardContent className="text-gray-200">{backlogFinance?.backlog || 0} / {backlogFinance?.backlog_over_sla || 0} / {secondsToHours(backlogFinance?.avg_age_seconds)}</CardContent></Card>
+        <Card className="bg-gray-900 border-gray-800"><CardHeader><CardTitle className="text-white text-sm">Admin Backlog / &gt;SLA / Avg Age(d)</CardTitle></CardHeader><CardContent className="text-gray-200">{backlogAdmin?.backlog || 0} / {backlogAdmin?.backlog_over_sla || 0} / {secondsToDaysDisplay(backlogAdmin?.avg_age_seconds)}</CardContent></Card>
+        <Card className="bg-gray-900 border-gray-800"><CardHeader><CardTitle className="text-white text-sm">Finance Backlog / &gt;SLA / Avg Age(d)</CardTitle></CardHeader><CardContent className="text-gray-200">{backlogFinance?.backlog || 0} / {backlogFinance?.backlog_over_sla || 0} / {secondsToDaysDisplay(backlogFinance?.avg_age_seconds)}</CardContent></Card>
       </div>
 
       <Tabs value={tab} onValueChange={setTab} className="w-full">
@@ -196,11 +204,19 @@ export default function AdminKpiDashboard({ user }: Props) {
             <CardHeader><CardTitle className="text-white">Productivity Ranking by User</CardTitle></CardHeader>
             <CardContent className="overflow-x-auto">
               <table className="w-full text-sm text-left">
-                <thead className="text-gray-400 border-b border-gray-700"><tr><th>User</th><th>Completed</th><th>Approved</th><th>Rejected</th><th>OTD%</th><th>Avg Claim(d)</th><th>Avg Work(d)</th><th>Avg Cycle(d)</th></tr></thead>
+                <thead className="text-gray-400 border-b border-gray-700"><tr><th>#</th><th>User</th><th>Completed</th><th>Approved</th><th>Rejected</th><th>OTD%</th><th>Avg Claim(d)</th><th>Avg Work(d)</th><th>Avg Cycle(d)</th></tr></thead>
                 <tbody>
                   {leaderboard.map((r, i) => (
                     <tr key={`${r.user_id}-${i}`} className="border-b border-gray-800 text-gray-200">
-                      <td>{r.user_name}</td><td>{r.completed || 0}</td><td>{r.approved || 0}</td><td>{r.rejected || 0}</td><td>{pct(r.met_sla || 0, r.considered_sla || 0)}%</td><td>{r.avg_claim_d}</td><td>{r.avg_work_d}</td><td>{r.avg_cycle_d}</td>
+                      <td className="text-gray-400 pr-3">{i + 1}</td>
+                      <td>{r.user_name}</td>
+                      <td>{r.completed || 0}</td>
+                      <td>{r.approved || 0}</td>
+                      <td>{r.rejected || 0}</td>
+                      <td>{pct(r.met_sla || 0, r.considered_sla || 0)}%</td>
+                      <td>{r.avg_claim_d}</td>
+                      <td>{r.avg_work_d}</td>
+                      <td>{r.avg_cycle_d}</td>
                     </tr>
                   ))}
                 </tbody>
