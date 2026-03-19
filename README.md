@@ -2,7 +2,7 @@
 
 **Copyright © 2025 Carlos Deligi. All Rights Reserved.**
 
-**Project Timeline:** May 2025 - December 2025
+**Project Timeline:** Initiated in May 2025 - V1 release March 2026
 
 ## Overview
 
