@@ -31,7 +31,6 @@ import {
   RefreshCw,
   Shield,
   Edit,
-  Eye,
   EyeOff,
   Pencil,
   Check,
