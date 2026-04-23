@@ -4,6 +4,55 @@ const supabase = getSupabaseClient();
 
 export type KpiBucket = 'day' | 'week' | 'biweek' | 'month';
 export type KpiLane = 'admin' | 'finance' | 'both';
+export type ApprovalAgingLane = 'all' | 'admin' | 'finance';
+
+export interface ApprovalAgingSummary {
+  openCases: number;
+  overSla: number;
+  unclaimedAdmin: number;
+  unclaimedFinance: number;
+  medianOpenAgeSeconds: number | null;
+  oldestOpenAgeSeconds: number | null;
+}
+
+export interface ApprovalAgingOpenCase {
+  quoteId: string;
+  customerName: string;
+  salesOwnerLabel: string;
+  lane: 'admin' | 'finance';
+  queueOwnerKey: string;
+  queueOwnerLabel: string;
+  queueOwnerId: string | null;
+  ageSeconds: number;
+  startedAt: string;
+  isClaimed: boolean;
+  status: string;
+  discountedMargin: number | null;
+  financeLimitPercent: number | null;
+  requiresFinanceApproval: boolean;
+}
+
+export interface ApprovalAgingOwnerBoardRow {
+  ownerKey: string;
+  ownerLabel: string;
+  ownerType: 'reviewer' | 'unclaimed_admin' | 'unclaimed_finance';
+  role: string | null;
+  openOwned: number;
+  taken: number;
+  closed: number;
+  approved: number;
+  rejected: number;
+  releasedToFinance: number;
+  medianCloseAgeSeconds: number | null;
+  overSlaOpen: number;
+}
+
+export interface ApprovalAgingPayload {
+  summary: ApprovalAgingSummary;
+  openCases: ApprovalAgingOpenCase[];
+  ownerBoard: ApprovalAgingOwnerBoardRow[];
+  generatedAt: string;
+}
 
 export interface KpiSummary {
   total_submitted: number;
@@ -76,6 +125,8 @@ interface KpiFactRow {
   finance_work_seconds?: number | null;
 }
 
+type WorkflowQuoteRow = Record<string, any>;
+
 export const secondsToHours = (seconds?: number | null): number =>
   seconds == null ? 0 : Number((seconds / 3600).toFixed(2));
 
@@ -96,6 +147,21 @@ const avg = (values: Array<number | null | undefined>): number | null => {
   const valid = values.filter((v): v is number => typeof v === 'number' && Number.isFinite(v));
   if (!valid.length) return null;
   return valid.reduce((a, b) => a + b, 0) / valid.length;
+};
+
+const median = (values: Array<number | null | undefined>): number | null => {
+  const valid = values
+    .filter((value): value is number => typeof value === 'number' && Number.isFinite(value))
+    .sort((a, b) => a - b);
+
+  if (!valid.length) return null;
+
+  const mid = Math.floor(valid.length / 2);
+  if (valid.length % 2 === 1) {
+    return valid[mid];
+  }
+
+  return (valid[mid - 1] + valid[mid]) / 2;
 };
 
 const emptyPayload = (): KpiPayload => ({
@@ -151,6 +217,101 @@ const hasMeaningfulRpcData = (payload: any) => {
 const sec = (a?: string | null, b?: string | null) => {
   if (!a || !b) return null;
   return (new Date(b).getTime() - new Date(a).getTime()) / 1000;
+};
+
+const FINAL_STATUSES = new Set(['approved', 'rejected']);
+
+const normalizeText = (value?: unknown): string | null => {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+};
+
+const parseDateValue = (value?: string | null): number | null => {
+  if (!value) return null;
+  const time = new Date(value).getTime();
+  return Number.isFinite(time) ? time : null;
+};
+
+const isWithinRange = (value: string | null | undefined, start: Date, end: Date) => {
+  const ms = parseDateValue(value);
+  if (ms === null) return false;
+  return ms >= start.getTime() && ms <= end.getTime();
+};
+
+const isOpenApprovalStatus = (row: WorkflowQuoteRow) => {
+  const status = String(row.status ?? '').toLowerCase();
+  const workflowState = String(row.workflow_state ?? '').toLowerCase();
+
+  if (FINAL_STATUSES.has(status) || status === 'draft' || status === 'needs_revision') {
+    return false;
+  }
+
+  if (workflowState === 'closed' || workflowState === 'approved' || workflowState === 'rejected' || workflowState === 'needs_revision') {
+    return false;
+  }
+
+  return (
+    status === 'submitted'
+    || status === 'pending_approval'
+    || status === 'under-review'
+    || workflowState === 'submitted'
+    || workflowState === 'admin_review'
+    || workflowState === 'finance_review'
+    || Boolean(row.requires_finance_approval)
+    || Boolean(row.finance_required_at && !row.finance_decision_at)
+  );
+};
+
+const hasFinancePath = (row: WorkflowQuoteRow) => (
+  Boolean(row.finance_required_at)
+  || Boolean(row.finance_claimed_at)
+  || Boolean(row.finance_decision_at)
+  || Boolean(row.finance_reviewer_id)
+  || Boolean(row.finance_decision_status)
+  || String(row.admin_decision_status ?? '') === 'requires_finance'
+  || String(row.workflow_state ?? '') === 'finance_review'
+);
+
+const deriveOpenLane = (row: WorkflowQuoteRow): 'admin' | 'finance' | null => {
+  if (!isOpenApprovalStatus(row)) return null;
+
+  if (
+    Boolean(row.requires_finance_approval)
+    || String(row.workflow_state ?? '').toLowerCase() === 'finance_review'
+    || Boolean(row.finance_required_at && !row.finance_decision_at)
+  ) {
+    return 'finance';
+  }
+
+  return 'admin';
+};
+
+const extractFinanceLimitPercent = (row: WorkflowQuoteRow): number | null => {
+  const snapshot = row.finance_threshold_snapshot;
+  if (!snapshot || typeof snapshot !== 'object') return null;
+
+  const raw = (snapshot as Record<string, unknown>).limitPercent;
+  if (typeof raw === 'number' && Number.isFinite(raw)) {
+    return raw;
+  }
+
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
+const toNumberOrNull = (value: unknown): number | null => {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
+const getQueueOwnerId = (row: WorkflowQuoteRow, lane: 'admin' | 'finance') => {
+  if (lane === 'finance') {
+    return normalizeText(row.finance_reviewer_id);
+  }
+
+  return normalizeText(row.admin_reviewer_id) ?? normalizeText(row.reviewed_by);
 };
 
 const buildPayloadFromFacts = (
@@ -378,6 +539,247 @@ class KpiService {
       };
     });
     return map;
+  }
+
+  async getApprovalAgingDashboard(params: {
+    start: Date;
+    end: Date;
+    lane: ApprovalAgingLane;
+    slaHours: number;
+  }): Promise<ApprovalAgingPayload> {
+    const [quotesResult, factsResult] = await Promise.all([
+      supabase
+        .from('quotes')
+        .select('*')
+        .order('created_at', { ascending: false }),
+      supabase
+        .from('quote_kpi_facts')
+        .select('quote_id,status,workflow_state,submitted_at,submitted_by_email,submitted_by_name,admin_reviewer_id,finance_reviewer_id,requires_finance,admin_claimed_at,admin_decision_at,finance_required_at,finance_claimed_at,finance_decision_at,final_decision_at,total_cycle_seconds'),
+    ]);
+
+    if (quotesResult.error) {
+      throw quotesResult.error;
+    }
+
+    const factsByQuoteId = new Map<string, WorkflowQuoteRow>();
+    if (!factsResult.error && Array.isArray(factsResult.data)) {
+      (factsResult.data as WorkflowQuoteRow[]).forEach((row) => {
+        const quoteId = normalizeText(row.quote_id);
+        if (quoteId) {
+          factsByQuoteId.set(quoteId, row);
+        }
+      });
+    }
+
+    const mergedRows = ((quotesResult.data || []) as WorkflowQuoteRow[]).map((quote) => {
+      const facts = factsByQuoteId.get(String(quote.id)) || {};
+      return {
+        ...quote,
+        ...facts,
+        id: quote.id,
+        customer_name: quote.customer_name,
+        discounted_margin: quote.discounted_margin,
+        finance_threshold_snapshot: quote.finance_threshold_snapshot,
+        requires_finance_approval: quote.requires_finance_approval ?? facts.requires_finance ?? false,
+        submitted_by_name: quote.submitted_by_name ?? facts.submitted_by_name,
+        submitted_by_email: quote.submitted_by_email ?? facts.submitted_by_email,
+      };
+    });
+
+    const reviewerIds = Array.from(
+      new Set(
+        mergedRows.flatMap((row) => [
+          normalizeText(row.admin_reviewer_id),
+          normalizeText(row.finance_reviewer_id),
+          normalizeText(row.reviewed_by),
+        ].filter(Boolean) as string[])
+      )
+    );
+
+    const reviewerMap = reviewerIds.length > 0
+      ? await this.resolveUsers(reviewerIds)
+      : {};
+
+    const now = Date.now();
+    const slaSeconds = params.slaHours * 3600;
+
+    const openCases = mergedRows
+      .map((row) => {
+        const lane = deriveOpenLane(row);
+        if (!lane) return null;
+        if (params.lane !== 'all' && params.lane !== lane) return null;
+
+        const startedAt = normalizeText(row.submitted_at) ?? normalizeText(row.created_at);
+        const startedAtMs = parseDateValue(startedAt);
+        if (!startedAt || startedAtMs === null) return null;
+
+        const queueOwnerId = getQueueOwnerId(row, lane);
+        const queueOwnerLabel = queueOwnerId
+          ? (reviewerMap[queueOwnerId]?.name || reviewerMap[queueOwnerId]?.email || queueOwnerId)
+          : (lane === 'finance' ? 'Unclaimed Finance Queue' : 'Unclaimed Admin Queue');
+
+        return {
+          quoteId: String(row.id),
+          customerName: normalizeText(row.customer_name) || 'Pending Customer',
+          salesOwnerLabel: normalizeText(row.submitted_by_name) || normalizeText(row.submitted_by_email) || 'Unknown requester',
+          lane,
+          queueOwnerKey: queueOwnerId ?? `unclaimed_${lane}`,
+          queueOwnerLabel,
+          queueOwnerId,
+          ageSeconds: Math.max(0, (now - startedAtMs) / 1000),
+          startedAt,
+          isClaimed: Boolean(queueOwnerId),
+          status: String(row.status ?? lane),
+          discountedMargin: toNumberOrNull(row.discounted_margin),
+          financeLimitPercent: extractFinanceLimitPercent(row),
+          requiresFinanceApproval: Boolean(row.requires_finance_approval) || lane === 'finance',
+        } satisfies ApprovalAgingOpenCase;
+      })
+      .filter((value): value is ApprovalAgingOpenCase => Boolean(value))
+      .sort((a, b) => b.ageSeconds - a.ageSeconds);
+
+    type MutableBoardRow = ApprovalAgingOwnerBoardRow & {
+      closeAgeSamples: number[];
+    };
+
+    const boardMap = new Map<string, MutableBoardRow>();
+    const ensureBoardRow = (
+      ownerKey: string,
+      ownerLabel: string,
+      ownerType: ApprovalAgingOwnerBoardRow['ownerType'],
+      role: string | null,
+    ) => {
+      if (!boardMap.has(ownerKey)) {
+        boardMap.set(ownerKey, {
+          ownerKey,
+          ownerLabel,
+          ownerType,
+          role,
+          openOwned: 0,
+          taken: 0,
+          closed: 0,
+          approved: 0,
+          rejected: 0,
+          releasedToFinance: 0,
+          medianCloseAgeSeconds: null,
+          overSlaOpen: 0,
+          closeAgeSamples: [],
+        });
+      }
+
+      return boardMap.get(ownerKey)!;
+    };
+
+    openCases.forEach((openCase) => {
+      const row = ensureBoardRow(
+        openCase.queueOwnerKey,
+        openCase.queueOwnerLabel,
+        openCase.queueOwnerId
+          ? 'reviewer'
+          : (openCase.lane === 'finance' ? 'unclaimed_finance' : 'unclaimed_admin'),
+        openCase.queueOwnerId ? (reviewerMap[openCase.queueOwnerId]?.role || null) : null,
+      );
+
+      row.openOwned += 1;
+      if (openCase.ageSeconds > slaSeconds) {
+        row.overSlaOpen += 1;
+      }
+    });
+
+    mergedRows.forEach((row) => {
+      const startedAt = normalizeText(row.submitted_at) ?? normalizeText(row.created_at);
+      const adminOwnerId = getQueueOwnerId(row, 'admin');
+      const financeOwnerId = getQueueOwnerId(row, 'finance');
+      const adminOwnerLabel = adminOwnerId
+        ? (reviewerMap[adminOwnerId]?.name || reviewerMap[adminOwnerId]?.email || adminOwnerId)
+        : 'Unclaimed Admin Queue';
+      const financeOwnerLabel = financeOwnerId
+        ? (reviewerMap[financeOwnerId]?.name || reviewerMap[financeOwnerId]?.email || financeOwnerId)
+        : 'Unclaimed Finance Queue';
+      const finalStatus = String(row.status ?? '').toLowerCase();
+      const financePath = hasFinancePath(row);
+      const totalCloseAgeSeconds = sec(startedAt, normalizeText(row.finance_decision_at) ?? normalizeText(row.admin_decision_at) ?? normalizeText(row.reviewed_at));
+
+      if (params.lane !== 'finance' && adminOwnerId && isWithinRange(row.admin_claimed_at, params.start, params.end)) {
+        ensureBoardRow(adminOwnerId, adminOwnerLabel, 'reviewer', reviewerMap[adminOwnerId]?.role || null).taken += 1;
+      }
+
+      if (params.lane !== 'admin' && financeOwnerId && isWithinRange(row.finance_claimed_at, params.start, params.end)) {
+        ensureBoardRow(financeOwnerId, financeOwnerLabel, 'reviewer', reviewerMap[financeOwnerId]?.role || null).taken += 1;
+      }
+
+      if (
+        params.lane !== 'finance'
+        && adminOwnerId
+        && String(row.admin_decision_status ?? '') === 'requires_finance'
+        && isWithinRange(row.admin_decision_at, params.start, params.end)
+      ) {
+        ensureBoardRow(adminOwnerId, adminOwnerLabel, 'reviewer', reviewerMap[adminOwnerId]?.role || null).releasedToFinance += 1;
+      }
+
+      const adminClosedDirectly = !financePath
+        && FINAL_STATUSES.has(finalStatus)
+        && isWithinRange(normalizeText(row.admin_decision_at) ?? normalizeText(row.reviewed_at), params.start, params.end);
+
+      if (params.lane !== 'finance' && adminOwnerId && adminClosedDirectly) {
+        const boardRow = ensureBoardRow(adminOwnerId, adminOwnerLabel, 'reviewer', reviewerMap[adminOwnerId]?.role || null);
+        boardRow.closed += 1;
+        if (finalStatus === 'approved') boardRow.approved += 1;
+        if (finalStatus === 'rejected') boardRow.rejected += 1;
+        if (typeof totalCloseAgeSeconds === 'number' && Number.isFinite(totalCloseAgeSeconds)) {
+          boardRow.closeAgeSamples.push(totalCloseAgeSeconds);
+        }
+      }
+
+      const financeClosed = financePath
+        && FINAL_STATUSES.has(finalStatus)
+        && isWithinRange(row.finance_decision_at, params.start, params.end);
+
+      if (params.lane !== 'admin' && financeOwnerId && financeClosed) {
+        const boardRow = ensureBoardRow(financeOwnerId, financeOwnerLabel, 'reviewer', reviewerMap[financeOwnerId]?.role || null);
+        boardRow.closed += 1;
+        if (finalStatus === 'approved') boardRow.approved += 1;
+        if (finalStatus === 'rejected') boardRow.rejected += 1;
+        if (typeof totalCloseAgeSeconds === 'number' && Number.isFinite(totalCloseAgeSeconds)) {
+          boardRow.closeAgeSamples.push(totalCloseAgeSeconds);
+        }
+      }
+    });
+
+    const ownerBoard = Array.from(boardMap.values())
+      .map(({ closeAgeSamples, ...row }) => ({
+        ...row,
+        medianCloseAgeSeconds: median(closeAgeSamples),
+      }))
+      .filter((row) =>
+        row.openOwned > 0
+        || row.taken > 0
+        || row.closed > 0
+        || row.releasedToFinance > 0
+      )
+      .sort((a, b) => {
+        const openDiff = b.openOwned - a.openOwned;
+        if (openDiff !== 0) return openDiff;
+
+        const overSlaDiff = b.overSlaOpen - a.overSlaOpen;
+        if (overSlaDiff !== 0) return overSlaDiff;
+
+        return b.closed - a.closed;
+      });
+
+    return {
+      summary: {
+        openCases: openCases.length,
+        overSla: openCases.filter((row) => row.ageSeconds > slaSeconds).length,
+        unclaimedAdmin: openCases.filter((row) => row.lane === 'admin' && !row.isClaimed).length,
+        unclaimedFinance: openCases.filter((row) => row.lane === 'finance' && !row.isClaimed).length,
+        medianOpenAgeSeconds: median(openCases.map((row) => row.ageSeconds)),
+        oldestOpenAgeSeconds: openCases.length ? openCases[0].ageSeconds : null,
+      },
+      openCases,
+      ownerBoard,
+      generatedAt: new Date().toISOString(),
+    };
   }
 }
 

@@ -155,6 +155,9 @@ const isQuoteInQueue = (quote: Quote): boolean => {
   return WORKFLOW_QUEUE_STATES.has(state);
 };
 
+const canActInAdminLane = (role?: string | null) =>
+  role === 'ADMIN' || role === 'MASTER' || role === 'LEVEL_3';
+
 
 const getStatusBadge = (quote: Quote) => {
   const state = getDerivedWorkflowState(quote);
@@ -515,7 +518,7 @@ const EnhancedQuoteApprovalDashboard = ({ user }: EnhancedQuoteApprovalDashboard
       const isAdminLane = lane === 'admin';
       const isFinanceLane = lane === 'finance';
       const hasPermission = isAdminLane
-        ? userRole === 'ADMIN' || userRole === 'MASTER'
+        ? canActInAdminLane(userRole)
         : userRole === 'FINANCE' || userRole === 'MASTER';
 
       if (!hasPermission) {
