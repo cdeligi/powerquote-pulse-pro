@@ -15,6 +15,10 @@ import { useConfiguredQuoteFields } from "@/hooks/useConfiguredQuoteFields";
 import { FEATURES, usePermissions } from "@/hooks/usePermissions";
 import { extractCommissionFromQuoteFields, calculatePartnerCommission } from "@/utils/marginCalculations";
 import { deriveWorkflowState, getWorkflowLaneForState, isPendingWorkflowState } from "@/lib/workflow/utils";
+
+const canActInAdminLane = (role?: string | null) =>
+  role === 'ADMIN' || role === 'MASTER' || role === 'LEVEL_3';
+
 interface QuoteDetailsProps {
   quote: Quote;
   onApprove: (payload: {
@@ -79,7 +83,7 @@ const QuoteDetails = ({
   const currentLane = getWorkflowLaneForState(workflowState);
   const isWorkflowPending = isPendingWorkflowState(workflowState);
   const userRole = user?.role ?? 'SALES';
-  const canAdminAct = currentLane === 'admin' && (userRole === 'ADMIN' || userRole === 'MASTER');
+  const canAdminAct = currentLane === 'admin' && canActInAdminLane(userRole);
   const canFinanceAct = currentLane === 'finance' && (userRole === 'FINANCE' || userRole === 'MASTER');
   const canCurrentUserAct = canAdminAct || canFinanceAct;
   const reviewedBy = (quote as any).reviewed_by as string | undefined;

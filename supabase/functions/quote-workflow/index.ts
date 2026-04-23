@@ -84,6 +84,29 @@ class HttpError extends Error {
   }
 }
 
+const OPTIONAL_WORKFLOW_COLUMNS = [
+  "workflow_state",
+  "admin_reviewer_id",
+  "finance_reviewer_id",
+  "admin_claimed_at",
+  "finance_claimed_at",
+  "reviewed_at",
+  "reviewed_by",
+  "admin_decision_at",
+  "admin_decision_by",
+  "admin_decision_status",
+  "admin_decision_notes",
+  "finance_required_at",
+  "finance_notes",
+  "finance_decision_by",
+  "finance_decision_at",
+  "finance_decision_status",
+  "finance_decision_notes",
+  "finance_threshold_snapshot",
+  "finance_margin_breached",
+  "requires_finance_approval",
+] as const;
+
 const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
 const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 
@@ -149,6 +172,102 @@ serve(async (req) => {
 });
 
 type SupabaseServerClient = SupabaseClient<Database>;
+
+const isRowNotFoundError = (error: { code?: string; message?: string } | null | undefined) => {
+  if (!error) {
+    return false;
+  }
+
+  return error.code === "PGRST116";
+};
+
+const isMissingColumnError = (error: { code?: string; message?: string } | null | undefined) => {
+  if (!error) {
+    return false;
+  }
+
+  if (error.code === "42703" || error.code === "PGRST204") {
+    return true;
+  }
+
+  const message = String(error.message ?? "").toLowerCase();
+  return message.includes("column") && message.includes("does not exist");
+};
+
+const extractMissingColumnName = (error: { message?: string } | null | undefined) => {
+  const message = String(error?.message ?? "");
+  const quoted = message.match(/column\s+"?([a-zA-Z0-9_]+)"?\s+does not exist/i);
+  if (quoted?.[1]) {
+    return quoted[1];
+  }
+
+  const named = message.match(/["']([a-zA-Z0-9_]+)["']/);
+  return named?.[1] ?? null;
+};
+
+async function fetchQuoteById(
+  supabase: SupabaseServerClient,
+  quoteId: string,
+) {
+  const safeQuoteId = quoteId.trim();
+  const result = await supabase
+    .from("quotes")
+    .select("*")
+    .eq("id", safeQuoteId)
+    .single();
+
+  if (result.data) {
+    return result.data;
+  }
+
+  if (isRowNotFoundError(result.error)) {
+    throw new HttpError(404, "Quote not found");
+  }
+
+  throw new HttpError(500, result.error?.message ?? "Unable to load quote");
+}
+
+async function updateQuoteWithLegacyFallback(
+  supabase: SupabaseServerClient,
+  quoteId: string,
+  payload: Record<string, any>,
+) {
+  const safeQuoteId = quoteId.trim();
+  const updatePayload = { ...payload };
+
+  while (true) {
+    const result = await supabase
+      .from("quotes")
+      .update(updatePayload)
+      .eq("id", safeQuoteId)
+      .select("*")
+      .single();
+
+    if (!result.error && result.data) {
+      return result.data;
+    }
+
+    if (!isMissingColumnError(result.error)) {
+      throw new HttpError(400, result.error?.message ?? "Unable to claim quote");
+    }
+
+    const dynamicMissingColumn = extractMissingColumnName(result.error);
+    const missingColumn = (dynamicMissingColumn && dynamicMissingColumn in updatePayload)
+      ? dynamicMissingColumn
+      : OPTIONAL_WORKFLOW_COLUMNS.find((column) => {
+      if (!(column in updatePayload)) {
+        return false;
+      }
+      return String(result.error?.message ?? "").includes(column);
+    });
+
+    if (!missingColumn) {
+      throw new HttpError(400, result.error?.message ?? "Unable to claim quote");
+    }
+
+    delete updatePayload[missingColumn];
+  }
+}
 
 async function getRequestContext(req: Request, supabase: SupabaseServerClient): Promise<RequestContext> {
   const authHeader = req.headers.get("Authorization");
@@ -256,6 +375,10 @@ async function handleClaim(
   if (!quoteId || !lane) {
     throw new HttpError(400, "quoteId and lane are required");
   }
+  const safeQuoteId = String(quoteId).trim();
+  if (!safeQuoteId) {
+    throw new HttpError(400, "quoteId is required");
+  }
 
   if (lane === "admin") {
     assertRole(context, ["ADMIN", "MASTER"]);
@@ -265,17 +388,14 @@ async function handleClaim(
     throw new HttpError(400, "Lane must be admin or finance");
   }
 
-  const { data: before, error: beforeError } = await supabase
-    .from("quotes")
-    .select("id, status, workflow_state, requires_finance_approval, admin_claimed_at, finance_claimed_at")
-    .eq("id", quoteId)
-    .single();
+  const before = await fetchQuoteById(supabase, safeQuoteId);
 
-  if (beforeError || !before) {
-    throw new HttpError(404, "Quote not found");
-  }
+  const statusBefore = String((before as any).status ?? "");
+  const requiresFinanceClaim = Boolean((before as any).requires_finance_approval)
+    || statusBefore === "under-review"
+    || String((before as any).workflow_state ?? "") === "finance_review";
 
-  if (lane === 'finance' && !(before as any).requires_finance_approval) {
+  if (lane === "finance" && !requiresFinanceClaim) {
     throw new HttpError(400, "Quote is not waiting for finance claim");
   }
 
@@ -287,7 +407,7 @@ async function handleClaim(
   const rpcResult = await supabase.rpc("claim_quote_for_review", {
     p_actor_id: context.userId,
     p_lane: lane,
-    p_quote_id: quoteId,
+    p_quote_id: safeQuoteId,
   });
 
   if (!rpcResult.error) {
@@ -309,22 +429,12 @@ async function handleClaim(
       claimPayload.finance_claimed_at = (before as any).finance_claimed_at ?? now;
     }
 
-    const updated = await supabase
-      .from("quotes")
-      .update(claimPayload)
-      .eq("id", quoteId)
-      .select("*")
-      .single();
-
-    if (updated.error || !updated.data) {
-      throw new HttpError(400, rpcResult.error?.message ?? "Unable to claim quote");
-    }
-    data = updated.data;
+    data = await updateQuoteWithLegacyFallback(supabase, safeQuoteId, claimPayload);
   }
 
   await logEvent(
     supabase,
-    quoteId,
+    safeQuoteId,
     lane === "admin" ? "quote_claimed_admin" : "quote_claimed_finance",
     context,
     (before as any).workflow_state ?? (before as any).status ?? null,
@@ -345,16 +455,11 @@ async function handleAdminDecision(
   if (!quoteId || !decision) {
     throw new HttpError(400, "quoteId and decision are required");
   }
-
-  const { data: quote, error } = await supabase
-    .from("quotes")
-    .select("*")
-    .eq("id", quoteId)
-    .single();
-
-  if (error || !quote) {
-    throw new HttpError(404, "Quote not found");
+  const safeQuoteId = String(quoteId).trim();
+  if (!safeQuoteId) {
+    throw new HttpError(400, "quoteId is required");
   }
+  const quote = await fetchQuoteById(supabase, safeQuoteId);
 
   const currentStatus = String((quote as any).status || 'draft');
   const isFinancePending = Boolean((quote as any).requires_finance_approval);
@@ -421,18 +526,9 @@ async function handleAdminDecision(
     nextState = "needs_revision";
   }
 
-  const { data: updatedQuote, error: updateError } = await supabase
-    .from("quotes")
-    .update(updates)
-    .eq("id", quoteId)
-    .select("*")
-    .single();
+  const updatedQuote = await updateQuoteWithLegacyFallback(supabase, safeQuoteId, updates);
 
-  if (updateError || !updatedQuote) {
-    throw new HttpError(500, "Unable to record admin decision");
-  }
-
-  await logEvent(supabase, quoteId, "quote_admin_decision", context, quote.workflow_state, nextState, {
+  await logEvent(supabase, safeQuoteId, "quote_admin_decision", context, quote.workflow_state, nextState, {
     decision,
     notes,
     marginPercent,
@@ -441,7 +537,7 @@ async function handleAdminDecision(
 
   if (decision === "requires_finance") {
     await notifyFinanceReviewRequired(supabase, {
-      quoteId,
+      quoteId: safeQuoteId,
       customerName: updatedQuote.customer_name ?? "Unknown Customer",
       requesterName: context.fullName,
       appUrl: Deno.env.get("APP_DOMAIN") ? `https://${Deno.env.get("APP_DOMAIN")}` : null,
@@ -461,18 +557,16 @@ async function handleFinanceDecision(
   if (!quoteId || !decision) {
     throw new HttpError(400, "quoteId and decision are required");
   }
-
-  const { data: quote, error } = await supabase
-    .from("quotes")
-    .select("*")
-    .eq("id", quoteId)
-    .single();
-
-  if (error || !quote) {
-    throw new HttpError(404, "Quote not found");
+  const safeQuoteId = String(quoteId).trim();
+  if (!safeQuoteId) {
+    throw new HttpError(400, "quoteId is required");
   }
+  const quote = await fetchQuoteById(supabase, safeQuoteId);
 
-  if (!(quote as any).requires_finance_approval) {
+  const financePending = Boolean((quote as any).requires_finance_approval)
+    || String((quote as any).status ?? "") === "under-review"
+    || String((quote as any).workflow_state ?? "") === "finance_review";
+  if (!financePending) {
     throw new HttpError(400, "Quote is not waiting for finance");
   }
 
@@ -498,18 +592,9 @@ async function handleFinanceDecision(
     status: decision === "approved" ? "approved" : "rejected",
   };
 
-  const { data: updatedQuote, error: updateError } = await supabase
-    .from("quotes")
-    .update(updates)
-    .eq("id", quoteId)
-    .select("*")
-    .single();
+  const updatedQuote = await updateQuoteWithLegacyFallback(supabase, safeQuoteId, updates);
 
-  if (updateError || !updatedQuote) {
-    throw new HttpError(500, "Unable to record finance decision");
-  }
-
-  await logEvent(supabase, quoteId, "quote_finance_decision", context, (quote as any).status ?? null, updates.status ?? null, {
+  await logEvent(supabase, safeQuoteId, "quote_finance_decision", context, (quote as any).status ?? null, updates.status ?? null, {
     decision,
     notes,
     marginPercent: margin,
